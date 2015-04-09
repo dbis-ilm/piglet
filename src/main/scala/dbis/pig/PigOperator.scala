@@ -14,14 +14,15 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
   def this(out: String, in: String) = this(out, List(in))
 
   def constructSchema: Option[Schema] = {
-    schema = inputs(0).producer.schema
+    // schema = inputs(0).producer.schema
     schema
   }
 }
 
 case class Load(override val outPipeName: String, file: String) extends PigOperator(outPipeName) {
   override def constructSchema: Option[Schema] = {
-    schema = inputs(0).producer.schema // TODO
+    // schema = inputs(0).producer.schema // TODO
+    schema
   }
 }
 
@@ -30,7 +31,8 @@ case class Dump(inPipeName: String) extends PigOperator("", inPipeName)
 case class Foreach(override val outPipeName: String, inPipeName: String, expr: List[String])
   extends PigOperator(outPipeName, inPipeName) {
   override def constructSchema: Option[Schema] = {
-    schema = inputs(0).producer.schema // TODO
+    // schema = inputs(0).producer.schema // TODO
+    schema
   }
 }
 

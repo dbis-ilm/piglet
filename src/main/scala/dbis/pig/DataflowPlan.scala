@@ -26,7 +26,7 @@ class DataflowPlan(val operators: List[PigOperator]) {
       if (op.outPipeName != "") {
         if (pipes.contains(op.outPipeName))
           throw new InvalidPlanException("duplicate pipe: " + op.outPipeName)
-        pipes(op.outPipeName) = Pipe(op.outPipeName, op, None)
+        pipes(op.outPipeName) = Pipe(op.outPipeName, op)
       }
     })
     /*
