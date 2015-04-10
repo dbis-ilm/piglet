@@ -20,8 +20,16 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("dump b;") == List(Dump("b")))
   }
 
-  it should "parse a simple filter with a eq expression" in {
-    assert(parseScript("a = filter b by x=y;") == List(Filter("a", "b", Eq("x", "y"))))
+  it should "parse a simple filter with a eq expression on named fields" in {
+    assert(parseScript("a = filter b by x=y;") == List(Filter("a", "b", Eq(NamedField("x"), NamedField("y")))))
+  }
+
+  it should "parse a simple filter with a greater or equal expression on positional fields" in {
+    assert(parseScript("a = filter b by $1 >= $2;") == List(Filter("a", "b", Geq(PositionalField(1), PositionalField(2)))))
+  }
+
+  it should "parse a simple filter with a less than expression on fields and literals" in {
+    assert(parseScript("a = filter b by $1 < 42;") == List(Filter("a", "b", Lt(PositionalField(1), Value("42")))))
   }
 
   it should "parse a simple foreach statement" in {

@@ -13,7 +13,7 @@ class DataflowPlanSpec extends FlatSpec {
     val op2 = Foreach("b", "a", List("x", "y"))
     val op3 = Dump("b")
     val plan = new DataflowPlan(List(op1, op2, op3))
-    assert(plan.pipes == Map("a" -> Pipe("a", op1, None), "b" -> Pipe("b", op2, None)))
+    assert(plan.pipes == Map("a" -> Pipe("a", op1), "b" -> Pipe("b", op2)))
   }
 
   it should "not contain duplicate pipes" in {

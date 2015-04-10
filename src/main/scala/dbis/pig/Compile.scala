@@ -7,8 +7,8 @@ trait GenCodeBase {
   def emitNode(node: PigOperator): String
   def emitHeader(scriptName: String): String
   def emitFooter: String
-  def emitPredicate(predicate: Predicate): String
-  def emitRef(ref: Ref): String
+  def emitPredicate(schema: Option[Schema], predicate: Predicate): String
+  def emitRef(schema: Option[Schema], ref: Ref): String
 }
 
 trait Compile {
@@ -25,26 +25,30 @@ trait Compile {
 }
 
 class SparkGenCode extends GenCodeBase {
-  def emitRef(ref: Ref): String = ref match {
-    case Field(f) => { s"t._$f" } // TODO: should be position of field
+  def emitRef(schema: Option[Schema], ref: Ref): String = ref match {
+    case NamedField(f) => {
+      if (schema.isEmpty) throw new SchemaException(s"unknown schema for field $f")
+      s"t._${schema.get.indexOfField(f)}"
+    } // TODO: should be position of field
+    case PositionalField(pos) => { s"t._$pos" }
     case Value(v) => { v.toString } // TODO: could be also a predicate!
     case _ => { "" }
   }
 
-  def emitPredicate(predicate: Predicate): String = predicate match {
-    case Eq(left, right) => { s"${emitRef(left)} == ${emitRef(right)}"}
-    case Neq(left, right) => { s"${emitRef(left)} != ${emitRef(right)}"}
-    case Leq(left, right) => { s"${emitRef(left)} <= ${emitRef(right)}"}
-    case Lt(left, right) => { s"${emitRef(left)} < ${emitRef(right)}"}
-    case Geq(left, right) => { s"${emitRef(left)} >= ${emitRef(right)}"}
-    case Gt(left, right) => { s"${emitRef(left)} > ${emitRef(right)}"}
+  def emitPredicate(schema: Option[Schema], predicate: Predicate): String = predicate match {
+    case Eq(left, right) => { s"${emitRef(schema, left)} == ${emitRef(schema, right)}"}
+    case Neq(left, right) => { s"${emitRef(schema, left)} != ${emitRef(schema, right)}"}
+    case Leq(left, right) => { s"${emitRef(schema, left)} <= ${emitRef(schema, right)}"}
+    case Lt(left, right) => { s"${emitRef(schema, left)} < ${emitRef(schema, right)}"}
+    case Geq(left, right) => { s"${emitRef(schema, left)} >= ${emitRef(schema, right)}"}
+    case Gt(left, right) => { s"${emitRef(schema, left)} > ${emitRef(schema, right)}"}
     case _ => { "" }
   }
 
   def emitNode(node: PigOperator): String = node match {
     case Load(out, file) => { s"""val $out = sc.textFile("$file")""" }
     case Dump(in) => { s"${node.inPipeNames(0)}.map(t => println(t))" }
-    case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames(0)}.filter(t => {${emitPredicate(pred)}})" }
+    case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames(0)}.filter(t => {${emitPredicate(node.schema, pred)}})" }
     case _ => { "" }
   }
 

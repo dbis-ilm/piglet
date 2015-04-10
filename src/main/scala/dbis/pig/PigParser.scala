@@ -5,6 +5,7 @@ import scala.util.parsing.combinator.JavaTokenParsers
 /**
  * Created by kai on 31.03.15.
  */
+
 class PigParser extends JavaTokenParsers {
   override protected val whiteSpace = """(\s|--.*)+""".r
 
@@ -13,7 +14,21 @@ class PigParser extends JavaTokenParsers {
   def exprList: Parser[List[String]] = repsep(expr, ",")
   def bag: Parser[String] = ident
   def fileName: Parser[String] = stringLiteral ^^ {str => str.substring(1, str.length - 1)}
-  def predicate: Parser[Predicate] = ident ~ "=" ~ ident ^^ { case a ~ _ ~ b => Eq(Field(a), Field(b)) }
+
+  def posField: Parser[Ref] = """\$[0-9]*""".r ^^ { p => PositionalField(p.substring(1, p.length).toInt) }
+  def namedField: Parser[Ref] = ident ^^ { i => NamedField(i) }
+  def literalField: Parser[Ref] = (floatingPointNumber ^^ { n => Value(n) } | stringLiteral ^^ { s => Value(s) })
+  def ref: Parser[Ref] = ( posField | namedField | literalField )
+  def predicate: Parser[Predicate] = ref ~ ("!=" | "<=" | ">=" | "=" | "<" | ">") ~ ref ^^ {
+    case a ~ op ~ b => op match {
+      case "=" => Eq(a, b)
+      case "!=" => Neq(a, b)
+      case "<" => Lt(a, b)
+      case "<=" => Leq(a, b)
+      case ">" => Gt(a, b)
+      case ">=" => Geq(a, b)
+    }
+  }
 
   def loadStmt: Parser[PigOperator] = bag ~ "=" ~ "load" ~ fileName ^^ { case b ~ _ ~ _ ~ f => Load(b, f) }
   def dumpStmt: Parser[PigOperator] = "dump" ~ bag ^^ { case _ ~ b => Dump(b) }

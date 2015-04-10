@@ -14,7 +14,8 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
   def this(out: String, in: String) = this(out, List(in))
 
   def constructSchema: Option[Schema] = {
-    // schema = inputs(0).producer.schema
+    if (inputs.nonEmpty)
+      schema = inputs(0).producer.schema
     schema
   }
 }
@@ -22,7 +23,7 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
 case class Load(override val outPipeName: String, file: String) extends PigOperator(outPipeName) {
   override def constructSchema: Option[Schema] = {
     // schema = inputs(0).producer.schema // TODO
-    schema
+    None
   }
 }
 
@@ -43,8 +44,9 @@ case class Filter(override val outPipeName: String, inPipeName: String, pred: Pr
 
 sealed abstract class Ref
 
-case class Field(name: String) extends Ref
-case class Value(x: Any) extends Ref
+case class NamedField(name: String) extends Ref
+case class PositionalField(pos: Int) extends Ref
+case class Value(v: Any) extends Ref
 
 sealed abstract class Predicate
 
