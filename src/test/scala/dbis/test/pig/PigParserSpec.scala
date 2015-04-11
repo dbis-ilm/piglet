@@ -50,4 +50,27 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("-- A comment\na = load \"file.csv\";-- Another comment\ndump b;") ==
       List(Load("a", "file.csv"), Dump("b")))
   }
+
+  it should "parse a describe statement" in {
+    assert(parseScript("describe x;") == List(Describe("x")))
+  }
+
+  it should "parse a group by all statement" in {
+    assert(parseScript("a = group b all;") == List(Grouping("a", "b", GroupingExpression(List()))))
+  }
+
+  it should "parse a group by statement with a single key" in {
+    assert(parseScript("a = group b by $1;") == List(Grouping("a", "b", GroupingExpression(List(PositionalField(1))))))
+  }
+
+  it should "parse a group by statement with multiple keys" in {
+    assert(parseScript("a = group b by ($0, $1);") ==
+      List(Grouping("a", "b", GroupingExpression(List(PositionalField(0), PositionalField(1))))))
+  }
+
+  it should "parse a group by statement with multiple named keys" in {
+    assert(parseScript("a = group b by (k1, k2, k3);") ==
+      List(Grouping("a", "b", GroupingExpression(List(NamedField("k1"),
+      NamedField("k2"), NamedField("k3"))))))
+  }
 }

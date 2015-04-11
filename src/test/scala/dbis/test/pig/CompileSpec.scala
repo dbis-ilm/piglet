@@ -32,13 +32,43 @@ class CompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for LOAD" in {
-    val op1 = Load("a", "file.csv")
-    val op2 = Dump("a")
-    val plan = new DataflowPlan(List(op1, op2))
-    val compiler = new SparkCompile
-    val result = compiler.compile("test", plan)
-    // println(result)
+  it should "contain produce for LOAD" in {
+    val op = Load("a", "file.csv")
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""val a = sc.textFile("file.csv")""")
+    assert(generatedCode == expectedCode)
   }
 
+  it should "contain produce for FILTER" in {
+    val op = Filter("a", "b", Lt(PositionalField(1), Value("42")))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.filter(t => {t(1) < 42})")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain produce for DUMP" in {
+    val op = Dump("a")
+    val codeGenerator = new SparkGenCode
+    val generatedCode = codeGenerator.emitNode(op)
+    val expectedCode = cleanString("a.collect.map(t => println(t))")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain produce for GROUP BY ALL" in {
+    val op = Grouping("a", "b", GroupingExpression(List()))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = codeGenerator.emitNode(op)
+    val expectedCode = cleanString("val a = b.glom")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain produce for GROUP BY $0" in {
+    val op = Grouping("a", "b", GroupingExpression(List(PositionalField(0))))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = codeGenerator.emitNode(op)
+    val expectedCode = cleanString("val a = b.groupBy(t => {t(0)})")
+    assert(generatedCode == expectedCode)
+  }
 }

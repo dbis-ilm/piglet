@@ -12,6 +12,7 @@ class PigParser extends JavaTokenParsers {
   def num: Parser[Int] = wholeNumber ^^ (_.toInt)
   def expr: Parser[String] = ident
   def exprList: Parser[List[String]] = repsep(expr, ",")
+
   def bag: Parser[String] = ident
   def fileName: Parser[String] = stringLiteral ^^ {str => str.substring(1, str.length - 1)}
 
@@ -38,7 +39,14 @@ class PigParser extends JavaTokenParsers {
   def filterStmt: Parser[PigOperator] = bag ~ "=" ~ "filter" ~ bag ~ "by" ~ predicate ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pred => Filter(out, in, pred)
   }
+  def describeStmt: Parser[PigOperator] = "describe" ~ bag ^^ { case _ ~ b => Describe(b) }
+  def refList: Parser[List[Ref]] = (ref ^^ { r => List(r) } | "(" ~ repsep(ref, ",") ~ ")" ^^ { case _ ~ rlist ~ _ => rlist})
+  def groupingClause: Parser[GroupingExpression] = "all" ^^ { s => GroupingExpression(List())} |
+    ("by" ~ refList ^^ { case _ ~ rlist => GroupingExpression(rlist)})
+  def groupingStmt: Parser[PigOperator] = bag ~ "=" ~ "group" ~ bag ~ groupingClause ^^ {
+    case out ~ _ ~ _ ~ in ~ grouping => Grouping(out, in, grouping) }
 
-  def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | foreachStmt | filterStmt) ~ ";" ^^ { case op ~ _  => op }
+  def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt ) ~ ";" ^^ {
+    case op ~ _  => op }
   def script: Parser[List[PigOperator]] = rep(stmt)
 }
