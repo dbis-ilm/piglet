@@ -46,6 +46,7 @@ class SparkGenCode extends GenCodeBase {
       if (groupExpr.keyList.isEmpty) s"val $out = ${node.inPipeNames(0)}.glom"
       else s"val $out = ${node.inPipeNames(0)}.groupBy(t => {${emitGrouping(node.schema, groupExpr)}})" }
     case Distinct(out, in) => { s"val $out = ${node.inPipeNames(0)}.distinct" }
+    case Limit(out, in, num) => { s"val $out = sc.parallelize(${node.inPipeNames(0)}.take($num))" }
     case Join(out, rels, exprs) => {
       val res = rels.zip(exprs)
       val s1 = res.map{case (rel, expr) => s"val ${rel}_kv = ${rel}.keyBy(t => {${emitJoinKey(node.schema, expr)}})\n"}.mkString

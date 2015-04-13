@@ -49,6 +49,7 @@ class PigParser extends JavaTokenParsers {
   lazy val joinKeyword = "join".ignoreCase
   lazy val distinctKeyword = "distinct".ignoreCase
   lazy val describeKeyword = "describe".ignoreCase
+  lazy val limitKeyword = "limit".ignoreCase
 
   def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ^^ { case b ~ _ ~ _ ~ f => Load(b, f) }
 
@@ -73,6 +74,8 @@ class PigParser extends JavaTokenParsers {
 
   def distinctStmt: Parser[PigOperator] = bag ~ "=" ~ distinctKeyword ~ bag ^^ { case out ~ _ ~ _ ~ in => Distinct(out, in) }
 
+  def limitStmt: Parser[PigOperator] = bag ~ "=" ~ limitKeyword ~ bag ~ num ^^ { case out ~ _ ~ _ ~ in ~ num => Limit(out, in, num) }
+
   def joinExpr: Parser[(String, List[Ref])] = bag ~ byKeyword ~ refList ^^ { case b ~ _ ~ rlist => (b, rlist) }
   def joinExprList: Parser[List[(String, List[Ref])]] = repsep(joinExpr, ",") ^^ { case jlist => jlist }
   def extractJoinRelation(jList: List[(String, List[Ref])]): List[String] = { jList.map{ case (alias, refs) => alias } }
@@ -81,7 +84,7 @@ class PigParser extends JavaTokenParsers {
     case out ~ _ ~ _ ~ jlist => Join(out, extractJoinRelation(jlist), extractJoinFields(jlist)) }
 
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt) ~ ";" ^^ {
+    distinctStmt | joinStmt | storeStmt | limitStmt) ~ ";" ^^ {
     case op ~ _  => op }
   def script: Parser[List[PigOperator]] = rep(stmt)
 }

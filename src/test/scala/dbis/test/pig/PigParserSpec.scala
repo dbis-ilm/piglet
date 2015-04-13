@@ -63,6 +63,10 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("describe x;") == List(Describe("x")))
   }
 
+  it should "parse a limit statement" in {
+    assert(parseScript("a = limit b 100;") == List(Limit("a", "b", 100)))
+  }
+
   it should "parse a group by all statement" in {
     assert(parseScript("a = group b all;") == List(Grouping("a", "b", GroupingExpression(List()))))
   }

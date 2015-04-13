@@ -88,6 +88,14 @@ class CompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for Limit" in {
+    val op = Limit("a", "b", 10)
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = sc.parallelize(b.take(10))")
+    assert(generatedCode == expectedCode)
+  }
+
   it should "contain code for a binary join statement with simple expression" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0)), List(PositionalField(0)))
     )

@@ -119,6 +119,15 @@ case class Distinct(override val outPipeName: String, inPipeName: String)
   extends PigOperator(outPipeName, inPipeName)
 
 /**
+ * Limit represents the LIMIT operator of Pig.
+ *
+ * @param outPipeName the name of the output pipe (relation).
+ * @param inPipeName the name of the input pipe.
+ */
+case class Limit(override val outPipeName: String, inPipeName: String, num: Int)
+  extends PigOperator(outPipeName, inPipeName)
+
+/**
  * Join represents the multiway JOIN operator of Pig.
  *
  * @param outPipeName the name of the output pipe (relation).
