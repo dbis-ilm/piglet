@@ -56,6 +56,14 @@ class CompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for STORE" in {
+    val op = Store("a", "file.csv")
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""a.coalesce(1, true).saveAsTextFile("file.csv")""")
+    assert(generatedCode == expectedCode)
+  }
+
   it should "contain code for GROUP BY ALL" in {
     val op = Grouping("a", "b", GroupingExpression(List()))
     val codeGenerator = new SparkGenCode

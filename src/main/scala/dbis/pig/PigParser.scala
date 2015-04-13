@@ -35,6 +35,8 @@ class PigParser extends JavaTokenParsers {
 
   def dumpStmt: Parser[PigOperator] = "dump" ~ bag ^^ { case _ ~ b => Dump(b) }
 
+  def storeStmt: Parser[PigOperator] = "store" ~ bag ~ "into" ~ fileName ^^ { case _ ~ b ~  _ ~ f => Store(b, f) }
+
   def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ "foreach" ~ bag ~ "generate" ~ exprList ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ ex => Foreach(out, in, ex)
   }
@@ -60,7 +62,7 @@ class PigParser extends JavaTokenParsers {
     case out ~ _ ~ _ ~ jlist => Join(out, extractJoinRelation(jlist), extractJoinFields(jlist)) }
 
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt) ~ ";" ^^ {
+    distinctStmt | joinStmt | storeStmt) ~ ";" ^^ {
     case op ~ _  => op }
   def script: Parser[List[PigOperator]] = rep(stmt)
 }

@@ -39,6 +39,7 @@ class SparkGenCode extends GenCodeBase {
   def emitNode(node: PigOperator): String = node match {
     case Load(out, file) => { s"""val $out = sc.textFile("$file")""" }
     case Dump(in) => { s"${node.inPipeNames(0)}.collect.map(t => println(t))" }
+    case Store(in, file) => { s"""${node.inPipeNames(0)}.coalesce(1, true).saveAsTextFile("${file}")""" }
     case Describe(in) => { s"$in: { $node.schemaToString }" }
     case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames(0)}.filter(t => {${emitPredicate(node.schema, pred)}})" }
     case Grouping(out, in, groupExpr) => {

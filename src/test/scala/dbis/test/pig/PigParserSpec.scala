@@ -9,7 +9,7 @@ import org.scalatest.FlatSpec
 
 class PigParserSpec extends FlatSpec {
   "The parser" should "parse a simple load statement" in  {
-    assert(parseScript("a = load \"file.csv\";") == List(Load("a", "file.csv")))
+    assert(parseScript("""a = load "file.csv";""") == List(Load("a", "file.csv")))
   }
 
   it should "should ignore comments" in {
@@ -18,6 +18,10 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse the dump statement" in {
     assert(parseScript("dump b;") == List(Dump("b")))
+  }
+
+  it should "parse the store statement" in {
+    assert(parseScript("""store b into "file.csv";""") == List(Store("b", "file.csv")))
   }
 
   it should "parse a simple filter with a eq expression on named fields" in {

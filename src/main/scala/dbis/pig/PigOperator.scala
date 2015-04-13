@@ -53,6 +53,14 @@ case class Load(override val outPipeName: String, file: String) extends PigOpera
 case class Dump(inPipeName: String) extends PigOperator("", inPipeName)
 
 /**
+ * Store represents the STORE operator of Pig.
+ *
+ * @param inPipeName the name of the input pipe
+ * @param file the name of the output file
+ */
+case class Store(inPipeName: String, file: String) extends PigOperator("", inPipeName)
+
+/**
  * Describe represents the DESCRIBE operator of Pig.
  *
  * @param inPipeName the name of the input pipe
