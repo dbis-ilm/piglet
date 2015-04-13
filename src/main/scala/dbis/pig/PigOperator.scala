@@ -100,3 +100,22 @@ case class GroupingExpression(val keyList: List[Ref])
  */
 case class Grouping(override val outPipeName: String, inPipeName: String, groupExpr: GroupingExpression)
   extends PigOperator(outPipeName, inPipeName)
+
+/**
+ * Distinct represents the DISTINCT operator of Pig.
+ *
+ * @param outPipeName the name of the output pipe (relation).
+ * @param inPipeName the name of the input pipe.
+ */
+case class Distinct(override val outPipeName: String, inPipeName: String)
+  extends PigOperator(outPipeName, inPipeName)
+
+/**
+ * Join represents the multiway JOIN operator of Pig.
+ *
+ * @param outPipeName the name of the output pipe (relation).
+ * @param inPipeNames the list of names of input pipes.
+ * @param fieldExprs  list of key expressions (list of keys) used as join expressions.
+ */
+case class Join(override val outPipeName: String, override val inPipeNames: List[String], val fieldExprs: List[List[Ref]])
+  extends PigOperator(outPipeName, inPipeNames)

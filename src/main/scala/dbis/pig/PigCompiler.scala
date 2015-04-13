@@ -1,6 +1,7 @@
 package dbis.pig
 
 import java.io.{FileReader, FileWriter}
+
 import org.apache.spark.deploy.SparkSubmit
 
 import scala.io.Source
@@ -30,23 +31,48 @@ object PigCompiler extends PigParser {
     phrase(script)(input)
   }
 
+  case class CompilerConfig(master: String = "local", input: String = "")
+
   def main(args: Array[String]): Unit = {
-    // 1. we read the Pig file
-    val reader = new FileReader(args(0))
-    val source = Source.fromFile(args(0))
+    var master: String = "local"
+    var inputFile: String = null
+
+    val parser = new scopt.OptionParser[CompilerConfig]("PigCompiler") {
+      head("PigCompiler", "0.1")
+      opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text("spark://host:port, mesos://host:port, yarn, or local.")
+      help("help") text("prints this usage text")
+      version("version") text("prints this version info")
+      arg[String]("<file>") required() action { (x, c) => c.copy(input = x) } text("Pig file")
+    }
+    // parser.parse returns Option[C]
+    parser.parse(args, CompilerConfig()) match {
+      case Some(config) => {
+        // do stuff
+        master = config.master
+        inputFile = config.input
+      }
+      case None =>
+      // arguments are bad, error message will have been displayed
+        return
+    }
+
+      // 1. we read the Pig file
+    // val inputFile = args(0)
+    val reader = new FileReader(inputFile)
+    val source = Source.fromFile(inputFile)
 
     // 2. then we parse it and construct a dataflow plan
     val plan = new DataflowPlan(parseScriptFromSource(source))
 
     // 3. now, we should apply optimizations
-    val scriptName = args(0).replace(".pig", "")
+    val scriptName = inputFile.replace(".pig", "")
 
     // 4. compile it into Scala code for Spark
     val compile = new SparkCompile
     val code = compile.compile(scriptName, plan)
 
     // 5. write it to a file
-    val outputFile = args(0).replace(".pig", ".scala")
+    val outputFile = inputFile.replace(".pig", ".scala")
     val writer = new FileWriter(outputFile)
     writer.append(code)
     writer.close()
@@ -67,6 +93,6 @@ object PigCompiler extends PigParser {
     JarBuilder.apply(outputDirectory, jarFile, true)
 
     // 8. and finally call SparkSubmit
-    SparkSubmit.main(Array("--master", "local", "--class", scriptName, jarFile))
+    SparkSubmit.main(Array("--master", master, "--class", scriptName, jarFile))
   }
 }

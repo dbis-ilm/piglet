@@ -29,6 +29,13 @@ class SparkGenCode extends GenCodeBase {
     groupingExpr.keyList.map(e => emitRef(schema, e)).mkString(",")
   }
 
+  def emitJoinKey(schema: Option[Schema], joinExpr: List[Ref]): String = {
+    if (joinExpr.size == 1)
+      emitRef(schema, joinExpr(0))
+    else
+      s"Array(${joinExpr.map(e => emitRef(schema, e)).mkString(",")}).mkString"
+  }
+
   def emitNode(node: PigOperator): String = node match {
     case Load(out, file) => { s"""val $out = sc.textFile("$file")""" }
     case Dump(in) => { s"${node.inPipeNames(0)}.collect.map(t => println(t))" }
@@ -37,6 +44,12 @@ class SparkGenCode extends GenCodeBase {
     case Grouping(out, in, groupExpr) => {
       if (groupExpr.keyList.isEmpty) s"val $out = ${node.inPipeNames(0)}.glom"
       else s"val $out = ${node.inPipeNames(0)}.groupBy(t => {${emitGrouping(node.schema, groupExpr)}})" }
+    case Distinct(out, in) => { s"val $out = ${node.inPipeNames(0)}.distinct" }
+    case Join(out, rels, exprs) => {
+      val res = rels.zip(exprs)
+      val s1 = res.map{case (rel, expr) => s"val ${rel}_kv = ${rel}.keyBy(t => {${emitJoinKey(node.schema, expr)}})\n"}.mkString
+      s1 + s"val $out = ${rels.head}_kv" + rels.tail.map{other => s".join(${other}_kv)"}.mkString
+    }
     case _ => { "" }
   }
 

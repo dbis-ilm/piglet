@@ -12,7 +12,18 @@ import scala.tools.nsc.{Global, Settings}
 
 trait Probe
 
+/**
+ * ScalaCompiler is an object allowing to access the Scala compiler
+ * for compiling source files.
+ */
 object ScalaCompiler {
+  /**
+   * Compiles the given Scala source file into a class file stored
+   * in targetDir.
+   *
+   * @param targetDir the target directory for the compiled code
+   * @param sourceFile the Scala file to be compiled
+   */
   def compile (targetDir: String, sourceFile: String) : Unit = {
     val target = AbstractFile.getDirectory(targetDir)
     val settings = new Settings
@@ -32,5 +43,5 @@ object ScalaCompiler {
     val run = new Run
     val sourceFiles = List(new BatchSourceFile(file, fileContent))
     run.compileSources(sourceFiles)
-    }
+  }
 }

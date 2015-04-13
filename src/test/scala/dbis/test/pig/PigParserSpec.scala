@@ -21,7 +21,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a simple filter with a eq expression on named fields" in {
-    assert(parseScript("a = filter b by x=y;") == List(Filter("a", "b", Eq(NamedField("x"), NamedField("y")))))
+    assert(parseScript("a = filter b by x == y;") == List(Filter("a", "b", Eq(NamedField("x"), NamedField("y")))))
   }
 
   it should "parse a simple filter with a greater or equal expression on positional fields" in {
@@ -72,5 +72,24 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("a = group b by (k1, k2, k3);") ==
       List(Grouping("a", "b", GroupingExpression(List(NamedField("k1"),
       NamedField("k2"), NamedField("k3"))))))
+  }
+
+  it should "parse the distinct statement" in {
+    assert(parseScript("a = distinct b;") == List(Distinct("a", "b")))
+  }
+
+  it should "parse a binary join statement with simple expression" in {
+    assert(parseScript("a = join b by $0, c by $0;") == List(Join("a", List("b", "c"),
+      List(List(PositionalField(0)), List(PositionalField(0))))))
+  }
+
+  it should "parse a binary join statement with expression lists" in {
+    assert(parseScript("a = join b by ($0, $1), c by ($1, $2);") == List(Join("a", List("b", "c"),
+      List(List(PositionalField(0), PositionalField(1)), List(PositionalField(1), PositionalField(2))))))
+  }
+
+  it should "parse a multiway join statement " in {
+    assert(parseScript("a = join b by $0, c by $0, d by $0;") == List(Join("a", List("b", "c", "d"),
+      List(List(PositionalField(0)), List(PositionalField(0)), List(PositionalField(0))))))
   }
 }
