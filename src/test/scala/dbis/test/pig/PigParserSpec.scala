@@ -12,6 +12,10 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("""a = load "file.csv";""") == List(Load("a", "file.csv")))
   }
 
+  it should "parse also a case insensitive load statement" in  {
+    assert(parseScript("""a = LOAD "file.csv";""") == List(Load("a", "file.csv")))
+  }
+
   it should "should ignore comments" in {
     assert(parseScript("dump b; -- A comment") == List(Dump("b")))
   }
@@ -29,7 +33,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a simple filter with a greater or equal expression on positional fields" in {
-    assert(parseScript("a = filter b by $1 >= $2;") == List(Filter("a", "b", Geq(PositionalField(1), PositionalField(2)))))
+    assert(parseScript("a = FILTER b BY $1 >= $2;") == List(Filter("a", "b", Geq(PositionalField(1), PositionalField(2)))))
   }
 
   it should "parse a simple filter with a less than expression on fields and literals" in {
@@ -68,7 +72,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a group by statement with multiple keys" in {
-    assert(parseScript("a = group b by ($0, $1);") ==
+    assert(parseScript("a = GROUP b BY ($0, $1);") ==
       List(Grouping("a", "b", GroupingExpression(List(PositionalField(0), PositionalField(1))))))
   }
 
