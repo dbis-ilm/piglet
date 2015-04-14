@@ -55,4 +55,17 @@ class DataflowPlanSpec extends FlatSpec {
     val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
     assert(plan.sinkNodes == Set(op3, op5))
   }
+
+  it should "compute identical lineage signatures for two operators with the same plans" in {
+    val op1 = Load("a", "file.csv")
+    val op2 = Filter("b", "a", Lt(PositionalField(1), Value("42")))
+    val op3 = Grouping("c", "b", GroupingExpression(List(PositionalField(0))))
+    val plan1 = new DataflowPlan(List(op1, op2, op3))
+
+    val op4 = Load("a", "file.csv")
+    val op5 = Filter("b", "a", Lt(PositionalField(1), Value("42")))
+    val op6 = Grouping("c", "b", GroupingExpression(List(PositionalField(0))))
+    val plan2 = new DataflowPlan(List(op4, op5, op6))
+    assert(op3.lineageSignature == op6.lineageSignature)
+  }
 }

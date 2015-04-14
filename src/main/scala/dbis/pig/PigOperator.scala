@@ -4,6 +4,8 @@ package dbis.pig
  * Created by kai on 31.03.15.
  */
 
+import java.security.MessageDigest
+
 /**
  * PigOperator is the base class for all Pig operators. An operator contains
  * pipes representing the input and output connections to other operators in the
@@ -30,6 +32,25 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
   def schemaToString: String = {
     "" // TODO: how to describe the schema??
   }
+
+  /**
+   * Returns a MD5 hash string representing the sub-plan producing the input for this operator.
+   *
+   * @return the MD5 hash string
+   */
+  def lineageSignature: String = {
+    val digest = MessageDigest.getInstance("MD5")
+    digest.digest(lineageString.getBytes).map("%02x".format(_)).mkString
+  }
+
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
+  def lineageString: String = {
+    inputs.map(p => p.producer.lineageString).mkString("%")
+  }
 }
 
 /**
@@ -44,6 +65,10 @@ case class Load(override val outPipeName: String, file: String,
     // schema = inputs(0).producer.schema // TODO
     None
   }
+
+  override def lineageString: String = {
+    s"""LOAD%${file}%""" + super.lineageString
+  }
 }
 
 /**
@@ -51,7 +76,11 @@ case class Load(override val outPipeName: String, file: String,
  *
  * @param inPipeName the name of the input pipe
  */
-case class Dump(inPipeName: String) extends PigOperator("", inPipeName)
+case class Dump(inPipeName: String) extends PigOperator("", inPipeName) {
+  override def lineageString: String = {
+    s"""DUMP%""" + super.lineageString
+  }
+}
 
 /**
  * Store represents the STORE operator of Pig.
@@ -59,14 +88,23 @@ case class Dump(inPipeName: String) extends PigOperator("", inPipeName)
  * @param inPipeName the name of the input pipe
  * @param file the name of the output file
  */
-case class Store(inPipeName: String, file: String) extends PigOperator("", inPipeName)
+case class Store(inPipeName: String, file: String) extends PigOperator("", inPipeName) {
+  override def lineageString: String = {
+    s"""STORE%${file}%""" + super.lineageString
+  }
+}
 
 /**
  * Describe represents the DESCRIBE operator of Pig.
  *
  * @param inPipeName the name of the input pipe
  */
-case class Describe(inPipeName: String) extends PigOperator("", inPipeName)
+case class Describe(inPipeName: String) extends PigOperator("", inPipeName) {
+  override def lineageString: String = {
+    s"""DESCRIBE%""" + super.lineageString
+  }
+
+}
 
 /**
  * Foreach represents the FOREACH operator of Pig.
@@ -91,7 +129,12 @@ case class Foreach(override val outPipeName: String, inPipeName: String, expr: L
  * @param pred the predicate used for filtering tuples from the input pipe
  */
 case class Filter(override val outPipeName: String, inPipeName: String, pred: Predicate)
-  extends PigOperator(outPipeName, inPipeName)
+  extends PigOperator(outPipeName, inPipeName) {
+  override def lineageString: String = {
+    s"""FILTER%${pred}%""" + super.lineageString
+  }
+
+}
 
 /**
  * Represents the grouping expression for the Grouping operator.
@@ -108,7 +151,12 @@ case class GroupingExpression(val keyList: List[Ref])
  * @param groupExpr the expression (a key or a list of keys) used for grouping
  */
 case class Grouping(override val outPipeName: String, inPipeName: String, groupExpr: GroupingExpression)
-  extends PigOperator(outPipeName, inPipeName)
+  extends PigOperator(outPipeName, inPipeName) {
+  override def lineageString: String = {
+    s"""GROUPBY%${groupExpr}%""" + super.lineageString
+  }
+
+}
 
 /**
  * Distinct represents the DISTINCT operator of Pig.
@@ -117,7 +165,12 @@ case class Grouping(override val outPipeName: String, inPipeName: String, groupE
  * @param inPipeName the name of the input pipe.
  */
 case class Distinct(override val outPipeName: String, inPipeName: String)
-  extends PigOperator(outPipeName, inPipeName)
+  extends PigOperator(outPipeName, inPipeName) {
+  override def lineageString: String = {
+    s"""DISTINCT%""" + super.lineageString
+  }
+
+}
 
 /**
  * Limit represents the LIMIT operator of Pig.
@@ -126,7 +179,12 @@ case class Distinct(override val outPipeName: String, inPipeName: String)
  * @param inPipeName the name of the input pipe.
  */
 case class Limit(override val outPipeName: String, inPipeName: String, num: Int)
-  extends PigOperator(outPipeName, inPipeName)
+  extends PigOperator(outPipeName, inPipeName) {
+  override def lineageString: String = {
+    s"""LIMIT%${num}%""" + super.lineageString
+  }
+
+}
 
 /**
  * Join represents the multiway JOIN operator of Pig.
@@ -136,4 +194,9 @@ case class Limit(override val outPipeName: String, inPipeName: String, num: Int)
  * @param fieldExprs  list of key expressions (list of keys) used as join expressions.
  */
 case class Join(override val outPipeName: String, override val inPipeNames: List[String], val fieldExprs: List[List[Ref]])
-  extends PigOperator(outPipeName, inPipeNames)
+  extends PigOperator(outPipeName, inPipeNames) {
+  override def lineageString: String = {
+    s"""JOIN%""" + super.lineageString
+  }
+
+}
