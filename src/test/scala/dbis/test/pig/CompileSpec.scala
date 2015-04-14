@@ -69,7 +69,7 @@ class CompileSpec extends FlatSpec {
     val op = Dump("a")
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""a.collect.map(t => println(t.deep.mkString(",")))""")
+    val expectedCode = cleanString("""a.collect.map(t => println(t.mkString(",")))""")
     assert(generatedCode == expectedCode)
   }
 
