@@ -51,6 +51,8 @@ class PigParser extends JavaTokenParsers {
   lazy val describeKeyword = "describe".ignoreCase
   lazy val limitKeyword = "limit".ignoreCase
   lazy val usingKeyword = "using".ignoreCase
+  lazy val foreachKeyword = "foreach".ignoreCase
+  lazy val generateKeyword = "generate".ignoreCase
 
   def usingClause: Parser[(String, List[String])] = usingKeyword ~ ident ~ "(" ~ repsep(stringLiteral, ",") ~ ")" ^^ {
     case _ ~ loader ~ _ ~ params ~ _ => (loader, params)
@@ -66,7 +68,7 @@ class PigParser extends JavaTokenParsers {
 
   def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ^^ { case _ ~ b ~  _ ~ f => Store(b, f) }
 
-  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ "foreach" ~ bag ~ "generate" ~ exprList ^^ {
+  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~ generateKeyword ~ exprList ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ ex => Foreach(out, in, ex)
   }
 
