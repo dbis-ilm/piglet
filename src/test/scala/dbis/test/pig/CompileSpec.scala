@@ -19,6 +19,7 @@ class CompileSpec extends FlatSpec {
         |import org.apache.spark.SparkContext._
         |import org.apache.spark.SparkConf
         |import org.apache.spark.rdd._
+        |import dbis.spark._
         |
         |object test {
         |    def main(args: Array[String]) {
@@ -44,7 +45,7 @@ class CompileSpec extends FlatSpec {
     val op = Load("a", "file.csv", "PigStorage", List(","))
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStorage(sc).load("file.csv", ",")""")
+    val expectedCode = cleanString("""val a = PigStorage().load(sc, "file.csv", ",")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -52,7 +53,7 @@ class CompileSpec extends FlatSpec {
     val op = Load("a", "file.n3", "RDFFileStorage")
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = RDFFileStorage(sc).load("file.n3")""")
+    val expectedCode = cleanString("""val a = RDFFileStorage().load(sc, "file.n3")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -68,7 +69,7 @@ class CompileSpec extends FlatSpec {
     val op = Dump("a")
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("a.collect.map(t => println(t))")
+    val expectedCode = cleanString("""a.collect.map(t => println(t.deep.mkString(",")))""")
     assert(generatedCode == expectedCode)
   }
 

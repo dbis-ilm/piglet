@@ -43,14 +43,13 @@ class SparkGenCode extends GenCodeBase {
       s"""sc.textFile("$file")"""
     else {
       var params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams.map(quote(_)).mkString(",") else ""
-      println("=======> " + loaderParams)
-      s"""${loaderFunc}(sc).load("${file}"${params})"""
+      s"""${loaderFunc}().load(sc, "${file}"${params})"""
     }
   }
 
   def emitNode(node: PigOperator): String = node match {
     case Load(out, file, func, params) => { s"""val $out = ${emitLoader(file, func, params)}""" }
-    case Dump(in) => { s"${node.inPipeNames(0)}.collect.map(t => println(t))" }
+    case Dump(in) => { s"""${node.inPipeNames(0)}.collect.map(t => println(t.deep.mkString(",")))""" }
     case Store(in, file) => { s"""${node.inPipeNames(0)}.coalesce(1, true).saveAsTextFile("${file}")""" }
     case Describe(in) => { s"$in: { $node.schemaToString }" }
     case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames(0)}.filter(t => {${emitPredicate(node.schema, pred)}})" }
@@ -73,6 +72,7 @@ class SparkGenCode extends GenCodeBase {
        |import org.apache.spark.SparkContext._
        |import org.apache.spark.SparkConf
        |import org.apache.spark.rdd._
+       |import dbis.spark._
        |
        |object $scriptName {
        |    def main(args: Array[String]) {

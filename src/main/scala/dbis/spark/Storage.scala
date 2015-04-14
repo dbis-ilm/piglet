@@ -6,30 +6,33 @@ import org.apache.spark.rdd._
 /**
  * Created by kai on 14.04.15.
  */
-class PigStorage (val sc: SparkContext) {
-  def load(path: String, delim: String = " "): RDD[Array[String]] = {
+class PigStorage extends java.io.Serializable {
+  def load(sc: SparkContext, path: String, delim: String = " "): RDD[Array[String]] = {
     sc.textFile(path).map(line => line.split(delim))
   }
 }
 
 object PigStorage {
-  def apply(sc: SparkContext): PigStorage = {
-    new PigStorage(sc)
+  def apply(): PigStorage = {
+    new PigStorage
   }
 }
 
-class RDFFileStorage(val sc: SparkContext) {
+class RDFFileStorage extends java.io.Serializable {
+  val pattern = "([^\"]\\S*|\".+?\")\\s*".r
+
   def rdfize(line: String): Array[String] = {
-    Array()
+    val fields = pattern.findAllIn(line).map(_.trim)
+    fields.toArray.slice(0, 3)
   }
 
-  def load(path: String): RDD[Array[String]] = {
+  def load(sc: SparkContext, path: String): RDD[Array[String]] = {
     sc.textFile(path).map(line => rdfize(line))
   }
 }
 
 object RDFFileStorage {
-  def apply(sc: SparkContext): RDFFileStorage = {
-    new RDFFileStorage(sc)
+  def apply(): RDFFileStorage = {
+    new RDFFileStorage
   }
 }
