@@ -46,7 +46,48 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a simple foreach statement" in {
-    assert(parseScript("a = foreach b generate x, y, z;") == List(Foreach("a", "b", List("x", "y", "z"))))
+    assert(parseScript("a = foreach b generate x, y, z;") ==
+      List(Foreach("a", "b", List(
+        GeneratorExpr(RefExpr(NamedField("x"))),
+        GeneratorExpr(RefExpr(NamedField("y"))),
+        GeneratorExpr(RefExpr(NamedField("z")))
+      ))))
+  }
+
+  it should "parse a foreach statement with aliases for fields" in {
+    assert(parseScript("a = foreach b generate $0 as f1, $1 as f2, $2 as f3;") ==
+      List(Foreach("a", "b", List(
+        GeneratorExpr(RefExpr(PositionalField(0)), Some("f1")),
+        GeneratorExpr(RefExpr(PositionalField(1)), Some("f2")),
+        GeneratorExpr(RefExpr(PositionalField(2)), Some("f3"))
+      ))))
+  }
+
+  it should "parse a foreach statement with field expressions" in {
+    assert(parseScript("a = foreach b generate $0 + $1 as f1, $1 * 42 as f2;") ==
+      List(Foreach("a", "b", List(
+        GeneratorExpr(Add(RefExpr(PositionalField(0)), RefExpr(PositionalField(1))), Some("f1")),
+        GeneratorExpr(Mult(RefExpr(PositionalField(1)), RefExpr(Value("42"))), Some("f2"))
+      ))))
+  }
+
+  it should "parse a foreach statement with function expressions" in {
+    assert(parseScript("""a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);""") ==
+      List(Foreach("a", "b", List(
+        GeneratorExpr(Func("TOMAP", List(
+          RefExpr(Value(""""field1"""")),
+          RefExpr(PositionalField(0)),
+          RefExpr(Value(""""field2"""")),
+          RefExpr(PositionalField(1)))))
+      ))))
+  }
+
+  it should "parse a foreach statement with another function expression" in {
+    assert(parseScript("a = FOREACH b GENERATE f0, COUNT(f1) AS CNT;") ==
+      List(Foreach("a", "b", List(
+        GeneratorExpr(RefExpr(NamedField("f0"))),
+        GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("f1")))), Some("CNT"))
+      ))))
   }
 
   it should "detect an invalid statement" in {

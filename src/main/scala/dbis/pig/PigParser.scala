@@ -24,8 +24,6 @@ class PigParser extends JavaTokenParsers {
   implicit def pimpString(str: String): CaseInsensitiveString = new CaseInsensitiveString(str)
 
   def num: Parser[Int] = wholeNumber ^^ (_.toInt)
-  def expr: Parser[String] = ident
-  def exprList: Parser[List[String]] = repsep(expr, ",")
 
   def bag: Parser[String] = ident
   def fileName: Parser[String] = stringLiteral ^^ {str => str.substring(1, str.length - 1)}
@@ -49,6 +47,31 @@ class PigParser extends JavaTokenParsers {
     }
   }
 
+
+  def arithmExpr: Parser[ArithmeticExpr] = term ~ rep("+" ~ term | "-" ~ term) ^^ {
+    case l ~ list => list.foldLeft(l) {
+      case (x, "+" ~ i) => Add(x,i)
+      case (x, "-" ~ i) => Minus(x,i)
+    }
+  }
+
+  def term: Parser[ArithmeticExpr] = factor ~ rep("*" ~ factor | "/" ~ factor) ^^ {
+    case l ~ list => list.foldLeft(l) {
+      case (x, "*" ~ i) => Mult(x,i)
+      case (x, "/" ~ i) => Div(x,i)
+    }
+  }
+
+  def factor: Parser[ArithmeticExpr] =  (
+    "(" ~ arithmExpr ~ ")" ^^ { case _ ~ e ~ _ => e }
+      | func
+      | refExpr
+    )
+
+  def func: Parser[ArithmeticExpr] = ident ~ "(" ~ repsep(arithmExpr, ",") ~ ")" ^^ { case f ~ _ ~ p ~ _ => Func(f, p) }
+  def refExpr: Parser[ArithmeticExpr] = ref ^^ { r => RefExpr(r) }
+
+
   /*
    * The list of case-insensitive keywords we want to accept.
    */
@@ -67,6 +90,7 @@ class PigParser extends JavaTokenParsers {
   lazy val usingKeyword = "using".ignoreCase
   lazy val foreachKeyword = "foreach".ignoreCase
   lazy val generateKeyword = "generate".ignoreCase
+  lazy val asKeyword = "as".ignoreCase
 
   /*
    * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>)
@@ -93,9 +117,13 @@ class PigParser extends JavaTokenParsers {
   def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ^^ { case _ ~ b ~  _ ~ f => Store(b, f) }
 
   /*
-   * <A> = FOREACH <B> GENERATE ....
+   * <A> = FOREACH <B> GENERATE <Expr> [ AS <Schema> ]
    */
-  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~ generateKeyword ~ exprList ^^ {
+  def schema: Parser[String] = ident // TODO: not only a typename but a schema!
+  def exprSchema: Parser[String] = asKeyword ~ schema ^^ { case _ ~ t => t }
+  def genExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
+  def generatorList: Parser[List[GeneratorExpr]] = repsep(genExpr, ",")
+  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~ generateKeyword ~ generatorList ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ ex => Foreach(out, in, ex)
   }
 

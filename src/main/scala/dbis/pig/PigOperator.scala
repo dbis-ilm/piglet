@@ -106,6 +106,8 @@ case class Describe(inPipeName: String) extends PigOperator("", inPipeName) {
 
 }
 
+case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[String] = None)
+
 /**
  * Foreach represents the FOREACH operator of Pig.
  *
@@ -113,11 +115,15 @@ case class Describe(inPipeName: String) extends PigOperator("", inPipeName) {
  * @param inPipeName the name of the input pipe
  * @param expr the generator expression
  */
-case class Foreach(override val outPipeName: String, inPipeName: String, expr: List[String])
+case class Foreach(override val outPipeName: String, inPipeName: String, expr: List[GeneratorExpr])
   extends PigOperator(outPipeName, inPipeName) {
   override def constructSchema: Option[Schema] = {
     // schema = inputs(0).producer.schema // TODO
     schema
+  }
+
+  override def lineageString: String = {
+    s"""FOREACH%${expr}%""" + super.lineageString
   }
 }
 
