@@ -60,19 +60,21 @@ object PigCompiler extends PigParser {
     // val inputFile = args(0)
     val reader = new FileReader(inputFile)
     val source = Source.fromFile(inputFile)
+    
+    val fileName = new java.io.File(inputFile).getName
 
     // 2. then we parse it and construct a dataflow plan
     val plan = new DataflowPlan(parseScriptFromSource(source))
 
     // 3. now, we should apply optimizations
-    val scriptName = inputFile.replace(".pig", "")
+    val scriptName = fileName.replace(".pig", "")
 
     // 4. compile it into Scala code for Spark
     val compile = new SparkCompile
     val code = compile.compile(scriptName, plan)
 
     // 5. write it to a file
-    val outputFile = inputFile.replace(".pig", ".scala")
+    val outputFile = fileName.replace(".pig", ".scala")
     val writer = new FileWriter(outputFile)
     writer.append(code)
     writer.close()

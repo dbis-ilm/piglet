@@ -144,7 +144,7 @@ class PigParser extends JavaTokenParsers {
     case out ~ _ ~ _ ~ jlist => Join(out, extractJoinRelation(jlist), extractJoinFields(jlist)) }
 
   /*
-   * A statement cocanuld be one of the above delimited by a semicolon.
+   * A statement can be one of the above delimited by a semicolon.
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | storeStmt | limitStmt) ~ ";" ^^ {
