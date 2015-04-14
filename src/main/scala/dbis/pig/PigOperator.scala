@@ -38,7 +38,8 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
  * @param outPipeName the name of the output pipe (relation).
  * @param file the name of the file to be loaded
  */
-case class Load(override val outPipeName: String, file: String) extends PigOperator(outPipeName) {
+case class Load(override val outPipeName: String, file: String,
+                loaderFunc: String = "", loaderParams: List[String] = null) extends PigOperator(outPipeName) {
   override def constructSchema: Option[Schema] = {
     // schema = inputs(0).producer.schema // TODO
     None

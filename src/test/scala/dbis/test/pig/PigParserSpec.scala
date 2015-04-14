@@ -16,6 +16,11 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("""a = LOAD "file.csv";""") == List(Load("a", "file.csv")))
   }
 
+  it should "parse also a load statement with the using clause" in  {
+    assert(parseScript("""a = LOAD "file.data" using PigStorage("\t");""") == List(Load("a", "file.data", "PigStorage", List(""""\t""""))))
+    assert(parseScript("""a = LOAD "file.n3" using RDFFileStorage();""") == List(Load("a", "file.n3", "RDFFileStorage")))
+  }
+
   it should "should ignore comments" in {
     assert(parseScript("dump b; -- A comment") == List(Dump("b")))
   }

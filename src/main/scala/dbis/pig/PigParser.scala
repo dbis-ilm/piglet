@@ -50,8 +50,17 @@ class PigParser extends JavaTokenParsers {
   lazy val distinctKeyword = "distinct".ignoreCase
   lazy val describeKeyword = "describe".ignoreCase
   lazy val limitKeyword = "limit".ignoreCase
+  lazy val usingKeyword = "using".ignoreCase
 
-  def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ^^ { case b ~ _ ~ _ ~ f => Load(b, f) }
+  def usingClause: Parser[(String, List[String])] = usingKeyword ~ ident ~ "(" ~ repsep(stringLiteral, ",") ~ ")" ^^ {
+    case _ ~ loader ~ _ ~ params ~ _ => (loader, params)
+  }
+  def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ^^ {
+    case b ~ _ ~ _ ~ f ~ u => u match {
+      case Some(p) => Load(b, f, p._1, if (p._2.isEmpty) null else p._2)
+      case None => Load(b, f)
+    }
+  }
 
   def dumpStmt: Parser[PigOperator] = dumpKeyword ~ bag ^^ { case _ ~ b => Dump(b) }
 

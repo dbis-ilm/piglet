@@ -40,6 +40,22 @@ class CompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for LOAD with PigStorage" in {
+    val op = Load("a", "file.csv", "PigStorage", List(","))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""val a = PigStorage(sc).load("file.csv", ",")""")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for LOAD with RDFFileStorage" in {
+    val op = Load("a", "file.n3", "RDFFileStorage")
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""val a = RDFFileStorage(sc).load("file.n3")""")
+    assert(generatedCode == expectedCode)
+  }
+
   it should "contain code for FILTER" in {
     val op = Filter("a", "b", Lt(PositionalField(1), Value("42")))
     val codeGenerator = new SparkGenCode
