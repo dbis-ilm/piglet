@@ -47,12 +47,17 @@ class SparkGenCode extends GenCodeBase {
     }
   }
 
+  def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
+    ""
+  }
+
   def emitNode(node: PigOperator): String = node match {
     case Load(out, file, func, params) => { s"""val $out = ${emitLoader(file, func, params)}""" }
     case Dump(in) => { s"""${node.inPipeNames(0)}.collect.map(t => println(t.mkString(",")))""" }
     case Store(in, file) => { s"""${node.inPipeNames(0)}.coalesce(1, true).saveAsTextFile("${file}")""" }
     case Describe(in) => { s"$in: { $node.schemaToString }" }
     case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames(0)}.filter(t => {${emitPredicate(node.schema, pred)}})" }
+    case Foreach(out, in, expr) => { s"val $out = ${node.inPipeNames(0)}.map(t => {${emitGenerator(node.schema, expr)}})" }
     case Grouping(out, in, groupExpr) => {
       if (groupExpr.keyList.isEmpty) s"val $out = ${node.inPipeNames(0)}.glom"
       else s"val $out = ${node.inPipeNames(0)}.groupBy(t => {${emitGrouping(node.schema, groupExpr)}})" }
