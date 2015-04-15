@@ -4,7 +4,18 @@ package dbis.pig
  * Created by kai on 10.04.15.
  */
 
+case class UDF(name: String, numParams: Int, isAggregate: Boolean)
+
 class SparkGenCode extends GenCodeBase {
+  val funcTable = Map("COUNT" -> UDF("PigFuncs.count", 1, true),
+                      "AVG" -> UDF("PigFuncs.average", 1, true),
+                      "SUM" -> UDF("PigFuncs.sum", 1, true),
+                      "MIN" -> UDF("PigFuncs.min", 1, true),
+                      "MAX" -> UDF("PigFuncs.max", 1, true),
+                      "TOKENIZE" -> UDF("PigFuncs.tokenize", 1, false),
+                      "TOMAP" -> UDF("PigFuncs.toMap", Int.MaxValue, false)
+  )
+
   def emitRef(schema: Option[Schema], ref: Ref): String = ref match {
     case NamedField(f) => {
       if (schema.isEmpty) throw new SchemaException(s"unknown schema for field $f")
@@ -31,7 +42,7 @@ class SparkGenCode extends GenCodeBase {
 
   def emitJoinKey(schema: Option[Schema], joinExpr: List[Ref]): String = {
     if (joinExpr.size == 1)
-      emitRef(schema, joinExpr(0))
+      emitRef(schema, joinExpr.head)
     else
       s"Array(${joinExpr.map(e => emitRef(schema, e)).mkString(",")}).mkString"
   }
@@ -47,22 +58,39 @@ class SparkGenCode extends GenCodeBase {
     }
   }
 
+  def emitExpr(schema: Option[Schema], expr: ArithmeticExpr): String = expr match {
+    case Add(e1, e2) => s"${emitExpr(schema, e1)} + ${emitExpr(schema, e2)}"
+    case Minus(e1, e2) => s"${emitExpr(schema, e1)} - ${emitExpr(schema, e2)}"
+    case Mult(e1, e2) => s"${emitExpr(schema, e1)} * ${emitExpr(schema, e2)}"
+    case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
+    case RefExpr(e) => s"${emitRef(schema, e)}"
+    case Func(f, params) => {
+      val udf = funcTable(f)
+      // TODO: check whether f exists + size of params
+      if (udf.isAggregate)
+        s"${udf.name}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
+      else
+        s"${udf.name}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+    }
+    case _ => ""
+  }
+
   def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    ""
+    s"List(${genExprs.map(e => emitExpr(schema, e.expr)).mkString(",")})"
   }
 
   def emitNode(node: PigOperator): String = node match {
     case Load(out, file, func, params) => { s"""val $out = ${emitLoader(file, func, params)}""" }
-    case Dump(in) => { s"""${node.inPipeNames(0)}.collect.map(t => println(t.mkString(",")))""" }
-    case Store(in, file) => { s"""${node.inPipeNames(0)}.coalesce(1, true).saveAsTextFile("${file}")""" }
+    case Dump(in) => { s"""${node.inPipeNames.head}.collect.map(t => println(t.mkString(",")))""" }
+    case Store(in, file) => { s"""${node.inPipeNames.head}.coalesce(1, true).saveAsTextFile("${file}")""" }
     case Describe(in) => { s"$in: { $node.schemaToString }" }
-    case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames(0)}.filter(t => {${emitPredicate(node.schema, pred)}})" }
-    case Foreach(out, in, expr) => { s"val $out = ${node.inPipeNames(0)}.map(t => {${emitGenerator(node.schema, expr)}})" }
+    case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames.head}.filter(t => {${emitPredicate(node.schema, pred)}})" }
+    case Foreach(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.map(t => ${emitGenerator(node.schema, expr)})" }
     case Grouping(out, in, groupExpr) => {
-      if (groupExpr.keyList.isEmpty) s"val $out = ${node.inPipeNames(0)}.glom"
-      else s"val $out = ${node.inPipeNames(0)}.groupBy(t => {${emitGrouping(node.schema, groupExpr)}})" }
-    case Distinct(out, in) => { s"val $out = ${node.inPipeNames(0)}.distinct" }
-    case Limit(out, in, num) => { s"val $out = sc.parallelize(${node.inPipeNames(0)}.take($num))" }
+      if (groupExpr.keyList.isEmpty) s"val $out = ${node.inPipeNames.head}.glom"
+      else s"val $out = ${node.inPipeNames.head}.groupBy(t => {${emitGrouping(node.schema, groupExpr)}}).map{case (k,v) => List(k,v)}" }
+    case Distinct(out, in) => { s"val $out = ${node.inPipeNames.head}.distinct" }
+    case Limit(out, in, num) => { s"val $out = sc.parallelize(${node.inPipeNames.head}.take($num))" }
     case Join(out, rels, exprs) => {
       val res = rels.zip(exprs)
       val s1 = res.map{case (rel, expr) => s"val ${rel}_kv = ${rel}.keyBy(t => {${emitJoinKey(node.schema, expr)}})\n"}.mkString

@@ -8,7 +8,7 @@ package dbis.pig
  */
 object FieldType extends Enumeration {
   type FieldType = Value
-  val IntType, DoubleType, StringType = Value
+  val IntType, LongType, DoubleType, CharArrayType, ByteArrayType, BagType = Value
 }
 
 import FieldType._
