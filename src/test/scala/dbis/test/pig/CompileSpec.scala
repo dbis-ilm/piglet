@@ -24,7 +24,6 @@ class CompileSpec extends FlatSpec {
         |object test {
         |    def main(args: Array[String]) {
         |      val conf = new SparkConf().setAppName("test_App")
-        |      conf.setMaster("local[4]")
         |      val sc = new SparkContext(conf)
         |      sc.stop()
         |    }
@@ -42,9 +41,10 @@ class CompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val op = Load("a", "file.csv", "PigStorage", List(","))
+    val op = Load("a", "file.csv", "PigStorage", List("""",""""))
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
+    println(generatedCode)
     val expectedCode = cleanString("""val a = PigStorage().load(sc, "file.csv", ",")""")
     assert(generatedCode == expectedCode)
   }
@@ -58,7 +58,7 @@ class CompileSpec extends FlatSpec {
   }
 
   it should "contain code for FILTER" in {
-    val op = Filter("a", "b", Lt(PositionalField(1), Value("42")))
+    val op = Filter("a", "b", Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.filter(t => {t(1) < 42})")
@@ -121,7 +121,7 @@ class CompileSpec extends FlatSpec {
     val expectedCode = cleanString("""
       |val b_kv = b.keyBy(t => {t(0)})
       |val c_kv = c.keyBy(t => {t(0)})
-      |val a = b_kv.join(c_kv)""".stripMargin)
+      |val a = b_kv.join(c_kv).map{case (k,v) => List(k,v)}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -134,7 +134,7 @@ class CompileSpec extends FlatSpec {
     val expectedCode = cleanString("""
       |val b_kv = b.keyBy(t => {Array(t(0),t(1)).mkString})
       |val c_kv = c.keyBy(t => {Array(t(1),t(2)).mkString})
-      |val a = b_kv.join(c_kv)""".stripMargin)
+      |val a = b_kv.join(c_kv).map{case (k,v) => List(k,v)}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -148,7 +148,7 @@ class CompileSpec extends FlatSpec {
       |val b_kv = b.keyBy(t => {t(0)})
       |val c_kv = c.keyBy(t => {t(0)})
       |val d_kv = d.keyBy(t => {t(0)})
-      |val a = b_kv.join(c_kv).join(d_kv)""".stripMargin)
+      |val a = b_kv.join(c_kv).join(d_kv).map{case (k,v) => List(k,v)}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 

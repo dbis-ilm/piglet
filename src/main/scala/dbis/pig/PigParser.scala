@@ -36,18 +36,6 @@ class PigParser extends JavaTokenParsers {
   def literalField: Parser[Ref] = (floatingPointNumber ^^ { n => Value(n) } | stringLiteral ^^ { s => Value(s) })
   def ref: Parser[Ref] = ( posField | namedField | literalField )
 
-  def predicate: Parser[Predicate] = ref ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ ref ^^ {
-    case a ~ op ~ b => op match {
-      case "==" => Eq(a, b)
-      case "!=" => Neq(a, b)
-      case "<" => Lt(a, b)
-      case "<=" => Leq(a, b)
-      case ">" => Gt(a, b)
-      case ">=" => Geq(a, b)
-    }
-  }
-
-
   def arithmExpr: Parser[ArithmeticExpr] = term ~ rep("+" ~ term | "-" ~ term) ^^ {
     case l ~ list => list.foldLeft(l) {
       case (x, "+" ~ i) => Add(x,i)
@@ -62,14 +50,29 @@ class PigParser extends JavaTokenParsers {
     }
   }
 
+  def typeName: Parser[String] = ( "int" | "float" | "double" | "chararray"| " bytearray") ^^ { s => s }
+
   def factor: Parser[ArithmeticExpr] =  (
-    "(" ~ arithmExpr ~ ")" ^^ { case _ ~ e ~ _ => e }
+     "(" ~ typeName ~ ")" ~ refExpr ^^ { case _ ~ t ~ _ ~ e => CastExpr(t, e) }
+      | "(" ~ arithmExpr ~ "" ^^ { case _ ~ e ~ _ => e }
       | func
       | refExpr
     )
 
   def func: Parser[ArithmeticExpr] = ident ~ "(" ~ repsep(arithmExpr, ",") ~ ")" ^^ { case f ~ _ ~ p ~ _ => Func(f, p) }
   def refExpr: Parser[ArithmeticExpr] = ref ^^ { r => RefExpr(r) }
+
+  def comparisonExpr: Parser[Predicate] = arithmExpr ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ arithmExpr ^^ {
+    case a ~ op ~ b => op match {
+      case "==" => Eq(a, b)
+      case "!=" => Neq(a, b)
+      case "<" => Lt(a, b)
+      case "<=" => Leq(a, b)
+      case ">" => Gt(a, b)
+      case ">=" => Geq(a, b)
+    }
+  }
+
 
 
   /*
@@ -130,7 +133,7 @@ class PigParser extends JavaTokenParsers {
   /*
    * <A> = FILTER <B> BY <Predicate>
    */
-  def filterStmt: Parser[PigOperator] = bag ~ "=" ~ filterKeyword ~ bag ~ byKeyword ~ predicate ^^ {
+  def filterStmt: Parser[PigOperator] = bag ~ "=" ~ filterKeyword ~ bag ~ byKeyword ~ comparisonExpr ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pred => Filter(out, in, pred)
   }
 

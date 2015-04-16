@@ -9,6 +9,7 @@ case class Value(v: Any) extends Ref
 sealed abstract class ArithmeticExpr
 
 case class RefExpr(r: Ref) extends ArithmeticExpr
+case class CastExpr(t: String, a: ArithmeticExpr) extends ArithmeticExpr
 case class MSign(a: ArithmeticExpr) extends ArithmeticExpr
 case class Add(a: ArithmeticExpr, b: ArithmeticExpr) extends ArithmeticExpr
 case class Minus(a: ArithmeticExpr, b: ArithmeticExpr) extends ArithmeticExpr
@@ -18,12 +19,13 @@ case class Func(f: String, params: List[ArithmeticExpr]) extends ArithmeticExpr
 
 sealed abstract class Predicate
 
-case class Eq(a: Ref, b: Ref) extends Predicate
-case class Neq(a: Ref, b: Ref) extends Predicate
-case class Geq(a: Ref, b: Ref) extends Predicate
-case class Leq(a: Ref, b: Ref) extends Predicate
-case class Gt(a: Ref, b: Ref) extends Predicate
-case class Lt(a: Ref, b: Ref) extends Predicate
+case class Eq(a: ArithmeticExpr, b: ArithmeticExpr) extends Predicate
+case class Neq(a: ArithmeticExpr, b: ArithmeticExpr) extends Predicate
+case class Geq(a: ArithmeticExpr, b: ArithmeticExpr) extends Predicate
+case class Leq(a: ArithmeticExpr, b: ArithmeticExpr) extends Predicate
+case class Gt(a: ArithmeticExpr, b: ArithmeticExpr) extends Predicate
+case class Lt(a: ArithmeticExpr, b: ArithmeticExpr) extends Predicate
+
 case class And(a: Ref, b: Ref) extends Predicate
 case class Or(a: Ref, b: Ref) extends Predicate
 case class Not(a: Ref) extends Predicate

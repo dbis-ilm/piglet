@@ -16,6 +16,8 @@ class SparkGenCode extends GenCodeBase {
                       "TOMAP" -> UDF("PigFuncs.toMap", Int.MaxValue, false)
   )
 
+  val typeTable = Map("int" -> "toInt", "float" -> "toFloat", "double" -> "toDouble", "chararray" -> "toString")
+
   def emitRef(schema: Option[Schema], ref: Ref): String = ref match {
     case NamedField(f) => {
       if (schema.isEmpty) throw new SchemaException(s"unknown schema for field $f")
@@ -27,12 +29,12 @@ class SparkGenCode extends GenCodeBase {
   }
 
   def emitPredicate(schema: Option[Schema], predicate: Predicate): String = predicate match {
-    case Eq(left, right) => { s"${emitRef(schema, left)} == ${emitRef(schema, right)}"}
-    case Neq(left, right) => { s"${emitRef(schema, left)} != ${emitRef(schema, right)}"}
-    case Leq(left, right) => { s"${emitRef(schema, left)} <= ${emitRef(schema, right)}"}
-    case Lt(left, right) => { s"${emitRef(schema, left)} < ${emitRef(schema, right)}"}
-    case Geq(left, right) => { s"${emitRef(schema, left)} >= ${emitRef(schema, right)}"}
-    case Gt(left, right) => { s"${emitRef(schema, left)} > ${emitRef(schema, right)}"}
+    case Eq(left, right) => { s"${emitExpr(schema, left)} == ${emitExpr(schema, right)}"}
+    case Neq(left, right) => { s"${emitExpr(schema, left)} != ${emitExpr(schema, right)}"}
+    case Leq(left, right) => { s"${emitExpr(schema, left)} <= ${emitExpr(schema, right)}"}
+    case Lt(left, right) => { s"${emitExpr(schema, left)} < ${emitExpr(schema, right)}"}
+    case Geq(left, right) => { s"${emitExpr(schema, left)} >= ${emitExpr(schema, right)}"}
+    case Gt(left, right) => { s"${emitExpr(schema, left)} > ${emitExpr(schema, right)}"}
     case _ => { "" }
   }
 
@@ -47,18 +49,24 @@ class SparkGenCode extends GenCodeBase {
       s"Array(${joinExpr.map(e => emitRef(schema, e)).mkString(",")}).mkString"
   }
 
-  def quote(s: String): String = s""""$s""""
+  def quote(s: String): String = s"$s"
 
   def emitLoader(file: String, loaderFunc: String, loaderParams: List[String]): String = {
     if (loaderFunc == "")
       s"""sc.textFile("$file")"""
     else {
-      var params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams.map(quote(_)).mkString(",") else ""
+      val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams.map(quote(_)).mkString(",") else ""
       s"""${loaderFunc}().load(sc, "${file}"${params})"""
     }
   }
 
   def emitExpr(schema: Option[Schema], expr: ArithmeticExpr): String = expr match {
+    case CastExpr(t, e) => {
+      // TODO: check for invalid type
+      val targetType = typeTable(t)
+      s"${emitExpr(schema, e)}.$targetType"
+    }
+    case MSign(e) => s"-${emitExpr(schema, e)}"
     case Add(e1, e2) => s"${emitExpr(schema, e1)} + ${emitExpr(schema, e2)}"
     case Minus(e1, e2) => s"${emitExpr(schema, e1)} - ${emitExpr(schema, e2)}"
     case Mult(e1, e2) => s"${emitExpr(schema, e1)} * ${emitExpr(schema, e2)}"
@@ -94,7 +102,7 @@ class SparkGenCode extends GenCodeBase {
     case Join(out, rels, exprs) => {
       val res = rels.zip(exprs)
       val s1 = res.map{case (rel, expr) => s"val ${rel}_kv = ${rel}.keyBy(t => {${emitJoinKey(node.schema, expr)}})\n"}.mkString
-      s1 + s"val $out = ${rels.head}_kv" + rels.tail.map{other => s".join(${other}_kv)"}.mkString
+      s1 + s"val $out = ${rels.head}_kv" + rels.tail.map{other => s".join(${other}_kv)"}.mkString + ".map{case (k,v) => List(k,v)}"
     }
     case _ => { "" }
   }
@@ -110,7 +118,6 @@ class SparkGenCode extends GenCodeBase {
        |object $scriptName {
        |    def main(args: Array[String]) {
        |      val conf = new SparkConf().setAppName("${scriptName}_App")
-       |      conf.setMaster("local[4]")
        |      val sc = new SparkContext(conf)
     """.stripMargin
   }
