@@ -21,9 +21,13 @@ object TypeCode extends Enumeration {
 
 import TypeCode._
 
-sealed abstract class PigType(val name: String)
+sealed abstract class PigType {
+  var name: String = ""
 
-case class SimpleType(override val name: String, tc: TypeCode) extends PigType(name)
+  def this(s: String) = { this(); name = s }
+}
+
+case class SimpleType(s: String, tc: TypeCode) extends PigType(s)
 
 object Types {
   def typeCompatibility(t1: PigType, t2: PigType): Boolean = {
@@ -67,13 +71,15 @@ object Types {
 }
 
 case class Field(name: String, fType: PigType)
-case class TupleType(override val name: String, var fields: Array[Field]) extends PigType(name) {
+case class TupleType(s: String, var fields: Array[Field]) extends PigType(s) {
   override def equals(that: Any): Boolean = that match {
     case TupleType(name, fields) => this.name == name && this.fields.deep == fields.deep
     case _ => false
   }
+
+  override def toString = "TupleType(" + name + "," + fields.mkString(",") + ")"
 }
 
-case class BagType(override val name: String, var valueType: PigType) extends PigType(name)
+case class BagType(s: String, var valueType: PigType) extends PigType(s)
 
-case class MapType(override val name: String, var valueType: PigType) extends PigType(name)
+case class MapType(s: String, var valueType: PigType) extends PigType(s)

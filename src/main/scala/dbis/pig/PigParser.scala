@@ -98,6 +98,9 @@ class PigParser extends JavaTokenParsers {
   /*
    * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>) [ AS (<Schema>) ]
    */
+  def tupleTypeSpec: Parser[TupleType] =
+    ("tuple"?) ~ "(" ~repsep(fieldSchema, ",") ~ ")" ^^{ case _ ~ _ ~ fieldList ~ _ => TupleType("", fieldList.toArray) }
+
   def typeSpec: Parser[PigType] = (
     "int" ^^ { _ => Types.IntType }
     | "long" ^^ { _ => Types.LongType }
@@ -106,6 +109,12 @@ class PigParser extends JavaTokenParsers {
     | "boolean" ^^ { _ => Types.BooleanType }
     | "chararray" ^^ { _ => Types.CharArrayType }
     | "bytearray" ^^{ _ => Types.ByteArrayType }
+    | tupleTypeSpec
+    | ("bag"?) ~ "{" ~ ident ~ ":" ~ tupleTypeSpec ~ "}" ^^{ case _ ~ _ ~ id ~ _ ~ tup ~ _ => tup.name = id; BagType("", tup) }
+    | ("map"?) ~ "[" ~(typeSpec?) ~ "]" ^^{ case _ ~ _ ~ ty ~ _ => ty match {
+        case Some(t) => MapType("", t)
+        case None => MapType("", Types.ByteArrayType)
+    }}
     )
 
   def fieldType: Parser[PigType] = ":" ~ typeSpec ^^ { case _ ~ t => t }

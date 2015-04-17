@@ -31,6 +31,23 @@ class PigParserSpec extends FlatSpec {
       List(Load("a", "file.csv", Some(Schema(schema)))))
   }
 
+  it should "parse a load statement with complex typed schema specification" in {
+    val schema = BagType("", TupleType("", Array(Field("a", Types.IntType),
+      Field("t", TupleType("", Array(Field("f1", Types.IntType), Field("f2", Types.IntType)))),
+      Field("b", BagType("", TupleType("t2", Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))))
+    assert(parseScript("""a = load "file.csv" as (a:int, t:tuple(f1: int, f2:int), b:{t2:tuple(f3:double, f4:double)}); """) ==
+      List(Load("a", "file.csv", Some(Schema(schema)))))
+  }
+
+  it should "parse another load statement with complex typed schema specification" in {
+    val schema = BagType("", TupleType("", Array(Field("a", Types.IntType),
+      Field("m1", MapType("", Types.CharArrayType)),
+      Field("m2", MapType("", TupleType("", Array(Field("f1", Types.IntType), Field("f2", Types.IntType))))),
+      Field("m3", MapType("", Types.ByteArrayType)))))
+    assert(parseScript("""a = load "file.csv" as (a:int, m1:map[chararray], m2:[(f1: int, f2:int)], m3:[]); """) ==
+      List(Load("a", "file.csv", Some(Schema(schema)))))
+  }
+
   it should "parse a load statement with typed schema specification and using clause" in {
     val schema = BagType("", TupleType("", Array(Field("a", Types.IntType),
       Field("b", Types.CharArrayType),

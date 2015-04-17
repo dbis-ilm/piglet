@@ -17,7 +17,6 @@ import java.security.MessageDigest
 sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: List[String], var schema: Option[Schema]) {
   var inputs: List[Pipe] = List[Pipe]()
   var output: Option[Pipe] = None
-  // var schema: Option[Schema] = None
 
   def this(out: String, in: List[String]) = this(out, in, None)
 
