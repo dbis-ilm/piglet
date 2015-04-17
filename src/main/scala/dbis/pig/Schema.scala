@@ -3,15 +3,6 @@ package dbis.pig
 /**
  * Created by kai on 08.04.15.
  */
-/**
- * An enumeration of possible field types.
- */
-object FieldType extends Enumeration {
-  type FieldType = Value
-  val IntType, LongType, DoubleType, CharArrayType, ByteArrayType, BagType = Value
-}
-
-import FieldType._
 
 /**
  * An exception indicating failures in schema handling.
@@ -21,19 +12,12 @@ import FieldType._
 case class SchemaException(msg: String) extends Exception(msg)
 
 /**
- * A field definition describes the structure of a field (column).
- *
- * @param name the name of the field
- * @param ftype the type of the field
- */
-case class FieldDef(val name: String, val ftype: FieldType)
-
-/**
  * A schema describes the structure of the output relation of an operator.
  *
- * @param fields the list of fields (columns) consisting of name and type.
+ * @param element the type definition - in most cases a bag of tuples
+ *
  */
-case class Schema(val fields: Vector[FieldDef]) {
+case class Schema(val element: BagType) {
   /**
    * Returns the index of the field in the schema.
    *
@@ -41,7 +25,10 @@ case class Schema(val fields: Vector[FieldDef]) {
    * @return the position in the field list
    */
   def indexOfField(name: String) : Int = {
-    fields.indexWhere(_.name == name)
+    if (! element.valueType.isInstanceOf[TupleType])
+      throw new SchemaException("schema type isn't a bag of tuples")
+    val tupleType = element.valueType.asInstanceOf[TupleType]
+    tupleType.fields.indexWhere(_.name == name)
   }
 
   /**
@@ -50,7 +37,10 @@ case class Schema(val fields: Vector[FieldDef]) {
    * @param pos the position of the field in the schemas field list
    * @return the field definition
    */
-  def field(pos: Int): FieldDef = {
-    fields(pos)
+  def field(pos: Int): Field = {
+    if (! element.valueType.isInstanceOf[TupleType])
+      throw new SchemaException("schema type isn't a bag of tuples")
+    val tupleType = element.valueType.asInstanceOf[TupleType]
+    tupleType.fields(pos)
   }
 }

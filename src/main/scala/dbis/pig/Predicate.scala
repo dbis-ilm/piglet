@@ -6,7 +6,11 @@ case class NamedField(name: String) extends Ref
 case class PositionalField(pos: Int) extends Ref
 case class Value(v: Any) extends Ref
 
-sealed abstract class ArithmeticExpr
+trait Expr {
+
+}
+
+sealed abstract class ArithmeticExpr extends Expr
 
 case class RefExpr(r: Ref) extends ArithmeticExpr
 case class CastExpr(t: String, a: ArithmeticExpr) extends ArithmeticExpr
@@ -17,7 +21,7 @@ case class Mult(a: ArithmeticExpr, b: ArithmeticExpr) extends ArithmeticExpr
 case class Div(a: ArithmeticExpr, b: ArithmeticExpr) extends ArithmeticExpr
 case class Func(f: String, params: List[ArithmeticExpr]) extends ArithmeticExpr
 
-sealed abstract class Predicate
+sealed abstract class Predicate extends Expr
 
 case class Eq(a: ArithmeticExpr, b: ArithmeticExpr) extends Predicate
 case class Neq(a: ArithmeticExpr, b: ArithmeticExpr) extends Predicate

@@ -96,17 +96,38 @@ class PigParser extends JavaTokenParsers {
   lazy val asKeyword = "as".ignoreCase
 
   /*
-   * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>)
+   * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>) [ AS (<Schema>) ]
    */
+  def typeSpec: Parser[PigType] = (
+    "int" ^^ { _ => Types.IntType }
+    | "long" ^^ { _ => Types.LongType }
+    | "float" ^^ { _ => Types.FloatType }
+    | "double" ^^ { _ => Types.DoubleType }
+    | "boolean" ^^ { _ => Types.BooleanType }
+    | "chararray" ^^ { _ => Types.CharArrayType }
+    | "bytearray" ^^{ _ => Types.ByteArrayType }
+    )
+
+  def fieldType: Parser[PigType] = ":" ~ typeSpec ^^ { case _ ~ t => t }
+  def fieldSchema: Parser[Field] = ident ~ (fieldType?) ^^ {
+    case n ~ t => t match {
+      case Some(tp) => Field(n, tp)
+      case None => Field(n, Types.ByteArrayType)
+    }
+  }
+  def loadSchemaClause: Parser[Schema] = asKeyword ~ "(" ~ repsep(fieldSchema, ",") ~ ")" ^^{
+    case _ ~ _ ~ fieldList ~ _ => Schema(BagType("", TupleType("", fieldList.toArray)))
+  }
+
   def usingClause: Parser[(String, List[String])] = usingKeyword ~ ident ~ "(" ~ repsep(stringLiteral, ",") ~ ")" ^^ {
     case _ ~ loader ~ _ ~ params ~ _ => (loader, params)
   }
 
-  def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ^^ {
-    case b ~ _ ~ _ ~ f ~ u => u match {
-      case Some(p) => Load(b, f, p._1, if (p._2.isEmpty) null else p._2)
-      case None => Load(b, f)
-    }
+  def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
+    case b ~ _ ~ _ ~ f ~ u ~ s => u match {
+        case Some(p) => Load(b, f, s, p._1, if (p._2.isEmpty) null else p._2)
+        case None => Load(b, f, s)
+      }
   }
 
   /*

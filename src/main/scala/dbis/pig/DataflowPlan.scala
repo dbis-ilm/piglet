@@ -61,4 +61,5 @@ class DataflowPlan(val operators: List[PigOperator]) {
      */
     graph.isConnected
   }
+
  }

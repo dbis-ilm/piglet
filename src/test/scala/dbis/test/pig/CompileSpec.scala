@@ -41,7 +41,7 @@ class CompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val op = Load("a", "file.csv", "PigStorage", List("""",""""))
+    val op = Load("a", "file.csv", None, "PigStorage", List("""",""""))
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     println(generatedCode)
@@ -50,7 +50,7 @@ class CompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD with RDFFileStorage" in {
-    val op = Load("a", "file.n3", "RDFFileStorage")
+    val op = Load("a", "file.n3", None, "RDFFileStorage")
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""val a = RDFFileStorage().load(sc, "file.n3")""")

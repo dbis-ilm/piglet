@@ -14,14 +14,16 @@ import java.security.MessageDigest
  * @param outPipeName the name of the output pipe (relation).
  * @param inPipeNames the list of names of input pipes.
  */
-sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: List[String]) {
+sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: List[String], var schema: Option[Schema]) {
   var inputs: List[Pipe] = List[Pipe]()
   var output: Option[Pipe] = None
-  var schema: Option[Schema] = None
+  // var schema: Option[Schema] = None
 
-  def this(out: String) = this(out, List())
+  def this(out: String, in: List[String]) = this(out, in, None)
 
-  def this(out: String, in: String) = this(out, List(in))
+  def this(out: String) = this(out, List(), None)
+
+  def this(out: String, in: String) = this(out, List(in), None)
 
   def constructSchema: Option[Schema] = {
     if (inputs.nonEmpty)
@@ -60,7 +62,8 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
  * @param file the name of the file to be loaded
  */
 case class Load(override val outPipeName: String, file: String,
-                loaderFunc: String = "", loaderParams: List[String] = null) extends PigOperator(outPipeName) {
+                var loadSchema: Option[Schema] = None,
+                loaderFunc: String = "", loaderParams: List[String] = null) extends PigOperator(outPipeName, List(), loadSchema) {
   override def constructSchema: Option[Schema] = {
     // schema = inputs(0).producer.schema // TODO
     None

@@ -17,8 +17,34 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse also a load statement with the using clause" in  {
-    assert(parseScript("""a = LOAD "file.data" using PigStorage("\t");""") == List(Load("a", "file.data", "PigStorage", List(""""\t""""))))
-    assert(parseScript("""a = LOAD "file.n3" using RDFFileStorage();""") == List(Load("a", "file.n3", "RDFFileStorage")))
+    assert(parseScript("""a = LOAD "file.data" using PigStorage("\t");""") ==
+      List(Load("a", "file.data", None, "PigStorage", List(""""\t""""))))
+    assert(parseScript("""a = LOAD "file.n3" using RDFFileStorage();""") ==
+      List(Load("a", "file.n3", None, "RDFFileStorage")))
+  }
+
+  it should "parse a load statement with typed schema specification" in {
+    val schema = BagType("", TupleType("", Array(Field("a", Types.IntType),
+                                                Field("b", Types.CharArrayType),
+                                                Field("c", Types.DoubleType))))
+    assert(parseScript("""a = load "file.csv" as (a:int, b:chararray, c:double); """) ==
+      List(Load("a", "file.csv", Some(Schema(schema)))))
+  }
+
+  it should "parse a load statement with typed schema specification and using clause" in {
+    val schema = BagType("", TupleType("", Array(Field("a", Types.IntType),
+      Field("b", Types.CharArrayType),
+      Field("c", Types.DoubleType))))
+    assert(parseScript("""a = load "file.data" using PigStorage() as (a:int, b:chararray, c:double); """) ==
+      List(Load("a", "file.data", Some(Schema(schema)), "PigStorage")))
+  }
+
+  it should "parse a load statement with untyped schema specification" in {
+    val schema = BagType("", TupleType("", Array(Field("a", Types.ByteArrayType),
+      Field("b", Types.ByteArrayType),
+      Field("c", Types.ByteArrayType))))
+    assert(parseScript("""a = load "file.csv" as (a, b, c); """) ==
+      List(Load("a", "file.csv", Some(Schema(schema)))))
   }
 
   it should "should ignore comments" in {
