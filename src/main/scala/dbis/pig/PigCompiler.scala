@@ -31,15 +31,17 @@ object PigCompiler extends PigParser {
     phrase(script)(input)
   }
 
-  case class CompilerConfig(master: String = "local", input: String = "")
+  case class CompilerConfig(master: String = "local", input: String = "", compile: Boolean = false)
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
     var inputFile: String = null
+    var compileOnly: Boolean = false
 
     val parser = new scopt.OptionParser[CompilerConfig]("PigCompiler") {
       head("PigCompiler", "0.1")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text("spark://host:port, mesos://host:port, yarn, or local.")
+      opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text("compile only (don't execute the script)")
       help("help") text("prints this usage text")
       version("version") text("prints this version info")
       arg[String]("<file>") required() action { (x, c) => c.copy(input = x) } text("Pig file")
@@ -50,6 +52,7 @@ object PigCompiler extends PigParser {
         // do stuff
         master = config.master
         inputFile = config.input
+        compileOnly = config.compile
       }
       case None =>
       // arguments are bad, error message will have been displayed
@@ -78,6 +81,8 @@ object PigCompiler extends PigParser {
     val writer = new FileWriter(outputFile)
     writer.append(code)
     writer.close()
+
+    if (compileOnly) sys.exit(0)
 
     // 6. compile the Scala code
     val outputDirectory = new java.io.File(".").getCanonicalPath + "/out"

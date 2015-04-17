@@ -96,7 +96,7 @@ class PigParser extends JavaTokenParsers {
   lazy val asKeyword = "as".ignoreCase
 
   /*
-   * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>) [ AS (<Schema>) ]
+   * tuple schema: tuple(<list of fields>) or (<list of fields>)
    */
   def tupleTypeSpec: Parser[TupleType] =
     ("tuple"?) ~ "(" ~repsep(fieldSchema, ",") ~ ")" ^^{ case _ ~ _ ~ fieldList ~ _ => TupleType("", fieldList.toArray) }
@@ -110,13 +110,22 @@ class PigParser extends JavaTokenParsers {
     | "chararray" ^^ { _ => Types.CharArrayType }
     | "bytearray" ^^{ _ => Types.ByteArrayType }
     | tupleTypeSpec
+      /*
+       * bag schema: bag{<tuple>} or {<tuple>}
+       */
     | ("bag"?) ~ "{" ~ ident ~ ":" ~ tupleTypeSpec ~ "}" ^^{ case _ ~ _ ~ id ~ _ ~ tup ~ _ => tup.name = id; BagType("", tup) }
+      /*
+       * map schema: map[<list of fields>] or [<list of fields>]
+       */
     | ("map"?) ~ "[" ~(typeSpec?) ~ "]" ^^{ case _ ~ _ ~ ty ~ _ => ty match {
         case Some(t) => MapType("", t)
         case None => MapType("", Types.ByteArrayType)
     }}
     )
 
+  /*
+   * schema of a field: <identifier> : type or simply <identifier>
+   */
   def fieldType: Parser[PigType] = ":" ~ typeSpec ^^ { case _ ~ t => t }
   def fieldSchema: Parser[Field] = ident ~ (fieldType?) ^^ {
     case n ~ t => t match {
@@ -124,6 +133,9 @@ class PigParser extends JavaTokenParsers {
       case None => Field(n, Types.ByteArrayType)
     }
   }
+  /*
+   * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>) [ AS (<Schema>) ]
+   */
   def loadSchemaClause: Parser[Schema] = asKeyword ~ "(" ~ repsep(fieldSchema, ",") ~ ")" ^^{
     case _ ~ _ ~ fieldList ~ _ => Schema(BagType("", TupleType("", fieldList.toArray)))
   }
