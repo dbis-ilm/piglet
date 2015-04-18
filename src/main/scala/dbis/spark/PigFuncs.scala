@@ -19,9 +19,9 @@ object PigFuncs {
 
   def tokenize(s: String, delim: String = """[, "]""") = s.split(delim)
 
-  def toMap(pList: String*): Map[String, Any] = {
+  def toMap(pList: Any*): Map[String, Any] = {
     var m = Map[String, Any]()
-    for (i <- 0 to pList.length / 2 + 1 by 2) { m += (pList(i).toString -> pList(i+1)) }
+    for (i <- 0 to pList.length-1 by 2) { m += (pList(i).toString -> pList(i+1)) }
     m
   }
 }

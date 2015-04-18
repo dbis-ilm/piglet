@@ -5,6 +5,8 @@ sealed abstract class Ref
 case class NamedField(name: String) extends Ref
 case class PositionalField(pos: Int) extends Ref
 case class Value(v: Any) extends Ref
+case class DerefTuple(tref: Ref, component: Ref) extends Ref
+case class DerefMap(mref: Ref, key: String) extends Ref
 
 trait Expr {
 

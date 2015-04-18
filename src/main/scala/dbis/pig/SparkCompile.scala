@@ -23,8 +23,10 @@ class SparkGenCode extends GenCodeBase {
       if (schema.isEmpty) throw new SchemaException(s"unknown schema for field $f")
       s"t._${schema.get.indexOfField(f)}"
     } // TODO: should be position of field
-    case PositionalField(pos) => { s"t($pos)" }
-    case Value(v) => { v.toString } // TODO: could be also a predicate!
+    case PositionalField(pos) => s"t($pos)"
+    case Value(v) => v.toString // TODO: could be also a predicate!
+    case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}(${emitRef(schema, r2)})"
+    case DerefMap(m, k) => s"${m}(${k})"
     case _ => { "" }
   }
 

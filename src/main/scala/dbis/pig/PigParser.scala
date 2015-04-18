@@ -23,18 +23,27 @@ class PigParser extends JavaTokenParsers {
 
   implicit def pimpString(str: String): CaseInsensitiveString = new CaseInsensitiveString(str)
 
+  def unquote(s: String): String = s.substring(1, s.length - 1)
+
   def num: Parser[Int] = wholeNumber ^^ (_.toInt)
 
   def bag: Parser[String] = ident
-  def fileName: Parser[String] = stringLiteral ^^ {str => str.substring(1, str.length - 1)}
+  def fileName: Parser[String] = stringLiteral ^^ { str => unquote(str) }
 
   /*
-   * A reference can be a named field,a positional field (e.g $0, $1, ...) or a literal.
+   * A reference can be a named field, a positional field (e.g $0, $1, ...) or a literal.
    */
   def posField: Parser[Ref] = """\$[0-9]*""".r ^^ { p => PositionalField(p.substring(1, p.length).toInt) }
   def namedField: Parser[Ref] = ident ^^ { i => NamedField(i) }
   def literalField: Parser[Ref] = (floatingPointNumber ^^ { n => Value(n) } | stringLiteral ^^ { s => Value(s) })
-  def ref: Parser[Ref] = ( posField | namedField | literalField )
+  def fieldSpec: Parser[Ref] = (posField | namedField | literalField)
+  /*
+   * It can be also a dereference operator for tuples, bags or maps.
+   */
+  def derefBagOrTuple: Parser[Ref] = (posField | namedField) ~ "." ~ (posField | namedField) ^^ { case r1 ~ _ ~ r2 => DerefTuple(r1, r2) }
+  def derefMap: Parser[Ref] = (posField | namedField) ~ "#" ~ stringLiteral ^^ { case m ~ _ ~ k => DerefMap(m, unquote(k)) }
+
+  def ref: Parser[Ref] = (derefMap |  derefBagOrTuple | fieldSpec) // ( fieldSpec | derefBagOrTuple | derefMap)
 
   def arithmExpr: Parser[ArithmeticExpr] = term ~ rep("+" ~ term | "-" ~ term) ^^ {
     case l ~ list => list.foldLeft(l) {

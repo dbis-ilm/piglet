@@ -192,8 +192,20 @@ class PigParserSpec extends FlatSpec {
       List(List(PositionalField(0), PositionalField(1)), List(PositionalField(1), PositionalField(2))))))
   }
 
-  it should "parse a multiway join statement " in {
+  it should "parse a multiway join statement" in {
     assert(parseScript("a = join b by $0, c by $0, d by $0;") == List(Join("a", List("b", "c", "d"),
       List(List(PositionalField(0)), List(PositionalField(0)), List(PositionalField(0))))))
+  }
+
+  it should "parse expressions with deref operators for map" in {
+    assert(parseScript("""a = foreach b generate m1#"k1", m1#"k2";""") ==
+      List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), "k1"))),
+        GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), "k2")))))))
+  }
+
+  it should "parse expressions with deref operators for tuple and bag" in {
+    assert(parseScript("""a = foreach b generate t1.k, t2.$0;""") ==
+      List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(NamedField("t1"), NamedField("k")))),
+        GeneratorExpr(RefExpr(DerefTuple(NamedField("t2"), PositionalField(0))))))))
   }
 }
