@@ -26,7 +26,7 @@ class SparkGenCode extends GenCodeBase {
     case PositionalField(pos) => s"t($pos)"
     case Value(v) => v.toString // TODO: could be also a predicate!
     case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}(${emitRef(schema, r2)})"
-    case DerefMap(m, k) => s"${m}(${k})"
+    case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
     case _ => { "" }
   }
 

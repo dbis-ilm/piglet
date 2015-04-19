@@ -180,5 +180,13 @@ class CompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-
+  it should "contain code for deref operator in foreach statement" in {
+    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), """"k1""""))),
+      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), """"k2"""")))))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val a = b.map(t => List(t(0).asInstanceOf[Map[String,Any]]("k1"),t(1).asInstanceOf[Map[String,Any]]("k2")))""".stripMargin)
+        assert(generatedCode == expectedCode)
+  }
 }
