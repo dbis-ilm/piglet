@@ -62,4 +62,7 @@ class DataflowPlan(val operators: List[PigOperator]) {
     graph.isConnected
   }
 
+  def checkSchemaConformance: Boolean = {
+    operators.map(_.checkSchemaConformance).foldLeft(true){ (b1: Boolean, b2: Boolean) => b1 && b2 }
+  }
  }

@@ -24,17 +24,41 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
 
   def this(out: String, in: String) = this(out, List(in), None)
 
+  /**
+   * Constructs the output schema of this operator based on the input + the semantics of the operator.
+   * The default implementation is to simply take over the schema of the input operator.
+   *
+   * @return the output schema
+   */
   def constructSchema: Option[Schema] = {
     if (inputs.nonEmpty)
       schema = inputs(0).producer.schema
     schema
   }
 
+  /**
+   * Returns a string representation of the output schema of the operator.
+   *
+   * @return a string describing the schema
+   */
   def schemaToString: String = {
     "" // TODO: how to describe the schema??
   }
 
   /**
+   * A helper function for traversing expression trees:
+   *
+   * Checks the (named) fields referenced in the expression (if any) if they conform to
+   * the schema. Should be overridden in operators changing the schema by invoking
+   * traverse with one of the traverser function.
+   *
+   * @return true if valid field references, otherwise false
+   */
+  def checkSchemaConformance: Boolean = {
+    true
+  }
+
+   /**
    * Returns a MD5 hash string representing the sub-plan producing the input for this operator.
    *
    * @return the MD5 hash string
@@ -64,8 +88,10 @@ case class Load(override val outPipeName: String, file: String,
                 var loadSchema: Option[Schema] = None,
                 loaderFunc: String = "", loaderParams: List[String] = null) extends PigOperator(outPipeName, List(), loadSchema) {
   override def constructSchema: Option[Schema] = {
-    // schema = inputs(0).producer.schema // TODO
-    None
+    /*
+     * Either the schema was defined or it is None.
+     */
+    schema
   }
 
   override def lineageString: String = {
@@ -120,8 +146,21 @@ case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[String] = None)
 case class Foreach(override val outPipeName: String, inPipeName: String, expr: List[GeneratorExpr])
   extends PigOperator(outPipeName, inPipeName) {
   override def constructSchema: Option[Schema] = {
-    // schema = inputs(0).producer.schema // TODO
+    schema = inputs(0).producer.schema // TODO
     schema
+  }
+
+  override def checkSchemaConformance: Boolean = {
+    schema match {
+      case Some(s) => {
+        // if we know the schema we check all named fields
+        true
+      }
+      case None => {
+        // if we don't have a schema all expressions should contain only positional fields
+        true
+      }
+    }
   }
 
   override def lineageString: String = {
@@ -142,6 +181,20 @@ case class Filter(override val outPipeName: String, inPipeName: String, pred: Pr
     s"""FILTER%${pred}%""" + super.lineageString
   }
 
+  override def checkSchemaConformance: Boolean = {
+    schema match {
+      case Some(s) => {
+        // if we know the schema we check all named fields
+        pred.traverse(s, Expr.checkExpressionConformance)
+      }
+      case None => {
+        // if we don't have a schema all expressions should contain only positional fields
+        pred.traverse(null, Expr.containsNoNamedFields)
+      }
+    }
+  }
+
+
 }
 
 /**
@@ -160,10 +213,15 @@ case class GroupingExpression(val keyList: List[Ref])
  */
 case class Grouping(override val outPipeName: String, inPipeName: String, groupExpr: GroupingExpression)
   extends PigOperator(outPipeName, inPipeName) {
+
   override def lineageString: String = {
     s"""GROUPBY%${groupExpr}%""" + super.lineageString
   }
 
+  override def constructSchema: Option[Schema] = {
+    schema = inputs(0).producer.schema // TODO
+    schema
+  }
 }
 
 /**

@@ -18,14 +18,24 @@ class SparkGenCode extends GenCodeBase {
 
   val typeTable = Map("int" -> "toInt", "float" -> "toFloat", "double" -> "toDouble", "chararray" -> "toString")
 
-  def emitRef(schema: Option[Schema], ref: Ref): String = ref match {
-    case NamedField(f) => {
-      if (schema.isEmpty) throw new SchemaException(s"unknown schema for field $f")
-      s"t._${schema.get.indexOfField(f)}"
+  def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true): String = ref match {
+    case NamedField(f) => schema match {
+      case Some(s) => {
+        val idx = s.indexOfField(f)
+        require(idx >= 0) // the field doesn't exist in the schema: shouldn't occur because it was checked before
+        if (requiresTypeCast) {
+          val field = s.field(idx)
+          val typeCast = typeTable(field.fType.name)
+          s"${tuplePrefix}(${idx}).${typeCast}"
+        }
+        else
+          s"${tuplePrefix}(${idx})"
+      }
+      case None => throw new SchemaException(s"unknown schema for field $f")
     } // TODO: should be position of field
-    case PositionalField(pos) => s"t($pos)"
-    case Value(v) => v.toString // TODO: could be also a predicate!
-    case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}(${emitRef(schema, r2)})"
+    case PositionalField(pos) => s"$tuplePrefix($pos)"
+    case Value(v) => v.toString
+    case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
     case _ => { "" }
   }
@@ -41,7 +51,7 @@ class SparkGenCode extends GenCodeBase {
   }
 
   def emitGrouping(schema: Option[Schema], groupingExpr: GroupingExpression): String = {
-    groupingExpr.keyList.map(e => emitRef(schema, e)).mkString(",")
+    groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",")
   }
 
   def emitJoinKey(schema: Option[Schema], joinExpr: List[Ref]): String = {

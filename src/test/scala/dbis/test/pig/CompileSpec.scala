@@ -44,7 +44,6 @@ class CompileSpec extends FlatSpec {
     val op = Load("a", "file.csv", None, "PigStorage", List("""",""""))
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    println(generatedCode)
     val expectedCode = cleanString("""val a = PigStorage().load(sc, "file.csv", ",")""")
     assert(generatedCode == expectedCode)
   }
@@ -163,7 +162,6 @@ class CompileSpec extends FlatSpec {
     ))
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    println(generatedCode)
     val expectedCode = cleanString("val a = b.map(t => List(PigFuncs.toMap(\"field1\",t(0),\"field2\",t(1))))")
     assert(generatedCode == expectedCode)
   }
@@ -180,13 +178,26 @@ class CompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for deref operator in foreach statement" in {
+  it should "contain code for deref operator on maps in foreach statement" in {
+    // a = FOREACH b GENERATE $0#"k1", $1#"k2";
     val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), """"k1""""))),
       GeneratorExpr(RefExpr(DerefMap(PositionalField(1), """"k2"""")))))
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val a = b.map(t => List(t(0).asInstanceOf[Map[String,Any]]("k1"),t(1).asInstanceOf[Map[String,Any]]("k2")))""".stripMargin)
-        assert(generatedCode == expectedCode)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for deref operator on tuple in foreach statement" in {
+    // a = FOREACH b GENERATE $0.$1, $2.$0;
+    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
+      GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0))))))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    println(generatedCode)
+    val expectedCode = cleanString("""
+        |val a = b.map(t => List(t(0).asInstanceOf[List[Any]](1),t(2).asInstanceOf[List[Any]](0)))""".stripMargin)
+    assert(generatedCode == expectedCode)
   }
 }

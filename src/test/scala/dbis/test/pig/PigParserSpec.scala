@@ -208,9 +208,16 @@ class PigParserSpec extends FlatSpec {
       List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), """"k1""""))),
         GeneratorExpr(RefExpr(DerefMap(PositionalField(1), """"k2"""")))))))
   }
+
   it should "parse expressions with deref operators for tuple and bag" in {
     assert(parseScript("""a = foreach b generate t1.k, t2.$0;""") ==
       List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(NamedField("t1"), NamedField("k")))),
         GeneratorExpr(RefExpr(DerefTuple(NamedField("t2"), PositionalField(0))))))))
+  }
+
+  it should "parse expressions with deref operators on positional fields for tuple and bag" in {
+    assert(parseScript("""a = foreach b generate $0.$1, $2.$0;""") ==
+      List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
+        GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0))))))))
   }
 }
