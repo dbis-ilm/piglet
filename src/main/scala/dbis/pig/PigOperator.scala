@@ -285,13 +285,30 @@ case class Grouping(override val outPipeName: String, inPipeName: String, groupE
   }
 
   override def constructSchema: Option[Schema] = {
-    schema = inputs(0).producer.schema // TODO
+    val inputSchema = inputs.head.producer.schema
+    // tuple(group: typeOfGroupingExpr, in:bag(inputSchema))
+    val inputType = inputSchema match {
+      case Some(s) => s.element.valueType
+      case None => TupleType("", Array(Field("", Types.ByteArrayType)))
+    }
+    val groupingType = Types.IntType
+    val fields = Array(Field("group", groupingType),
+                      Field(inputs.head.name, BagType("", inputType)))
+    schema = Some(new Schema(new BagType("", new TupleType("", fields))))
     schema
   }
 
   override def checkSchemaConformance: Boolean = {
-    // TODO
-    true
+    schema match {
+      case Some(s) => {
+        // if we know the schema we check all named fields
+        groupExpr.keyList.filter(_.isInstanceOf[NamedField]).exists(f => s.indexOfField(f.asInstanceOf[NamedField].name) != -1)
+      }
+      case None => {
+        // if we don't have a schema all expressions should contain only positional fields
+        groupExpr.keyList.map(_.isInstanceOf[NamedField]).exists(b => b)
+      }
+    }
   }
 }
 

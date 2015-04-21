@@ -51,4 +51,11 @@ case class Schema(val element: BagType) {
    * @return the field definition
    */
   def field(name: String): Field = field(indexOfField(name))
+
+  def fields: Array[Field] = {
+    if (! element.valueType.isInstanceOf[TupleType])
+      throw new SchemaException("schema type isn't a bag of tuples")
+    val tupleType = element.valueType.asInstanceOf[TupleType]
+    tupleType.fields
+  }
 }

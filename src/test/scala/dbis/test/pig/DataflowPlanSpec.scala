@@ -143,7 +143,22 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "infer the schema for group by" in {
-
+    val plan = new DataflowPlan(parseScript("""
+        |a = load "file.csv" as (f1: int, f2: double, f3:map[]);
+        |b = group a by f1;
+        |""".stripMargin))
+    val schema = plan.operators(1).schema
+    schema should not be (None)
+    schema match {
+      case Some(s) => {
+        s.fields.length should equal (2)
+        s.field(0) should equal(Field("group", Types.IntType))
+        s.field(1) should equal(Field("a", BagType("", TupleType("", Array(Field("f1", Types.IntType),
+                                                                      Field("f2", Types.DoubleType),
+                                                                      Field("f3", MapType("", Types.ByteArrayType))
+        )))))
+      }
+    }
   }
 
   it should "infer the schema for join" in {
