@@ -90,8 +90,56 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     }
   }
 
-  it should "infer the schema for foreach" in {
+  it should "infer the schema for a generate clause in foreach" in {
+    val plan = new DataflowPlan(parseScript("""
+        |a = load "file.csv";
+        |b = foreach a generate $0 as subject: chararray, $1 as predicate: chararray, $2 as object:bytearray;
+        |""".stripMargin))
+    val schema = plan.operators(1).schema
+    schema should not be (None)
+    schema match {
+      case Some(s) => {
+        s.field(0) should equal (Field("subject", Types.CharArrayType))
+        s.field(1) should equal (Field("predicate", Types.CharArrayType))
+        s.field(2) should equal (Field("object", Types.ByteArrayType))
+      }
+      case None => fail()
+    }
+  }
 
+  it should "infer the schema for another generate clause in foreach" in {
+    val plan = new DataflowPlan(parseScript("""
+        |a = load "file.csv";
+        |b = foreach a generate $0+$1, $1 as f1: double, $2 as f3;
+        |""".stripMargin))
+    val schema = plan.operators(1).schema
+    schema should not be (None)
+    schema match {
+      case Some(s) => {
+        s.field(0) should equal (Field("", Types.DoubleType))
+        s.field(1) should equal (Field("f1", Types.DoubleType))
+        s.field(2) should equal (Field("f3", Types.ByteArrayType))
+      }
+      case None => fail()
+    }
+  }
+
+  it should "infer the schema for a generate clause in foreach with type casts" in {
+    val plan = new DataflowPlan(parseScript("""
+        |a = load "file.csv";
+        |b = foreach a generate (int)$0, (tuple(int,int,float))$1 as f1;
+        |""".stripMargin))
+    val schema = plan.operators(1).schema
+    schema should not be (None)
+    schema match {
+      case Some(s) => {
+        s.field(0) should equal (Field("", Types.IntType))
+        s.field(1) should equal (Field("f1", TupleType("", Array(Field("", Types.IntType),
+                                                                Field("", Types.IntType),
+                                                                Field("", Types.FloatType)))))
+      }
+      case None => fail()
+    }
   }
 
   it should "infer the schema for group by" in {
@@ -123,7 +171,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
         |a = load "file.csv";
         |b = filter a by f0 > 0;
         |""".stripMargin))
-    println(plan.operators(1))
     plan.checkSchemaConformance should equal (false)
   }
 }

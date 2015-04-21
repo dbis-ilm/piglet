@@ -21,12 +21,23 @@ object TypeCode extends Enumeration {
 
 import TypeCode._
 
+/**
+ * The base class for all Pig types.
+ */
 sealed abstract class PigType {
   var name: String = ""
 
   def this(s: String) = { this(); name = s }
+
+  def descriptionString: String = name
 }
 
+/**
+ * The base class for all primitive types (int, float, double, ...).
+ *
+ * @param s the name of the type.
+ * @param tc the typecode representing this type.
+ */
 case class SimpleType(s: String, tc: TypeCode) extends PigType(s)
 
 object Types {
@@ -70,7 +81,10 @@ object Types {
   }
 }
 
-case class Field(name: String, fType: PigType)
+case class Field(name: String, fType: PigType = Types.ByteArrayType) {
+  override def toString = s"${name}: ${fType.descriptionString}"
+}
+
 case class TupleType(s: String, var fields: Array[Field]) extends PigType(s) {
   override def equals(that: Any): Boolean = that match {
     case TupleType(name, fields) => this.name == name && this.fields.deep == fields.deep
@@ -78,8 +92,16 @@ case class TupleType(s: String, var fields: Array[Field]) extends PigType(s) {
   }
 
   override def toString = "TupleType(" + name + "," + fields.mkString(",") + ")"
+
+  override def descriptionString = "(" + fields.mkString(", ") + ")"
+
+  def plainDescriptionString = fields.mkString(", ")
 }
 
-case class BagType(s: String, var valueType: PigType) extends PigType(s)
+case class BagType(s: String, var valueType: TupleType) extends PigType(s) {
+  override def descriptionString = "{" + valueType.plainDescriptionString + "}"
+}
 
-case class MapType(s: String, var valueType: PigType) extends PigType(s)
+case class MapType(s: String, var valueType: PigType) extends PigType(s) {
+  override def descriptionString = "[" + valueType.descriptionString + "]"
+}

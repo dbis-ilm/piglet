@@ -59,10 +59,31 @@ class PigParser extends JavaTokenParsers {
     }
   }
 
-  def typeName: Parser[String] = ( "int" | "float" | "double" | "chararray"| " bytearray") ^^ { s => s }
+  // def typeName: Parser[String] = ( "int" | "float" | "double" | "chararray"| " bytearray") ^^ { s => s }
+
+  def castTypeSpec: Parser[PigType] = (
+    "int" ^^ { _ => Types.IntType }
+      | "long" ^^ { _ => Types.LongType }
+      | "float" ^^ { _ => Types.FloatType }
+      | "double" ^^ { _ => Types.DoubleType }
+      | "boolean" ^^ { _ => Types.BooleanType }
+      | "chararray" ^^ { _ => Types.CharArrayType }
+      | "bytearray" ^^{ _ => Types.ByteArrayType }
+      | "tuple" ~ "(" ~ repsep(castTypeSpec, ",") ~ ")" ^^{
+            case _ ~ _ ~ typeList ~ _ => TupleType("", typeList.map(t => Field("", t)).toArray)
+        }
+      /*
+       * bag schema: bag{tuple(<list of types>)}
+       */
+     // | "bag" ~ "{" ~ "tuple" ~ "(" ~ ")" ~ repsep(castTypeSpec, ",") ~ "}" ^^{ case _ ~ "{" ~ tup ~ "}" => BagType("", tup) }
+      /*
+       * map schema: map[<list of types>]
+       */
+      | "map" ~ "[" ~ "]" ^^{ case _ ~ _ ~ _ => MapType("", Types.ByteArrayType) }
+    )
 
   def factor: Parser[ArithmeticExpr] =  (
-     "(" ~ typeName ~ ")" ~ refExpr ^^ { case _ ~ t ~ _ ~ e => CastExpr(t, e) }
+     "(" ~ castTypeSpec ~ ")" ~ refExpr ^^ { case _ ~ t ~ _ ~ e => CastExpr(t, e) }
       | "(" ~ arithmExpr ~ "" ^^ { case _ ~ e ~ _ => e }
       | func
       | refExpr
@@ -173,8 +194,8 @@ class PigParser extends JavaTokenParsers {
   /*
    * <A> = FOREACH <B> GENERATE <Expr> [ AS <Schema> ]
    */
-  def schema: Parser[String] = ident // TODO: not only a typename but a schema!
-  def exprSchema: Parser[String] = asKeyword ~ schema ^^ { case _ ~ t => t }
+  // def schema: Parser[String] = ident // TODO: not only a typename but a schema!
+  def exprSchema: Parser[Field] = asKeyword ~ fieldSchema ^^ { case _ ~ t => t }
   def genExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
   def generatorList: Parser[List[GeneratorExpr]] = repsep(genExpr, ",")
   def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~ generateKeyword ~ generatorList ^^ {

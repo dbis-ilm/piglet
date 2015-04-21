@@ -43,4 +43,12 @@ case class Schema(val element: BagType) {
     val tupleType = element.valueType.asInstanceOf[TupleType]
     tupleType.fields(pos)
   }
+
+  /**
+   * Returns the field with the given name.
+   *
+   * @param name the name of the field
+   * @return the field definition
+   */
+  def field(name: String): Field = field(indexOfField(name))
 }

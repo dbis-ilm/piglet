@@ -170,7 +170,7 @@ class CompileSpec extends FlatSpec {
     // a = FOREACH b GENERATE $0, COUNT($1) AS CNT;
     val op = Foreach("a", "b", List(
         GeneratorExpr(RefExpr(PositionalField(0))),
-        GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some("CNT"))
+        GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType)))
       ))
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -195,7 +195,6 @@ class CompileSpec extends FlatSpec {
       GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0))))))
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    println(generatedCode)
     val expectedCode = cleanString("""
         |val a = b.map(t => List(t(0).asInstanceOf[List[Any]](1),t(2).asInstanceOf[List[Any]](0)))""".stripMargin)
     assert(generatedCode == expectedCode)

@@ -1,17 +1,17 @@
 package dbis.test.pig
 
 import dbis.pig._
-import org.scalatest.FlatSpec
+import org.scalatest.{Matchers, FlatSpec}
 
 /**
  * Created by kai on 16.04.15.
  */
-class TypeSpec extends FlatSpec {
+class TypeSpec extends FlatSpec with Matchers {
 
   "The type system" should "contain predefined simple types" in {
     val t1 = Types.IntType
-    assert(t1.name == "int")
-    assert(t1 == Types.typeForName("int"))
+    t1.name should be ("int")
+    t1 should be (Types.typeForName("int"))
 
     val t2 = Types.FloatType
     assert(t2.name == "float")
@@ -39,9 +39,10 @@ class TypeSpec extends FlatSpec {
     assert(t1.name == "m")
     assert(t1.valueType == Types.typeForName("double"))
 
-    val t2 = BagType("b", Types.CharArrayType)
+    val tt = TupleType("", Array(Field("c", Types.IntType)))
+    val t2 = BagType("b", tt)
     assert(t2.name == "b")
-    assert(t2.valueType == Types.CharArrayType)
+    assert(t2.valueType == tt)
 
     val t3 = TupleType("t", Array(Field("f1", Types.IntType),
                                   Field("f2", Types.DoubleType),
@@ -60,5 +61,21 @@ class TypeSpec extends FlatSpec {
     assert(Types.typeCompatibility(Types.FloatType, Types.DoubleType))
     assert(! Types.typeCompatibility(Types.IntType, Types.CharArrayType))
     assert(! Types.typeCompatibility(Types.IntType, MapType("m", Types.CharArrayType)))
+  }
+
+  it should "return the type description for a bag" in {
+    val t = BagType("", TupleType("", Array(Field("f1", Types.IntType),
+                                            Field("f2", Types.CharArrayType)
+    )))
+    t.descriptionString should be ("{f1: int, f2: chararray}")
+  }
+
+  it should "return the type description for a nested bag" in {
+    val t = BagType("", TupleType("", Array(Field("f1", Types.IntType),
+                                            Field("f2", TupleType("", Array(Field("t1", Types.ByteArrayType),
+                                                                Field("t2", Types.ByteArrayType)
+                                              )))
+    )))
+    t.descriptionString should be ("{f1: int, f2: (t1: bytearray, t2: bytearray)}")
   }
 }

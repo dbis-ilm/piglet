@@ -16,7 +16,12 @@ class SparkGenCode extends GenCodeBase {
                       "TOMAP" -> UDF("PigFuncs.toMap", Int.MaxValue, false)
   )
 
-  val typeTable = Map("int" -> "toInt", "float" -> "toFloat", "double" -> "toDouble", "chararray" -> "toString")
+  // TODO: complex types
+  val typeTable = Map[PigType, String](Types.IntType -> "toInt",
+                      Types.LongType -> "toLong",
+                      Types.FloatType -> "toFloat",
+                      Types.DoubleType -> "toDouble",
+                      Types.CharArrayType -> "toString")
 
   def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true): String = ref match {
     case NamedField(f) => schema match {
@@ -25,7 +30,7 @@ class SparkGenCode extends GenCodeBase {
         require(idx >= 0) // the field doesn't exist in the schema: shouldn't occur because it was checked before
         if (requiresTypeCast) {
           val field = s.field(idx)
-          val typeCast = typeTable(field.fType.name)
+          val typeCast = typeTable(field.fType)
           s"${tuplePrefix}(${idx}).${typeCast}"
         }
         else
@@ -103,7 +108,7 @@ class SparkGenCode extends GenCodeBase {
     case Load(out, file, schema, func, params) => { s"""val $out = ${emitLoader(file, func, params)}""" }
     case Dump(in) => { s"""${node.inPipeNames.head}.collect.map(t => println(t.mkString(",")))""" }
     case Store(in, file) => { s"""${node.inPipeNames.head}.coalesce(1, true).saveAsTextFile("${file}")""" }
-    case Describe(in) => { s"$in: { $node.schemaToString }" }
+    case Describe(in) => { s"""println("${node.schemaToString}")""" }
     case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames.head}.filter(t => {${emitPredicate(node.schema, pred)}})" }
     case Foreach(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.map(t => ${emitGenerator(node.schema, expr)})" }
     case Grouping(out, in, groupExpr) => {

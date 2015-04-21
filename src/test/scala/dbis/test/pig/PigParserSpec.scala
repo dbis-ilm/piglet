@@ -103,17 +103,17 @@ class PigParserSpec extends FlatSpec {
   it should "parse a foreach statement with aliases for fields" in {
     assert(parseScript("a = foreach b generate $0 as f1, $1 as f2, $2 as f3;") ==
       List(Foreach("a", "b", List(
-        GeneratorExpr(RefExpr(PositionalField(0)), Some("f1")),
-        GeneratorExpr(RefExpr(PositionalField(1)), Some("f2")),
-        GeneratorExpr(RefExpr(PositionalField(2)), Some("f3"))
+        GeneratorExpr(RefExpr(PositionalField(0)), Some(Field("f1"))),
+        GeneratorExpr(RefExpr(PositionalField(1)), Some(Field("f2"))),
+        GeneratorExpr(RefExpr(PositionalField(2)), Some(Field("f3")))
       ))))
   }
 
   it should "parse a foreach statement with field expressions" in {
     assert(parseScript("a = foreach b generate $0 + $1 as f1, $1 * 42 as f2;") ==
       List(Foreach("a", "b", List(
-        GeneratorExpr(Add(RefExpr(PositionalField(0)), RefExpr(PositionalField(1))), Some("f1")),
-        GeneratorExpr(Mult(RefExpr(PositionalField(1)), RefExpr(Value("42"))), Some("f2"))
+        GeneratorExpr(Add(RefExpr(PositionalField(0)), RefExpr(PositionalField(1))), Some(Field("f1"))),
+        GeneratorExpr(Mult(RefExpr(PositionalField(1)), RefExpr(Value("42"))), Some(Field("f2")))
       ))))
   }
 
@@ -132,7 +132,16 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("a = FOREACH b GENERATE f0, COUNT(f1) AS CNT;") ==
       List(Foreach("a", "b", List(
         GeneratorExpr(RefExpr(NamedField("f0"))),
-        GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("f1")))), Some("CNT"))
+        GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("f1")))), Some(Field("CNT", Types.ByteArrayType)))
+      ))))
+  }
+
+  it should "parse a simple foreach statement with a schema" in {
+    assert(parseScript("a = foreach b generate $0 as subj:chararray, $1 as pred, $2 as obj:chararray;") ==
+      List(Foreach("a", "b", List(
+        GeneratorExpr(RefExpr(PositionalField(0)), Some(Field("subj", Types.CharArrayType))),
+        GeneratorExpr(RefExpr(PositionalField(1)), Some(Field("pred", Types.ByteArrayType))),
+        GeneratorExpr(RefExpr(PositionalField(2)), Some(Field("obj", Types.CharArrayType)))
       ))))
   }
 

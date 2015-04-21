@@ -32,7 +32,7 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
    */
   def constructSchema: Option[Schema] = {
     if (inputs.nonEmpty)
-      schema = inputs(0).producer.schema
+      schema = inputs.head.producer.schema
     schema
   }
 
@@ -42,7 +42,13 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
    * @return a string describing the schema
    */
   def schemaToString: String = {
-    "" // TODO: how to describe the schema??
+    /*
+     * schemaToString is mainly called from DESCRIBE. Thus, we can take inPipeNames.head as relation name.
+     */
+    schema match {
+      case Some(s) => s"${inPipeNames.head}: ${s.element.descriptionString}"
+      case None => s"Schema for ${inPipeNames.head} unknown."
+    }
   }
 
   /**
@@ -58,7 +64,7 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
     true
   }
 
-   /**
+  /**
    * Returns a MD5 hash string representing the sub-plan producing the input for this operator.
    *
    * @return the MD5 hash string
@@ -94,6 +100,11 @@ case class Load(override val outPipeName: String, file: String,
     schema
   }
 
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
   override def lineageString: String = {
     s"""LOAD%${file}%""" + super.lineageString
   }
@@ -105,6 +116,12 @@ case class Load(override val outPipeName: String, file: String,
  * @param inPipeName the name of the input pipe
  */
 case class Dump(inPipeName: String) extends PigOperator("", inPipeName) {
+
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
   override def lineageString: String = {
     s"""DUMP%""" + super.lineageString
   }
@@ -117,6 +134,12 @@ case class Dump(inPipeName: String) extends PigOperator("", inPipeName) {
  * @param file the name of the output file
  */
 case class Store(inPipeName: String, file: String) extends PigOperator("", inPipeName) {
+
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
   override def lineageString: String = {
     s"""STORE%${file}%""" + super.lineageString
   }
@@ -128,13 +151,19 @@ case class Store(inPipeName: String, file: String) extends PigOperator("", inPip
  * @param inPipeName the name of the input pipe
  */
 case class Describe(inPipeName: String) extends PigOperator("", inPipeName) {
+
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
   override def lineageString: String = {
     s"""DESCRIBE%""" + super.lineageString
   }
 
 }
 
-case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[String] = None)
+case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None)
 
 /**
  * Foreach represents the FOREACH operator of Pig.
@@ -145,8 +174,29 @@ case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[String] = None)
  */
 case class Foreach(override val outPipeName: String, inPipeName: String, expr: List[GeneratorExpr])
   extends PigOperator(outPipeName, inPipeName) {
+
   override def constructSchema: Option[Schema] = {
-    schema = inputs(0).producer.schema // TODO
+    val inputSchema = inputs.head.producer.schema
+    // we create a bag of tuples containing fields for each expression in expr
+    val fields = expr.map(e => {
+      e.alias match {
+        // if we have an explicit schema (i.e. a field) then we use it
+        case Some(f) => {
+          if (f.fType == Types.ByteArrayType) {
+            // if the type was only bytearray, we should check the expression if we have a more
+            // specific type
+            val res = e.expr.resultType(inputSchema)
+            Field(f.name, res._2)
+          }
+          else
+            f
+        }
+        // otherwise we take the field name from the expression and
+        // the input schema
+        case None => val res = e.expr.resultType(inputSchema); Field(res._1, res._2)
+      }
+    }).toArray
+    schema = Some(new Schema(new BagType("", new TupleType("", fields))))
     schema
   }
 
@@ -154,15 +204,20 @@ case class Foreach(override val outPipeName: String, inPipeName: String, expr: L
     schema match {
       case Some(s) => {
         // if we know the schema we check all named fields
-        true
+        expr.map(_.expr.traverse(s, Expr.checkExpressionConformance)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
       }
       case None => {
         // if we don't have a schema all expressions should contain only positional fields
-        true
+        expr.map(_.expr.traverse(null, Expr.containsNoNamedFields)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
       }
     }
   }
 
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
   override def lineageString: String = {
     s"""FOREACH%${expr}%""" + super.lineageString
   }
@@ -177,6 +232,12 @@ case class Foreach(override val outPipeName: String, inPipeName: String, expr: L
  */
 case class Filter(override val outPipeName: String, inPipeName: String, pred: Predicate)
   extends PigOperator(outPipeName, inPipeName) {
+
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
   override def lineageString: String = {
     s"""FILTER%${pred}%""" + super.lineageString
   }
@@ -214,6 +275,11 @@ case class GroupingExpression(val keyList: List[Ref])
 case class Grouping(override val outPipeName: String, inPipeName: String, groupExpr: GroupingExpression)
   extends PigOperator(outPipeName, inPipeName) {
 
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
   override def lineageString: String = {
     s"""GROUPBY%${groupExpr}%""" + super.lineageString
   }
@@ -221,6 +287,11 @@ case class Grouping(override val outPipeName: String, inPipeName: String, groupE
   override def constructSchema: Option[Schema] = {
     schema = inputs(0).producer.schema // TODO
     schema
+  }
+
+  override def checkSchemaConformance: Boolean = {
+    // TODO
+    true
   }
 }
 
