@@ -10,6 +10,18 @@ class PigStorage extends java.io.Serializable {
   def load(sc: SparkContext, path: String, delim: String = " "): RDD[List[String]] = {
     sc.textFile(path).map(line => line.split(delim).toList)
   }
+
+  /*
+  def load(sc: SparkContext, path: String, schema: Schema, delim: String = " "): RDD[List[Any]] = {
+    val pattern = "[^,(){}]+".r
+    val fields = schema.element.valueType.fields
+    sc.textFile(path).map(line => {
+      val strings = pattern.findAllIn(line).toList
+      for (f <- fields) {
+      }
+    })
+  }
+  */
 }
 
 object PigStorage {
