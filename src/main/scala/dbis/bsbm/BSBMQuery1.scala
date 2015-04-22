@@ -22,7 +22,7 @@ object BSBMQuery1 {
         conf.setMaster("local[4]")
         val sc = new SparkContext(conf)
         
-        val raw = loadRDF(sc, "bsbm.n3")
+        val raw = loadRDF(sc, "usecases/testdata.nt")
         
         val producer = raw.filter(t => t(1) == "<http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/producer>").keyBy(t => t(0))
         val country = raw.filter(t => t(1) == "<http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/country>" && t(2) == "<http://downlode.org/rdf/iso-3166/countries#GB>").keyBy(t => t(0))
