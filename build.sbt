@@ -9,7 +9,7 @@ libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3" withSources(),
   "org.scala-lang" % "scala-compiler" % "2.11.6",
   "com.assembla.scala-incubator" %% "graph-core" % "1.9.1",
-  "org.apache.spark" %% "spark-core" % "1.3.0",
+  "org.apache.spark" %% "spark-core" % "1.3.0" % "provided",
   "com.github.scopt" %% "scopt" % "3.3.0"
 )
 
