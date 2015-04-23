@@ -38,6 +38,11 @@ object Query1 {
       .keyBy(t => t._1)
     /* product => product, type, producer, country */
 
+    /*
+    ---- Hage:  productWithTypes.saveAsObjectFile("products.ser")
+     productWithTypes: RDD[(String,(String,String,String,String))] = sc.objectFile("products.ser")
+    ----
+    */
     val reviews = raw.filter(t =>
       t(1) == "<http://www4.wiwiss.fu-berlin.de/bizer/bsbm/v01/vocabulary/reviewFor>").keyBy(t => t(2))
     val productReviews = reviews.join(productsWithTypes).map{case (k, v) => (v._1(0), v._2._1, v._2._2, v._2._3, v._2._4)}.keyBy(t => t._1)
