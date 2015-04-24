@@ -74,9 +74,6 @@ object Query6 extends App {
   // productRating = JOIN reviewedProducts BY $?, reviewRating BY $?
   val productRating = reviewedProducts.join(reviewRating).map{ case (k,v) => v._2(2) } // score
   
-  // compute average score
-  val avgScore = productRating.map { v => v.toDouble }.sum() / productRating.count()
-
   // reviewer = BGP_FILTER raw BY { ?review rev:reviewer ?reviewer . }
   val reviewer = raw.filter { t => t(1) == "<http://purl.org/stuff/rev#reviewer>" }.keyBy { t => t(0) } 
   
@@ -92,7 +89,7 @@ object Query6 extends App {
                       .map{ case (k,v) => (v._1._3, v._2(2)) } // reviewer, score
                       .keyBy{ t => t._1 }
   
-  // grouped = FOREACH (GROUP withRatings BY $?) GENERATE (group, AVG($?))                       
+  // grouped = FOREACH (GROUP withRatings BY $?) GENERATE (group, AVG($?) AS avg)                       
   val grouped = withRatings.groupByKey().map{ case (k,v) => 
       val scores = v.map{ case (r,s) => s.toDouble }
       val avgScore2 = PigFuncs.average(scores)
@@ -100,9 +97,12 @@ object Query6 extends App {
       (k, avgScore2)
   
   } 
-  
-  // having = FILTER (FOREACH (GROUP grouped ALL) GENERATE COUNT(grouped)) BY $1 > ??? 
-  // TODO: hmm how can we do this in Pig??? need to save one variable, not bag
+    
+  // avgScore = FOREACH (GROUP productsRating ALL) GENERATE AVG(productsRating.$?)
+  // cross = CROSS grouped, avgScore 
+  // having = FILTER cross BY $1 > ($2 * 1.5)
+  // 
+  val avgScore = productRating.map { v => v.toDouble }.sum() / productRating.count()
   val having = grouped.filter{ t => t._2 > avgScore *1.5 }
   
   val res = having.collect().foreach { x => println(x.toString())}
