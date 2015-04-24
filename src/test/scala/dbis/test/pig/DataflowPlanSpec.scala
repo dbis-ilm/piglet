@@ -56,6 +56,16 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
     assert(plan.sinkNodes == Set(op3, op5))
   }
+  
+  it should "find source operators" in {
+    val op1 = Load("a", "file.csv")
+    val op2 = Filter("b", "a", Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
+    val op3 = Dump("b")
+    val op4 = Load("c", "file.csv")
+    val op5 = Dump("c")
+    val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
+    assert(plan.sourceNodes == Set(op1, op4))
+  }
 
   it should "compute identical lineage signatures for two operators with the same plans" in {
     val op1 = Load("a", "file.csv")

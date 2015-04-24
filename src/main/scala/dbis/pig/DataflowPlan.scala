@@ -54,6 +54,12 @@ class DataflowPlan(val operators: List[PigOperator]) {
   def sinkNodes: Set[PigOperator] = {
     graph.nodes.filter((n : Graph[PigOperator,DiEdge]#NodeT) => n.outDegree == 0).map(_.value).toSet[PigOperator]
   }
+  
+  def sourceNodes: Set[PigOperator] = {
+    graph.nodes.filter((n : Graph[PigOperator,DiEdge]#NodeT) => n.inDegree == 0).map(_.value).toSet[PigOperator]
+  }
+  
+  
 
   def checkConnectivity: Boolean = {
     /*
