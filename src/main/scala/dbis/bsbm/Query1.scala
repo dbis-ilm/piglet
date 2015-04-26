@@ -45,12 +45,14 @@ object Query1 {
       .keyBy(t => t._1)
     /* product => product, type, producer, country */
 
+    productsWithTypes.saveAsObjectFile("products.ser")
     /*
     ---- Hage:  productWithTypes.saveAsObjectFile("products.ser")
      productWithTypes: RDD[(String,(String,String,String,String))] = sc.objectFile("products.ser")
     ----
     */
 
+    // val productsWithTypes: RDD[(String,(String,String,String,String))] = sc.objectFile("products.ser")
     /* reviewerCountry = BGP_FILTER raw BY { ?review bsbm:reviewFor ?product .
                                              ?review rev:reviewer ?reviewer .
                                              ?reviewer bsbm:country %Country2% .}; */
