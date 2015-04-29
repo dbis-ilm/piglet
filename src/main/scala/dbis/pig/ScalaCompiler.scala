@@ -16,6 +16,7 @@ trait Probe
  * ScalaCompiler is an object allowing to access the Scala compiler
  * for compiling source files.
  */
+
 object ScalaCompiler {
   /**
    * Compiles the given Scala source file into a class file stored
@@ -24,7 +25,7 @@ object ScalaCompiler {
    * @param targetDir the target directory for the compiled code
    * @param sourceFile the Scala file to be compiled
    */
-  def compile (targetDir: String, sourceFile: String) : Unit = {
+  def compile (targetDir: String, sourceFile: String) : Boolean = {
     val target = AbstractFile.getDirectory(targetDir)
     val settings = new Settings
     /*
@@ -34,7 +35,9 @@ object ScalaCompiler {
 */
     settings.outputDirs.setSingleOutput(target)
     settings.embeddedDefaults[Probe]
-    val global = Global(settings, new ConsoleReporter(settings))
+    val reporter = new ConsoleReporter(settings)
+
+    val global = Global(settings, reporter)
     import global._
 
     val file = sourceFile
@@ -43,5 +46,7 @@ object ScalaCompiler {
     val run = new Run
     val sourceFiles = List(new BatchSourceFile(file, fileContent))
     run.compileSources(sourceFiles)
+
+    !reporter.hasErrors
   }
 }

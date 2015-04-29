@@ -97,7 +97,8 @@ object PigCompiler extends PigParser {
     if (!dirFile.exists)
       dirFile.mkdir()
 
-    ScalaCompiler.compile(outputDirectory, outputFile)
+    if (! ScalaCompiler.compile(outputDirectory, outputFile))
+      return
 
     // 7. build a jar file
     val jarFile = scriptName + ".jar"

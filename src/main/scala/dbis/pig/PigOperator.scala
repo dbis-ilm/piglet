@@ -327,6 +327,20 @@ case class Distinct(override val outPipeName: String, inPipeName: String)
 }
 
 /**
+ * Union represents the UNION operator of Pig.
+ *
+ * @param outPipeName the name of the output pipe (relation).
+ * @param inPipeName the name of the input pipe.
+ */
+case class Union(override val outPipeName: String, override val inPipeNames: List[String])
+  extends PigOperator(outPipeName, inPipeNames) {
+  override def lineageString: String = {
+    s"""UNION%""" + super.lineageString
+  }
+
+}
+
+/**
  * Limit represents the LIMIT operator of Pig.
  *
  * @param outPipeName the name of the output pipe (relation).

@@ -162,7 +162,19 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "infer the schema for join" in {
+    // TODO
+  }
 
+  it should "infer the schema for union with compatible relations" in {
+    // TODO
+  }
+
+  it should "infer a null schema for union with relations of different sizes" in {
+    // TODO
+  }
+
+  it should "infer the schema for union with relations with different types" in {
+    // TODO
   }
 
   it should "accept a filter statement with correct field names" in {

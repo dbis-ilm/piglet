@@ -106,7 +106,7 @@ class SparkGenCode extends GenCodeBase {
 
   def emitNode(node: PigOperator): String = node match {
     case Load(out, file, schema, func, params) => { s"""val $out = ${emitLoader(file, func, params)}""" }
-    case Dump(in) => { s"""${node.inPipeNames.head}.collect.map(t => println(t.mkString(",")))""" }
+    case Dump(in) => { s"""${node.inPipeNames.head}.collect.blub.map(t => println(t.mkString(",")))""" }
     case Store(in, file) => { s"""${node.inPipeNames.head}.coalesce(1, true).saveAsTextFile("${file}")""" }
     case Describe(in) => { s"""println("${node.schemaToString}")""" }
     case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames.head}.filter(t => {${emitPredicate(node.schema, pred)}})" }
@@ -120,6 +120,9 @@ class SparkGenCode extends GenCodeBase {
       val res = rels.zip(exprs)
       val s1 = res.map{case (rel, expr) => s"val ${rel}_kv = ${rel}.keyBy(t => {${emitJoinKey(node.schema, expr)}})\n"}.mkString
       s1 + s"val $out = ${rels.head}_kv" + rels.tail.map{other => s".join(${other}_kv)"}.mkString + ".map{case (k,v) => List(k,v)}"
+    }
+    case Union(out, rels) => {
+      s"val $out = ${rels.head}" + rels.tail.map{other => s".union(${other})"}.mkString
     }
     case _ => { "" }
   }

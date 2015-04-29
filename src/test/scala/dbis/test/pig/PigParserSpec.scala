@@ -229,4 +229,13 @@ class PigParserSpec extends FlatSpec {
       List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
         GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0))))))))
   }
+
+  it should "parse a binary union statement" in {
+    assert(parseScript("a = union b, c;") == List(Union("a", List("b", "c"))))
+  }
+
+  it should "parse a n-ary union statement" in {
+    assert(parseScript("a = union b, c, d, e;") == List(Union("a", List("b", "c", "d", "e"))))
+  }
+
 }

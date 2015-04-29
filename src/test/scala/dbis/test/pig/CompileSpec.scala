@@ -199,4 +199,24 @@ class CompileSpec extends FlatSpec {
         |val a = b.map(t => List(t(0).asInstanceOf[List[Any]](1),t(2).asInstanceOf[List[Any]](0)))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
+
+  it should "contain code for a union operator on two relations" in {
+    // a = UNION b, c;
+    val op = Union("a", List("b", "c"))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+        |val a = b.union(c)""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a union operator on more than two relations" in {
+    // a = UNION b, c, d;
+    val op = Union("a", List("b", "c", "d"))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+        |val a = b.union(c).union(d)""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
 }

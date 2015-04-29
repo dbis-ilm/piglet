@@ -124,6 +124,7 @@ class PigParser extends JavaTokenParsers {
   lazy val foreachKeyword = "foreach".ignoreCase
   lazy val generateKeyword = "generate".ignoreCase
   lazy val asKeyword = "as".ignoreCase
+  lazy val unionKeyword = "union".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
@@ -247,10 +248,15 @@ class PigParser extends JavaTokenParsers {
     case out ~ _ ~ _ ~ jlist => Join(out, extractJoinRelation(jlist), extractJoinFields(jlist)) }
 
   /*
+   * <A> = UNION <B>, <C>, <D>, ...
+   */
+  def unionStmt: Parser[PigOperator] = bag ~ "=" ~ unionKeyword ~ repsep(bag, ",") ^^ { case out ~ _ ~ _ ~ rlist => Union(out, rlist)}
+
+  /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt) ~ ";" ^^ {
+    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*
