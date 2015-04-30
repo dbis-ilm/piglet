@@ -55,7 +55,22 @@ object PigREPL extends PigParser {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
       case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
-      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => false
+      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
+        val plan = new DataflowPlan(buf.toList)
+        if (plan.checkSchemaConformance) {
+          val pat = "[Dd][Ee][Ss][Cc][Rr][Ii][Bb][Ee]\\s[A-Za-z]\\w*".r
+          pat.findFirstIn(s) match {
+            case Some(str) =>
+              val alias = str.split(" ")(1)
+              plan.findOperatorForAlias(alias) match {
+                case Some (op) => println (op.schemaToString)
+                case None => println (s"unknown alias '$alias'")
+              }
+            case None => println("invalid describe command")
+          }
+        }
+        false
+      }
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") => {
         buf ++= parseScript(s)
         val plan = new DataflowPlan(buf.toList)

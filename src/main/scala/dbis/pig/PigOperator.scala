@@ -43,11 +43,11 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
    */
   def schemaToString: String = {
     /*
-     * schemaToString is mainly called from DESCRIBE. Thus, we can take inPipeNames.head as relation name.
+     * schemaToString is mainly called from DESCRIBE. Thus, we can take outPipeName as relation name.
      */
     schema match {
-      case Some(s) => s"${inPipeNames.head}: ${s.element.descriptionString}"
-      case None => s"Schema for ${inPipeNames.head} unknown."
+      case Some(s) => s"${outPipeName}: ${s.element.descriptionString}"
+      case None => s"Schema for ${outPipeName} unknown."
     }
   }
 

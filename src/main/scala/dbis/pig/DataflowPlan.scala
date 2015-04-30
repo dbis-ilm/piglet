@@ -65,4 +65,8 @@ class DataflowPlan(val operators: List[PigOperator]) {
   def checkSchemaConformance: Boolean = {
     operators.map(_.checkSchemaConformance).foldLeft(true){ (b1: Boolean, b2: Boolean) => b1 && b2 }
   }
+
+  def findOperatorForAlias(s: String): Option[PigOperator] = {
+    operators.find(o => o.outPipeName == s)
+  }
  }
