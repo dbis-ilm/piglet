@@ -66,6 +66,12 @@ class DataflowPlan(val operators: List[PigOperator]) {
     operators.map(_.checkSchemaConformance).foldLeft(true){ (b1: Boolean, b2: Boolean) => b1 && b2 }
   }
 
+  /**
+   * Returns the operator that produces the relation with the given alias.
+   *
+   * @param s the alias name of the output relation
+   * @return the operator producing this relation
+   */
   def findOperatorForAlias(s: String): Option[PigOperator] = {
     operators.find(o => o.outPipeName == s)
   }
