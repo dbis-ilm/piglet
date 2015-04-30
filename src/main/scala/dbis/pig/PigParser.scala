@@ -1,6 +1,7 @@
 package dbis.pig
 
 import scala.util.parsing.combinator.JavaTokenParsers
+import scala.util.parsing.input.CharSequenceReader
 
 /**
  * Created by kai on 31.03.15.
@@ -263,4 +264,21 @@ class PigParser extends JavaTokenParsers {
    * A script is a list of statements.
    */
   def script: Parser[List[PigOperator]] = rep(stmt)
+
+  def parseScript(s: CharSequence): List[PigOperator] = {
+    parseScript(new CharSequenceReader(s))
+  }
+
+  def parseScript(input: CharSequenceReader): List[PigOperator] = {
+    parsePhrase(input) match {
+      case Success(t, _) => t
+      case NoSuccess(msg, next) => throw new IllegalArgumentException(
+        "Could not parse '" + input + "' near '" + next.pos.longString + ": " + msg)
+    }
+  }
+
+  def parsePhrase(input: CharSequenceReader): ParseResult[List[PigOperator]] = {
+    phrase(script)(input)
+  }
+
 }

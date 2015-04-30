@@ -5,6 +5,7 @@ version := "1.0"
 scalaVersion := "2.11.6"
 
 libraryDependencies ++= Seq(
+  "jline" % "jline" % "2.12.1",
   "org.scalatest" % "scalatest_2.11" % "2.2.0" % "test" withSources(),
   "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3" withSources(),
   "org.scala-lang" % "scala-compiler" % "2.11.6",
@@ -12,6 +13,8 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % "1.3.0",
   "com.github.scopt" %% "scopt" % "3.3.0"
 )
+
+mainClass in (Compile, packageBin) := Some("dbis.pig.PigREPL")
 
 assemblyJarName in assembly := "PigCompiler.jar"
 
