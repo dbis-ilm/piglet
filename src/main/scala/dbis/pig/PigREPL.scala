@@ -41,12 +41,11 @@ object PigREPL extends PigParser {
         |Commands:
         |<pig latin statement>; - See the PigLatin manual for details: http://hadoop.apache.org/pig
         |Diagnostic commands:
-        |    describe <alias>[::<alias] - Show the schema for the alias. Inner aliases can be described as A::B.
+        |    describe <alias> - Show the schema for the alias.
         |    dump <alias> - Compute the alias and writes the results to stdout.
         |Utility Commands:
         |    help - Display this message.
         |    quit - Quit the Pig shell.
-        |
       """.stripMargin)
   }
 

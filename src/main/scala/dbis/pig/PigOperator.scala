@@ -363,22 +363,9 @@ case class Union(override val outPipeName: String, override val inPipeNames: Lis
         val typeList = inputs.map(p => bagType(p))
         val resultType = typeList.reduceLeft(generalizedBagType)
         schema = Some(new Schema(resultType))
-        /*
-        val typeCompatibility = inputs.tail.map(p => Types.typeCompatibility(s1.element, bagType(p)))
-        if (! typeCompatibility.exists(!_)) {
-          // ... and  compatible fields
-          val typeList = inputs.map(p => bagType(p))
-          val resultType = typeList.reduceLeft(generalizedBagType)
-          schema = Some(new Schema(resultType))
-        }
-        else {
-          // case 3: we have the same number of fields, but incompatible fields
-          // TODO
-        }
-        */
       }
       else {
-        // case 4: the number of fields differ
+        // case 3: the number of fields differ
         schema = None
       }
     }
@@ -413,6 +400,16 @@ case class Join(override val outPipeName: String, override val inPipeNames: List
   extends PigOperator(outPipeName, inPipeNames) {
   override def lineageString: String = {
     s"""JOIN%""" + super.lineageString
+  }
+
+  override def constructSchema: Option[Schema] = {
+    val newFields = ArrayBuffer[Field]()
+    inputs.foreach(p => p.producer.schema match {
+      case Some(s) => newFields ++= s.fields
+      case None => ???
+    })
+    schema = Some(new Schema(BagType("", TupleType("", newFields.toArray))))
+    schema
   }
 
 }
