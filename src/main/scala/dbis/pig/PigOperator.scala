@@ -6,6 +6,8 @@ package dbis.pig
 
 import java.security.MessageDigest
 
+import scala.collection.mutable.ArrayBuffer
+
 /**
  * PigOperator is the base class for all Pig operators. An operator contains
  * pipes representing the input and output connections to other operators in the
@@ -330,13 +332,59 @@ case class Distinct(override val outPipeName: String, inPipeName: String)
  * Union represents the UNION operator of Pig.
  *
  * @param outPipeName the name of the output pipe (relation).
- * @param inPipeName the name of the input pipe.
+ * @param inPipeNames the list of names of input pipes.
  */
 case class Union(override val outPipeName: String, override val inPipeNames: List[String])
   extends PigOperator(outPipeName, inPipeNames) {
   override def lineageString: String = {
     s"""UNION%""" + super.lineageString
   }
+
+  override def constructSchema: Option[Schema] = {
+    val bagType = (p: Pipe) => p.producer.schema.get.element
+    val generalizedBagType = (b1: BagType, b2: BagType) => {
+      require(b1.valueType.fields.length == b2.valueType.fields.length)
+      val newFields = ArrayBuffer[Field]()
+      val fieldPairs = b1.valueType.fields.zip(b2.valueType.fields)
+      for ((f1, f2) <- fieldPairs) {
+        newFields += Field(f1.name, Types.escalateTypes(f1.fType, f2.fType))
+      }
+      BagType(b1.s, TupleType(b1.valueType.s, newFields.toArray))
+    }
+
+    // case 1: one of the input schema isn't known -> output schema = None
+    if (inputs.exists(p => p.producer.schema == None)) {
+      schema = None
+    }
+    else {
+      // case 2: all input schemas have the same number of fields
+      val s1 = inputs.head.producer.schema.get
+      if (! inputs.tail.exists(p => s1.fields.length != p.producer.schema.get.fields.length)) {
+        val typeList = inputs.map(p => bagType(p))
+        val resultType = typeList.reduceLeft(generalizedBagType)
+        schema = Some(new Schema(resultType))
+        /*
+        val typeCompatibility = inputs.tail.map(p => Types.typeCompatibility(s1.element, bagType(p)))
+        if (! typeCompatibility.exists(!_)) {
+          // ... and  compatible fields
+          val typeList = inputs.map(p => bagType(p))
+          val resultType = typeList.reduceLeft(generalizedBagType)
+          schema = Some(new Schema(resultType))
+        }
+        else {
+          // case 3: we have the same number of fields, but incompatible fields
+          // TODO
+        }
+        */
+      }
+      else {
+        // case 4: the number of fields differ
+        schema = None
+      }
+    }
+    schema
+  }
+
 
 }
 

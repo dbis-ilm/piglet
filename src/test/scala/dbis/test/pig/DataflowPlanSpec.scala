@@ -108,7 +108,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
         |b = foreach a generate $0 as subject: chararray, $1 as predicate: chararray, $2 as object:bytearray;
         |""".stripMargin))
     val schema = plan.operators(1).schema
-    schema should not be (None)
     schema match {
       case Some(s) => {
         s.field(0) should equal (Field("subject", Types.CharArrayType))
@@ -125,7 +124,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
         |b = foreach a generate $0+$1, $1 as f1: double, $2 as f3;
         |""".stripMargin))
     val schema = plan.operators(1).schema
-    schema should not be (None)
     schema match {
       case Some(s) => {
         s.field(0) should equal (Field("", Types.DoubleType))
@@ -142,7 +140,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
         |b = foreach a generate (int)$0, (tuple(int,int,float))$1 as f1;
         |""".stripMargin))
     val schema = plan.operators(1).schema
-    schema should not be (None)
     schema match {
       case Some(s) => {
         s.field(0) should equal (Field("", Types.IntType))
@@ -160,7 +157,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
         |b = group a by f1;
         |""".stripMargin))
     val schema = plan.operators(1).schema
-    schema should not be (None)
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
@@ -170,6 +166,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
                                                                       Field("f3", MapType("", Types.ByteArrayType))
         )))))
       }
+      case None => fail()
     }
   }
 
@@ -178,15 +175,49 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "infer the schema for union with compatible relations" in {
-    // TODO
+    val plan = new DataflowPlan(parseScript("""
+        |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
+        |b = load "file.csv" as (f1:int, f2:chararray, f3:double);
+        |c = union a, b;
+        |""".stripMargin))
+    val schema = plan.operators.last.schema
+    schema match {
+      case Some(s) => {
+        s.fields.length should equal (3)
+        s.field(0) should equal(Field("f1", Types.IntType))
+        s.field(1) should equal(Field("f2", Types.CharArrayType))
+        s.field(2) should equal(Field("f3", Types.DoubleType))
+      }
+      case None => fail()
+    }
   }
 
   it should "infer a null schema for union with relations of different sizes" in {
-    // TODO
+    val plan = new DataflowPlan(parseScript("""
+         |a = load "file.csv" as (f1:int, f2:chararray, f3:double, f4:int);
+         |b = load "file.csv" as (f1:int, f2:chararray, f3:double);
+         |c = union a, b;
+         |""".stripMargin))
+    val schema = plan.operators.last.schema
+    schema should equal (None)
   }
 
   it should "infer the schema for union with relations with different types" in {
-    // TODO
+    val plan = new DataflowPlan(parseScript("""
+        |a = load "file.csv" as (f1:int, f2:chararray, f3:float);
+        |b = load "file.csv" as (f11:double, f21:bytearray, f31:long);
+        |c = union a, b;
+        |""".stripMargin))
+    val schema = plan.operators.last.schema
+    schema match {
+      case Some(s) => {
+        s.fields.length should equal (3)
+        s.field(0) should equal(Field("f1", Types.DoubleType))
+        s.field(1) should equal(Field("f2", Types.CharArrayType))
+        s.field(2) should equal(Field("f3", Types.FloatType))
+      }
+      case None => fail()
+    }
   }
 
   it should "accept a filter statement with correct field names" in {

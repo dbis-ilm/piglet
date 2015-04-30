@@ -63,6 +63,25 @@ class TypeSpec extends FlatSpec with Matchers {
     assert(! Types.typeCompatibility(Types.IntType, MapType("m", Types.CharArrayType)))
   }
 
+  it should "check type compatibility for bags" in {
+    val t1 = BagType("b", TupleType("", Array(Field("f1", Types.IntType),
+                                              Field("f2", Types.DoubleType),
+                                              Field("f3", Types.CharArrayType))))
+    val t2 = BagType("b", TupleType("", Array(Field("f1", Types.IntType),
+                                              Field("f2", Types.DoubleType),
+                                              Field("f3", Types.CharArrayType))))
+    val t3 = BagType("b", TupleType("", Array(Field("f11", Types.IntType),
+                                              Field("f21", Types.IntType),
+                                              Field("f31", Types.CharArrayType))))
+    val t4 = BagType("b", TupleType("", Array(Field("f11", Types.IntType),
+                                              Field("f12", Types.DoubleType),
+                                              Field("f13", Types.DoubleType),
+                                              Field("f14", Types.CharArrayType))))
+    assert(Types.typeCompatibility(t1, t2))
+    assert(Types.typeCompatibility(t1, t3))
+    assert(! Types.typeCompatibility(t1, t4))
+  }
+
   it should "return the type description for a bag" in {
     val t = BagType("", TupleType("", Array(Field("f1", Types.IntType),
                                             Field("f2", Types.CharArrayType)
