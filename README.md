@@ -32,6 +32,16 @@ pigs --master local your_script.pig
 
 to compile the script and execute it on your local Spark installation.
 
+In addition, where is an interactive Pig shell similar to grunt:
+
+```
+pigsh
+```
+
+where Pig statements can be entered at the prompt and are executed as soon as
+a `DUMP` or `STORE` statement is entered. Furthermore, the schema can be printed using `DESCRIBE`.
+
+
 ### Mapping of Pig statements to Spark ###
 
 Currently, we have implemented to following mappings in the code generator.
@@ -47,6 +57,5 @@ Currently, we have implemented to following mappings in the code generator.
  * Flink not supported yet; requires a scala 2.11 build of Flink
  * nested blocks in FOREACH`
  * `COGROUP` and `GROUP BY` with multiple relations
- * schema support
  * UDF support
- * `EXPLAIN` and `DESCRIBE` not implemented yet
+ * `EXPLAIN` not implemented yet
