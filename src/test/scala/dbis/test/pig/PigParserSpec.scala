@@ -238,4 +238,7 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("a = union b, c, d, e;") == List(Union("a", List("b", "c", "d", "e"))))
   }
 
+  it should "parse a register statement" in {
+    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(Register(""""/usr/local/share/myfile.jar"""")))
+  }
 }

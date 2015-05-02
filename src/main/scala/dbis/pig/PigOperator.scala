@@ -148,6 +148,14 @@ case class Store(inPipeName: String, file: String) extends PigOperator("", inPip
 }
 
 /**
+ * Register represents a pseudo operator for the REGISTER statement. This "operator" will
+ * be eliminated during building the dataflow plan.
+ *
+ * @param jarFile the URI of the Jar file to be registered
+ */
+case class Register(jarFile: String) extends PigOperator("")
+
+/**
  * Describe represents the DESCRIBE operator of Pig.
  *
  * @param inPipeName the name of the input pipe

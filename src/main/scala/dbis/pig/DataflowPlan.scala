@@ -1,6 +1,6 @@
 package dbis.pig
 
-import scala.collection.mutable.Map
+import scala.collection.mutable.{ListBuffer, Map}
 import scalax.collection.GraphEdge._
 import scalax.collection.GraphPredef._
 import scalax.collection.mutable.Graph
@@ -12,17 +12,26 @@ case class Pipe (name: String, producer: PigOperator)
 
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
-class DataflowPlan(val operators: List[PigOperator]) {
+class DataflowPlan(var operators: List[PigOperator]) {
   var pipes: Map[String, Pipe] = Map[String, Pipe]()
   var graph = Graph[PigOperator,DiEdge]()
+  val additionalJars = ListBuffer[String]()
 
   constructPlan(operators)
 
   def constructPlan(ops: List[PigOperator]) : Unit = {
+    def unquote(s: String): String = s.substring(1, s.length - 1)
+
+    /*
+     * 0. we remove all Register operators: they are just pseudo-operators
+     *    instead, we add the arguments to the additionalJars list
+     */
+    ops.filter(_.isInstanceOf[Register]).foreach(op => additionalJars += unquote(op.asInstanceOf[Register].jarFile))
+    val planOps = ops.filterNot(_.isInstanceOf[Register])
     /*
      * 1. we create pipes for all outPipeNames and make sure they are unique
      */
-    operators.foreach(op => {
+    planOps.foreach(op => {
       if (op.outPipeName != "") {
         if (pipes.contains(op.outPipeName))
           throw new InvalidPlanException("duplicate pipe: " + op.outPipeName)
@@ -34,7 +43,7 @@ class DataflowPlan(val operators: List[PigOperator]) {
      *    based on their names
      */
     try {
-      operators.foreach(op => {
+      planOps.foreach(op => {
         op.output = if (op.outPipeName != "") pipes.get(op.outPipeName) else None
         op.inputs = op.inPipeNames.map(p => pipes(p))
         op.constructSchema
@@ -49,6 +58,7 @@ class DataflowPlan(val operators: List[PigOperator]) {
     catch {
       case e: java.util.NoSuchElementException => throw new InvalidPlanException("invalid pipe: " + e.getMessage)
     }
+    operators = planOps
   }
 
   def sinkNodes: Set[PigOperator] = {

@@ -79,6 +79,17 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     plan.findOperatorForAlias("x") should equal (None)
   }
 
+  it should "eliminate register statements" in {
+    val plan = new DataflowPlan(parseScript("""
+         |register "myfile.jar";
+         |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
+         |b = filter a by f1 > 0;
+         |""".stripMargin))
+    plan.additionalJars.toList should equal (List("myfile.jar"))
+    plan.operators.length should equal (2)
+    plan.operators.filter(_.isInstanceOf[Register]).length should equal (0)
+  }
+
   it should "compute identical lineage signatures for two operators with the same plans" in {
     val op1 = Load("a", "file.csv")
     val op2 = Filter("b", "a", Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
@@ -270,4 +281,5 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
         |""".stripMargin))
     plan.checkSchemaConformance should equal (false)
   }
+
 }
