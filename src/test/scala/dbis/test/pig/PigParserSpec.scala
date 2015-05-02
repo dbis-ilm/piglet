@@ -241,4 +241,42 @@ class PigParserSpec extends FlatSpec {
   it should "parse a register statement" in {
     assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(Register(""""/usr/local/share/myfile.jar"""")))
   }
+
+  it should "parse a stream statement without schema" in {
+    assert(parseScript("a = stream b through myOp;") == List(StreamOp("a", "b", "myOp")))
+  }
+
+  it should "parse a stream statement with schema" in {
+    val schema = BagType("", TupleType("", Array(Field("f1", Types.IntType),
+      Field("f2", Types.DoubleType))))
+    assert(parseScript("a = stream b through myOp as (f1: int, f2:double);") == List(StreamOp("a", "b", "myOp", Some(Schema(schema)))))
+  }
+
+  it should "parse a sample statement with a given size" in {
+    assert(parseScript("a = sample b 0.10;") == List(Sample("a", "b", RefExpr(Value("0.10")))))
+  }
+
+  it should "parse a sample statement with an expression" in {
+    parseScript("a = sample b 100/num_rows;") == List(Sample("a", "b", Div(RefExpr(Value("100")), RefExpr(NamedField("num_rows")))))
+  }
+
+  it should "parse a simple order by statement" in {
+    parseScript("a = order b by $0;")
+  }
+
+  it should "parse a simple order by statement on whole tuples" in {
+    parseScript("a = order b by * desc;")
+  }
+
+  it should "parse a simple order by statement with ascending sort order" in {
+    parseScript("a = order b by f1 asc;")
+  }
+
+  it should "parse a simple order by statement with descending sort order" in {
+    parseScript("a = order b by $1 desc;")
+  }
+
+  it should "parse an order by statement with multiple fields" in {
+    parseScript("a = order b by $1 desc, $2 asc;")
+  }
 }

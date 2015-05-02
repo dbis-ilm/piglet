@@ -421,3 +421,27 @@ case class Join(override val outPipeName: String, override val inPipeNames: List
   }
 
 }
+
+case class StreamOp(override val outPipeName: String, inPipeName: String, opName: String, var loadSchema: Option[Schema] = None)
+  extends PigOperator(outPipeName, List(inPipeName), loadSchema) {
+  override def lineageString: String = s"""STREAM%""" + super.lineageString
+}
+
+case class Sample(override val outPipeName: String, inPipeName: String, expr: ArithmeticExpr)
+  extends PigOperator(outPipeName, inPipeName) {
+  override def lineageString: String = s"""SAMPLE%""" + super.lineageString
+}
+
+object OrderByDirection extends Enumeration {
+  type OrderByDirection = Value
+  val AscendingOrder, DescendingOrder = Value
+}
+
+import OrderByDirection._
+
+case class OrderBySpec(field: Ref, dir: OrderByDirection)
+
+case class OrderBy(override val outPipeName: String, inPipeName: String, orderSpec: List[OrderBySpec])
+  extends PigOperator(outPipeName, inPipeName) {
+  override def lineageString: String = s"""ORDERBY%""" + super.lineageString
+}

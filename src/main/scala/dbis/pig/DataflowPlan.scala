@@ -23,11 +23,12 @@ class DataflowPlan(var operators: List[PigOperator]) {
     def unquote(s: String): String = s.substring(1, s.length - 1)
 
     /*
-     * 0. we remove all Register operators: they are just pseudo-operators
-     *    instead, we add the arguments to the additionalJars list
+     * 0. we remove all Register operators: they are just pseudo-operators.
+     *    Instead, we add their arguments to the additionalJars list
      */
     ops.filter(_.isInstanceOf[Register]).foreach(op => additionalJars += unquote(op.asInstanceOf[Register].jarFile))
     val planOps = ops.filterNot(_.isInstanceOf[Register])
+
     /*
      * 1. we create pipes for all outPipeNames and make sure they are unique
      */

@@ -127,6 +127,12 @@ class PigParser extends JavaTokenParsers {
   lazy val asKeyword = "as".ignoreCase
   lazy val unionKeyword = "union".ignoreCase
   lazy val registerKeyword = "register".ignoreCase
+  lazy val streamKeyword = "stream".ignoreCase
+  lazy val throughKeyword = "through".ignoreCase
+  lazy val sampleKeyword = "sample".ignoreCase
+  lazy val orderKeyword = "order".ignoreCase
+  lazy val ascKeyword = "asc".ignoreCase
+  lazy val descKeyword = "desc".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
@@ -197,7 +203,6 @@ class PigParser extends JavaTokenParsers {
   /*
    * <A> = FOREACH <B> GENERATE <Expr> [ AS <Schema> ]
    */
-  // def schema: Parser[String] = ident // TODO: not only a typename but a schema!
   def exprSchema: Parser[Field] = asKeyword ~ fieldSchema ^^ { case _ ~ t => t }
   def genExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
   def generatorList: Parser[List[GeneratorExpr]] = repsep(genExpr, ",")
@@ -260,10 +265,56 @@ class PigParser extends JavaTokenParsers {
   def registerStmt: Parser[PigOperator] = registerKeyword ~ stringLiteral ^^{ case _ ~ uri => Register(uri) }
 
   /*
+   * <A> = STREAM <B> TROUGH <Operator> [AS (<Schema>) ]
+   */
+  def streamStmt: Parser[PigOperator] = bag ~ "=" ~ streamKeyword ~ bag ~ throughKeyword ~ ident ~ (loadSchemaClause?) ^^{
+    case out ~ _ ~_ ~ in ~ _ ~ opname ~ schema => StreamOp(out, in, opname, schema)
+  }
+
+  /*
+   * <A> = SAMPLE <B> <num>
+   * <A> = SAMPLE <B> <Expr>
+   */
+  def sampleStmt: Parser[PigOperator] = bag ~ "=" ~ sampleKeyword ~ bag ~ arithmExpr ^^ {
+    case out ~ _ ~ _ ~ in ~ expr => Sample(out, in, expr)
+  }
+
+  /*
+   * * [ASC | DESC]
+   * field [ASC | DESC], field [ASC | DESC]
+   */
+  import OrderByDirection._
+
+  def sortOrder: Parser[OrderByDirection] = ascKeyword ^^ { _ => OrderByDirection.AscendingOrder } |
+    descKeyword ^^ { _ => OrderByDirection.DescendingOrder }
+
+  def allOrderSpec: Parser[OrderBySpec] = "*" ~ (sortOrder?) ^^ { case s ~ o => o match {
+     case Some(dir) => OrderBySpec(Value("*"), dir)
+      case None => OrderBySpec(Value("*"), OrderByDirection.AscendingOrder)
+    }
+  }
+
+  def fieldOrderSpec:Parser[OrderBySpec] =  (posField | namedField) ~ (sortOrder?) ^^ {
+    case r ~ o => o match {
+      case Some(dir) => OrderBySpec(r, dir)
+      case None => OrderBySpec(r, OrderByDirection.AscendingOrder)
+    }
+  }
+
+  def orderSpec: Parser[List[OrderBySpec]] = ( allOrderSpec ^^ {s => List(s)} | repsep(fieldOrderSpec, ",") )
+
+  /*
+   * <A> = ORDER <B> BY <OrderSpec>
+   */
+  def orderByStmt: Parser[PigOperator] = bag ~ "=" ~ orderKeyword ~ bag ~ byKeyword ~ orderSpec ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ spec => OrderBy(out, in, spec)
+  }
+
+  /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt) ~ ";" ^^ {
+    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*
