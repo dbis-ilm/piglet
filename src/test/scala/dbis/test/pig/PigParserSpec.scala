@@ -257,26 +257,33 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a sample statement with an expression" in {
-    parseScript("a = sample b 100/num_rows;") == List(Sample("a", "b", Div(RefExpr(Value("100")), RefExpr(NamedField("num_rows")))))
+    assert(parseScript("a = sample b 100/num_rows;") ==
+      List(Sample("a", "b", Div(RefExpr(Value("100")), RefExpr(NamedField("num_rows"))))))
   }
 
   it should "parse a simple order by statement" in {
-    parseScript("a = order b by $0;")
+    assert(parseScript("a = order b by $0;") ==
+      List(OrderBy("a", "b", List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))))
   }
 
   it should "parse a simple order by statement on whole tuples" in {
-    parseScript("a = order b by * desc;")
+    assert(parseScript("a = order b by * desc;") ==
+      List(OrderBy("a", "b", List(OrderBySpec(Value("*"), OrderByDirection.DescendingOrder)))))
   }
 
   it should "parse a simple order by statement with ascending sort order" in {
-    parseScript("a = order b by f1 asc;")
+    assert(parseScript("a = order b by f1 asc;") ==
+      List(OrderBy("a", "b", List(OrderBySpec(NamedField("f1"), OrderByDirection.AscendingOrder)))))
   }
 
   it should "parse a simple order by statement with descending sort order" in {
-    parseScript("a = order b by $1 desc;")
+    assert(parseScript("a = order b by $1 desc;") ==
+      List(OrderBy("a", "b", List(OrderBySpec(PositionalField(1), OrderByDirection.DescendingOrder)))))
   }
 
   it should "parse an order by statement with multiple fields" in {
-    parseScript("a = order b by $1 desc, $2 asc;")
+    assert(parseScript("a = order b by $1 desc, $2 asc;") ==
+      List(OrderBy("a", "b", List(OrderBySpec(PositionalField(1), OrderByDirection.DescendingOrder),
+        OrderBySpec(PositionalField(2), OrderByDirection.AscendingOrder)))))
   }
 }
