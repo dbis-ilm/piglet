@@ -219,4 +219,24 @@ class CompileSpec extends FlatSpec {
         |val a = b.union(c).union(d)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
+
+  it should "contain code for the sample operator with a literal value" in {
+    // a = SAMPLE b 0.01;
+    val op = Sample("a", "b", RefExpr(Value("0.01")))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+        |val a = b.sample(0.01)""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for the sample operator with an expression" in {
+    // a = SAMPLE b 100 / $3
+    val op = Sample("a", "b", Div(RefExpr(Value("100")), RefExpr(PositionalField(3))))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+        |val a = b.sample(100 / t(3))""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
 }

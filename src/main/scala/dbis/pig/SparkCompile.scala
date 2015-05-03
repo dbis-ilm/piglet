@@ -122,6 +122,7 @@ class SparkGenCode extends GenCodeBase {
       s1 + s"val $out = ${rels.head}_kv" + rels.tail.map{other => s".join(${other}_kv)"}.mkString + ".map{case (k,v) => List(k,v)}"
     }
     case Union(out, rels) => { s"val $out = ${rels.head}" + rels.tail.map{other => s".union(${other})"}.mkString }
+    case Sample(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.sample(${emitExpr(node.schema, expr)})"}
     case _ => { "" }
   }
 

@@ -4,6 +4,8 @@ version := "1.0"
 
 scalaVersion := "2.11.6"
 
+// scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
+
 libraryDependencies ++= Seq(
   "jline" % "jline" % "2.12.1",
   "org.scalatest" % "scalatest_2.11" % "2.2.0" % "test" withSources(),
