@@ -52,10 +52,16 @@ Currently, we have implemented to following mappings in the code generator.
 | `DUMP A` |   |
 | `FILTER A BY predicate`  | `A.filter(t => predicate(t))`   |
 `
+### Testing ###
+
+We use the Scala testing framework as well as the scoverage tool for test coverage. You can produce
+a coverage report by running `sbt clean coverage test`. The results can be found in 
+`target/scala-2.11/scoverage-report/index.html`.
+
 ### ToDo ###
 
  * Flink not supported yet; requires a scala 2.11 build of Flink
- * nested blocks in FOREACH`
+ * nested blocks in `FOREACH`
  * `COGROUP` and `GROUP BY` with multiple relations
  * UDF support
  * `EXPLAIN` not implemented yet

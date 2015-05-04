@@ -1,0 +1,3 @@
+#!/bin/sh
+PIG_LIB=`dirname $0`/../target/scala-2.11/pigparser_2.11-1.0.jar
+scala -classpath $PIG_LIB dbis.pig.PigREPL $*
