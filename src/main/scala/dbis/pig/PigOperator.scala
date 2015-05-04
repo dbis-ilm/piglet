@@ -62,9 +62,7 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
    *
    * @return true if valid field references, otherwise false
    */
-  def checkSchemaConformance: Boolean = {
-    true
-  }
+  def checkSchemaConformance: Boolean = true
 
   /**
    * Returns a MD5 hash string representing the sub-plan producing the input for this operator.
@@ -425,11 +423,34 @@ case class Join(override val outPipeName: String, override val inPipeNames: List
 case class StreamOp(override val outPipeName: String, inPipeName: String, opName: String, var loadSchema: Option[Schema] = None)
   extends PigOperator(outPipeName, List(inPipeName), loadSchema) {
   override def lineageString: String = s"""STREAM%""" + super.lineageString
+
+  override def checkSchemaConformance: Boolean = {
+    // TODO
+    true
+  }
+
+  override def constructSchema: Option[Schema] = {
+    // TODO
+    schema
+  }
 }
 
 case class Sample(override val outPipeName: String, inPipeName: String, expr: ArithmeticExpr)
   extends PigOperator(outPipeName, inPipeName) {
   override def lineageString: String = s"""SAMPLE%""" + super.lineageString
+
+  override def checkSchemaConformance: Boolean = {
+    schema match {
+      case Some(s) => {
+        // if we know the schema we check all named fields
+        expr.traverse(s, Expr.checkExpressionConformance)
+      }
+      case None => {
+        // if we don't have a schema all expressions should contain only positional fields
+        expr.traverse(null, Expr.containsNoNamedFields)
+      }
+    }
+  }
 }
 
 object OrderByDirection extends Enumeration {
@@ -444,4 +465,14 @@ case class OrderBySpec(field: Ref, dir: OrderByDirection)
 case class OrderBy(override val outPipeName: String, inPipeName: String, orderSpec: List[OrderBySpec])
   extends PigOperator(outPipeName, inPipeName) {
   override def lineageString: String = s"""ORDERBY%""" + super.lineageString
+
+  override def checkSchemaConformance: Boolean = {
+    // TODO
+    true
+  }
+
+  override def constructSchema: Option[Schema] = {
+    // TODO
+    schema
+  }
 }
