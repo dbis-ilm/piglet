@@ -1,0 +1,30 @@
+// ----------------- header declaration ----------------- 
+init_code(includes) ::= <<
+import org.apache.flink.streaming.api.scala._
+import java.util.concurrent.TimeUnit
+
+<\n>
+>>
+
+// ----------------- begin of code building and initializing the query ----------------- 
+begin_query(name) ::= <<
+object <name> {
+    def main(args: Array[String]) {
+        val env = StreamExecutionEnvironment.getExecutionEvironment
+>>
+
+// ----------------- end of the code implementing the query ----------------- 
+end_query(name) ::= <<
+        env.execute("<name>")
+    }
+}<\n>   
+>>
+
+// ----------------- Load text file -----------------
+loader(file,func,params) ::=<<
+<if (func)>
+        <func>().load(env, "<file>"<if (params)><params><endif>)
+<else>
+        env.readTextFile("<file>")
+<endif>
+>>
