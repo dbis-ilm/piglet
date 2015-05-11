@@ -22,3 +22,5 @@ lodhub_data
 .worksheet/
 *.sc
 .sbt_completion_cache
+.tags
+*.bak
