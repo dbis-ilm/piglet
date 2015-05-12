@@ -14,12 +14,12 @@ class CompileSpec extends FlatSpec {
   "The compiler output" should "contain the Spark header & footer" in {
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitHeader("test") + codeGenerator.emitFooter)
+//        |import dbis.spark._
     val expectedCode = cleanString("""
         |import org.apache.spark.SparkContext
         |import org.apache.spark.SparkContext._
         |import org.apache.spark.SparkConf
         |import org.apache.spark.rdd._
-        |import dbis.spark._
         |
         |object test {
         |    def main(args: Array[String]) {
