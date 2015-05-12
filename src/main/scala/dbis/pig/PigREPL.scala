@@ -80,7 +80,12 @@ object PigREPL extends PigParser {
         // buf.clear()
         false
       }
-      case Line(s, buf) => buf ++= parseScript(s); false
+      case Line(s, buf) => try {
+        buf ++= parseScript(s); 
+        false 
+      } catch {
+        case iae: IllegalArgumentException => println(iae.getMessage); false
+      }
       case _ => false
     }
   }
