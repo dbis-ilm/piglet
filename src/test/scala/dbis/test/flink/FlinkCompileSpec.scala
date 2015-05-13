@@ -76,7 +76,24 @@ class FlinkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code a foreach statement with function expressions" in {
+  it should "contain code for DISTINCT" in {
+    val op = Distinct("a", "b")
+    val codeGenerator = new FlinkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for LIMIT" in {
+    val op = Limit("a", "b", 10)
+    val codeGenerator = new FlinkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.window(Count.of(10)).every(Time.of(5, TimeUnit.SECONDS))")
+    assert(generatedCode == expectedCode)
+  }
+
+
+  it should "contain code a FOREACH statement with function expressions" in {
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
     val op = Foreach("a", "b", List(
       GeneratorExpr(Func("TOMAP", List(
@@ -91,7 +108,7 @@ class FlinkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for a foreach statement with another function expression" in {
+  it should "contain code for a FOREACH statement with another function expression" in {
     // a = FOREACH b GENERATE $0, COUNT($1) AS CNT;
     val op = Foreach("a", "b", List(
       GeneratorExpr(RefExpr(PositionalField(0))),
@@ -103,7 +120,7 @@ class FlinkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for deref operator on maps in foreach statement" in {
+  it should "contain code for deref operator on maps in FOREACH statement" in {
     // a = FOREACH b GENERATE $0#"k1", $1#"k2";
     val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), """"k1""""))),
       GeneratorExpr(RefExpr(DerefMap(PositionalField(1), """"k2"""")))))
@@ -114,7 +131,7 @@ class FlinkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for deref operator on tuple in foreach statement" in {
+  it should "contain code for deref operator on tuple in FOREACH statement" in {
     // a = FOREACH b GENERATE $0.$1, $2.$0;
     val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
       GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0))))))
@@ -125,7 +142,7 @@ class FlinkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for a union operator on two relations" in {
+  it should "contain code for a UNION operator on two relations" in {
     // a = UNION b, c;
     val op = Union("a", List("b", "c"))
     val codeGenerator = new FlinkGenCode
@@ -135,7 +152,7 @@ class FlinkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for a union operator on more than two relations" in {
+  it should "contain code for a UNION operator on more than two relations" in {
     // a = UNION b, c, d;
     val op = Union("a", List("b", "c", "d"))
     val codeGenerator = new FlinkGenCode
@@ -145,43 +162,66 @@ class FlinkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for a binary join statement with simple expression" in {
+  it should "contain code for a binary JOIN statement with simple expression" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0)), List(PositionalField(0)))
     )
     val codeGenerator = new FlinkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val b_k = b.map(t => {t(0)})
-        |val c_k = c.map(t => {t(0)})
+        |val b_k = (0)
+        |val c_k = (0)
         |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(b_k).equalTo(c_k)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for a binary join statement with expression lists" in {
+  it should "contain code for a binary JOIN statement with expression lists" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0), PositionalField(1)),
       List(PositionalField(1), PositionalField(2)))
     )
     val codeGenerator = new FlinkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val b_k = b.map(t => {Array(t(0),t(1)).mkString})
-        |val c_k = c.map(t => {Array(t(1),t(2)).mkString})
+        |val b_k = Array((0),(1)).mkString
+        |val c_k = Array((1),(2)).mkString
         |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(b_k).equalTo(c_k)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for a multiway join statement" in {
+  it should "contain code for a multiway JOIN statement" in {
     val op = Join("a", List("b", "c", "d"), List(List(PositionalField(0)),
       List(PositionalField(0)), List(PositionalField(0)))
     )
     val codeGenerator = new FlinkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val b_k = b.map(t => {t(0)})
-        |val c_k = c.map(t => {t(0)})
-        |val d_k = d.map(t => {t(0)})
+        |val b_k = (0)
+        |val c_k = (0)
+        |val d_k = (0)
         |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(b_k).equalTo(c_k).join(d).onWindow(5, TimeUnit.SECONDS).where(b_k).equalTo(d_k)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
+
+  it should "contain code for GROUP BY ALL" in {
+    val op = Grouping("a", "b", GroupingExpression(List()))
+    val codeGenerator = new FlinkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b"
+      /*"""
+        |val fields = new ListBuffer[Int]
+        |for(i <- 0 to b.getType.getTotalFields()-1)(fields+=i)
+        |val a = b.groupBy(fields.toList:_*)
+        |""".stripMargin*/
+    )
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for GROUP BY $0" in {
+    val op = Grouping("a", "b", GroupingExpression(List(PositionalField(0))))
+    val codeGenerator = new FlinkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.groupBy((0))")
+    assert(generatedCode == expectedCode)
+  }
+
 
 }

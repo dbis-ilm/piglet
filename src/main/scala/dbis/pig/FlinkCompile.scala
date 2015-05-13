@@ -60,14 +60,14 @@ class FlinkGenCode extends GenCodeBase {
   }
 
   def emitGrouping(schema: Option[Schema], groupingExpr: GroupingExpression): String = {
-    groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",")
+    groupingExpr.keyList.map(e => emitRef(schema, e, "", requiresTypeCast = false)).mkString(",")
   }
 
   def emitJoinKey(schema: Option[Schema], joinExpr: List[Ref]): String = {
     if (joinExpr.size == 1)
-      emitRef(schema, joinExpr.head)
+      emitRef(schema, joinExpr.head, "")
     else
-      s"Array(${joinExpr.map(e => emitRef(schema, e)).mkString(",")}).mkString"
+      s"Array(${joinExpr.map(e => emitRef(schema, e, "")).mkString(",")}).mkString"
   }
 
   def quote(s: String): String = s"$s"
@@ -126,21 +126,42 @@ class FlinkGenCode extends GenCodeBase {
       case Describe(in) => { s"""println("${node.schemaToString}")""" }
       case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames.head}.filter(t => {${emitPredicate(node.schema, pred)}})" }
       case Foreach(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.map(t => ${emitGenerator(node.schema, expr)})" }
-
-//    case Grouping(out, in, groupExpr) => {
-//      if (groupExpr.keyList.isEmpty) s"val $out = ${node.inPipeNames.head}.glom"
-//      else s"val $out = ${node.inPipeNames.head}.groupBy(t => {${emitGrouping(node.schema, groupExpr)}}).map{case (k,v) => List(k,v)}" }
-//    case Distinct(out, in) => { s"val $out = ${node.inPipeNames.head}.distinct" }
-//    case Limit(out, in, num) => { s"val $out = sc.parallelize(${node.inPipeNames.head}.take($num))" }
-      case Join(out, rels, exprs) => {
-        val res = rels.zip(exprs)
-        val s1 = res.map{case (rel, expr) => s"val ${rel}_k = ${rel}.map(t => {${emitJoinKey(node.schema, expr)}})\n"}.mkString
-        s1 + s"val $out = ${rels.head}" + rels.tail.map{other => s".join(${other}).onWindow(5, TimeUnit.SECONDS).where(${rels.head}_k).equalTo(${other}_k)"}.mkString
-      }
-      case Union(out, rels) => { s"val $out = ${rels.head}.merge(" + rels.tail.map{other => s"${other}"}.mkString(",") + ")" }
-//    case Sample(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.sample(${emitExpr(node.schema, expr)})"}
-//    case OrderBy(out, in, orderSpec) => { s"val $out = ${node.inPipeNames.head}.sortBy()"} // TODO
-      case _ => { "" }
+      case Grouping(out, in, groupExpr) => {
+        if (groupExpr.keyList.isEmpty){ //GROUP ALL (Pig -> all in one group) seems to be not necessary for Flink?...
+        //This snippet would put every tuple in a separate group:
+        /*s"""
+         |val fields = new ListBuffer[Int]
+         |for(i <- 0 to ${node.inPipeNames.head}.getType.getTotalFields()-1)(fields+=i)
+         |val $out = ${node.inPipeNames.head}.groupBy(fields.toList:_*)
+         """.stripMargin
+         */
+        s"val $out = ${node.inPipeNames.head}"
+      } else s"val $out = ${node.inPipeNames.head}.groupBy(${emitGrouping(node.schema, groupExpr)})" }
+      case Distinct(out, in) => { s"val $out = ${node.inPipeNames.head}"} //TODO: GroupBy ALL + window + max/min
+      case Limit(out, in, num) => { s"val $out = ${node.inPipeNames.head}.window(Count.of($num)).every(Time.of(5, TimeUnit.SECONDS))" }
+      case Join(out, rels, exprs) => { //TODO: Multiple Joins, Window Parameters
+      val res = rels.zip(exprs)
+      val s1 = res.map{case (rel, expr) => s"val ${rel}_k = ${emitJoinKey(node.schema, expr)}\n"}.mkString
+      s1 + s"val $out = ${rels.head}" + 
+      rels.tail.map{other => s".join(${other}).onWindow(5, TimeUnit.SECONDS).where(${rels.head}_k).equalTo(${other}_k)"}.mkString
+    }
+    case Union(out, rels) => { s"val $out = ${rels.head}.merge(" + rels.tail.map{other => s"${other}"}.mkString(",") + ")" }
+    case Sample(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.sample(${emitExpr(node.schema, expr)})"}//TODO
+    case OrderBy(out, in, orderSpec) => { s"val $out = ${node.inPipeNames.head}"} // TODO
+    /*     
+     case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
+     case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
+     val s1 = s"""
+     |val split = ${rels.head}.split(${emitExpr(node.schema, expr)} match {
+         |  case true => List("1st")
+         |  case false => List("2nd")
+         |})
+       """.stripMargin
+       val s2 = rels.tail.map{rel => s"""val ${rel} = split.select("1st")"""}.mkString
+       s1 + s2
+     }
+     */
+    case _ => { "" }
     }
   }
 
