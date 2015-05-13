@@ -128,12 +128,13 @@ class SparkGenCode extends GenCodeBase {
   }
 
   def emitHeader(scriptName: String): String = {
+
+//     |import dbis.spark._
     s"""
        |import org.apache.spark.SparkContext
        |import org.apache.spark.SparkContext._
        |import org.apache.spark.SparkConf
        |import org.apache.spark.rdd._
-       |import dbis.spark._
        |
        |object $scriptName {
        |    def main(args: Array[String]) {

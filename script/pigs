@@ -1,4 +1,16 @@
 #!/bin/sh
+
+# TODO: we should find our jar file the same way we do for spark
 PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
-CP=/Users/kai/Projects/spark-1.3.1/core/target/spark-core_2.11-1.3.1.jar:$PIG_LIB
+
+CP=$PIG_LIB
+if [ -z "$SPARK_JAR" ]; then
+	echo "Please set SPARK_JAR to your spark-core jar file"
+	exit 1
+else
+	CP=$SPARK_JAR:$CP
+fi
+
+#CP=/Users/kai/Projects/spark-1.3.1/core/target/spark-core_2.11-1.3.1.jar:$PIG_LIB
+
 java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.PigCompiler $*

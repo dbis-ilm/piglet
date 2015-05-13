@@ -329,8 +329,8 @@ class PigParser extends JavaTokenParsers {
   def parseScript(input: CharSequenceReader): List[PigOperator] = {
     parsePhrase(input) match {
       case Success(t, _) => t
-      case NoSuccess(msg, next) => throw new IllegalArgumentException(
-        "Could not parse '" + input + "' near '" + next.pos.longString + ": " + msg)
+      case NoSuccess(msg, next) => 
+        throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
     }
   }
 

@@ -73,14 +73,19 @@ object PigREPL extends PigParser {
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") => {
         buf ++= parseScript(s)
         val plan = new DataflowPlan(buf.toList)
-        if (PigCompiler.compileToJar(plan, "script")) {
+        if (PigCompiler.compileToJar(plan, "script", ".")) {
           val jarFile = "script.jar"
           SparkSubmit.main(Array("--master", "local", "--class", "script", jarFile))
         }
         // buf.clear()
         false
       }
-      case Line(s, buf) => buf ++= parseScript(s); false
+      case Line(s, buf) => try {
+        buf ++= parseScript(s); 
+        false 
+      } catch {
+        case iae: IllegalArgumentException => println(iae.getMessage); false
+      }
       case _ => false
     }
   }
