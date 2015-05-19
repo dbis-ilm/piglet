@@ -20,7 +20,7 @@ class FlinkCompileSpec extends FlatSpec {
       |
       |object test {
       |    def main(args: Array[String]) {
-      |        val env = StreamExecutionEnvironment.getExecutionEvironment
+      |        val env = StreamExecutionEnvironment.getExecutionEnvironment
       |        env.execute("Starting Flink Query")
       |    }
       |}
@@ -37,7 +37,7 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val op = Load("a", "file.csv", None, "PigStorage", List("""",""""))
+    val op = Load("a", "file.csv", None, "PigStorage", List("\",\""))
     val codeGenerator = new FlinkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""val a = PigStorage().load(env, "file.csv", ",")""")
@@ -64,7 +64,7 @@ class FlinkCompileSpec extends FlatSpec {
     val op = Dump("a")
     val codeGenerator = new FlinkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""a.print()""")
+    val expectedCode = cleanString("""a.print""")
     assert(generatedCode == expectedCode)
   }
 
@@ -97,9 +97,9 @@ class FlinkCompileSpec extends FlatSpec {
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
     val op = Foreach("a", "b", List(
       GeneratorExpr(Func("TOMAP", List(
-        RefExpr(Value(""""field1"""")),
+        RefExpr(Value("\"field1\"")),
         RefExpr(PositionalField(0)),
-        RefExpr(Value(""""field2"""")),
+        RefExpr(Value("\"field2\"")),
         RefExpr(PositionalField(1)))))
       ))
     val codeGenerator = new FlinkGenCode
@@ -122,8 +122,8 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for deref operator on maps in FOREACH statement" in {
     // a = FOREACH b GENERATE $0#"k1", $1#"k2";
-    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), """"k1""""))),
-      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), """"k2"""")))))
+    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
+      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\"")))))
     val codeGenerator = new FlinkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""

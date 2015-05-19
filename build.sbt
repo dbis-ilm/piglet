@@ -4,21 +4,21 @@ version := "1.0"
 
 scalaVersion := "2.11.6"
 
-// scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature")
+//scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature", "-Ylog-classpath")
 
 bintrayResolverSettings
 
+val Dtarget = settingKey[String]("Dtarget")
+Dtarget := sys.env.getOrElse("Dtarget", default = "flink")
+
 libraryDependencies ++= Seq(
   "jline" % "jline" % "2.12.1",
-  "org.scalatest" % "scalatest_2.11" % "2.2.0" % "test" withSources(),
+  "org.scalatest" %% "scalatest" % "2.2.0" % "test" withSources(),
   "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3" withSources(),
   "org.scala-lang" % "scala-compiler" % "2.11.6",
-  "com.assembla.scala-incubator" %% "graph-core" % "1.9.1",
+  "com.assembla.scala-incubator" %% "graph-core" % "1.9.2",
   "org.apache.spark" %% "spark-core" % "1.3.0" % "provided",
   "com.github.scopt" %% "scopt" % "3.3.0",
-//  "org.apache.flink" %% "flink-streaming-scala" % "0.9-SNAPSHOT",
-//  "org.apache.flink" %% "flink-scala" % "0.9-SNAPSHOT",
-//  "org.apache.flink" %% "flink-clients" % "0.9-SNAPSHOT",
   "org.clapper" %% "scalasti" % "2.0.0"
 )
 
@@ -30,4 +30,4 @@ test in assembly := {}
 
 mainClass in assembly := Some("dbis.pig.PigCompiler")
 
-//resolvers += "Apache Development Snapshot Repository" at "https://repository.apache.org/content/repositories/snapshots/"
+//fork in run := true

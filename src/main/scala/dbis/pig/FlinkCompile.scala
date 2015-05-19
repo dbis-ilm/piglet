@@ -120,33 +120,127 @@ class FlinkGenCode extends GenCodeBase {
   def emitNode(node: PigOperator): String = {
     val group = STGroupFile(templateFile)
     node match {
-      case Load(out, file, schema, func, params) => { s"""val $out = ${emitLoader(file, func, params, group)}""" }
-      case Dump(in) => { s"""${node.inPipeNames.head}.print()""" }
-      case Store(in, file) => { s"""${node.inPipeNames.head}.writeAsText("${file}")""" }
+      case Load(out, file, schema, func, params) => { 
+        val tryST = group.instanceOf("loader")
+        if (tryST.isSuccess) {
+          val st = tryST.get
+          st.add("out", out)
+          st.add("file", file)
+          if (func == "") st.render()
+          else{
+            val parameters = if (params != null && params.nonEmpty) params.map(quote(_)).mkString(",") else ""
+            st.add("params", parameters)
+            if (func == "PigStorage") st.add("pfunc", true)
+            else if (func == "RDFFileStorage") st.add("rdffunc", true)
+            st.render()
+          }
+        } 
+        else ""
+      }
+      case Dump(in) => { 
+        val tryST = group.instanceOf("dump")
+        if (tryST.isSuccess) {    
+          val st = tryST.get
+          st.add("in", node.inPipeNames.head)
+          st.render()
+        } 
+        else ""
+      }
+      case Store(in, file) => { 
+        val tryST = group.instanceOf("store")
+        if (tryST.isSuccess) {
+          val st = tryST.get
+          st.add("in", node.inPipeNames.head)
+          st.add("file", file)
+          st.render()
+        }
+        else ""
+      }
       case Describe(in) => { s"""println("${node.schemaToString}")""" }
-      case Filter(out, in, pred) => { s"val $out = ${node.inPipeNames.head}.filter(t => {${emitPredicate(node.schema, pred)}})" }
-      case Foreach(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.map(t => ${emitGenerator(node.schema, expr)})" }
+      case Filter(out, in, pred) => { 
+        val tryST = group.instanceOf("filter")
+        if (tryST.isSuccess) {
+          val st = tryST.get
+          st.add("out", out)
+          st.add("in", node.inPipeNames.head)
+          st.add("pred", emitPredicate(node.schema, pred))
+          st.render()
+        }
+        else ""
+      }
+      case Foreach(out, in, expr) => { 
+        val tryST = group.instanceOf("foreach")
+        if (tryST.isSuccess) {
+          val st = tryST.get
+          st.add("out", out)
+          st.add("in", node.inPipeNames.head)
+          st.add("expr", emitGenerator(node.schema, expr))
+          st.render()
+        }
+        else ""
+      }
       case Grouping(out, in, groupExpr) => {
-        if (groupExpr.keyList.isEmpty){ //GROUP ALL (Pig -> all in one group) seems to be not necessary for Flink?...
-        //This snippet would put every tuple in a separate group:
-        /*s"""
-         |val fields = new ListBuffer[Int]
-         |for(i <- 0 to ${node.inPipeNames.head}.getType.getTotalFields()-1)(fields+=i)
-         |val $out = ${node.inPipeNames.head}.groupBy(fields.toList:_*)
-         """.stripMargin
-         */
-        s"val $out = ${node.inPipeNames.head}"
-      } else s"val $out = ${node.inPipeNames.head}.groupBy(${emitGrouping(node.schema, groupExpr)})" }
-      case Distinct(out, in) => { s"val $out = ${node.inPipeNames.head}"} //TODO: GroupBy ALL + window + max/min
-      case Limit(out, in, num) => { s"val $out = ${node.inPipeNames.head}.window(Count.of($num)).every(Time.of(5, TimeUnit.SECONDS))" }
+        val tryST = group.instanceOf("groupBy")
+        if (tryST.isSuccess) {
+          val st = tryST.get
+          st.add("out", out)
+          st.add("in", node.inPipeNames.head)
+          if (groupExpr.keyList.isEmpty) st.render()
+          else {
+            st.add("expr", emitGrouping(node.schema, groupExpr))
+            st.render()
+          }
+        }
+        else ""
+      }
+      case Distinct(out, in) => {
+        val tryST = group.instanceOf("distinct")
+        if (tryST.isSuccess) {
+          val st = tryST.get
+          st.add("out", out)
+          st.add("in", node.inPipeNames.head)
+          st.render()
+        }
+        else ""
+      }
+      case Limit(out, in, num) => { 
+        val tryST = group.instanceOf("limit")
+        if (tryST.isSuccess) {
+          val st = tryST.get
+          st.add("out", out)
+          st.add("in", node.inPipeNames.head)
+          st.add("num", num)
+          st.render()
+        }
+        else ""
+      }
       case Join(out, rels, exprs) => { //TODO: Multiple Joins, Window Parameters
-      val res = rels.zip(exprs)
-      val s1 = res.map{case (rel, expr) => s"val ${rel}_k = ${emitJoinKey(node.schema, expr)}\n"}.mkString
-      s1 + s"val $out = ${rels.head}" + 
-      rels.tail.map{other => s".join(${other}).onWindow(5, TimeUnit.SECONDS).where(${rels.head}_k).equalTo(${other}_k)"}.mkString
+        val tryST = group.instanceOf("join")
+        if (tryST.isSuccess) {
+          val st = tryST.get
+          val keys = exprs.map(k => emitJoinKey(node.schema, k))
+          val res = rels.zip(keys)
+          st.add("out", out)
+          st.add("rel1", res.head._1)
+          st.add("key1", res.head._2)
+          st.add("rel2", res.tail.head._1)
+          st.add("key2", res.tail.head._2)
+          st.render()
+        }
+        else ""     
     }
-    case Union(out, rels) => { s"val $out = ${rels.head}.merge(" + rels.tail.map{other => s"${other}"}.mkString(",") + ")" }
-    case Sample(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.sample(${emitExpr(node.schema, expr)})"}//TODO
+    case Union(out, rels) => {
+      val tryST = group.instanceOf("union")
+      if (tryST.isSuccess) {
+        val st = tryST.get
+        st.add("out", out)
+        st.add("in", rels.head)
+        st.add("others", rels.tail.toList.mkString(","))
+        st.render()
+      }
+      else ""
+    }
+    case Sample(out, in, expr) => { s"val $out = ${node.inPipeNames.head}"}//TODO
     case OrderBy(out, in, orderSpec) => { s"val $out = ${node.inPipeNames.head}"} // TODO
     /*     
      case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }

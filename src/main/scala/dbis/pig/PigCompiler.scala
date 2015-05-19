@@ -5,6 +5,7 @@ import org.apache.spark.deploy.SparkSubmit
 import scopt.OptionParser
 import scala.io.Source
 import java.io.IOException
+import sys.process._
 
 /**
  * Created by kai on 31.03.15.
@@ -18,12 +19,17 @@ object PigCompiler extends PigParser {
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
+    var target: String = sys.env.get("Dtarget") match{
+        case Some(t) => t.toLowerCase()
+        case _ => "flink"
+    }
     var inputFile: String = null
     var compileOnly: Boolean = false
     var outDir: String = null
 
     val parser = new OptionParser[CompilerConfig]("PigCompiler") {
       head("PigCompiler", "0.1")
+//      opt[String]('t', "target") optional() action { (x, c) => c.copy(target = x) } text ("spark, flink")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text ("compile only (don't execute the script)")
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
@@ -36,6 +42,7 @@ object PigCompiler extends PigParser {
       case Some(config) => {
         // do stuff
         master = config.master
+//        target = config.target
         inputFile = config.input
         compileOnly = config.compile
         outDir = config.outDir
@@ -63,18 +70,23 @@ object PigCompiler extends PigParser {
 
     // 3. now, we should apply optimizations
 
-    if (compileToJar(plan, scriptName, outDir, compileOnly)) {
+    if (compileToJar(plan, scriptName, outDir, target, compileOnly)) {
       val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"  //scriptName + ".jar"
       
       // 8. and finally call SparkSubmit
-      SparkSubmit.main(Array("--master", master, "--class", scriptName, jarFile))
+      if (target == "spark")
+        SparkSubmit.main(Array("--master", master, "--class", scriptName, jarFile))
+      else
+        s"java -Dscala.usejavacp=true -cp lib/flink-dist-0.9-SNAPSHOT.jar:${jarFile} ${scriptName}" !
     }
   }
 
 
-  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, compileOnly: Boolean = false): Boolean = {
-    // 4. compile it into Scala code for Spark
-    val compile = new SparkCompile
+  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, target: String, compileOnly: Boolean = false): Boolean = {
+    // 4. compile it into Scala code for Spark or Flink
+    val compile = if(target == "flink") (new FlinkCompile) 
+                  else (new SparkCompile)
+//    val compile = new SparkCompile
     val code = compile.compile(scriptName, plan)
 
     // 5. write it to a file

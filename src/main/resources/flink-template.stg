@@ -5,26 +5,99 @@ import java.util.concurrent.TimeUnit
 
 <\n>
 >>
-
-// ----------------- begin of code building and initializing the query ----------------- 
+// ----------------- BEGIN of code building and initializing the query --------
 begin_query(name) ::= <<
 object <name> {
     def main(args: Array[String]) {
-        val env = StreamExecutionEnvironment.getExecutionEvironment
+        val env = StreamExecutionEnvironment.getExecutionEnvironment<\n>
 >>
 
-// ----------------- end of the code implementing the query ----------------- 
+// ----------------- LOAD text file -------------------------------------------
+loader(out,file,pfunc,rdffunc,params) ::=<<
+<if (pfunc)><pigstorage(out=out,file=file,del=params)>
+<elseif (rdffunc)><rdfstorage(out=out,file=file)>
+<else> 
+        val <out> = env.readTextFile("<file>")
+<endif>
+>>
+
+pigstorage(out,file,del) ::=<<
+        val <out> = env.readTextFile("<file>").map(line => line.split(<del>).toList)
+>>
+
+rdfstorage(out,file) ::=<<
+        val pattern = "([^\"]\\S*|\".+?\")\\s*".r
+        val <out> = env.readTextFile("<file>").map(line => pattern.findAllIn(line).map(_.trim).toArray.slice(0,3))
+>>
+
+
+// ------------------ DUMP Results --------------------------------------------
+dump(in) ::=<<
+        <in>.print
+>>
+
+// ------------------ STORE Results on Disk -----------------------------------
+store(in,file) ::=<<
+        <in>.writeAsText("<file>")
+>>
+
+// ------------------ FILTER for a Predicate ----------------------------------
+filter(out,in,pred) ::=<<
+        val <out> = <in>.filter(t => {<pred>})
+>>
+
+// ------------------ Executes an expression FOR EACH input element -----------
+foreach(out,in,expr) ::=<<
+        val <out> = <in>.map(t => <expr>)
+>>
+
+// ------------------ GROUPS elements on an expression ------------------------
+groupBy(out,in,expr) ::=<<
+<if (expr)>
+        val <out> = <in>.groupBy(<expr>)
+<else>
+        val <out> = <in>
+<endif>
+>>
+
+// ------------------ Outputs only distinct values ----------------------------
+distinct(out,in) ::=<<
+        val <out> = <in>
+>>
+
+// ------------------ Outputs only num records --------------------------------
+limit(out,in,num) ::=<<
+        val <out> = <in>.window(Count.of(<num>)).every(Time.of(5, TimeUnit.SECONDS))
+>>
+
+// ------------------ Joins two streams on the specified keys -----------------
+join(out,rel1,key1,rel2,key2) ::=<<
+        val <out> = <rel1>.join(<rel2>).onWindow(5, TimeUnit.SECONDS).where(<key1>).equalTo(<key2>)
+        //TODO: afterjoin -> next join *
+>>
+
+// ------------------ Transformation after Joins ------------------------------
+afterjoin(out, in) ::=<<
+        val <out> = <in> {
+            (left, right) =\> {
+                val res: ListBuffer[Any] = new ListBuffer[Any]
+                for(i \<- 0 to left.productArity-1) res+=left.productElement(i)
+                for(i \<- 0 to right.productArity-1) res+=right.productElement(i)
+                (res.mkString(","): _*) //TODO: Shapeless?
+            }
+        }
+>>
+
+
+// ------------------ UNIONs multiple streams to one --------------------------
+union(out,in,others) ::=<<
+        val <out> = <in>.merge(<others>)
+>>
+
+
+// ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
         env.execute("<name>")
     }
-}<\n>   
->>
-
-// ----------------- Load text file -----------------
-loader(file,func,params) ::=<<
-<if (func)>
-        <func>().load(env, "<file>"<if (params)><params><endif>)
-<else>
-        env.readTextFile("<file>")
-<endif>
+}
 >>
