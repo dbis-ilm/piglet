@@ -104,6 +104,11 @@ class SparkGenCode extends GenCodeBase {
     s"List(${genExprs.map(e => emitExpr(schema, e.expr)).mkString(",")})"
   }
 
+  def emitParamList(schema: Option[Schema], params: Option[List[Ref]]): String = params match {
+    case Some(refList) => s",${refList.map(r => emitRef(schema, r)).mkString(",")}"
+    case None => ""
+  }
+
   def emitNode(node: PigOperator): String = node match {
     case Load(out, file, schema, func, params) => { s"""val $out = ${emitLoader(file, func, params)}""" }
     case Dump(in) => { s"""${node.inPipeNames.head}.collect.map(t => println(t.mkString(",")))""" }
@@ -124,6 +129,7 @@ class SparkGenCode extends GenCodeBase {
     case Union(out, rels) => { s"val $out = ${rels.head}" + rels.tail.map{other => s".union(${other})"}.mkString }
     case Sample(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.sample(${emitExpr(node.schema, expr)})"}
     case OrderBy(out, in, orderSpec) => { s"val $out = ${node.inPipeNames.head}.sortBy()"} // TODO
+    case StreamOp(out, in, op, params, schema) => { s"val $out = $op($in${emitParamList(node.schema, params)})"}
     case _ => { "" }
   }
 

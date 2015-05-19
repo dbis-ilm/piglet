@@ -31,6 +31,8 @@ class PigParser extends JavaTokenParsers {
   def bag: Parser[String] = ident
   def fileName: Parser[String] = stringLiteral ^^ { str => unquote(str) }
 
+  def className: Parser[String] = repsep(ident, ".") ^^ { identList => identList.mkString(".")}
+
   /*
    * A reference can be a named field, a positional field (e.g $0, $1, ...) or a literal.
    */
@@ -265,10 +267,12 @@ class PigParser extends JavaTokenParsers {
   def registerStmt: Parser[PigOperator] = registerKeyword ~ stringLiteral ^^{ case _ ~ uri => Register(uri) }
 
   /*
-   * <A> = STREAM <B> TROUGH <Operator> [AS (<Schema>) ]
+   * <A> = STREAM <B> TROUGH <Operator> [(ParamList)] [AS (<Schema>) ]
    */
-  def streamStmt: Parser[PigOperator] = bag ~ "=" ~ streamKeyword ~ bag ~ throughKeyword ~ ident ~ (loadSchemaClause?) ^^{
-    case out ~ _ ~_ ~ in ~ _ ~ opname ~ schema => StreamOp(out, in, opname, schema)
+  def paramList: Parser[List[Ref]] = "(" ~ repsep(ref, ",") ~ ")" ^^ { case _ ~ rlist ~ _ => rlist}
+
+  def streamStmt: Parser[PigOperator] = bag ~ "=" ~ streamKeyword ~ bag ~ throughKeyword ~ className ~ (paramList?) ~ (loadSchemaClause?) ^^{
+    case out ~ _ ~_ ~ in ~ _ ~ opname ~ params ~ schema => StreamOp(out, in, opname, params, schema)
   }
 
   /*

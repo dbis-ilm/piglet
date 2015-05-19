@@ -243,13 +243,17 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a stream statement without schema" in {
-    assert(parseScript("a = stream b through myOp;") == List(StreamOp("a", "b", "myOp")))
+    assert(parseScript("a = stream b through package.myOp;") == List(StreamOp("a", "b", "package.myOp")))
+  }
+
+  it should "parse a stream statement with parameters" in {
+    assert(parseScript("a = stream b through myOp(1.0, 42);") == List(StreamOp("a", "b", "myOp", Some(List(Value("1.0"), Value("42"))))))
   }
 
   it should "parse a stream statement with schema" in {
     val schema = BagType("", TupleType("", Array(Field("f1", Types.IntType),
       Field("f2", Types.DoubleType))))
-    assert(parseScript("a = stream b through myOp as (f1: int, f2:double);") == List(StreamOp("a", "b", "myOp", Some(Schema(schema)))))
+    assert(parseScript("a = stream b through myOp as (f1: int, f2:double);") == List(StreamOp("a", "b", "myOp", None, Some(Schema(schema)))))
   }
 
   it should "parse a sample statement with a given size" in {
