@@ -37,7 +37,9 @@ lazy val root = (project in file(".")).
       "com.github.scopt" %% "scopt" % "3.3.0",
       "com.github.scala-incubator.io" % "scala-io-file_2.11" % "0.4.3-1"
     )
-  )
+  ).
+  aggregate(sparklib).
+  dependsOn(sparklib)
 
 lazy val sparklib = (project in file("sparklib")).
   settings(commonSettings: _*).

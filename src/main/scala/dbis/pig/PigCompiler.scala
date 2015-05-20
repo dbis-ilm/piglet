@@ -1,6 +1,7 @@
 package dbis.pig
 
-import java.io.{File, FileWriter}
+import java.io._
+import java.util.jar._
 
 import org.apache.spark.deploy.SparkSubmit
 import scopt.OptionParser
@@ -47,8 +48,6 @@ object PigCompiler extends PigParser {
     }
 
     // 1. we read the Pig file
-    // val inputFile = args(0)
-    // val reader = new FileReader(inputFile)
     val source = Source.fromFile(inputFile)
 
     val fileName = new File(inputFile).getName
@@ -65,13 +64,45 @@ object PigCompiler extends PigParser {
     // 3. now, we should apply optimizations
 
     if (compileToJar(plan, scriptName, outDir, compileOnly)) {
-      val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"  //scriptName + ".jar"
+      val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
       
-      // 8. and finally call SparkSubmit
+      // 4. and finally call SparkSubmit
       SparkSubmit.main(Array("--master", master, "--class", scriptName, jarFile))
     }
   }
 
+  def copyStream(istream : InputStream, ostream : OutputStream) : Unit = {
+    var bytes =  new Array[Byte](1024)
+    var len = -1
+    while({ len = istream.read(bytes, 0, 1024); len != -1 })
+      ostream.write(bytes, 0, len)
+  }
+
+  def extractJarToDir(jarName: String, outDir: String): Boolean = {
+    val jar = new JarFile(jarName)
+    val enu = jar.entries
+    while (enu.hasMoreElements) {
+      val entry = enu.nextElement
+      val entryPath = entry.getName
+
+      // we don't need the MANIFEST.MF file
+      if (! entryPath.endsWith("MANIFEST.MF")) {
+
+        // println("Extracting to " + outDir + "/" + entryPath)
+        if (entry.isDirectory) {
+          new File(outDir, entryPath).mkdirs
+        }
+        else {
+          val istream = jar.getInputStream(entry)
+          val ostream = new FileOutputStream(new File(outDir, entryPath))
+          copyStream(istream, ostream)
+          ostream.close
+          istream.close
+        }
+      }
+    }
+    true
+  }
 
   def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, compileOnly: Boolean = false): Boolean = {
     // 4. compile it into Scala code for Spark
@@ -104,7 +135,9 @@ object PigCompiler extends PigParser {
     if (!ScalaCompiler.compile(outputDirectory, outputFile))
       false
 
-    // TODO: 7. copy the dbis.spark library to output
+    // TODO: 7. copy the sparklib library to output
+    if (!extractJarToDir("sparklib/target/scala-2.11/sparklib_2.11-1.0.jar", outputDirectory))
+      false
 
     // 8. build a jar file
     val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
