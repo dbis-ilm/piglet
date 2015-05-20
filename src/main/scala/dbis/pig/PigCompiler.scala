@@ -78,7 +78,7 @@ object PigCompiler extends PigParser {
       ostream.write(bytes, 0, len)
   }
 
-  def extractJarToDir(jarName: String, outDir: String): Boolean = {
+  def extractJarToDir(jarName: String, outDir: String): Unit = {
     val jar = new JarFile(jarName)
     val enu = jar.entries
     while (enu.hasMoreElements) {
@@ -101,7 +101,6 @@ object PigCompiler extends PigParser {
         }
       }
     }
-    true
   }
 
   def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, compileOnly: Boolean = false): Boolean = {
@@ -135,11 +134,13 @@ object PigCompiler extends PigParser {
     if (!ScalaCompiler.compile(outputDirectory, outputFile))
       false
 
-    // TODO: 7. copy the sparklib library to output
-    if (!extractJarToDir("sparklib/target/scala-2.11/sparklib_2.11-1.0.jar", outputDirectory))
-      false
+    // 7. extract all additional jar files to output
+    plan.additionalJars.foreach(jarFile => extractJarToDir(jarFile, outputDirectory))
 
-    // 8. build a jar file
+    // 8. copy the sparklib library to output
+    extractJarToDir("sparklib/target/scala-2.11/sparklib_2.11-1.0.jar", outputDirectory)
+
+    // 9. build a jar file
     val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
     JarBuilder.apply(outputDirectory, jarFile, verbose = false)
     true
