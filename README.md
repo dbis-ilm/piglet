@@ -20,14 +20,21 @@ Simply clone the git project, change to the project directory and invoke
 sbt package
 ```
 
-There are several test cases included which should be passed. Note that building
-the compiler requires the most recent Spark jars, but they will be downloaded by
-sbt automatically.
+There are several test cases included which should be passed: unit tests can be executed by `sbt test`, integration tests which compile and execute Pig scripts on Spark are executed by `sbt it:test`.
+
+In order to support Pig functions and loaders an additional library `sparklib` is needed. This library can be build by
+
+```
+sbt 'project sparklib' package
+```
+
+Note that building the compiler requires the most recent Spark jars, but they will be downloaded by sbt automatically.
+
 
 We provide a simple wrapper script for processing Pig scripts. Just call it with 
 
 ```
-pigs --master local your_script.pig
+pigs --master local[4] your_script.pig
 ```
 
 to compile the script and execute it on your local Spark installation.

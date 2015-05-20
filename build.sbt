@@ -39,6 +39,17 @@ lazy val root = (project in file(".")).
     )
   )
 
+lazy val sparklib = (project in file("sparklib")).
+  settings(commonSettings: _*).
+  settings(
+    libraryDependencies ++= Seq(
+      "org.scalatest" % "scalatest_2.11" % "2.2.0" % "test" withSources(),
+      "org.scala-lang" % "scala-compiler" % "2.11.6",
+      "org.apache.spark" %% "spark-core" % "1.3.0"
+    // other settings
+    )
+  )
+
 mainClass in (Compile, packageBin) := Some("dbis.pig.PigREPL")
 
 mainClass in (Compile, run) := Some("dbis.pig.PigCompiler")
