@@ -1,10 +1,11 @@
 package dbis.pig
 
-import java.io.{File, FileReader, FileWriter}
+import java.io.{File, FileWriter}
+
 import org.apache.spark.deploy.SparkSubmit
 import scopt.OptionParser
+
 import scala.io.Source
-import java.io.IOException
 
 /**
  * Created by kai on 31.03.15.
@@ -47,7 +48,7 @@ object PigCompiler extends PigParser {
 
     // 1. we read the Pig file
     // val inputFile = args(0)
-    val reader = new FileReader(inputFile)
+    // val reader = new FileReader(inputFile)
     val source = Source.fromFile(inputFile)
 
     val fileName = new File(inputFile).getName
@@ -103,7 +104,9 @@ object PigCompiler extends PigParser {
     if (!ScalaCompiler.compile(outputDirectory, outputFile))
       false
 
-    // 7. build a jar file
+    // TODO: 7. copy the dbis.spark library to output
+
+    // 8. build a jar file
     val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
     JarBuilder.apply(outputDirectory, jarFile, verbose = false)
     true

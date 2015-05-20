@@ -141,6 +141,7 @@ class SparkGenCode extends GenCodeBase {
        |import org.apache.spark.SparkContext._
        |import org.apache.spark.SparkConf
        |import org.apache.spark.rdd._
+       |import dbis.spark._
        |
        |object $scriptName {
        |    def main(args: Array[String]) {

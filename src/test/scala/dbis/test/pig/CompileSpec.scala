@@ -20,6 +20,7 @@ class CompileSpec extends FlatSpec {
         |import org.apache.spark.SparkContext._
         |import org.apache.spark.SparkConf
         |import org.apache.spark.rdd._
+        |import dbis.spark._
         |
         |object test {
         |    def main(args: Array[String]) {
