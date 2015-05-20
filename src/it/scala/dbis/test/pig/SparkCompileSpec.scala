@@ -30,22 +30,23 @@ class SparkCompileSpec extends FlatSpec with Matchers {
 
   }
 
+  "The Pig compiler" should "compile and execute the script" in {
+    forAll(scripts) { (script: String, resultDir: String, truthFile: String) =>
+      // 1. make sure the output directory is empty
+      cleanupResult(resultDir)
 
-  forAll(scripts) { (script: String, resultDir: String, truthFile: String) =>
-    // 1. make sure the output directory is empty
-    cleanupResult(resultDir)
+      // 2. compile and execute Pig script
+      PigCompiler.main(Array("--master", "local[2]", "--outdir", ".", "./src/it/resources/" + script))
+      println("execute: " + script)
 
-    // 2. compile and execute Pig script
-    PigCompiler.main(Array("--master", "local[2]", "--outdir", ".", "./src/it/resources/" + script))
-    println("execute: " + script)
+      // 3. load the output file and the truth file
+      val result = Source.fromFile(resultDir + "/part-00000").getLines()
+      val truth = Source.fromFile("./src/it/resources/" + truthFile).getLines()
+      // 4. compare both files
+      result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
 
-    // 3. load the output file and the truth file
-    val result = Source.fromFile(resultDir + "/part-00000").getLines()
-    val truth = Source.fromFile("./src/it/resources/" + truthFile).getLines()
-    // 4. compare both files
-    result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
-
-    // 5. delete the output directory
-    cleanupResult(resultDir)
+      // 5. delete the output directory
+      cleanupResult(resultDir)
+    }
   }
 }
