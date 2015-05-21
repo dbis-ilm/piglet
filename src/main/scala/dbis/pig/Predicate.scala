@@ -112,19 +112,19 @@ case class Lt(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(le
 }
 
 /* TODO: should work with Predicate as operands */
-case class And(a: Ref, b: Ref) extends Predicate {
+case class And(a: Predicate, b: Predicate) extends Predicate {
   override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = true
 
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 }
 
-case class Or(a: Ref, b: Ref) extends Predicate {
+case class Or(a: Predicate, b: Predicate) extends Predicate {
   override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = true
 
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 }
 
-case class Not(a: Ref) extends Predicate {
+case class Not(a: Predicate) extends Predicate {
   override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = true
 
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
