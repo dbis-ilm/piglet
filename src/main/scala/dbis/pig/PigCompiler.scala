@@ -1,10 +1,12 @@
 package dbis.pig
 
-import java.io.{File, FileReader, FileWriter}
+import java.io._
+import java.util.jar._
+
 import org.apache.spark.deploy.SparkSubmit
 import scopt.OptionParser
+
 import scala.io.Source
-import java.io.IOException
 import sys.process._
 
 /**
@@ -15,21 +17,18 @@ object PigCompiler extends PigParser {
     parseScript(source.getLines().mkString)
   }
 
-  case class CompilerConfig(master: String = "local", input: String = "", compile: Boolean = false, outDir: String = ".")
+  case class CompilerConfig(master: String = "local", input: String = "", target: String = "flink", compile: Boolean = false, outDir: String = ".")
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
-    var target: String = sys.env.get("backend") match{
-        case Some(t) => t.toLowerCase()
-        case _ => "flink"
-    }
+    var target: String = "flink"
     var inputFile: String = null
     var compileOnly: Boolean = false
     var outDir: String = null
 
     val parser = new OptionParser[CompilerConfig]("PigCompiler") {
       head("PigCompiler", "0.1")
-//      opt[String]('t', "target") optional() action { (x, c) => c.copy(target = x) } text ("spark, flink")
+      opt[String]('t', "target") optional() action { (x, c) => c.copy(target = x) } text ("spark, flink")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text ("compile only (don't execute the script)")
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
@@ -42,7 +41,7 @@ object PigCompiler extends PigParser {
       case Some(config) => {
         // do stuff
         master = config.master
-//        target = config.target
+        target = config.target
         inputFile = config.input
         compileOnly = config.compile
         outDir = config.outDir
@@ -53,8 +52,6 @@ object PigCompiler extends PigParser {
     }
 
     // 1. we read the Pig file
-    // val inputFile = args(0)
-    val reader = new FileReader(inputFile)
     val source = Source.fromFile(inputFile)
 
     val fileName = new File(inputFile).getName
@@ -71,16 +68,47 @@ object PigCompiler extends PigParser {
     // 3. now, we should apply optimizations
 
     if (compileToJar(plan, scriptName, outDir, target, compileOnly)) {
-      val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"  //scriptName + ".jar"
+      val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
       
-      // 8. and finally call SparkSubmit
+      // 4. and finally call SparkSubmit
       if (target == "spark")
         SparkSubmit.main(Array("--master", master, "--class", scriptName, jarFile))
       else
-        s"java -Dscala.usejavacp=true -cp lib/flink-dist-0.9-SNAPSHOT.jar:${jarFile} ${scriptName}" !
+        s"java -Dscala.usejavacp=true -cp ${jarFile} ${scriptName}" !
     }
   }
 
+  def copyStream(istream : InputStream, ostream : OutputStream) : Unit = {
+    var bytes =  new Array[Byte](1024)
+    var len = -1
+    while({ len = istream.read(bytes, 0, 1024); len != -1 })
+      ostream.write(bytes, 0, len)
+  }
+
+  def extractJarToDir(jarName: String, outDir: String): Unit = {
+    val jar = new JarFile(jarName)
+    val enu = jar.entries
+    while (enu.hasMoreElements) {
+      val entry = enu.nextElement
+      val entryPath = entry.getName
+
+      // we don't need the MANIFEST.MF file
+      if (! entryPath.endsWith("MANIFEST.MF")) {
+
+        // println("Extracting to " + outDir + "/" + entryPath)
+        if (entry.isDirectory) {
+          new File(outDir, entryPath).mkdirs
+        }
+        else {
+          val istream = jar.getInputStream(entry)
+          val ostream = new FileOutputStream(new File(outDir, entryPath))
+          copyStream(istream, ostream)
+          ostream.close
+          istream.close
+        }
+      }
+    }
+  }
 
   def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, target: String, compileOnly: Boolean = false): Boolean = {
     // 4. compile it into Scala code for Spark or Flink
@@ -115,7 +143,16 @@ object PigCompiler extends PigParser {
     if (!ScalaCompiler.compile(outputDirectory, outputFile))
       false
 
-    // 7. build a jar file
+    // 7. extract all additional jar files to output
+    plan.additionalJars.foreach(jarFile => extractJarToDir(jarFile, outputDirectory))
+
+    // 8. copy the sparklib library to output
+    if (target == "flink")  
+      extractJarToDir("flinklib/target/scala-2.11/flinklib_2.11-1.0.jar", outputDirectory)
+    else
+      extractJarToDir("sparklib/target/scala-2.11/sparklib_2.11-1.0.jar", outputDirectory)
+
+    // 9. build a jar file
     val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
     JarBuilder.apply(outputDirectory, jarFile, verbose = false)
     true

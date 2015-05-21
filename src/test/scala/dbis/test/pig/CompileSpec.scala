@@ -20,6 +20,7 @@ class CompileSpec extends FlatSpec {
         |import org.apache.spark.SparkContext._
         |import org.apache.spark.SparkConf
         |import org.apache.spark.rdd._
+        |import dbis.spark._
         |
         |object test {
         |    def main(args: Array[String]) {
@@ -237,6 +238,26 @@ class CompileSpec extends FlatSpec {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.sample(100 / t(3))""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for the stream through statement without parameters" in {
+    // a = STREAM b THROUGH myOp
+    val op = StreamOp("a", "b", "myOp")
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+        |val a = myOp(b)""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for the stream through statement with parameters" in {
+    // a = STREAM b THROUGH package.myOp(1, 42.0)
+    val op = StreamOp("a", "b", "package.myOp", Some(List(Value("1"), Value(42.0))))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+        |val a = package.myOp(b,1,42.0)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 }

@@ -1,6 +1,6 @@
 package dbis.spark
 
-import Numeric.Implicits._
+import scala.Numeric.Implicits._
 
 
 /**

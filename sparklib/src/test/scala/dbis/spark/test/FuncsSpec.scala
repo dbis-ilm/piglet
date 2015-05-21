@@ -1,4 +1,4 @@
-package dbis.test.spark
+package dbis.spark.test
 
 import dbis.spark.PigFuncs
 import org.scalatest._

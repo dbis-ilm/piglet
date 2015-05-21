@@ -420,7 +420,8 @@ case class Join(override val outPipeName: String, override val inPipeNames: List
 
 }
 
-case class StreamOp(override val outPipeName: String, inPipeName: String, opName: String, var loadSchema: Option[Schema] = None)
+case class StreamOp(override val outPipeName: String, inPipeName: String, opName: String, params: Option[List[Ref]] = None,
+                    var loadSchema: Option[Schema] = None)
   extends PigOperator(outPipeName, List(inPipeName), loadSchema) {
   override def lineageString: String = s"""STREAM%""" + super.lineageString
 

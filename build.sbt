@@ -16,17 +16,16 @@ bintrayResolverSettings
  */
 val backend = "flink"
 
+def backendlib(backend: String) = backend match {
+    case "flink" => flinklib
+    case "spark" => sparklib
+}
 def backendDependencies(backend: String) = backend match {
-    case "flink" => "org.apache.spark" %% "spark-core" % "1.3.0" % "provided"
+    case "flink" => "org.apache.flink" % "flink-dist" % "0.9-SNAPSHOT" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
     case "spark" => "org.apache.spark" %% "spark-core" % "1.3.0"
 }
 
-//val backend = settingKey[String]("backend")
-//backend := sys.env.getOrElse("backend", default = "flink")
-//if(sys.env("backend") == "flink")
-//excludeFilter in unmanagedSources ~= { _ || "EXAMPLE.scala" }
-
-
+excludeFilter in unmanagedSources := HiddenFileFilter || "*PigCompilerFlink.scala"
 
 lazy val root = (project in file(".")).
   configs(IntegrationTest).
@@ -40,13 +39,15 @@ lazy val root = (project in file(".")).
       "org.scala-lang" % "scala-compiler" % "2.11.6",
       "com.assembla.scala-incubator" %% "graph-core" % "1.9.2",
       backendDependencies(backend),
+      "org.apache.spark" %% "spark-core" % "1.3.0" % "provided", //DELETE Later
       "com.github.scopt" %% "scopt" % "3.3.0",
       "com.github.scala-incubator.io" % "scala-io-file_2.11" % "0.4.3-1",
       "org.clapper" %% "scalasti" % "2.0.0"
     )
-  )//.
-//  aggregate(sparklib).
-//  dependsOn(sparklib)
+  ).
+  aggregate(backendlib(backend)).
+  dependsOn(backendlib(backend))
+
 
 lazy val sparklib = (project in file("sparklib")).
   settings(commonSettings: _*).
@@ -58,6 +59,15 @@ lazy val sparklib = (project in file("sparklib")).
       // other settings
     )
   )
+
+lazy val flinklib = (project in file("flinklib")).
+  settings(commonSettings: _*).
+  settings(
+    libraryDependencies ++= Seq(
+    backendDependencies(backend)
+    )
+  )
+
 
 mainClass in (Compile, packageBin) := Some("dbis.pig.PigREPL")
 
