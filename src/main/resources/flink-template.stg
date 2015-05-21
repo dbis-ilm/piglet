@@ -13,7 +13,7 @@ object <name> {
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,pfunc,rdffunc,params) ::=<<
+loader(out,file,pfunc,rdffunc,params,size) ::=<<
 <if (pfunc)><pigstorage(out=out,file=file,del=params)>
 <elseif (rdffunc)><rdfstorage(out=out,file=file)>
 <else> 
@@ -22,7 +22,7 @@ loader(out,file,pfunc,rdffunc,params) ::=<<
 >>
 
 pigstorage(out,file,del) ::=<<
-        val <out> = env.readTextFile("<file>").map(line => line.split(<del>).toList)
+        val <out> = env.readTextFile("<file>").map(line => line.split(<del>)).map{x => (x(0)<size:{ e | ,x(<e>)}>)}
 >>
 
 rdfstorage(out,file) ::=<<
@@ -71,23 +71,11 @@ limit(out,in,num) ::=<<
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
-join(out,rel1,key1,rel2,key2) ::=<<
-        val <out> = <rel1>.join(<rel2>).onWindow(5, TimeUnit.SECONDS).where(<key1>).equalTo(<key2>)
-        //TODO: afterjoin -> next join *
->>
-
-// ------------------ Transformation after Joins ------------------------------
-afterjoin(out, in) ::=<<
-        val <out> = <in> {
-            (left, right) =\> {
-                val res: ListBuffer[Any] = new ListBuffer[Any]
-                for(i \<- 0 to left.productArity-1) res+=left.productElement(i)
-                for(i \<- 0 to right.productArity-1) res+=right.productElement(i)
-                (res.mkString(","): _*) //TODO: Shapeless?
-            }
+join(out,rel1,key1,rel2,key2,lsize,rsize) ::=<<
+        val <out> = <rel1>.join(<rel2>).onWindow(5, TimeUnit.SECONDS).where(<key1>).equalTo(<key2>){ 
+            (l,r) => (l._1<lsize:{ l | ,l._<l>}><rsize:{ r | ,r._<r>}>) 
         }
 >>
-
 
 // ------------------ UNIONs multiple streams to one --------------------------
 union(out,in,others) ::=<<

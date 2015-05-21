@@ -72,7 +72,8 @@ class FlinkGenCode extends GenCodeBase {
 
   def quote(s: String): String = s"$s"
 
-  def emitLoader(file: String, loaderFunc: String, loaderParams: List[String], group: STGroup): String = {
+/*
+ def emitLoader(file: String, loaderFunc: String, loaderParams: List[String], group: STGroup): String = {
     val tryST = group.instanceOf("loader")
     if (tryST.isSuccess) {
       val st = tryST.get
@@ -89,7 +90,7 @@ class FlinkGenCode extends GenCodeBase {
     } 
     else ""
   }
-
+*/
   def emitExpr(schema: Option[Schema], expr: ArithmeticExpr): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
@@ -126,6 +127,7 @@ class FlinkGenCode extends GenCodeBase {
           val st = tryST.get
           st.add("out", out)
           st.add("file", file)
+          st.add("size", (1 to (schema.get.fields.size-1)).toList)
           if (func == "") st.render()
           else{
             val parameters = if (params != null && params.nonEmpty) params.map(quote(_)).mkString(",") else ""
@@ -135,7 +137,7 @@ class FlinkGenCode extends GenCodeBase {
             st.render()
           }
         } 
-        else ""
+        else throw new Exception(s"Template for node '$node' not implemented or not found")
       }
       case Dump(in) => { 
         val tryST = group.instanceOf("dump")
@@ -144,7 +146,7 @@ class FlinkGenCode extends GenCodeBase {
           st.add("in", node.inPipeNames.head)
           st.render()
         } 
-        else ""
+        else throw new Exception(s"Template for node '$node' not implemented or not found")
       }
       case Store(in, file) => { 
         val tryST = group.instanceOf("store")
@@ -154,7 +156,7 @@ class FlinkGenCode extends GenCodeBase {
           st.add("file", file)
           st.render()
         }
-        else ""
+        else throw new Exception(s"Template for node '$node' not implemented or not found")
       }
       case Describe(in) => { s"""println("${node.schemaToString}")""" }
       case Filter(out, in, pred) => { 
@@ -166,7 +168,7 @@ class FlinkGenCode extends GenCodeBase {
           st.add("pred", emitPredicate(node.schema, pred))
           st.render()
         }
-        else ""
+        else throw new Exception(s"Template for node '$node' not implemented or not found")
       }
       case Foreach(out, in, expr) => { 
         val tryST = group.instanceOf("foreach")
@@ -177,7 +179,7 @@ class FlinkGenCode extends GenCodeBase {
           st.add("expr", emitGenerator(node.schema, expr))
           st.render()
         }
-        else ""
+        else throw new Exception(s"Template for node '$node' not implemented or not found")
       }
       case Grouping(out, in, groupExpr) => {
         val tryST = group.instanceOf("groupBy")
@@ -191,7 +193,7 @@ class FlinkGenCode extends GenCodeBase {
             st.render()
           }
         }
-        else ""
+        else throw new Exception(s"Template for node '$node' not implemented or not found")
       }
       case Distinct(out, in) => {
         val tryST = group.instanceOf("distinct")
@@ -201,7 +203,7 @@ class FlinkGenCode extends GenCodeBase {
           st.add("in", node.inPipeNames.head)
           st.render()
         }
-        else ""
+        else throw new Exception(s"Template for node '$node' not implemented or not found")
       }
       case Limit(out, in, num) => { 
         val tryST = group.instanceOf("limit")
@@ -212,7 +214,7 @@ class FlinkGenCode extends GenCodeBase {
           st.add("num", num)
           st.render()
         }
-        else ""
+        else throw new Exception(s"Template for node '$node' not implemented or not found")
       }
       case Join(out, rels, exprs) => { //TODO: Multiple Joins, Window Parameters
         val tryST = group.instanceOf("join")
@@ -220,6 +222,10 @@ class FlinkGenCode extends GenCodeBase {
           val st = tryST.get
           val keys = exprs.map(k => emitJoinKey(node.schema, k))
           val res = rels.zip(keys)
+          val lsize = (2 to node.inputs.head.producer.schema.get.fields.size).toList
+          val rsize = (1 to node.inputs.tail.head.producer.schema.get.fields.size).toList
+          st.add("lsize", lsize)
+          st.add("rsize", rsize)
           st.add("out", out)
           st.add("rel1", res.head._1)
           st.add("key1", res.head._2)
@@ -227,7 +233,7 @@ class FlinkGenCode extends GenCodeBase {
           st.add("key2", res.tail.head._2)
           st.render()
         }
-        else ""     
+        else throw new Exception(s"Template for node '$node' not implemented or not found")
     }
     case Union(out, rels) => {
       val tryST = group.instanceOf("union")
@@ -238,7 +244,7 @@ class FlinkGenCode extends GenCodeBase {
         st.add("others", rels.tail.toList.mkString(","))
         st.render()
       }
-      else ""
+      else throw new Exception(s"Template for node '$node' not implemented or not found")
     }
     case Sample(out, in, expr) => { s"val $out = ${node.inPipeNames.head}"}//TODO
     case OrderBy(out, in, orderSpec) => { s"val $out = ${node.inPipeNames.head}"} // TODO
@@ -255,7 +261,7 @@ class FlinkGenCode extends GenCodeBase {
        s1 + s2
      }
      */
-    case _ => { "" }
+    case _ => { throw new Exception(s"Template for node '$node' not implemented or not found") }
     }
   }
 

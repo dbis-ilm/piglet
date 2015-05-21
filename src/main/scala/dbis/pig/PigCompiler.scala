@@ -19,7 +19,7 @@ object PigCompiler extends PigParser {
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
-    var target: String = sys.env.get("Dtarget") match{
+    var target: String = sys.env.get("backend") match{
         case Some(t) => t.toLowerCase()
         case _ => "flink"
     }
