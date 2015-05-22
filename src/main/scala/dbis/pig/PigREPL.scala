@@ -73,7 +73,7 @@ object PigREPL extends PigParser {
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") => {
         buf ++= parseScript(s)
         val plan = new DataflowPlan(buf.toList)
-        if (PigCompiler.compileToJar(plan, "script", ".")) {
+        if (FileTools.compileToJar(plan, "script", ".")) {
           val jarFile = "script.jar"
           SparkSubmit.main(Array("--master", "local", "--class", "script", jarFile))
         }
