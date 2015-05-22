@@ -9,7 +9,7 @@ package dbis.pig
  *
  * @param msg a message describing the exeption.
  */
-case class SchemaException(msg: String) extends Exception(msg)
+case class SchemaException(private val msg: String) extends Exception(msg)
 
 /**
  * A schema describes the structure of the output relation of an operator.

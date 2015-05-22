@@ -61,11 +61,21 @@ object PigCompiler extends PigParser {
     // 2. then we parse it and construct a dataflow plan
     val plan = new DataflowPlan(parseScriptFromSource(source))
     
-    
-    if (!plan.checkSchemaConformance) {
-      println("ERROR: schema conformance")
-      return
+    try {
+      // if this does _not_ throw an exception, the schema is ok
+      plan.checkSchemaConformance
+    } catch {
+      case e:SchemaException => {
+        println(s"schema conformance error in ${e.getMessage}")
+        return
+      }
     }
+    
+    
+//    if (!plan.checkSchemaConformance) {
+//      println("ERROR: schema conformance")
+//      return
+//    }
 
     val scriptName = fileName.replace(".pig", "")
 

@@ -263,15 +263,23 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
         |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
         |b = filter a by f1 > 0;
         |""".stripMargin))
-    plan.checkSchemaConformance should equal (true)
+//    plan.checkSchemaConformance should equal (true)
+    
+    /* somehow the not does not work here
+     * just let it check the conformance, if the exception is thrown, 
+     * the test will fail anyway
+     */
+    plan.checkSchemaConformance
+//    an [SchemaException] should not be thrownBy plan.checkSchemaConformance 
   }
 
-  it should "reject a filter statement with correct field names" in {
+  it should "reject a filter statement with incorrect field names" in {
     val plan = new DataflowPlan(parseScript("""
         |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
         |b = filter a by f0 > 0;
         |""".stripMargin))
-    plan.checkSchemaConformance should equal (false)
+//    plan.checkSchemaConformance should equal (false)
+    an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
   it should "reject a filter statement with field names for unknown schema" in {
@@ -279,7 +287,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
         |a = load "file.csv";
         |b = filter a by f0 > 0;
         |""".stripMargin))
-    plan.checkSchemaConformance should equal (false)
+//    plan.checkSchemaConformance should equal (false)
+    an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
 }
