@@ -91,6 +91,25 @@ class PigParserSpec extends FlatSpec {
       List(Filter("a", "b", Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))))
   }
 
+  it should "parse a filter with a complex arithmetic expression" in {
+    assert(parseScript("a = FILTER b BY x > (42 + y) * 3;") ==
+      List(Filter("a", "b", Gt(RefExpr(NamedField("x")),
+        Mult(Add(RefExpr(Value("42")), RefExpr(NamedField("y"))), RefExpr(Value("3")))))))
+  }
+
+  it should "parse a filter with a logical expression" in {
+    assert(parseScript("a = FILTER b BY x > 0 AND y < 1;") ==
+      List(Filter("a", "b", And(Gt(RefExpr(NamedField("x")), RefExpr(Value("0"))),
+                                Lt(RefExpr(NamedField("y")), RefExpr(Value("1")))))))
+  }
+
+  it should "parse a filter with a complex logical expression" in {
+    assert(parseScript("a = FILTER b BY x > 0 AND (y < 0 OR (NOT a == b));") ==
+      List(Filter("a", "b", And(Gt(RefExpr(NamedField("x")), RefExpr(Value("0"))),
+      Or(Lt(RefExpr(NamedField("y")), RefExpr(Value("0"))),
+        Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))))))))
+  }
+
   it should "parse a simple foreach statement" in {
     assert(parseScript("a = foreach b generate x, y, z;") ==
       List(Foreach("a", "b", List(

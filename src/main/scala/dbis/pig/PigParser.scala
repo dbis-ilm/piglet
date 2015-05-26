@@ -87,7 +87,7 @@ class PigParser extends JavaTokenParsers {
 
   def factor: Parser[ArithmeticExpr] =  (
      "(" ~ castTypeSpec ~ ")" ~ refExpr ^^ { case _ ~ t ~ _ ~ e => CastExpr(t, e) }
-      | "(" ~ arithmExpr ~ "" ^^ { case _ ~ e ~ _ => e }
+      | "(" ~ arithmExpr ~ ")" ^^ { case _ ~ e ~ _ => e }
       | func
       | refExpr
     )
@@ -106,7 +106,21 @@ class PigParser extends JavaTokenParsers {
     }
   }
 
+  def logicalTerm: Parser[Predicate] = (
+    comparisonExpr ^^ { e => e }
+     | "(" ~ logicalExpr ~ ")" ^^ { case _ ~ e ~ _ => e }
+    )
 
+  def logicalExpr: Parser[Predicate] = (
+      logicalTerm ~ (andKeyword | orKeyword) ~ logicalTerm ^^ {
+        case a ~ op ~ b => op match {
+          case "AND" => And(a, b)
+          case "OR" => Or(a, b)
+        }
+      }
+      | notKeyword ~ logicalTerm ^^ { case _ ~ e => Not(e) }
+      | logicalTerm ^^ { e => e }
+     )
 
   /*
    * The list of case-insensitive keywords we want to accept.
@@ -135,6 +149,9 @@ class PigParser extends JavaTokenParsers {
   lazy val orderKeyword = "order".ignoreCase
   lazy val ascKeyword = "asc".ignoreCase
   lazy val descKeyword = "desc".ignoreCase
+  lazy val andKeyword = "and".ignoreCase
+  lazy val orKeyword = "or".ignoreCase
+  lazy val notKeyword = "not".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
@@ -215,7 +232,7 @@ class PigParser extends JavaTokenParsers {
   /*
    * <A> = FILTER <B> BY <Predicate>
    */
-  def filterStmt: Parser[PigOperator] = bag ~ "=" ~ filterKeyword ~ bag ~ byKeyword ~ comparisonExpr ^^ {
+  def filterStmt: Parser[PigOperator] = bag ~ "=" ~ filterKeyword ~ bag ~ byKeyword ~ logicalExpr ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pred => Filter(out, in, pred)
   }
 

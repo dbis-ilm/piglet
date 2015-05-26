@@ -109,6 +109,14 @@ class SparkGenCode extends GenCodeBase {
     case None => ""
   }
 
+  /**
+   * Returns true if the sort order of the OrderBySpec is ascending
+   *
+   * @param spec
+   * @return
+   */
+  def ascendingSortOrder(spec: OrderBySpec): Boolean = spec.dir == OrderByDirection.AscendingOrder
+
   def emitNode(node: PigOperator): String = node match {
     case Load(out, file, schema, func, params) => { s"""val $out = ${emitLoader(file, func, params)}""" }
     case Dump(in) => { s"""${node.inPipeNames.head}.collect.map(t => println(t.mkString(",")))""" }
@@ -128,7 +136,8 @@ class SparkGenCode extends GenCodeBase {
     }
     case Union(out, rels) => { s"val $out = ${rels.head}" + rels.tail.map{other => s".union(${other})"}.mkString }
     case Sample(out, in, expr) => { s"val $out = ${node.inPipeNames.head}.sample(${emitExpr(node.schema, expr)})"}
-    case OrderBy(out, in, orderSpec) => { s"val $out = ${node.inPipeNames.head}.sortBy()"} // TODO
+    // TODO: generate a key for sorting and extract the tuple from the key
+    case OrderBy(out, in, orderSpec) => { s"val $out = ${node.inPipeNames.head}.sortByKey(${ascendingSortOrder(orderSpec.head)}).map(case (k,v) => v)"}
     case StreamOp(out, in, op, params, schema) => { s"val $out = $op($in${emitParamList(node.schema, params)})"}
     case _ => { "" }
   }

@@ -56,7 +56,10 @@ object PigREPL extends PigParser {
       case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
       case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
         val plan = new DataflowPlan(buf.toList)
-        if (plan.checkSchemaConformance) {
+        
+        try {
+          plan.checkSchemaConformance
+          
           val pat = "[Dd][Ee][Ss][Cc][Rr][Ii][Bb][Ee]\\s[A-Za-z]\\w*".r
           pat.findFirstIn(s) match {
             case Some(str) =>
@@ -67,13 +70,17 @@ object PigREPL extends PigParser {
               }
             case None => println("invalid describe command")
           }
+          
+        } catch {
+          case e:SchemaException => println(s"schema conformance error in ${e.getMessage}")
         }
+        
         false
       }
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") => {
         buf ++= parseScript(s)
         val plan = new DataflowPlan(buf.toList)
-        if (PigCompiler.compileToJar(plan, "script", "spark", ".")) {
+        if (FileTools.compileToJar(plan, "script", ".")) {
           val jarFile = "script.jar"
           SparkSubmit.main(Array("--master", "local", "--class", "script", jarFile))
         }

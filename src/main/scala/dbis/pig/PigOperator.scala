@@ -468,12 +468,19 @@ case class OrderBy(override val outPipeName: String, inPipeName: String, orderSp
   override def lineageString: String = s"""ORDERBY%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
-    // TODO
+    schema match {
+      case Some(s) => {
+        // if we know the schema we check all named fields
+        // TODO
+      }
+      case None => {
+        // if we don't have a schema then the OrderBySpec list should contain only positional fields
+        orderSpec.filter(s => s.field match {
+          case PositionalField(n) => true
+          case _ => false
+        }).size == orderSpec.size
+      }
+    }
     true
-  }
-
-  override def constructSchema: Option[Schema] = {
-    // TODO
-    schema
   }
 }

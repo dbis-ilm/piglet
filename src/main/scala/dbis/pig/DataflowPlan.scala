@@ -69,8 +69,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
   def sourceNodes: Set[PigOperator] = {
     graph.nodes.filter((n : Graph[PigOperator,DiEdge]#NodeT) => n.inDegree == 0).map(_.value).toSet[PigOperator]
   }
-  
-  
 
   def checkConnectivity: Boolean = {
     /*
@@ -79,8 +77,16 @@ class DataflowPlan(var operators: List[PigOperator]) {
     graph.isConnected
   }
 
-  def checkSchemaConformance: Boolean = {
-    operators.map(_.checkSchemaConformance).foldLeft(true){ (b1: Boolean, b2: Boolean) => b1 && b2 }
+  def checkSchemaConformance: Unit = {
+    val errors = operators.view.map{ op => (op, op.checkSchemaConformance) }
+                    .filter{ t => t._2 == false }
+
+    if(!errors.isEmpty) {
+      val str = errors.map(_._1).mkString(" and ")
+      throw SchemaException(str)
+    }
+    
+//    operators.map(_.checkSchemaConformance).foldLeft(true){ (b1: Boolean, b2: Boolean) => b1 && b2 }
   }
 
   /**
