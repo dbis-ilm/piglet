@@ -14,7 +14,8 @@ import scala.io.Source
 class FlinkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
     ("script", "result", "truth"), // only the header of the table
-    ("load.pig", "result1.out", "result1.data")
+    ("load.pig", "result1.out", "result1.data"),
+    ("selfjoin.pig", "result2.out", "result2.data")
   )
 
   def cleanupResult(dir: String): Unit = {
