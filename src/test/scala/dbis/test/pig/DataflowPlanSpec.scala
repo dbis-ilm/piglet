@@ -9,6 +9,7 @@ import dbis.pig._
 import org.scalatest.{Matchers, FlatSpec}
 
 class DataflowPlanSpec extends FlatSpec with Matchers {
+  /*
   "The plan" should "contain all pipes" in {
     val op1 = Load("a", "file.csv")
     val op2 = Filter("b", "a", Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
@@ -16,8 +17,9 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     val plan = new DataflowPlan(List(op1, op2, op3))
     assert(plan.pipes == Map("a" -> Pipe("a", op1), "b" -> Pipe("b", op2)))
   }
+  */
 
-  it should "not contain duplicate pipes" in {
+  "The plan" should "not contain duplicate pipes" in {
     val op1 = Load("a", "file.csv")
     val op2 = Filter("b", "a", Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op3 = Dump("b")
@@ -291,4 +293,23 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
+  it should "be consistent after adding a new operator using insertAfter" in {
+    val plan = new DataflowPlan(parseScript("""
+         |a = load "file.csv";
+         |b = filter a by $0 > 0;
+         |""".stripMargin))
+    val ops = plan.findOperator(o => o.outPipeName == "a")
+    ops.size should be (1)
+    val op = ops.head
+    op.outPipeName should be ("a")
+    plan.insertAfter(op, Distinct("c", "a"))
+    println(op)
+  }
+
+  it should "be consistent after exchanging two operators" in {
+
+  }
+  it should "be consistent after removing an operator" in {
+
+  }
 }
