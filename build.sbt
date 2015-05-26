@@ -8,6 +8,12 @@ lazy val commonSettings = Seq(
 
 // scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
 
+val backNd = settingKey[String]("Backend Description")
+backNd := sys.props.getOrElse("backNd",default= "flink")
+
+lazy val print = taskKey[Unit]("Print out")
+print := println(backNd.value)
+
 //For String Template (Scalasti)
 bintrayResolverSettings
 
@@ -21,11 +27,11 @@ def backendlib(backend: String) = backend match {
     case "spark" => sparklib
 }
 def backendDependencies(backend: String) = backend match {
-    case "flink" => "org.apache.flink" % "flink-dist" % "0.9-SNAPSHOT" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
+    case "flink" => "org.apache.flink" %% "flink-dist" % "0.9-SNAPSHOT" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
     case "spark" => "org.apache.spark" %% "spark-core" % "1.3.0"
 }
 
-excludeFilter in unmanagedSources := HiddenFileFilter || "*PigCompilerFlink.scala"
+excludeFilter in unmanagedSources := HiddenFileFilter || "*SparkCompileSpec.scala" || "*PigCompilerFlink.scala"
 
 lazy val root = (project in file(".")).
   configs(IntegrationTest).
@@ -78,5 +84,13 @@ assemblyJarName in assembly := "PigCompiler.jar"
 test in assembly := {}
 
 mainClass in assembly := Some("dbis.pig.PigCompiler")
+
+assemblyMergeStrategy in assembly := {
+    case PathList("scala", "util", xs @ _*)         => MergeStrategy.first
+    case PathList(ps @ _*) if ps startsWith "scala" => MergeStrategy.first
+    case x =>
+        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        oldStrategy(x)
+}
 
 //fork in run := true

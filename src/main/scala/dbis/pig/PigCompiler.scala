@@ -73,8 +73,16 @@ object PigCompiler extends PigParser {
       // 4. and finally call SparkSubmit
       if (target == "spark")
         SparkSubmit.main(Array("--master", master, "--class", scriptName, jarFile))
-      else
-        s"java -Dscala.usejavacp=true -cp ${jarFile} ${scriptName}" !
+      else{
+        val flinkJar = sys.env.get("FLINK_JAR") match{
+          case Some(n) => n
+          case None => throw new Exception(s"Please set FLINK_JAR to your flink-dist jar file")
+        }
+        //val flinkJar = "/home/blaze/.ivy2/cache/org.apache.flink/flink-dist_2.11/jars/flink-dist_2.11-0.9-SNAPSHOT.jar"
+        val submit = s"java -Dscala.usejavacp=true -cp ${flinkJar}:${jarFile} ${scriptName}"
+        println(submit)
+        submit !
+      }
     }
   }
 

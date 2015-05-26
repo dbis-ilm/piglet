@@ -37,10 +37,10 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val op = Load("a", "file.csv", None, "PigStorage", List("\",\""))
+    val op = Load("a", "file.csv", Option(Schema(BagType("",TupleType("",Array(Field("a1"),Field("a2"),Field("a3")))))), "PigStorage", List("\",\""))
     val codeGenerator = new FlinkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStorage().load(env, "file.csv", ",")""")
+    val expectedCode = cleanString("""val a = env.readTextFile("file.csv").map(line => line.split(",")).map(a => (a(0),a(1),a(2)))""")
     assert(generatedCode == expectedCode)
   }
 
@@ -48,7 +48,10 @@ class FlinkCompileSpec extends FlatSpec {
     val op = Load("a", "file.n3", None, "RDFFileStorage")
     val codeGenerator = new FlinkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = RDFFileStorage().load(env, "file.n3")""")
+    val expectedCode = cleanString("""
+      |val pattern = "([^\"]\S*|\".+?\")\s*".r 
+      |val a = env.readTextFile("file.n3").map(line => pattern.findAllIn(line).map(_.trim).toArray.slice(0,3)).map(a => (a(0),a(1),a(2)))
+      """.stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -162,6 +165,7 @@ class FlinkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  // TODO: ADD Schema definitions / Load op before
   it should "contain code for a binary JOIN statement with simple expression" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0)), List(PositionalField(0)))
     )

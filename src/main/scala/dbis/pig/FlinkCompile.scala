@@ -7,6 +7,7 @@ package dbis.pig
 import org.clapper.scalasti._
 
 //case class UDF(name: String, numParams: Int, isAggregate: Boolean)
+case class TemplateException(msg: String) extends Exception(msg)
 
 class FlinkGenCode extends GenCodeBase {
   val templateFile = "src/main/resources/flink-template.stg"
@@ -121,177 +122,88 @@ class FlinkGenCode extends GenCodeBase {
   def emitNode(node: PigOperator): String = {
     val group = STGroupFile(templateFile)
     node match {
-      case Load(out, file, schema, func, params) => { 
-        val tryST = group.instanceOf("loader")
-        if (tryST.isSuccess) {
-          val st = tryST.get
-          st.add("out", out)
-          st.add("file", file)
-          st.add("size", (1 to (schema.get.fields.size-1)).toList)
-          if (func == "") st.render()
-          else{
+      case Load(out, file, schema, func, params) => {
+        func match {
+          case "PigStorage" => {
             val parameters = if (params != null && params.nonEmpty) params.map(quote(_)).mkString(",") else ""
-            st.add("params", parameters)
-            if (func == "PigStorage") st.add("pfunc", true)
-            else if (func == "RDFFileStorage") st.add("rdffunc", true)
-            st.render()
+            val iSize = schema match{
+              case Some(s) => s.fields.size
+              case None => throw new SchemaException(s"Could not load Schema for load operation. Make sure to define it with the AS keyword")
+            }
+            val iList = if(iSize>1) (1 to iSize-1).toList else List.empty[Int]
+            callST("loader", Map("out"->out,"file"->file,"pfunc"->true,"params"->parameters,"schema"->iList))
           }
-        } 
-        else throw new Exception(s"Template for node '$node' not implemented or not found")
-      }
-      case Dump(in) => { 
-        val tryST = group.instanceOf("dump")
-        if (tryST.isSuccess) {    
-          val st = tryST.get
-          st.add("in", node.inPipeNames.head)
-          st.render()
-        } 
-        else throw new Exception(s"Template for node '$node' not implemented or not found")
-      }
-      case Store(in, file) => { 
-        val tryST = group.instanceOf("store")
-        if (tryST.isSuccess) {
-          val st = tryST.get
-          st.add("in", node.inPipeNames.head)
-          st.add("file", file)
-          st.render()
+          case "RDFFileStorage" => callST("loader", Map("out"->out,"file"->file,"rdffunc"->true))
+          case _  => callST("loader", Map("out"->out,"file"->file))
         }
-        else throw new Exception(s"Template for node '$node' not implemented or not found")
+
       }
+      case Dump(in) => callST("dump", Map("in"->in.head)) 
+      case Store(in, file) => callST("store", Map("in"->in.head,"file"->file))
       case Describe(in) => { s"""println("${node.schemaToString}")""" }
-      case Filter(out, in, pred) => { 
-        val tryST = group.instanceOf("filter")
-        if (tryST.isSuccess) {
-          val st = tryST.get
-          st.add("out", out)
-          st.add("in", node.inPipeNames.head)
-          st.add("pred", emitPredicate(node.schema, pred))
-          st.render()
-        }
-        else throw new Exception(s"Template for node '$node' not implemented or not found")
-      }
-      case Foreach(out, in, expr) => { 
-        val tryST = group.instanceOf("foreach")
-        if (tryST.isSuccess) {
-          val st = tryST.get
-          st.add("out", out)
-          st.add("in", node.inPipeNames.head)
-          st.add("expr", emitGenerator(node.schema, expr))
-          st.render()
-        }
-        else throw new Exception(s"Template for node '$node' not implemented or not found")
-      }
+      case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in.head,"pred"->emitPredicate(node.schema, pred)))
+      case Foreach(out, in, expr) => callST("foreach", Map("out"->out,"in"->in.head,"expr"->emitGenerator(node.schema, expr)))
       case Grouping(out, in, groupExpr) => {
-        val tryST = group.instanceOf("groupBy")
-        if (tryST.isSuccess) {
-          val st = tryST.get
-          st.add("out", out)
-          st.add("in", node.inPipeNames.head)
-          if (groupExpr.keyList.isEmpty) st.render()
-          else {
-            st.add("expr", emitGrouping(node.schema, groupExpr))
-            st.render()
-          }
-        }
-        else throw new Exception(s"Template for node '$node' not implemented or not found")
+        if (groupExpr.keyList.isEmpty) callST("groupBy", Map("out"->out,"in"->in.head))
+        else callST("groupBy", Map("out"->out,"in"->in.head,"expr"->emitGrouping(node.schema, groupExpr)))
       }
-      case Distinct(out, in) => {
-        val tryST = group.instanceOf("distinct")
-        if (tryST.isSuccess) {
-          val st = tryST.get
-          st.add("out", out)
-          st.add("in", node.inPipeNames.head)
-          st.render()
-        }
-        else throw new Exception(s"Template for node '$node' not implemented or not found")
-      }
-      case Limit(out, in, num) => { 
-        val tryST = group.instanceOf("limit")
-        if (tryST.isSuccess) {
-          val st = tryST.get
-          st.add("out", out)
-          st.add("in", node.inPipeNames.head)
-          st.add("num", num)
-          st.render()
-        }
-        else throw new Exception(s"Template for node '$node' not implemented or not found")
-      }
+      case Distinct(out, in) => callST("distinct", Map("out"->out,"in"->in.head))
+      case Limit(out, in, num) => callST("limit", Map("out"->out,"in"->in.head,"num"->num))
       case Join(out, rels, exprs) => { //TODO: Multiple Joins, Window Parameters
-        val tryST = group.instanceOf("join")
-        if (tryST.isSuccess) {
-          val st = tryST.get
-          val keys = exprs.map(k => emitJoinKey(node.schema, k))
-          val res = rels.zip(keys)
-          val lsize = (2 to node.inputs.head.producer.schema.get.fields.size).toList
-          val rsize = (1 to node.inputs.tail.head.producer.schema.get.fields.size).toList
-          st.add("lsize", lsize)
-          st.add("rsize", rsize)
-          st.add("out", out)
-          st.add("rel1", res.head._1)
-          st.add("key1", res.head._2)
-          st.add("rel2", res.tail.head._1)
-          st.add("key2", res.tail.head._2)
-          st.render()
+        val keys = exprs.map(k => emitJoinKey(node.schema, k))
+        val lSize = node.inputs.head.producer.schema match{
+          case Some(s) => s.fields.size
+          case None => throw new SchemaException(s"Could not load Schema for first join relation")
         }
-        else throw new Exception(s"Template for node '$node' not implemented or not found")
-    }
-    case Union(out, rels) => {
-      val tryST = group.instanceOf("union")
-      if (tryST.isSuccess) {
-        val st = tryST.get
-        st.add("out", out)
-        st.add("in", rels.head)
-        st.add("others", rels.tail.toList.mkString(","))
-        st.render()
+        val rSize = node.inputs.tail.head.producer.schema match{
+          case Some(s) => s.fields.size
+          case None => throw new SchemaException(s"Could not load Schema for second join relation")
+        }
+        val lList = if (lSize>1) (2 to lSize).toList else List.empty[Int]
+        val rList = (1 to rSize).toList
+        callST("join", Map("out"->out,"rel1"->rels.head,"key1"->keys.head,
+          "rel2"->rels.tail.head,"key2"->keys.tail.head,"lsize"->lList,"rsize"->rList))  
       }
-      else throw new Exception(s"Template for node '$node' not implemented or not found")
-    }
-    case Sample(out, in, expr) => { s"val $out = ${node.inPipeNames.head}"}//TODO
-    case OrderBy(out, in, orderSpec) => { s"val $out = ${node.inPipeNames.head}"} // TODO
-    /*     
-     case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
-     case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
-     val s1 = s"""
-     |val split = ${rels.head}.split(${emitExpr(node.schema, expr)} match {
-         |  case true => List("1st")
-         |  case false => List("2nd")
-         |})
-       """.stripMargin
-       val s2 = rels.tail.map{rel => s"""val ${rel} = split.select("1st")"""}.mkString
-       s1 + s2
-     }
-     */
-    case _ => { throw new Exception(s"Template for node '$node' not implemented or not found") }
+      case Union(out, rels) => callST("union", Map("out"->out,"in"->rels.head,"others"->rels.tail.mkString(","))) 
+      case Sample(out, in, expr) => callST("sample", Map("out"->out,"in"->in.head,"expr"->expr)) //TODO
+      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out,"in"->in.head,"spec"->orderSpec)) // TODO
+      /*     
+       case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
+       case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
+       val s1 = s"""
+       |val split = ${rels.head}.split(${emitExpr(node.schema, expr)} match {
+           |  case true => List("1st")
+           |  case false => List("2nd")
+           |})
+         """.stripMargin
+         val s2 = rels.tail.map{rel => s"""val ${rel} = split.select("1st")"""}.mkString
+         s1 + s2
+       }
+       */
+      case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
   }
 
-  def emitHeader(scriptName: String): String = {
-    var header = ""
-    val group = STGroupFile(templateFile)
-    var tryST = group.instanceOf("init_code")
-    if (tryST.isSuccess) {    
-       header+=tryST.get.render()
-    }
-    tryST = group.instanceOf("begin_query")
-    if (tryST.isSuccess){
-      val st = tryST.get
-      st.add("name", scriptName)
-      header+=st.render()
-    }
-    header
-  }
+  def emitHeader(scriptName: String): String = callST("init_code") + callST("begin_query", Map("name" -> scriptName))
 
-  def emitFooter: String = {
-    var footer = ""
+  def emitFooter: String = callST("end_query", Map("name" -> "Starting Flink Query"))
+
+  def callST(template: String): String = callST(template, Map[String,Any]())
+  def callST(template:String, attributes: Map[String, Any]): String = {
     val group = STGroupFile(templateFile)
-    val tryST = group.instanceOf("end_query")
+    val tryST = group.instanceOf(template)
     if (tryST.isSuccess) {
       val st = tryST.get
-      st.add("name", "Starting Flink Query")
-      footer+=st.render()
+      if (!attributes.isEmpty){
+        attributes.foreach {
+          attr => st.add(attr._1, attr._2)
+        }
+      }
+      st.render()
     }
-    footer
+    else throw new TemplateException(s"Template '$template' not implemented or not found") 
   }
+  
 }
 
 class FlinkCompile extends Compile {

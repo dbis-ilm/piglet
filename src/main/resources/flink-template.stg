@@ -13,21 +13,21 @@ object <name> {
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,pfunc,rdffunc,params,size) ::=<<
-<if (pfunc)><pigstorage(out=out,file=file,del=params)>
+loader(out,file,pfunc,rdffunc,params,schema) ::=<<
+<if (pfunc)><pigstorage(out=out,file=file,del=params,schema=schema)>
 <elseif (rdffunc)><rdfstorage(out=out,file=file)>
 <else> 
         val <out> = env.readTextFile("<file>")
 <endif>
 >>
 
-pigstorage(out,file,del) ::=<<
-        val <out> = env.readTextFile("<file>").map(line => line.split(<del>)).map{x => (x(0)<size:{ e | ,x(<e>)}>)}
+pigstorage(out,file,del,schema) ::=<<
+        val <out> = env.readTextFile("<file>").map(line => line.split(<del>)).map(a => (a(0)<schema:{ e | ,a(<e>)}>))
 >>
 
 rdfstorage(out,file) ::=<<
         val pattern = "([^\"]\\S*|\".+?\")\\s*".r
-        val <out> = env.readTextFile("<file>").map(line => pattern.findAllIn(line).map(_.trim).toArray.slice(0,3))
+        val <out> = env.readTextFile("<file>").map(line => pattern.findAllIn(line).map(_.trim).toArray.slice(0,3)).map(a => (a(0),a(1),a(2)))
 >>
 
 
