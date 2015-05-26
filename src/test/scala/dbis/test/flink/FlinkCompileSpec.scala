@@ -166,6 +166,7 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   // TODO: ADD Schema definitions / Load op before
+  /*
   it should "contain code for a binary JOIN statement with simple expression" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0)), List(PositionalField(0)))
     )
@@ -204,7 +205,7 @@ class FlinkCompileSpec extends FlatSpec {
         |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(b_k).equalTo(c_k).join(d).onWindow(5, TimeUnit.SECONDS).where(b_k).equalTo(d_k)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
-
+*/
   it should "contain code for GROUP BY ALL" in {
     val op = Grouping("a", "b", GroupingExpression(List()))
     val codeGenerator = new FlinkGenCode
