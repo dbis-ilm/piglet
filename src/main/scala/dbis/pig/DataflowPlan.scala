@@ -34,10 +34,10 @@ class DataflowPlan(var operators: List[PigOperator]) {
      * 1. we create pipes for all outPipeNames and make sure they are unique
      */
     planOps.foreach(op => {
-      if (op.outPipeName != "") {
-        if (pipes.contains(op.outPipeName))
-          throw new InvalidPlanException("duplicate pipe: " + op.outPipeName)
-        pipes(op.outPipeName) = Pipe(op.outPipeName, op)
+      if (op.initialOutPipeName != "") {
+        if (pipes.contains(op.initialOutPipeName))
+          throw new InvalidPlanException("duplicate pipe: " + op.initialOutPipeName)
+        pipes(op.initialOutPipeName) = Pipe(op.initialOutPipeName, op)
       }
     })
     /*
@@ -46,15 +46,11 @@ class DataflowPlan(var operators: List[PigOperator]) {
      */
     try {
       planOps.foreach(op => {
-        op.output = if (op.outPipeName != "") pipes.get(op.outPipeName) else None
-        op.inputs = op.inPipeNames.map(p => pipes(p))
+        op.output = if (op.initialOutPipeName != "") pipes.get(op.initialOutPipeName) else None
+        op.inputs = op.initialInPipeNames.map(p => pipes(p))
         op.constructSchema
 
         // println("op: " + op)
-        /*
-         * 3. while we process the operators we build a graph
-         */
-        // op.inputs.foreach(p => graph += p.producer ~> op)
       })
     }
     catch {
@@ -63,15 +59,9 @@ class DataflowPlan(var operators: List[PigOperator]) {
     operators = planOps
   }
 
-  def sinkNodes: Set[PigOperator] = {
-    operators.filter((n: PigOperator) => n.output.isEmpty).toSet[PigOperator]
-    // graph.nodes.filter((n : Graph[PigOperator,DiEdge]#NodeT) => n.outDegree == 0).map(_.value).toSet[PigOperator]
-  }
+  def sinkNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.output.isEmpty).toSet[PigOperator]
   
-  def sourceNodes: Set[PigOperator] = {
-    operators.filter((n: PigOperator) => n.inputs.isEmpty).toSet[PigOperator]
-    // graph.nodes.filter((n : Graph[PigOperator,DiEdge]#NodeT) => n.inDegree == 0).map(_.value).toSet[PigOperator]
-  }
+  def sourceNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.inputs.isEmpty).toSet[PigOperator]
 
   def checkConnectivity: Boolean = {
     // we simply construct a graph and check its connectivity
