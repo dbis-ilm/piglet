@@ -64,8 +64,10 @@ Currently, we have implemented to following mappings in the code generator.
 | `LIMIT alias num` |  `sc.parallelize(alias.take(num))` |
 | `UNION alias1, alias2, ...` | `alias1.union(alias2.union(...))` |
 | `SAMPLE alias size` |  `alias.sample(size)` |
-| `ORDER alias1 BY field1 [ASC|DESC], field2 [ASC|DESC] ...` |  |
+| `ORDER alias1 BY field1 ASC, field2 ASC ...` |  |
 | `JOIN alias1 BY expr1, alias2 BY expr2, ...` |  |
+| `GROUP alias ALL`| `alias.glom`  |
+| `GROUPB alias BY expr` | `alias.groupBy(t => {expr}).map{case (k,v) => List(k,v)}`|
 | `STREAM alias THROUGH op(params)` |  `op(alias, params)` |
 
 ### Testing ###
