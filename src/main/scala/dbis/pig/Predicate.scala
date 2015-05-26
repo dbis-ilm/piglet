@@ -111,7 +111,6 @@ case class Lt(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(le
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 }
 
-/* TODO: should work with Predicate as operands */
 case class And(a: Predicate, b: Predicate) extends Predicate {
   override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = true
 
