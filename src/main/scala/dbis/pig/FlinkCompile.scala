@@ -10,8 +10,9 @@ import org.clapper.scalasti._
 case class TemplateException(msg: String) extends Exception(msg)
 
 class FlinkGenCode extends GenCodeBase {
+  
   val templateFile = "src/main/resources/flink-template.stg"
-  //TODO: use Flink aggregate
+
   val funcTable = Map("COUNT" -> UDF("PigFuncs.count", 1, true),
                       "AVG" -> UDF("PigFuncs.average", 1, true),
                       "SUM" -> UDF("PigFuncs.sum", 1, true),

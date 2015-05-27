@@ -1,0 +1,20 @@
+#!/bin/sh
+
+
+# PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
+
+if [ -z "$PIG_LIB" ]; then
+    echo "Please set PIG_LIB to your PigCompiler jar file"
+    exit 1
+else
+    CP=$PIG_LIB
+fi
+
+if [ -z "$FLINK_JAR" ]; then
+    echo "Please set FLINK_JAR to your flink-dist jar file (built with scala 2.11)"
+	exit 1
+else
+	CP=$FLINK_JAR:$CP
+fi
+
+java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.PigCompiler $*

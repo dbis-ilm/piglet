@@ -96,7 +96,7 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
 
-  it should "contain code a FOREACH statement with function expressions" in {
+  it should "contain code for a FOREACH statement with function expressions" in {
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
     val op = Foreach("a", "b", List(
       GeneratorExpr(Func("TOMAP", List(

@@ -38,7 +38,7 @@ class FlinkCompileIt extends FlatSpec with Matchers {
       cleanupResult(script.replace(".pig",""))
 
       // 2. compile and execute Pig script
-      PigCompiler.main(Array("--target", "flink", "--outdir", ".", "./src/it/resources/" + script))
+      PigCompiler.main(Array("--outdir", ".", "./src/it/resources/" + script))
       println("execute: " + script)
 
       // 3. load the output file and the truth file
