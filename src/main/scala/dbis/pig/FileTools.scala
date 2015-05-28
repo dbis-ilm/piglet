@@ -95,7 +95,7 @@ object FileTools {
   }
 
   private def getCompiler(backend: String): Compile = {
-    val className = BuildSettings.backends.get(backend).get("class")
+    val className = BuildSettings.backends.get(backend).get("compilerClass")
     Class.forName(className).newInstance().asInstanceOf[Compile]
   }
 

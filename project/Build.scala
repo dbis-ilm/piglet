@@ -5,21 +5,17 @@ object PigBuild extends Build {
 
    val flinkSettings = Map(
     "name"  -> "flink",
-    "class" -> "dbis.pig.FlinkCompile"
+    "compilerClass" -> "dbis.pig.FlinkCompile"
   )
 
   val sparkSettings = Map(
     "name"  -> "spark",
-    "class" -> "dbis.pig.SparkCompile"
+    "compilerClass" -> "dbis.pig.SparkCompile"
   )
 
   val flinkBackend =      Map("flink" -> flinkSettings, "default" -> flinkSettings)
   val sparkBackend =      Map("spark" -> sparkSettings, "default" -> sparkSettings)
   val flinksparkBackend = Map("flink" -> flinkSettings, "spark" -> sparkSettings, "default" -> sparkSettings)
-
-  // For Testing:
-  //lazy val print = taskKey[Unit]("Print out")
-  //print := println(backends.value.get("default").get("name"))
 
   def backendDependencies(backend: String) = backend match {
     case "flink" => Seq (
@@ -86,7 +82,6 @@ object Dependencies {
     scalaParserCombinators withSources(),
     scalaCompiler,
     graphCore,
-    sparkCore % "provided", //Delete Later
     scopt,
     scalaIoFile,
     scalasti

@@ -2,10 +2,7 @@ package dbis.pig
 
 
 import java.io.File
-
-import org.apache.spark.deploy.SparkSubmit
 import scopt.OptionParser
-
 import scala.io.Source
 import sys.process._
 
@@ -84,7 +81,16 @@ object PigCompiler extends PigParser {
 
       // 4. and finally deploy/submit
       backend match {
-        case "spark" => SparkSubmit.main(Array("--master", master, "--class", scriptName, jarFile))
+        case "spark" => {
+          //TODO: outsource this to e.g. reflectObjectMethod(objName: String, methodName: String, params: Any)
+          val objName = "org.apache.spark.deploy.SparkSubmit"
+          val ru = scala.reflect.runtime.universe                                      //JavaUniverse
+          val mirror = ru.runtimeMirror(getClass.getClassLoader)                       //Mirror
+          val module = mirror.staticModule(objName)                                    //Module
+          val im = mirror.reflect(mirror.reflectModule(module).instance)               //InstanceMirror
+          val method = im.symbol.typeSignature.member(ru.newTermName("main")).asMethod //MethodSymbol
+          im.reflectMethod(method)(Array("--master", master, "--class", scriptName, jarFile))
+        }
         case "flink" => {
           val flinkJar = sys.env.get("FLINK_JAR") match {
             case Some(n) => n

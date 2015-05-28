@@ -1,7 +1,6 @@
 package dbis.pig
 
 import jline.console.ConsoleReader
-import org.apache.spark.deploy.SparkSubmit
 
 import scala.collection.mutable.ListBuffer
 
@@ -82,7 +81,14 @@ object PigREPL extends PigParser {
         val plan = new DataflowPlan(buf.toList)
         if (FileTools.compileToJar(plan, "script", ".")) {
           val jarFile = "script.jar"
-          SparkSubmit.main(Array("--master", "local", "--class", "script", jarFile))
+
+          val objName = "org.apache.spark.deploy.SparkSubmit"
+          val ru = scala.reflect.runtime.universe
+          val mirror = ru.runtimeMirror(getClass.getClassLoader)
+          val module = mirror.staticModule(objName)
+          val im = mirror.reflect(mirror.reflectModule(module).instance)
+          val method = im.symbol.typeSignature.member(ru.newTermName("main")).asMethod
+          im.reflectMethod(method)(Array("--master", "local", "--class", "script", jarFile))
         }
         // buf.clear()
         false

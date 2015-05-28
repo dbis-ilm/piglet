@@ -1,19 +1,18 @@
 name := "PigParser"
 
 lazy val commonSettings = Seq(
-        version := "1.0",
-        scalaVersion := "2.11.6",
-        organization := "dbis"
+  version := "1.0",
+  scalaVersion := "2.11.6",
+  organization := "dbis"
 )
 
 // scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
 
-//For String Template (Scalasti)
 
 /*  
  * define the backend for the compiler: currently we support spark and flink
  */
-val backendEnv = sys.props.getOrElse("backend", default="flink")
+val backendEnv = sys.props.getOrElse("backend", default="spark")
 val backends = settingKey[Map[String,Map[String,String]]]("Backend Settings")
 backends := (backendEnv match {
   case "flink"      => flinkBackend
@@ -21,6 +20,10 @@ backends := (backendEnv match {
   case "sparkflink" => flinksparkBackend
   case _            => throw new Exception(s"Backend $backendEnv not available")
 })  
+// For Testing:
+lazy val print = taskKey[Unit]("Print out")
+print := println(backends.value.get("default").get("name"))
+
 
 
 //Main Project
