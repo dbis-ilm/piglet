@@ -21,8 +21,8 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse also a load statement with the using clause" in  {
-    assert(parseScript("""a = LOAD 'file.data' using PigStorage("\t");""") ==
-      List(Load("a", "file.data", None, "PigStorage", List(""""\t""""))))
+    assert(parseScript("""a = LOAD 'file.data' using PigStorage(',');""") ==
+      List(Load("a", "file.data", None, "PigStorage", List("""','"""))))
     assert(parseScript("""a = LOAD 'file.n3' using RDFFileStorage();""") ==
       List(Load("a", "file.n3", None, "RDFFileStorage")))
   }
