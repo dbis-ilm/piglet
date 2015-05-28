@@ -13,7 +13,7 @@ class CompileSpec extends FlatSpec {
 
   "The compiler output" should "contain the Spark header & footer" in {
     val codeGenerator = new SparkGenCode
-    val generatedCode = cleanString(codeGenerator.emitHeader("test") + codeGenerator.emitFooter)
+    val generatedCode = cleanString(codeGenerator.emitImport + codeGenerator.emitHeader("test") + codeGenerator.emitFooter)
 //        |import dbis.spark._
     val expectedCode = cleanString("""
         |import org.apache.spark.SparkContext
@@ -37,7 +37,7 @@ class CompileSpec extends FlatSpec {
     val op = Load("a", "file.csv")
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = sc.textFile("file.csv")""")
+    val expectedCode = cleanString("""val a = sc.textFile("file.csv").map(s => List(s))""")
     assert(generatedCode == expectedCode)
   }
 
@@ -77,7 +77,7 @@ class CompileSpec extends FlatSpec {
     val op = Store("a", "file.csv")
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""a.coalesce(1, true).saveAsTextFile("file.csv")""")
+    val expectedCode = cleanString("""a.map(t => t(0)).coalesce(1, true).saveAsTextFile("file.csv")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -259,5 +259,43 @@ class CompileSpec extends FlatSpec {
     val expectedCode = cleanString("""
         |val a = package.myOp(b,1,42.0)""".stripMargin)
     assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for simple ORDER BY" in {
+    // a = ORDER b BY $0
+    val op = OrderBy("a", "b", List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+        |val a = b.keyBy(t => t(0)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for complex ORDER BY" in {
+    // a = ORDER b BY f1, f3
+    val op = OrderBy("a", "b", List(OrderBySpec(NamedField("f1"), OrderByDirection.AscendingOrder),
+                                    OrderBySpec(NamedField("f3"), OrderByDirection.AscendingOrder)))
+    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+                                                              Field("f2", Types.DoubleType),
+                                                              Field("f3", Types.IntType)
+    ))))
+
+    op.schema = Some(schema)
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+        |val a = b.keyBy(t => custKey_a_b(t(0).toString,t(2).toInt)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
+    assert(generatedCode == expectedCode)
+
+    val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(op))
+    val expectedHelperCode = cleanString("""
+        |case class custKey_a_b(c1: String, c2: Int) extends Ordered[custKey_a_b] {
+        |  def compare(that: custKey_a_b) = { if (this.c1 == that.c1) {
+        |                                    this.c2 compare that.c2
+        |                                 }
+        |                                 else
+        |                                   this.c1 compare that.c1 }
+        |}""".stripMargin)
+    assert(generatedHelperCode == expectedHelperCode)
   }
 }

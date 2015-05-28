@@ -33,6 +33,7 @@ sealed abstract class PigOperator (val initialOutPipeName: String, val initialIn
     case None => ""
   }
 
+  def inPipeName: String = inPipeNames.head
   def inPipeNames: List[String] = if (inputs.isEmpty) initialInPipeNames else inputs.map(p => p.name)
 
   /**

@@ -84,7 +84,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   it should "eliminate register statements" in {
     val plan = new DataflowPlan(parseScript("""
          |register "myfile.jar";
-         |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
+         |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
          |b = filter a by f1 > 0;
          |""".stripMargin))
     plan.additionalJars.toList should equal (List("myfile.jar"))
@@ -107,7 +107,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "infer the schema for filter" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
+        |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
         |b = filter a by f1 > 0;
         |""".stripMargin))
     val loadSchema = plan.operators(0).schema
@@ -127,7 +127,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "infer the schema for a generate clause in foreach" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv";
+        |a = load 'file.csv';
         |b = foreach a generate $0 as subject: chararray, $1 as predicate: chararray, $2 as object:bytearray;
         |""".stripMargin))
     val schema = plan.operators(1).schema
@@ -143,7 +143,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "infer the schema for another generate clause in foreach" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv";
+        |a = load 'file.csv';
         |b = foreach a generate $0+$1, $1 as f1: double, $2 as f3;
         |""".stripMargin))
     val schema = plan.operators(1).schema
@@ -159,7 +159,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "infer the schema for a generate clause in foreach with type casts" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv";
+        |a = load 'file.csv';
         |b = foreach a generate (int)$0, (tuple(int,int,float))$1 as f1;
         |""".stripMargin))
     val schema = plan.operators(1).schema
@@ -176,7 +176,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "infer the schema for group by" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv" as (f1: int, f2: double, f3:map[]);
+        |a = load 'file.csv' as (f1: int, f2: double, f3:map[]);
         |b = group a by f1;
         |""".stripMargin))
     val schema = plan.operators(1).schema
@@ -195,8 +195,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "infer the schema for join" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
-        |b = load "file.csv" as (f10:int, f11:double, f12:bytearray);
+        |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
+        |b = load 'file.csv' as (f10:int, f11:double, f12:bytearray);
         |c = join a by f1, b by f10;
         |""".stripMargin))
     val schema = plan.operators.last.schema
@@ -216,8 +216,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "infer the schema for union with compatible relations" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
-        |b = load "file.csv" as (f1:int, f2:chararray, f3:double);
+        |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
+        |b = load 'file.csv' as (f1:int, f2:chararray, f3:double);
         |c = union a, b;
         |""".stripMargin))
     val schema = plan.operators.last.schema
@@ -234,8 +234,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "infer a null schema for union with relations of different sizes" in {
     val plan = new DataflowPlan(parseScript("""
-         |a = load "file.csv" as (f1:int, f2:chararray, f3:double, f4:int);
-         |b = load "file.csv" as (f1:int, f2:chararray, f3:double);
+         |a = load 'file.csv' as (f1:int, f2:chararray, f3:double, f4:int);
+         |b = load 'file.csv' as (f1:int, f2:chararray, f3:double);
          |c = union a, b;
          |""".stripMargin))
     val schema = plan.operators.last.schema
@@ -244,8 +244,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "infer the schema for union with relations with different types" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv" as (f1:int, f2:chararray, f3:float);
-        |b = load "file.csv" as (f11:double, f21:bytearray, f31:long);
+        |a = load 'file.csv' as (f1:int, f2:chararray, f3:float);
+        |b = load 'file.csv' as (f11:double, f21:bytearray, f31:long);
         |c = union a, b;
         |""".stripMargin))
     val schema = plan.operators.last.schema
@@ -262,7 +262,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "accept a filter statement with correct field names" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
+        |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
         |b = filter a by f1 > 0;
         |""".stripMargin))
 //    plan.checkSchemaConformance should equal (true)
@@ -277,7 +277,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "reject a filter statement with incorrect field names" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv" as (f1:int, f2:chararray, f3:double);
+        |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
         |b = filter a by f0 > 0;
         |""".stripMargin))
 //    plan.checkSchemaConformance should equal (false)
@@ -286,7 +286,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "reject a filter statement with field names for unknown schema" in {
     val plan = new DataflowPlan(parseScript("""
-        |a = load "file.csv";
+        |a = load 'file.csv';
         |b = filter a by f0 > 0;
         |""".stripMargin))
 //    plan.checkSchemaConformance should equal (false)
@@ -295,7 +295,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "be consistent after adding a new operator using insertAfter" in {
     val plan = new DataflowPlan(parseScript("""
-         |a = load "file.csv";
+         |a = load 'file.csv';
          |b = filter a by $0 > 0;
          |""".stripMargin))
     val ops = plan.findOperator(o => o.outPipeName == "a")

@@ -24,12 +24,15 @@ class PigParser extends JavaTokenParsers {
 
   implicit def pimpString(str: String): CaseInsensitiveString = new CaseInsensitiveString(str)
 
+  def pigStringLiteral: Parser[String] =
+    ("'"+"""([^'\p{Cntrl}\\]|\\[\\"bfnrt]|\\u[a-fA-F0-9]{4})*"""+"'").r
+
   def unquote(s: String): String = s.substring(1, s.length - 1)
 
   def num: Parser[Int] = wholeNumber ^^ (_.toInt)
 
   def bag: Parser[String] = ident
-  def fileName: Parser[String] = stringLiteral ^^ { str => unquote(str) }
+  def fileName: Parser[String] = pigStringLiteral ^^ { str => unquote(str) }
 
   def className: Parser[String] = repsep(ident, ".") ^^ { identList => identList.mkString(".")}
 
