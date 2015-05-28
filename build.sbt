@@ -12,7 +12,9 @@ lazy val commonSettings = Seq(
 /*  
  * define the backend for the compiler: currently we support spark and flink
  */
+
 val backendEnv = sys.props.getOrElse("backend", default="spark")
+//possibleBackends.contains(backendEnv) //TODO: outsource case _ => Exception part in all functions to here
 val backends = settingKey[Map[String,Map[String,String]]]("Backend Settings")
 backends := (backendEnv match {
   case "flink"      => flinkBackend
@@ -37,11 +39,11 @@ settings(
   buildInfoPackage := "dbis.pig",
   buildInfoObject := "BuildSettings",
   bintrayResolverSettings,
-  libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv),
-  excludes(backendEnv)
+  libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv)
 ).
-aggregate(backendlib(backendEnv)).
-dependsOn(backendlib(backendEnv))
+settings(excludes(backendEnv): _*).
+aggregate(backendlib(backendEnv).map(a => a.project): _*)
+.dependsOn(backendlib(backendEnv): _*)
 
 
 //Sub-Projects
@@ -57,10 +59,10 @@ settings(
   libraryDependencies ++= Dependencies.flinkDeps
 )
 
-def backendlib(backend: String) = backend match {
-  case "flink" => flinklib
-  case "spark" => sparklib
-  case "sparkflink" => flinklib
+def backendlib(backend: String): List[ClasspathDep[ProjectReference]] = backend match {
+  case "flink" => List(flinklib)
+  case "spark" => List(sparklib)
+  case "sparkflink" => List(sparklib, flinklib)
   case _ => throw new Exception(s"Backend $backend not available")
 }
 

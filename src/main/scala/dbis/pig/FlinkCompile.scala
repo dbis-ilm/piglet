@@ -6,10 +6,10 @@ package dbis.pig
 
 import org.clapper.scalasti._
 
-//case class UDF(name: String, numParams: Int, isAggregate: Boolean)
-case class TemplateException(msg: String) extends Exception(msg)
-
 class FlinkGenCode extends GenCodeBase {
+
+  case class UDF(name: String, numParams: Int, isAggregate: Boolean)
+  case class TemplateException(msg: String) extends Exception(msg)
   
   val templateFile = "src/main/resources/flink-template.stg"
 

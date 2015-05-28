@@ -36,7 +36,7 @@ class SparkCompileSpec extends FlatSpec with Matchers {
       cleanupResult(resultDir)
 
       // 2. compile and execute Pig script
-      PigCompiler.main(Array("--master", "local[2]", "--outdir", ".", "./src/it/resources/" + script))
+      PigCompiler.main(Array("--backend", "spark", "--master", "local[2]", "--outdir", ".", "./src/it/resources/" + script))
       println("execute: " + script)
 
       // 3. load the output file and the truth file

@@ -3,7 +3,9 @@ import Keys._
 
 object PigBuild extends Build {
 
-   val flinkSettings = Map(
+  val possibleBackends = List("flink","spark","sparkflink")
+
+  val flinkSettings = Map(
     "name"  -> "flink",
     "compilerClass" -> "dbis.pig.FlinkCompile"
   )
@@ -17,7 +19,7 @@ object PigBuild extends Build {
   val sparkBackend =      Map("spark" -> sparkSettings, "default" -> sparkSettings)
   val flinksparkBackend = Map("flink" -> flinkSettings, "spark" -> sparkSettings, "default" -> sparkSettings)
 
-  def backendDependencies(backend: String) = backend match {
+  def backendDependencies(backend: String): Seq[sbt.ModuleID] = backend match {
     case "flink" => Seq (
       Dependencies.flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
     )
@@ -31,20 +33,24 @@ object PigBuild extends Build {
     case _ => throw new Exception(s"Backend $backend not available")
   }
 
-  def excludes(backend: String) = backend match{
-    case "flink" => {
+  def excludes(backend: String): Seq[sbt.Def.SettingsDefinition] = backend match{
+    case "flink" => { Seq(
       excludeFilter in unmanagedSources :=
       HiddenFileFilter            ||
       "*SparkCompileSpec.scala"   ||
+      "*SparkCompile.scala"       ||
       "*CompileSpec.scala"
-    } 
-    case "spark" =>{
+    )} 
+    case "spark" =>{ Seq(
       excludeFilter in unmanagedSources :=
       HiddenFileFilter            ||
+      "*FlinkCompile.scala"       ||
       "*FlinkCompileIt.scala"     ||
-      "*FlinkCompileSpec.scala"   ||
-      "*flink-template.stg"
-    }
+      "*FlinkCompileSpec.scala",
+      excludeFilter in unmanagedResources := 
+      HiddenFileFilter || 
+      "flink-template.stg"
+    )}
     case "sparkflink" => excludeFilter in unmanagedSources := HiddenFileFilter
     case _ => throw new Exception(s"Backend $backend not available")
   }
@@ -89,7 +95,7 @@ object Dependencies {
   val sparkDeps = Seq(
     scalaTest % "test" withSources(),
     scalaCompiler,
-    sparkCore
+    sparkCore % "provided"
   )
   val flinkDeps = Seq(
     scalaTest % "test" withSources(),
