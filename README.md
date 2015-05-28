@@ -39,7 +39,7 @@ pigs --master local[4] your_script.pig
 
 to compile the script and execute it on your local Spark installation.
 
-In addition, where is an interactive Pig shell similar to grunt:
+In addition, there is an interactive Pig shell similar to grunt:
 
 ```
 pigsh
