@@ -5,6 +5,7 @@ package dbis.test.pig
  * Created by kai on 01.04.15.
  */
 
+import dbis.pig.PigCompiler._
 import dbis.pig._
 import org.scalatest.FlatSpec
 
@@ -176,6 +177,16 @@ class CompileSpec extends FlatSpec {
     val codeGenerator = new SparkGenCode
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(t(0),PigFuncs.count(t(1).asInstanceOf[Seq[Any]])))")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a foreach statement with a UDF expression" in {
+    // a = FOREACH b GENERATE $0, distance($1, $2, 1.0, 2.0) AS dist;
+    val plan = parseScript("a = FOREACH b GENERATE $0, Distances.spatialDistance($1, $2, 1.0, 2.0) AS dist;")
+    val op = plan.head
+    val codeGenerator = new SparkGenCode
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.map(t => List(t(0),Distances.spatialDistance(t(1),t(2),1.0,2.0)))")
     assert(generatedCode == expectedCode)
   }
 

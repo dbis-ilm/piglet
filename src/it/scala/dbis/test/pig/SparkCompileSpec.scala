@@ -16,7 +16,8 @@ class SparkCompileSpec extends FlatSpec with Matchers {
     ("script", "result", "truth"), // only the header of the table
     ("load.pig", "result1.out", "result1.data"),
     ("load2.pig", "result2.out", "result2.data"),
-    ("sort.pig", "sorted.out", "sorted.data")
+    ("sort.pig", "sorted.out", "sorted.data"),
+    ("foreach1.pig", "distances.out", "distances.data")
   )
 
   def cleanupResult(dir: String): Unit = {

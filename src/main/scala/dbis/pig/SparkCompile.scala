@@ -27,6 +27,7 @@ class SparkGenCode extends GenCodeBase {
     case NamedField(f) => schema match {
       case Some(s) => {
         val idx = s.indexOfField(f)
+        if (idx == -1) println("----------> " + f)
         require(idx >= 0) // the field doesn't exist in the schema: shouldn't occur because it was checked before
         if (requiresTypeCast) {
           val field = s.field(idx)
@@ -66,7 +67,7 @@ class SparkGenCode extends GenCodeBase {
       s"Array(${joinExpr.map(e => emitRef(schema, e)).mkString(",")}).mkString"
   }
 
-  def quote(s: String): String = s"$s"
+  def quote(s: String): String = s.replace('\'', '"')
 
   def emitLoader(file: String, loaderFunc: String, loaderParams: List[String]): String = {
     if (loaderFunc == "")
@@ -90,12 +91,18 @@ class SparkGenCode extends GenCodeBase {
     case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
     case RefExpr(e) => s"${emitRef(schema, e)}"
     case Func(f, params) => {
-      val udf = funcTable(f)
-      // TODO: check whether f exists + size of params
-      if (udf.isAggregate)
-        s"${udf.name}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
-      else
-        s"${udf.name}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+      if (funcTable.contains(f)) {
+        val udf = funcTable(f)
+        // TODO: check size of params
+        if (udf.isAggregate)
+          s"${udf.name}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
+        else
+          s"${udf.name}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+      }
+      else {
+        // TODO: we don't know the function yet, let's assume there is a corresponding Scala function
+        s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+      }
     }
     case _ => ""
   }
@@ -177,10 +184,10 @@ class SparkGenCode extends GenCodeBase {
     case Store(in, file) => { s"""${node.inPipeName}.map(t => ${listToTuple(node.schema)}).coalesce(1, true).saveAsTextFile("${file}")""" }
     case Describe(in) => { s"""println("${node.schemaToString}")""" }
     case Filter(out, in, pred) => { s"val $out = ${node.inPipeName}.filter(t => {${emitPredicate(node.schema, pred)}})" }
-    case Foreach(out, in, expr) => { s"val $out = ${node.inPipeName}.map(t => ${emitGenerator(node.schema, expr)})" }
+    case Foreach(out, in, expr) => { s"val $out = ${node.inPipeName}.map(t => ${emitGenerator(node.inputSchema, expr)})" }
     case Grouping(out, in, groupExpr) => {
       if (groupExpr.keyList.isEmpty) s"val $out = ${node.inPipeName}.glom"
-      else s"val $out = ${node.inPipeName}.groupBy(t => {${emitGrouping(node.schema, groupExpr)}}).map{case (k,v) => List(k,v)}" }
+      else s"val $out = ${node.inPipeName}.groupBy(t => {${emitGrouping(node.inputSchema, groupExpr)}}).map{case (k,v) => List(k,v)}" }
     case Distinct(out, in) => { s"val $out = ${node.inPipeName}.distinct" }
     case Limit(out, in, num) => { s"val $out = sc.parallelize(${node.inPipeName}.take($num))" }
     case Join(out, rels, exprs) => {
