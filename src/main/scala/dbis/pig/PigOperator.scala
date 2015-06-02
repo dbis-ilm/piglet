@@ -13,10 +13,12 @@ import scala.collection.mutable.ArrayBuffer
  * pipes representing the input and output connections to other operators in the
  * dataflow.
  *
- * @param outPipeName the name of the output pipe (relation).
- * @param inPipeNames the list of names of input pipes.
+ * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
+ *                           can be changed later.
+ * @param initialInPipeNames the list of names of initial input pipes.
+ * @param schema
  */
-sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: List[String], var schema: Option[Schema]) {
+sealed abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNames: List[String], var schema: Option[Schema]) {
   var inputs: List[Pipe] = List[Pipe]()
   var output: Option[Pipe] = None
 
@@ -25,6 +27,14 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
   def this(out: String) = this(out, List(), None)
 
   def this(out: String, in: String) = this(out, List(in), None)
+
+  def outPipeName: String = output match {
+    case Some(p) => p.name
+    case None => ""
+  }
+
+  def inPipeName: String = inPipeNames.head
+  def inPipeNames: List[String] = if (inputs.isEmpty) initialInPipeNames else inputs.map(p => p.name)
 
   /**
    * Constructs the output schema of this operator based on the input + the semantics of the operator.
@@ -84,15 +94,19 @@ sealed abstract class PigOperator (val outPipeName: String, val inPipeNames: Lis
   }
 }
 
+/* ------------------------------------------------------- */
 /**
  * Load represents the LOAD operator of Pig.
  *
- * @param outPipeName the name of the output pipe (relation).
+ * @param initialOutPipeName the name of the initial output pipe (relation).
  * @param file the name of the file to be loaded
+ * @param loadSchema
+ * @param loaderFunc
+ * @param loaderParams
  */
-case class Load(override val outPipeName: String, file: String,
+case class Load(override val initialOutPipeName: String, file: String,
                 var loadSchema: Option[Schema] = None,
-                loaderFunc: String = "", loaderParams: List[String] = null) extends PigOperator(outPipeName, List(), loadSchema) {
+                loaderFunc: String = "", loaderParams: List[String] = null) extends PigOperator(initialOutPipeName, List(), loadSchema) {
   override def constructSchema: Option[Schema] = {
     /*
      * Either the schema was defined or it is None.
@@ -110,12 +124,14 @@ case class Load(override val outPipeName: String, file: String,
   }
 }
 
+/* ------------------------------------------------------- */
+
 /**
  * Dump represents the DUMP operator of Pig.
  *
- * @param inPipeName the name of the input pipe
+ * @param initialInPipeName the name of the input pipe
  */
-case class Dump(inPipeName: String) extends PigOperator("", inPipeName) {
+case class Dump(initialInPipeName: String) extends PigOperator("", initialInPipeName) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
@@ -127,13 +143,15 @@ case class Dump(inPipeName: String) extends PigOperator("", inPipeName) {
   }
 }
 
+/* ------------------------------------------------------- */
+
 /**
  * Store represents the STORE operator of Pig.
  *
- * @param inPipeName the name of the input pipe
+ * @param initialInPipeName the name of the input pipe
  * @param file the name of the output file
  */
-case class Store(inPipeName: String, file: String) extends PigOperator("", inPipeName) {
+case class Store(initialInPipeName: String, file: String) extends PigOperator("", initialInPipeName) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
@@ -145,6 +163,8 @@ case class Store(inPipeName: String, file: String) extends PigOperator("", inPip
   }
 }
 
+/* ------------------------------------------------------- */
+
 /**
  * Register represents a pseudo operator for the REGISTER statement. This "operator" will
  * be eliminated during building the dataflow plan.
@@ -153,12 +173,14 @@ case class Store(inPipeName: String, file: String) extends PigOperator("", inPip
  */
 case class Register(jarFile: String) extends PigOperator("")
 
+/* ------------------------------------------------------- */
+
 /**
  * Describe represents the DESCRIBE operator of Pig.
  *
- * @param inPipeName the name of the input pipe
+ * @param initialInPipeName the name of the input pipe
  */
-case class Describe(inPipeName: String) extends PigOperator("", inPipeName) {
+case class Describe(initialInPipeName: String) extends PigOperator("", initialInPipeName) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
@@ -170,18 +192,19 @@ case class Describe(inPipeName: String) extends PigOperator("", inPipeName) {
   }
 
 }
+/* ------------------------------------------------------- */
 
 case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None)
 
 /**
  * Foreach represents the FOREACH operator of Pig.
  *
- * @param outPipeName the name of the output pipe (relation).
- * @param inPipeName the name of the input pipe
+ * @param initialOutPipeName the name of the output pipe (relation).
+ * @param initialInPipeName the name of the input pipe
  * @param expr the generator expression
  */
-case class Foreach(override val outPipeName: String, inPipeName: String, expr: List[GeneratorExpr])
-  extends PigOperator(outPipeName, inPipeName) {
+case class Foreach(override val initialOutPipeName: String, initialInPipeName: String, expr: List[GeneratorExpr])
+  extends PigOperator(initialOutPipeName, initialInPipeName) {
 
   override def constructSchema: Option[Schema] = {
     val inputSchema = inputs.head.producer.schema
@@ -231,15 +254,17 @@ case class Foreach(override val outPipeName: String, inPipeName: String, expr: L
   }
 }
 
+/* ------------------------------------------------------- */
+
 /**
  * Filter represents the FILTER operator of Pig.
  *
- * @param outPipeName the name of the output pipe (relation).
- * @param inPipeName the name of the input pipe
+ * @param initialOutPipeName the name of the output pipe (relation).
+ * @param initialInPipeName the name of the input pipe
  * @param pred the predicate used for filtering tuples from the input pipe
  */
-case class Filter(override val outPipeName: String, inPipeName: String, pred: Predicate)
-  extends PigOperator(outPipeName, inPipeName) {
+case class Filter(override val initialOutPipeName: String, initialInPipeName: String, pred: Predicate)
+  extends PigOperator(initialOutPipeName, initialInPipeName) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
@@ -266,6 +291,8 @@ case class Filter(override val outPipeName: String, inPipeName: String, pred: Pr
 
 }
 
+/* ------------------------------------------------------- */
+
 /**
  * Represents the grouping expression for the Grouping operator.
  *
@@ -276,12 +303,12 @@ case class GroupingExpression(val keyList: List[Ref])
 /**
  * Grouping represents the GROUP ALL / GROUP BY operator of Pig.
  *
- * @param outPipeName the name of the output pipe (relation).
- * @param inPipeName the name of the input pipe
+ * @param initialOutPipeName the name of the output pipe (relation).
+ * @param initialInPipeName the name of the input pipe
  * @param groupExpr the expression (a key or a list of keys) used for grouping
  */
-case class Grouping(override val outPipeName: String, inPipeName: String, groupExpr: GroupingExpression)
-  extends PigOperator(outPipeName, inPipeName) {
+case class Grouping(override val initialOutPipeName: String, initialInPipeName: String, groupExpr: GroupingExpression)
+  extends PigOperator(initialOutPipeName, initialInPipeName) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
@@ -320,28 +347,32 @@ case class Grouping(override val outPipeName: String, inPipeName: String, groupE
   }
 }
 
+/* ------------------------------------------------------- */
+
 /**
  * Distinct represents the DISTINCT operator of Pig.
  *
- * @param outPipeName the name of the output pipe (relation).
- * @param inPipeName the name of the input pipe.
+ * @param initialOutPipeName the name of the output pipe (relation).
+ * @param initialInPipeName the name of the input pipe.
  */
-case class Distinct(override val outPipeName: String, inPipeName: String)
-  extends PigOperator(outPipeName, inPipeName) {
+case class Distinct(override val initialOutPipeName: String, initialInPipeName: String)
+  extends PigOperator(initialOutPipeName, initialInPipeName) {
   override def lineageString: String = {
     s"""DISTINCT%""" + super.lineageString
   }
 
 }
 
+/* ------------------------------------------------------- */
+
 /**
  * Union represents the UNION operator of Pig.
  *
- * @param outPipeName the name of the output pipe (relation).
- * @param inPipeNames the list of names of input pipes.
+ * @param initialOutPipeName the name of the output pipe (relation).
+ * @param initialInPipeNames the list of names of input pipes.
  */
-case class Union(override val outPipeName: String, override val inPipeNames: List[String])
-  extends PigOperator(outPipeName, inPipeNames) {
+case class Union(override val initialOutPipeName: String, override val initialInPipeNames: List[String])
+  extends PigOperator(initialOutPipeName, initialInPipeNames) {
   override def lineageString: String = {
     s"""UNION%""" + super.lineageString
   }
@@ -381,19 +412,24 @@ case class Union(override val outPipeName: String, override val inPipeNames: Lis
 
 }
 
+/* ------------------------------------------------------- */
+
 /**
  * Limit represents the LIMIT operator of Pig.
  *
- * @param outPipeName the name of the output pipe (relation).
- * @param inPipeName the name of the input pipe.
+ * @param initialOutPipeName the name of the output pipe (relation).
+ * @param initialInPipeName the name of the input pipe.
+ * @param num
  */
-case class Limit(override val outPipeName: String, inPipeName: String, num: Int)
-  extends PigOperator(outPipeName, inPipeName) {
+case class Limit(override val initialOutPipeName: String, initialInPipeName: String, num: Int)
+  extends PigOperator(initialOutPipeName, initialInPipeName) {
   override def lineageString: String = {
     s"""LIMIT%${num}%""" + super.lineageString
   }
 
 }
+
+/* ------------------------------------------------------- */
 
 /**
  * Join represents the multiway JOIN operator of Pig.
@@ -420,9 +456,20 @@ case class Join(override val outPipeName: String, override val inPipeNames: List
 
 }
 
-case class StreamOp(override val outPipeName: String, inPipeName: String, opName: String, params: Option[List[Ref]] = None,
+/* ------------------------------------------------------- */
+
+/**
+ *
+ * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
+ *                           can be changed later.
+ * @param initialInPipeName
+ * @param opName
+ * @param params
+ * @param loadSchema
+ */
+case class StreamOp(override val initialOutPipeName: String, initialInPipeName: String, opName: String, params: Option[List[Ref]] = None,
                     var loadSchema: Option[Schema] = None)
-  extends PigOperator(outPipeName, List(inPipeName), loadSchema) {
+  extends PigOperator(initialOutPipeName, List(initialInPipeName), loadSchema) {
   override def lineageString: String = s"""STREAM%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
@@ -436,8 +483,17 @@ case class StreamOp(override val outPipeName: String, inPipeName: String, opName
   }
 }
 
-case class Sample(override val outPipeName: String, inPipeName: String, expr: ArithmeticExpr)
-  extends PigOperator(outPipeName, inPipeName) {
+/* ------------------------------------------------------- */
+
+/**
+ *
+ * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
+ *                           can be changed later.
+ * @param initialInPipeName
+ * @param expr
+ */
+case class Sample(override val initialOutPipeName: String, initialInPipeName: String, expr: ArithmeticExpr)
+  extends PigOperator(initialOutPipeName, initialInPipeName) {
   override def lineageString: String = s"""SAMPLE%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
@@ -454,6 +510,8 @@ case class Sample(override val outPipeName: String, inPipeName: String, expr: Ar
   }
 }
 
+/* ------------------------------------------------------- */
+
 object OrderByDirection extends Enumeration {
   type OrderByDirection = Value
   val AscendingOrder, DescendingOrder = Value
@@ -461,10 +519,22 @@ object OrderByDirection extends Enumeration {
 
 import OrderByDirection._
 
+/**
+ *
+ * @param field
+ * @param dir
+ */
 case class OrderBySpec(field: Ref, dir: OrderByDirection)
 
-case class OrderBy(override val outPipeName: String, inPipeName: String, orderSpec: List[OrderBySpec])
-  extends PigOperator(outPipeName, inPipeName) {
+/**
+ *
+ * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
+ *                           can be changed later.
+ * @param initialInPipeName
+ * @param orderSpec
+ */
+case class OrderBy(override val initialOutPipeName: String, initialInPipeName: String, orderSpec: List[OrderBySpec])
+  extends PigOperator(initialOutPipeName, initialInPipeName) {
   override def lineageString: String = s"""ORDERBY%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {

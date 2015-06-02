@@ -14,7 +14,9 @@ import scala.io.Source
 class SparkCompileSpec extends FlatSpec with Matchers {
   val scripts = Table(
     ("script", "result", "truth"), // only the header of the table
-    ("load.pig", "result1.out", "result1.data")
+    ("load.pig", "result1.out", "result1.data"),
+    ("load2.pig", "result2.out", "result2.data"),
+    ("sort.pig", "sorted.out", "sorted.data")
   )
 
   def cleanupResult(dir: String): Unit = {

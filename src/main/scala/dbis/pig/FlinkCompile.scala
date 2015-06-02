@@ -23,11 +23,11 @@ class FlinkGenCode extends GenCodeBase {
   )
 
   // TODO: complex types
-  val typeTable = Map[PigType, String](Types.IntType -> "toInt",
-                      Types.LongType -> "toLong",
-                      Types.FloatType -> "toFloat",
-                      Types.DoubleType -> "toDouble",
-                      Types.CharArrayType -> "toString")
+  val scalaTypeMappingTable = Map[PigType, String](Types.IntType -> "Int",
+    Types.LongType -> "Long",
+    Types.FloatType -> "Float",
+    Types.DoubleType -> "Double",
+    Types.CharArrayType -> "String")
 
   def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true): String = ref match {
     case NamedField(f) => schema match {
@@ -36,8 +36,8 @@ class FlinkGenCode extends GenCodeBase {
         require(idx >= 0) // the field doesn't exist in the schema: shouldn't occur because it was checked before
         if (requiresTypeCast) {
           val field = s.field(idx)
-          val typeCast = typeTable(field.fType)
-          s"${tuplePrefix}(${idx}).${typeCast}"
+          val typeCast = scalaTypeMappingTable(field.fType)
+          s"${tuplePrefix}(${idx}).to${typeCast}"
         }
         else
           s"${tuplePrefix}(${idx})"
@@ -96,8 +96,8 @@ class FlinkGenCode extends GenCodeBase {
   def emitExpr(schema: Option[Schema], expr: ArithmeticExpr): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
-      val targetType = typeTable(t)
-      s"${emitExpr(schema, e)}.$targetType"
+      val targetType = scalaTypeMappingTable(t)
+      s"${emitExpr(schema, e)}.to$targetType"
     }
     case MSign(e) => s"-${emitExpr(schema, e)}"
     case Add(e1, e2) => s"${emitExpr(schema, e1)} + ${emitExpr(schema, e2)}"
@@ -118,6 +118,73 @@ class FlinkGenCode extends GenCodeBase {
 
   def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
     s"List(${genExprs.map(e => emitExpr(schema, e.expr)).mkString(",")})"
+  }
+
+  def emitParamList(schema: Option[Schema], params: Option[List[Ref]]): String = params match {
+    case Some(refList) => s",${refList.map(r => emitRef(schema, r)).mkString(",")}"
+    case None => ""
+  }
+
+  /**
+    * Returns true if the sort order of the OrderBySpec is ascending
+    *
+    * @param spec
+    * @return
+    */
+  def ascendingSortOrder(spec: OrderBySpec): Boolean = spec.dir == OrderByDirection.AscendingOrder
+
+  def emitSortKey(schema: Option[Schema], orderSpec: List[OrderBySpec], out: String, in: String) : String = {
+    if (orderSpec.size == 1)
+      emitRef(schema, orderSpec.head.field)
+    else
+      s"custKey_${out}_${in}(${orderSpec.map(r => emitRef(schema, r.field)).mkString(",")})"
+  }
+
+  /**
+   * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
+   * bytearray which is mapped to String.
+   *
+   * @param field a Ref representing the field (positional or named=
+   * @param schema the schema of the field
+   * @return the name of the Scala type
+   */
+  def scalaTypeOfField(field: Ref, schema: Option[Schema]) : String = {
+    schema match {
+      case Some(s) => {
+        field match {
+          case PositionalField(f) => scalaTypeMappingTable(s.field(f).fType)
+          case NamedField(n) => scalaTypeMappingTable(s.field(n).fType)
+          case _ => "String"
+        }
+      }
+      case None => "String"
+    }
+  }
+
+  def emitHelperClass(node: PigOperator): String = {
+    def genCmpExpr(col: Int, num: Int) : String =
+      if (col == num) s"{ this.c$col compare that.c$col }"
+      else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col+1, num)} else this.c$col compare that.c$col }"
+
+    node match {
+      case OrderBy(out, in, orderSpec) => {
+        val cname = s"custKey_${out}_${in}"
+        var col = 0
+        val fields = orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
+        val cmpExpr = genCmpExpr(1, orderSpec.size)
+        s"""
+        |case class ${cname}(${fields}) extends Ordered[${cname}] {
+          |  def compare(that: ${cname}) = $cmpExpr
+          |}""".stripMargin
+      }
+      case _ => ""
+    }
+  }
+
+  def listToTuple(schema: Option[Schema]): String = schema match {
+    case Some(s) => '"' + (0 to s.fields.length-1).toList.map(i => s"%s").mkString(",") + '"' +
+    ".format(" + (0 to s.fields.length-1).toList.map(i => s"t($i)").mkString(",") + ")" 
+    case None => s"t(0)"
   }
 
   def emitNode(node: PigOperator): String = {
@@ -185,7 +252,9 @@ class FlinkGenCode extends GenCodeBase {
     }
   }
 
-  def emitHeader(scriptName: String): String = callST("init_code") + callST("begin_query", Map("name" -> scriptName))
+  def emitImport: String = callST("init_code")
+
+  def emitHeader(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
 
   def emitFooter: String = callST("end_query", Map("name" -> "Starting Flink Query"))
 

@@ -7,7 +7,7 @@ import org.apache.spark.rdd._
  * Created by kai on 14.04.15.
  */
 class PigStorage extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, delim: String = " "): RDD[List[String]] = {
+  def load(sc: SparkContext, path: String, delim: Char = ' '): RDD[List[String]] = {
     sc.textFile(path).map(line => line.split(delim).toList)
   }
 

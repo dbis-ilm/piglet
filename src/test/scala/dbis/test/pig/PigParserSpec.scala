@@ -9,17 +9,21 @@ import org.scalatest.FlatSpec
 
 class PigParserSpec extends FlatSpec {
   "The parser" should "parse a simple load statement" in  {
-    assert(parseScript("""a = load "file.csv";""") == List(Load("a", "file.csv")))
+    assert(parseScript("""a = load 'file.csv';""") == List(Load("a", "file.csv")))
   }
 
   it should "parse also a case insensitive load statement" in  {
-    assert(parseScript("""a = LOAD "file.csv";""") == List(Load("a", "file.csv")))
+    assert(parseScript("""a = LOAD 'file.csv';""") == List(Load("a", "file.csv")))
+  }
+
+  it should "parse also a load statement with a path" in  {
+    assert(parseScript("""a = LOAD 'dir1/dir2/file.csv';""") == List(Load("a", "dir1/dir2/file.csv")))
   }
 
   it should "parse also a load statement with the using clause" in  {
-    assert(parseScript("""a = LOAD "file.data" using PigStorage("\t");""") ==
-      List(Load("a", "file.data", None, "PigStorage", List(""""\t""""))))
-    assert(parseScript("""a = LOAD "file.n3" using RDFFileStorage();""") ==
+    assert(parseScript("""a = LOAD 'file.data' using PigStorage(',');""") ==
+      List(Load("a", "file.data", None, "PigStorage", List("""','"""))))
+    assert(parseScript("""a = LOAD 'file.n3' using RDFFileStorage();""") ==
       List(Load("a", "file.n3", None, "RDFFileStorage")))
   }
 
@@ -27,7 +31,7 @@ class PigParserSpec extends FlatSpec {
     val schema = BagType("", TupleType("", Array(Field("a", Types.IntType),
                                                 Field("b", Types.CharArrayType),
                                                 Field("c", Types.DoubleType))))
-    assert(parseScript("""a = load "file.csv" as (a:int, b:chararray, c:double); """) ==
+    assert(parseScript("""a = load 'file.csv' as (a:int, b:chararray, c:double); """) ==
       List(Load("a", "file.csv", Some(Schema(schema)))))
   }
 
@@ -35,7 +39,7 @@ class PigParserSpec extends FlatSpec {
     val schema = BagType("", TupleType("", Array(Field("a", Types.IntType),
       Field("t", TupleType("", Array(Field("f1", Types.IntType), Field("f2", Types.IntType)))),
       Field("b", BagType("", TupleType("t2", Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))))
-    assert(parseScript("""a = load "file.csv" as (a:int, t:tuple(f1: int, f2:int), b:{t2:tuple(f3:double, f4:double)}); """) ==
+    assert(parseScript("""a = load 'file.csv' as (a:int, t:tuple(f1: int, f2:int), b:{t2:tuple(f3:double, f4:double)}); """) ==
       List(Load("a", "file.csv", Some(Schema(schema)))))
   }
 
@@ -44,7 +48,7 @@ class PigParserSpec extends FlatSpec {
       Field("m1", MapType("", Types.CharArrayType)),
       Field("m2", MapType("", TupleType("", Array(Field("f1", Types.IntType), Field("f2", Types.IntType))))),
       Field("m3", MapType("", Types.ByteArrayType)))))
-    assert(parseScript("""a = load "file.csv" as (a:int, m1:map[chararray], m2:[(f1: int, f2:int)], m3:[]); """) ==
+    assert(parseScript("""a = load 'file.csv' as (a:int, m1:map[chararray], m2:[(f1: int, f2:int)], m3:[]); """) ==
       List(Load("a", "file.csv", Some(Schema(schema)))))
   }
 
@@ -52,7 +56,7 @@ class PigParserSpec extends FlatSpec {
     val schema = BagType("", TupleType("", Array(Field("a", Types.IntType),
       Field("b", Types.CharArrayType),
       Field("c", Types.DoubleType))))
-    assert(parseScript("""a = load "file.data" using PigStorage() as (a:int, b:chararray, c:double); """) ==
+    assert(parseScript("""a = load 'file.data' using PigStorage() as (a:int, b:chararray, c:double); """) ==
       List(Load("a", "file.data", Some(Schema(schema)), "PigStorage")))
   }
 
@@ -60,7 +64,7 @@ class PigParserSpec extends FlatSpec {
     val schema = BagType("", TupleType("", Array(Field("a", Types.ByteArrayType),
       Field("b", Types.ByteArrayType),
       Field("c", Types.ByteArrayType))))
-    assert(parseScript("""a = load "file.csv" as (a, b, c); """) ==
+    assert(parseScript("""a = load 'file.csv' as (a, b, c); """) ==
       List(Load("a", "file.csv", Some(Schema(schema)))))
   }
 
@@ -73,7 +77,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse the store statement" in {
-    assert(parseScript("""store b into "file.csv";""") == List(Store("b", "file.csv")))
+    assert(parseScript("""store b into 'file.csv';""") == List(Store("b", "file.csv")))
   }
 
   it should "parse a simple filter with a eq expression on named fields" in {
@@ -171,11 +175,11 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a list of statements" in {
-    assert(parseScript("a = load \"file.csv\";\ndump b;") == List(Load("a", "file.csv"), Dump("b")))
+    assert(parseScript("a = load 'file.csv';\ndump b;") == List(Load("a", "file.csv"), Dump("b")))
   }
 
   it should "parse a list of statements while ignoring comments" in {
-    assert(parseScript("-- A comment\na = load \"file.csv\";-- Another comment\ndump b;") ==
+    assert(parseScript("-- A comment\na = load 'file.csv';-- Another comment\ndump b;") ==
       List(Load("a", "file.csv"), Dump("b")))
   }
 

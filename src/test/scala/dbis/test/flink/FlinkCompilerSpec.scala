@@ -13,7 +13,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   "The compiler output" should "contain the Flink header & footer" in {
     val codeGenerator = new FlinkGenCode
-    val generatedCode = cleanString(codeGenerator.emitHeader("test") + codeGenerator.emitFooter)
+    val generatedCode = cleanString(codeGenerator.emitImport + codeGenerator.emitHeader("test") + codeGenerator.emitFooter)
     val expectedCode = cleanString("""
       |import org.apache.flink.streaming.api.scala._
       |import java.util.concurrent.TimeUnit

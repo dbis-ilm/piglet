@@ -39,6 +39,10 @@ dump(in) ::=<<
 // ------------------ STORE Results on Disk -----------------------------------
 store(in,file) ::=<<
         <in>.writeAsText("<file>")
+<!       
+        if (<in>.getJavaStream.getType.isTupleType) <in>.writeAsCsv("<file>")
+        else <in>.writeAsText("<file>")
+!>
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
