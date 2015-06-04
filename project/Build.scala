@@ -7,14 +7,16 @@ object PigBuild extends Build {
 
   val flinkSettings = Map(
     "name"  -> "flink",
-    "compilerClass" -> "dbis.pig.FlinkCompile",
-    "templateFile" -> "src/main/resources/flink-template.stg"
+    "runClass" -> "dbis.pig.FlinkRun",
+//    "compilerClass" -> "dbis.pig.FlinkCompile",
+    "templateFile" -> "flink-template.stg"//"src/main/resources/flink-template.stg"
   )
 
   val sparkSettings = Map(
     "name"  -> "spark",
-    "compilerClass" -> "dbis.pig.SparkCompile",
-    "templateFile" -> "src/main/resources/spark-template.stg"
+    "runClass" -> "dbis.pig.SparkRun",
+//    "compilerClass" -> "dbis.pig.SparkCompile",
+    "templateFile" -> "spark-template.stg"//"src/main/resources/spark-template.stg"
   )
 
   val flinkBackend =      Map("flink" -> flinkSettings, "default" -> flinkSettings)
@@ -26,11 +28,11 @@ object PigBuild extends Build {
       Dependencies.flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
     )
     case "spark" => Seq (
-      Dependencies.sparkCore
+      Dependencies.sparkCore % "provided"
     )
     case "sparkflink" => Seq(
       Dependencies.flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar",
-      Dependencies.sparkCore
+      Dependencies.sparkCore % "provided"
     )
     case _ => throw new Exception(s"Backend $backend not available")
   }
@@ -39,6 +41,7 @@ object PigBuild extends Build {
     case "flink" => { Seq(
       excludeFilter in unmanagedSources :=
       HiddenFileFilter            ||
+      "*SparkRun.scala"           ||
       "*SparkCompile.scala"       ||
       "*SparkCompileIt.scala"     ||
       "*SparkCompileSpec.scala",
@@ -49,6 +52,7 @@ object PigBuild extends Build {
     case "spark" =>{ Seq(
       excludeFilter in unmanagedSources :=
       HiddenFileFilter            ||
+      "*FlinkRun.scala"           ||
       "*FlinkCompile.scala"       ||
       "*FlinkCompileIt.scala"     ||
       "*FlinkCompilerSpec.scala",

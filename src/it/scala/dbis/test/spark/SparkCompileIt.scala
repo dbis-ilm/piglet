@@ -36,6 +36,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     forAll(scripts) { (script: String, resultDir: String, truthFile: String) =>
       // 1. make sure the output directory is empty
       cleanupResult(resultDir)
+      cleanupResult(script.replace(".pig",""))
 
       // 2. compile and execute Pig script
       PigCompiler.main(Array("--backend", "spark", "--master", "local[2]", "--outdir", ".", "./src/it/resources/" + script))
@@ -49,6 +50,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
 
       // 5. delete the output directory
       cleanupResult(resultDir)
+      cleanupResult(script.replace(".pig",""))
     }
   }
 }

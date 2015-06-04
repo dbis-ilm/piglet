@@ -80,29 +80,8 @@ object PigCompiler extends PigParser {
       val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
 
       // 4. and finally deploy/submit
-      backend match {
-        case "spark" => {
-          //TODO: outsource this to e.g. reflectObjectMethod(objName: String, methodName: String, params: Any)
-          val objName = "org.apache.spark.deploy.SparkSubmit"
-          val ru = scala.reflect.runtime.universe                                      //JavaUniverse
-          val mirror = ru.runtimeMirror(getClass.getClassLoader)                       //Mirror
-          val module = mirror.staticModule(objName)                                    //Module
-          val im = mirror.reflect(mirror.reflectModule(module).instance)               //InstanceMirror
-          val method = im.symbol.typeSignature.member(ru.newTermName("main")).asMethod //MethodSymbol
-          im.reflectMethod(method)(Array("--master", master, "--class", scriptName, jarFile))
-        }
-        case "flink" => {
-          val flinkJar = sys.env.get("FLINK_JAR") match {
-            case Some(n) => n
-            case None => throw new Exception(s"Please set FLINK_JAR to your flink-dist jar file")
-          }
-          //val flinkJar = "/home/blaze/.ivy2/cache/org.apache.flink/flink-dist_2.11/jars/flink-dist_2.11-0.9-SNAPSHOT.jar"
-          val submit = s"java -Dscala.usejavacp=true -cp ${flinkJar}:${jarFile} ${scriptName}"
-          println(submit)
-          submit !
-        }
-        case _ => throw new Exception (s"""Backend "$backend" not implemented""")
-      }
+      val runner = FileTools.getRunner(backend)
+      runner.execute(master, scriptName, jarFile)
     }
   }
 

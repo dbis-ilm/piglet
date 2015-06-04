@@ -1,7 +1,15 @@
 #!/bin/sh
 
-
 # PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
+
+echo '
+ ____  _         _          _____ _ _       _    
+|  _ \(_) __ _  | |_ ___   |  ___| (_)_ __ | | __
+| |_) | |/ _` | | __/ _ \  | |_  | | |  _ \| |/ /
+|  __/| | (_| | | || (_) | |  _| | | | | | |   < 
+|_|   |_|\__, |  \__\___/  |_|   |_|_|_| |_|_|\_\
+         |___/                                   
+'
 
 if [ -z "$PIG_LIB" ]; then
     echo "Please set PIG_LIB to your PigCompiler jar file"
@@ -17,4 +25,4 @@ else
 	CP=$FLINK_JAR:$CP
 fi
 
-java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.PigCompiler $*
+java -Dscala.usejavacp=true -cp $CP dbis.pig.PigCompiler $*

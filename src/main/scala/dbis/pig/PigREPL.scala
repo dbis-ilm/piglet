@@ -1,5 +1,6 @@
 package dbis.pig
 
+import java.io.File
 import jline.console.ConsoleReader
 
 import scala.collection.mutable.ListBuffer
@@ -13,6 +14,7 @@ case object EmptyLine extends JLineEvent
 case object EOF extends JLineEvent
 
 object PigREPL extends PigParser {
+  val backend = BuildSettings.backends.get("default").get("name")
   val consoleReader = new ConsoleReader()
 
   def console(handler: JLineEvent => Boolean) {
@@ -79,16 +81,11 @@ object PigREPL extends PigParser {
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") => {
         buf ++= parseScript(s)
         val plan = new DataflowPlan(buf.toList)
-        if (FileTools.compileToJar(plan, "script", ".")) {
-          val jarFile = "script.jar"
-
-          val objName = "org.apache.spark.deploy.SparkSubmit"
-          val ru = scala.reflect.runtime.universe
-          val mirror = ru.runtimeMirror(getClass.getClassLoader)
-          val module = mirror.staticModule(objName)
-          val im = mirror.reflect(mirror.reflectModule(module).instance)
-          val method = im.symbol.typeSignature.member(ru.newTermName("main")).asMethod
-          im.reflectMethod(method)(Array("--master", "local", "--class", "script", jarFile))
+        if (FileTools.compileToJar(plan, "script", ".", false, backend)) {
+          val jarFile = s".${File.separator}script${File.separator}script.jar"
+//          val jarFile = "script.jar"
+          val runner = FileTools.getRunner(backend)
+          runner.execute("local", "script", jarFile)
         }
         // buf.clear()
         false

@@ -43,63 +43,57 @@ object FileTools {
   
   def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, compileOnly: Boolean = false, backend: String = "spark"): Boolean = {
     // 4. compile it into Scala code for Spark
-    try {
-      val compiler = new ScalaBackendCompile(getTemplateFile(backend)) //getCompiler(backend)
+    val compiler = new ScalaBackendCompile(getTemplateFile(backend)) 
 
-      val code = compiler.compile(scriptName, plan)
+    val code = compiler.compile(scriptName, plan)
 
-      // 5. write it to a file
+    // 5. write it to a file
 
-      val outputDir = new File(s"$outDir${File.separator}${scriptName}")
-      if(!outputDir.exists()) {
-        outputDir.mkdirs()
-      }
-
-      val outputFile = s"$outputDir${File.separator}${scriptName}.scala" //scriptName + ".scala"
-      val writer = new FileWriter(outputFile)
-      writer.append(code)
-      writer.close()
-
-      if (compileOnly) false // sys.exit(0)
-
-        // 6. compile the Scala code
-      val outputDirectory = outputDir.getCanonicalPath + s"${File.separator}out"
-
-      // check whether output directory exists
-      val dirFile = new File(outputDirectory)
-      // if not then create it
-      if (!dirFile.exists)
-        dirFile.mkdir()
-
-      if (!ScalaCompiler.compile(outputDirectory, outputFile))
-        false
-
-      // 7. extract all additional jar files to output
-      plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
-
-      // 8. copy the sparklib library to output
-      backend match {
-        case "flink" => FileTools.extractJarToDir("flinklib/target/scala-2.11/flinklib_2.11-1.0.jar", outputDirectory)
-        case "spark" => FileTools.extractJarToDir("sparklib/target/scala-2.11/sparklib_2.11-1.0.jar", outputDirectory)
-      }
-
-      // 9. build a jar file
-      val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
-      JarBuilder.apply(outputDirectory, jarFile, verbose = false)
-      true
-    } catch {
-      case e:ClassNotFoundException => 
-      throw new ClassNotFoundException(s"""FATAL: Could not find compiler class for name: "${e.getMessage}" """)
+    val outputDir = new File(s"$outDir${File.separator}${scriptName}")
+    if(!outputDir.exists()) {
+      outputDir.mkdirs()
     }
 
+    val outputFile = s"$outputDir${File.separator}${scriptName}.scala" //scriptName + ".scala"
+    val writer = new FileWriter(outputFile)
+    writer.append(code)
+    writer.close()
+
+    if (compileOnly) false // sys.exit(0)
+
+      // 6. compile the Scala code
+    val outputDirectory = outputDir.getCanonicalPath + s"${File.separator}out"
+
+    // check whether output directory exists
+    val dirFile = new File(outputDirectory)
+    // if not then create it
+    if (!dirFile.exists)
+      dirFile.mkdir()
+
+    if (!ScalaCompiler.compile(outputDirectory, outputFile))
+      false
+
+    // 7. extract all additional jar files to output
+    plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
+
+    // 8. copy the sparklib library to output
+    backend match {
+      case "flink" => FileTools.extractJarToDir("flinklib/target/scala-2.11/flinklib_2.11-1.0.jar", outputDirectory)
+      case "spark" => FileTools.extractJarToDir("sparklib/target/scala-2.11/sparklib_2.11-1.0.jar", outputDirectory)
+    }
+
+    // 9. build a jar file
+    val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
+    JarBuilder.apply(outputDirectory, jarFile, verbose = false)
+    true
   }
 
-  private def getCompiler(backend: String): Compile = {
-    val className = BuildSettings.backends.get(backend).get("compilerClass")
-    Class.forName(className).newInstance().asInstanceOf[Compile]
-  }
   private def getTemplateFile(backend: String): String = {
     BuildSettings.backends.get(backend).get("templateFile")
   }
 
+  def getRunner(backend: String): Run = { 
+    val className = BuildSettings.backends.get(backend).get("runClass")
+    Class.forName(className).newInstance().asInstanceOf[Run]
+  }
 }
