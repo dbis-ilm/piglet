@@ -1,6 +1,7 @@
 // ----------------- header declaration ----------------- 
 init_code(includes) ::= <<
 import org.apache.flink.streaming.api.scala._
+import dbis.flink._
 import java.util.concurrent.TimeUnit
 
 <\n>
@@ -13,23 +14,13 @@ object <name> {
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,pfunc,rdffunc,params,schema) ::=<<
-<if (pfunc)><pigstorage(out=out,file=file,del=params,schema=schema)>
-<elseif (rdffunc)><rdfstorage(out=out,file=file)>
-<else> 
-        val <out> = env.readTextFile("<file>")
+loader(out,file,func,params) ::=<<
+<if (func)>
+        val <out> = <func>().load(env, "<file>"<params>)
+<else>
+        val <out> = env.readTextFile("<file>").map(s => List(s))
 <endif>
 >>
-
-pigstorage(out,file,del,schema) ::=<<
-        val <out> = env.readTextFile("<file>").map(line => line.split(<del>)).map(a => (a(0)<schema:{ e | ,a(<e>)}>))
->>
-
-rdfstorage(out,file) ::=<<
-        val pattern = "([^\"]\\S*|\".+?\")\\s*".r
-        val <out> = env.readTextFile("<file>").map(line => pattern.findAllIn(line).map(_.trim).toArray.slice(0,3)).map(a => (a(0),a(1),a(2)))
->>
-
 
 // ------------------ DUMP Results --------------------------------------------
 dump(in) ::=<<
@@ -37,12 +28,14 @@ dump(in) ::=<<
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
-store(in,file) ::=<<
-        <in>.writeAsText("<file>")
-<!       
-        if (<in>.getJavaStream.getType.isTupleType) <in>.writeAsCsv("<file>")
-        else <in>.writeAsText("<file>")
-!>
+store(in,file,schema) ::=<<
+        <in>.map(_.mkString(",")).writeAsText("<file>")
+<!        
+        if (<in>.getJavaStream.getType.getTypeClass.isInstanceOf[Class[List[Any]]]) 
+            <in>.map(_.mkString(",")).writeAsText("<file>")
+        else 
+            <in>.writeAsText("<file>")
+ !>
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -58,7 +51,7 @@ foreach(out,in,expr) ::=<<
 // ------------------ GROUPS elements on an expression ------------------------
 groupBy(out,in,expr) ::=<<
 <if (expr)>
-        val <out> = <in>.groupBy(<expr>)
+        val <out> = <in>.groupBy(t => <expr>)
 <else>
         val <out> = <in>
 <endif>
@@ -75,15 +68,17 @@ limit(out,in,num) ::=<<
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
-join(out,rel1,key1,rel2,key2,lsize,rsize) ::=<<
-        val <out> = <rel1>.join(<rel2>).onWindow(5, TimeUnit.SECONDS).where(<key1>).equalTo(<key2>){ 
-            (l,r) => (l._1<lsize:{ l | ,l._<l>}><rsize:{ r | ,r._<r>}>) 
-        }
+join(out,rel1,key1,rel2,key2) ::=<<
+        val <out> = <rel1><rel2,key2:{ r,k |<\\>
+        .join(<r>).onWindow(5, TimeUnit.SECONDS).where(t => <key1>).equalTo(t => <k>)<\\>
+        .map{ t => t._1.toList ++ t._2.toList \}<\\>
+        }>
+
 >>
 
 // ------------------ UNIONs multiple streams to one --------------------------
 union(out,in,others) ::=<<
-        val <out> = <in>.merge(<others>)
+        val <out> = <in><others:{ e | .merge(<e>)}>
 >>
 
 

@@ -7,12 +7,14 @@ object PigBuild extends Build {
 
   val flinkSettings = Map(
     "name"  -> "flink",
-    "compilerClass" -> "dbis.pig.FlinkCompile"
+    "compilerClass" -> "dbis.pig.FlinkCompile",
+    "templateFile" -> "src/main/resources/flink-template.stg"
   )
 
   val sparkSettings = Map(
     "name"  -> "spark",
-    "compilerClass" -> "dbis.pig.SparkCompile"
+    "compilerClass" -> "dbis.pig.SparkCompile",
+    "templateFile" -> "src/main/resources/spark-template.stg"
   )
 
   val flinkBackend =      Map("flink" -> flinkSettings, "default" -> flinkSettings)
@@ -37,9 +39,12 @@ object PigBuild extends Build {
     case "flink" => { Seq(
       excludeFilter in unmanagedSources :=
       HiddenFileFilter            ||
-      "*SparkCompileSpec.scala"   ||
       "*SparkCompile.scala"       ||
-      "*CompileSpec.scala"
+      "*SparkCompileIt.scala"     ||
+      "*SparkCompileSpec.scala",
+      excludeFilter in unmanagedResources := 
+      HiddenFileFilter || 
+      "spark-template.stg"
     )} 
     case "spark" =>{ Seq(
       excludeFilter in unmanagedSources :=

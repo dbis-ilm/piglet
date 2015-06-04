@@ -44,7 +44,7 @@ object FileTools {
   def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, compileOnly: Boolean = false, backend: String = "spark"): Boolean = {
     // 4. compile it into Scala code for Spark
     try {
-      val compiler = getCompiler(backend) 
+      val compiler = new ScalaBackendCompile(getTemplateFile(backend)) //getCompiler(backend)
 
       val code = compiler.compile(scriptName, plan)
 
@@ -97,6 +97,9 @@ object FileTools {
   private def getCompiler(backend: String): Compile = {
     val className = BuildSettings.backends.get(backend).get("compilerClass")
     Class.forName(className).newInstance().asInstanceOf[Compile]
+  }
+  private def getTemplateFile(backend: String): String = {
+    BuildSettings.backends.get(backend).get("templateFile")
   }
 
 }
