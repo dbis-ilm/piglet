@@ -71,7 +71,7 @@ limit(out,in,num) ::=<<
 join(out,rel1,key1,rel2,key2) ::=<<
         val <out> = <rel1><rel2,key2:{ r,k |<\\>
         .join(<r>).onWindow(5, TimeUnit.SECONDS).where(t => <key1>).equalTo(t => <k>)<\\>
-        .map{ t => t._1.toList ++ t._2.toList \}<\\>
+        .map{ t => t._1 ++ t._2 \}<\\>
         }>
 
 >>

@@ -178,7 +178,7 @@ class FlinkCompileSpec extends FlatSpec {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
-        |t => t._1.toList ++ t._2.toList
+        |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
@@ -198,7 +198,7 @@ class FlinkCompileSpec extends FlatSpec {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => Array(t(0),t(1)).mkString).equalTo(t => Array(t(1),t(2)).mkString).map{
-        |t => t._1.toList ++ t._2.toList
+        |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
@@ -219,9 +219,9 @@ class FlinkCompileSpec extends FlatSpec {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{ 
-        |t => t._1.toList ++ t._2.toList
+        |t => t._1 ++ t._2
         |}.join(d).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
-        |t => t._1.toList ++ t._2.toList
+        |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
