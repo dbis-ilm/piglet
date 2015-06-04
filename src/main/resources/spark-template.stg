@@ -1,0 +1,104 @@
+// ----------------- header declaration ----------------- 
+init_code(includes) ::= <<
+import org.apache.spark.SparkContext
+import org.apache.spark.SparkContext._
+import org.apache.spark.SparkConf
+import org.apache.spark.rdd._
+import dbis.spark._
+
+<\n>
+>>
+
+// ----------------- BEGIN of code building and initializing the query --------
+begin_query(name) ::= <<
+object <name> {
+    def main(args: Array[String]) {
+        val conf = new SparkConf().setAppName("<name>_App")
+        val sc = new SparkContext(conf)
+
+>>
+
+// ----------------- LOAD text file -------------------------------------------
+loader(out,file,func,params) ::=<<
+<if (func)>
+        val <out> = <func>().load(sc, "<file>"<params>)
+<else>
+        val <out> = sc.textFile("<file>").map(s => List(s))
+<endif>
+>>
+
+// ------------------ DUMP Results --------------------------------------------
+dump(in) ::=<<
+        <in>.collect.map(t => println(t.mkString(",")))
+>>
+
+// ------------------ STORE Results on Disk -----------------------------------
+store(in,file,schema) ::=<<
+        <in>.map(t => <schema>).coalesce(1, true).saveAsTextFile("<file>")
+>>
+
+// ------------------ FILTER for a Predicate ----------------------------------
+filter(out,in,pred) ::=<<
+        val <out> = <in>.filter(t => {<pred>})
+>>
+
+// ------------------ Executes an expression FOR EACH input element -----------
+foreach(out,in,expr) ::=<<
+        val <out> = <in>.map(t => <expr>)
+>>
+
+// ------------------ GROUPs elements on an expression ------------------------
+groupBy(out,in,expr) ::=<<
+<if (expr)>
+        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(k,v)}
+<else>
+        val <out> = <in>.glom
+<endif>
+>>
+
+// ------------------ Outputs only distinct values ----------------------------
+distinct(out,in) ::=<<
+        val <out> = <in>.distinct
+>>
+
+// ------------------ Outputs only num records --------------------------------
+limit(out,in,num) ::=<<
+        val <out> = sc.parallelize(<in>.take(<num>))
+>>
+
+// ------------------ Joins two streams on the specified keys -----------------
+join(out,rel1,key1,rel2,key2) ::=<<
+        val <rel1>_kv = <rel1>.keyBy(t => {<key1>})
+        <rel2,key2:{ rel,key |val <rel>_kv = <rel>.keyBy(t => {<key>\})
+        }>
+        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv)}>.map{case (k,v) => List(k,v)}
+
+>>
+
+// ------------------ UNIONs multiple streams to one --------------------------
+union(out,in,others) ::=<<
+        val <out> = <in><others:{ e | .union(<e>)}>
+>>
+
+// ------------------ Returns a SAMPLE of the data ----------------------------
+sample(out,in,expr) ::=<<
+        val <out> = <in>.sample(<expr>)
+>>
+
+// ------------------ ORDERs the input BY a key -------------------------------
+orderBy(out,in,key,asc) ::=<<
+        val <out> = <in>.keyBy(t => <key>).sortByKey(<asc>).map{case (k,v) => v}
+>>
+
+// ------------------ STREAM operators ----------------------------------------
+streamOp(out,in,op,params) ::=<<
+        val <out> = <op>(<in><params>)
+>>
+
+// ----------------- END of the code implementing the query -------------------
+end_query(name) ::= <<
+    
+        sc.stop()
+    }
+}
+>>
