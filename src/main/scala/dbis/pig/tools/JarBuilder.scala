@@ -1,17 +1,34 @@
-package dbis.pig
+/*
+ * Copyright (c) 2015 The Piglet team,
+ *                    All Rights Reserved.
+ *
+ * This file is part of the Piglet package.
+ *
+ * PipeFabric is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License (GPL) as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file LICENSE.
+ * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
+ */
+package dbis.pig.tools
 
 /**
- * Created by kai on 10.04.15.
  * Taken from https://github.com/scalatron/scalatron/blob/master/Scalatron/src/scalatron/scalatron/impl/JarBuilder.scala
+ * This material is intended as a community resource and is licensed under the
+ * Creative Commons Attribution 3.0 Unported License. Feel free to use, modify and share it.
  */
 
-/** This material is intended as a community resource and is licensed under the
-  * Creative Commons Attribution 3.0 Unported License. Feel free to use, modify and share it.
-  */
 
-
+import java.io.{BufferedInputStream, File, FileInputStream, FileOutputStream}
 import java.util.jar.{JarEntry, JarOutputStream}
-import java.io.{FileOutputStream, FileInputStream, BufferedInputStream, File}
 
 
 /** Utility class for building a .jar file from a directory of .class files.

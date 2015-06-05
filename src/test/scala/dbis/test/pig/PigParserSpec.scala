@@ -5,6 +5,8 @@ package dbis.test.pig
 
 import dbis.pig._
 import dbis.pig.PigCompiler._
+import dbis.pig.op._
+import dbis.pig.schema._
 import org.scalatest.FlatSpec
 
 class PigParserSpec extends FlatSpec {

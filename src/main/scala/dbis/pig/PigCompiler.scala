@@ -1,14 +1,36 @@
+/*
+ * Copyright (c) 2015 The Piglet team,
+ *                    All Rights Reserved.
+ *
+ * This file is part of the Piglet package.
+ *
+ * PipeFabric is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License (GPL) as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * This package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; see the file LICENSE.
+ * If not you can find the GPL at http://www.gnu.org/copyleft/gpl.html
+ */
 package dbis.pig
 
 
 import java.io.File
+import dbis.pig.op.PigOperator
+import dbis.pig.parser.PigParser
+import dbis.pig.plan.DataflowPlan
+import dbis.pig.schema.SchemaException
+import dbis.pig.tools.FileTools
 import scopt.OptionParser
 import scala.io.Source
 import sys.process._
 
-/**
- * Created by kai on 31.03.15.
- */
 object PigCompiler extends PigParser {
   case class CompilerConfig(master: String = "local", input: String = "", compile: Boolean = false, outDir: String = ".", backend: String = BuildSettings.backends.get("default").get("name"))
 

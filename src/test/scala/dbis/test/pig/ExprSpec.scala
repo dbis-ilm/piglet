@@ -1,6 +1,8 @@
 package dbis.test.pig
 
 import dbis.pig._
+import dbis.pig.op._
+import dbis.pig.schema._
 import org.scalatest.{FlatSpec, Matchers}
 
 /**

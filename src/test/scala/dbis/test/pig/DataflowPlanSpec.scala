@@ -6,6 +6,9 @@ package dbis.test.pig
 
 import dbis.pig.PigCompiler._
 import dbis.pig._
+import dbis.pig.op._
+import dbis.pig.plan.{InvalidPlanException, DataflowPlan}
+import dbis.pig.schema._
 import org.scalatest.{Matchers, FlatSpec}
 
 class DataflowPlanSpec extends FlatSpec with Matchers {

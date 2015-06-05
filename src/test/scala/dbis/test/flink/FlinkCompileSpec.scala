@@ -6,6 +6,10 @@ package dbis.test.flink
   */
 
 import dbis.pig._
+import dbis.pig.codegen.ScalaBackendGenCode
+import dbis.pig.op._
+import dbis.pig.plan.Pipe
+import dbis.pig.schema._
 import org.scalatest.FlatSpec
 
 class FlinkCompileSpec extends FlatSpec {
