@@ -14,7 +14,6 @@ case object EmptyLine extends JLineEvent
 case object EOF extends JLineEvent
 
 object PigREPL extends PigParser {
-  val backend = BuildSettings.backends.get("default").get("name")
   val consoleReader = new ConsoleReader()
 
   def console(handler: JLineEvent => Boolean) {
@@ -51,6 +50,14 @@ object PigREPL extends PigParser {
   }
 
   def main(args: Array[String]): Unit = {
+    val backend = if(args.length==0) BuildSettings.backends.get("default").get("name")
+                  else { 
+                    args(0) match{
+                      case "flink" => "flink"
+                      case "spark" => "spark"
+                      case _ => throw new Exception("Unknown Backend $_")
+                    }
+                  }
     console {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
