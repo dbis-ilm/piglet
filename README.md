@@ -29,7 +29,8 @@ sbt 'project sparklib' package
 ```
 
 Note that building the compiler requires the most recent Spark jars, but they will be downloaded by sbt automatically.
-
+A similar library called `flinklib`is availablefor Flink. You can choose the backend which is supported by the Pig compiler
+with an parameter for sbt: `-Dbackend=spark` or `-Dbackend=flink`.
 
 We provide a simple wrapper script for processing Pig scripts. Just call it with 
 
@@ -37,7 +38,7 @@ We provide a simple wrapper script for processing Pig scripts. Just call it with
 pigs --master local[4] your_script.pig
 ```
 
-to compile the script and execute it on your local Spark installation.
+to compile the script and execute it on your local Spark/Flink installation.
 
 In addition, there is an interactive Pig shell similar to grunt:
 
@@ -78,8 +79,6 @@ a coverage report by running `sbt clean coverage test`. The results can be found
 
 ### ToDo ###
 
- * Flink not supported yet; requires a scala 2.11 build of Flink
  * nested blocks in `FOREACH`
  * `COGROUP` and `GROUP BY` with multiple relations
- * UDF support
  * `EXPLAIN` not implemented yet
