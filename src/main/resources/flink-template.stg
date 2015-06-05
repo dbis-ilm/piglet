@@ -81,7 +81,6 @@ union(out,in,others) ::=<<
         val <out> = <in><others:{ e | .merge(<e>)}>
 >>
 
-
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
         env.execute("<name>")

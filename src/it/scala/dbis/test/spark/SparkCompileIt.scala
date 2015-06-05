@@ -16,7 +16,10 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("script", "result", "truth"), // only the header of the table
     ("load.pig", "result1.out", "result1.data"),
     ("load2.pig", "result2.out", "result2.data"),
-    ("sort.pig", "sorted.out", "sorted.data")
+    ("selfjoin.pig", "joined.out", "joined.data"),
+    ("sort.pig", "sorted.out", "sorted.data"),
+    ("foreach1.pig", "distances.out", "distances.data"),
+    ("skyline.pig", "skyline.out", "skyline.data")
   )
 
   def cleanupResult(dir: String): Unit = {

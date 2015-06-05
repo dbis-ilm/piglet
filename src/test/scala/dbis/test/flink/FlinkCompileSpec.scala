@@ -166,14 +166,12 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for a binary JOIN statement with simple expression" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0)), List(PositionalField(0))))
-    /*
     val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
     val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("c",Load("c", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
-    */
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -186,14 +184,12 @@ class FlinkCompileSpec extends FlatSpec {
   it should "contain code for a binary JOIN statement with expression lists" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0), PositionalField(1)),
       List(PositionalField(1), PositionalField(2))))
-    /*
     val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
     val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("c",Load("c", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
-    */
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -206,7 +202,6 @@ class FlinkCompileSpec extends FlatSpec {
   it should "contain code for a multiway JOIN statement" in {
     val op = Join("a", List("b", "c", "d"), List(List(PositionalField(0)),
       List(PositionalField(0)), List(PositionalField(0))))
-    /*
     val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
@@ -214,7 +209,6 @@ class FlinkCompileSpec extends FlatSpec {
     val input2 = Pipe("c",Load("c", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input3 = Pipe("d",Load("d", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2,input3)
-    */
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""

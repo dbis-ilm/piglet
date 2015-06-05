@@ -42,9 +42,10 @@ settings(
   libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv)
 ).
 settings(excludes(backendEnv): _*).
-aggregate(backendlib(backendEnv).map(a => a.project): _*)
-.dependsOn(backendlib(backendEnv): _*)
-
+aggregate(backendlib(backendEnv).map(a => a.project): _*).
+dependsOn(backendlib(backendEnv): _*).
+aggregate(eventlib).
+dependsOn(eventlib)
 
 //Sub-Projects
 lazy val sparklib = (project in file("sparklib")).
@@ -59,13 +60,23 @@ settings(
   libraryDependencies ++= Dependencies.flinkDeps
 )
 
+lazy val eventlib = (project in file("eventlib")).
+settings(commonSettings: _*).
+settings(
+  libraryDependencies ++= Seq(
+    "org.scalatest" % "scalatest_2.11" % "2.2.0" % "test" withSources(),
+    "org.scala-lang" % "scala-compiler" % "2.11.6",
+    "org.apache.spark" %% "spark-core" % "1.3.0" % "provided"
+    // other settings
+  )
+)
+
 def backendlib(backend: String): List[ClasspathDep[ProjectReference]] = backend match {
   case "flink" => List(flinklib)
   case "spark" => List(sparklib)
   case "sparkflink" => List(sparklib, flinklib)
   case _ => throw new Exception(s"Backend $backend not available")
 }
-
 
 //Extra Settings
 mainClass in (Compile, packageBin) := Some("dbis.pig.PigREPL")

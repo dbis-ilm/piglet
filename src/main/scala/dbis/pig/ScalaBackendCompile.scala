@@ -33,6 +33,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     case NamedField(f) => schema match {
       case Some(s) => {
         val idx = s.indexOfField(f)
+        if (idx == -1) println("----------> " + f)
         require(idx >= 0) // the field doesn't exist in the schema: shouldn't occur because it was checked before
         if (requiresTypeCast) {
           val field = s.field(idx)
@@ -65,14 +66,6 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",")
   }
 
-  def getInputSchema(input: Pipe, sign: String, startAt: Int = 1): List[String] = {
-    val fieldSize = input.producer.schema match {
-        case Some(s) => s.fields.size
-        case None => throw new SchemaException(s"Could not load Schema for join relation")
-    }
-    (startAt to (fieldSize+startAt-1)).toList.map{e => s"${sign}._$e"}
-  }
-
   def emitJoinKey(schema: Option[Schema], joinExpr: List[Ref]): String = {
     if (joinExpr.size == 1)
       emitRef(schema, joinExpr.head)
@@ -80,14 +73,13 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       s"Array(${joinExpr.map(e => emitRef(schema, e)).mkString(",")}).mkString"
   }
 
-  def quote(s: String): String = s"$s"
-
+  def quote(s: String): String = s.replace('\'', '"')
 
   def emitLoader(out: String, file: String, loaderFunc: String, loaderParams: List[String]): String = {
     if (loaderFunc == "")
       callST("loader", Map("out"->out,"file"->file))
     else {
-      val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams.map(quote(_)).mkString(",") else ""
+      val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams/*.map(quote(_))*/.mkString(",") else ""
       callST("loader", Map("out"->out,"file"->file,"func"->loaderFunc,"params"->params))
     }
   }
@@ -105,12 +97,18 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
     case RefExpr(e) => s"${emitRef(schema, e)}"
     case Func(f, params) => {
-      val udf = funcTable(f)
-      // TODO: check whether f exists + size of params
-      if (udf.isAggregate)
-        s"${udf.name}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
-      else
-        s"${udf.name}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+      if (funcTable.contains(f)) {
+        val udf = funcTable(f)
+        // TODO: check size of params
+        if (udf.isAggregate)
+          s"${udf.name}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
+        else
+          s"${udf.name}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+      }
+      else {
+        // TODO: we don't know the function yet, let's assume there is a corresponding Scala function
+        s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+      }
     }
     case _ => ""
   }
@@ -194,32 +192,17 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       case Store(in, file) => callST("store", Map("in"->in.head,"file"->file,"schema"->listToTuple(node.schema)))
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in.head,"pred"->emitPredicate(node.schema, pred)))
-      case Foreach(out, in, expr) => callST("foreach", Map("out"->out,"in"->in.head,"expr"->emitGenerator(node.schema, expr)))
+      case Foreach(out, in, expr) => callST("foreach", Map("out"->out,"in"->in.head,"expr"->emitGenerator(node.inputSchema, expr)))
       case Grouping(out, in, groupExpr) => {
         if (groupExpr.keyList.isEmpty) callST("groupBy", Map("out"->out,"in"->in.head))
-        else callST("groupBy", Map("out"->out,"in"->in.head,"expr"->emitGrouping(node.schema, groupExpr)))
+        else callST("groupBy", Map("out"->out,"in"->in.head,"expr"->emitGrouping(node.inputSchema, groupExpr)))
       }
       case Distinct(out, in) => callST("distinct", Map("out"->out,"in"->in.head))
       case Limit(out, in, num) => callST("limit", Map("out"->out,"in"->in.head,"num"->num))
       case Join(out, rels, exprs) => { //TODO: Window Parameters
-        val keys = exprs.map(k => emitJoinKey(node.schema, k))
+        val res = node.inputs.zip(exprs)
+        val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
         callST("join", Map("out"->out,"rel1"->rels.head,"key1"->keys.head,"rel2"->rels.tail,"key2"->keys.tail)) 
-        /*
-        var key2 = keys.tail
-        var rel2 = rels.tail
-        var lschema = getInputSchema(node.inputs.head, "l")
-        val preJoin = callST("preJoin", Map("rels"->rels,"keys"->keys))
-        var result = s"val $out = ${rels.head}"
-        for(input <- node.inputs.tail){
-          val rschema = getInputSchema(input, "r")
-          result+= callST("join", Map("key1"->keys.head,"rel2"->rel2.head,"key2"->key2.head)) +
-                   callST("postJoin", Map("lschema"->lschema.mkString(","),"rschema"->rschema.mkString(",")))
-          rel2 = rel2.tail
-          key2 = key2.tail
-          lschema = lschema ++ getInputSchema(input, "l", lschema.length+1)
-        }
-        preJoin + result
-        */
       }
       case Union(out, rels) => callST("union", Map("out"->out,"in"->rels.head,"others"->rels.tail)) 
       case Sample(out, in, expr) => callST("sample", Map("out"->out,"in"->in.head,"expr"->emitExpr(node.schema, expr)))

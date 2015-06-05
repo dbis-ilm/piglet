@@ -16,7 +16,8 @@ class FlinkCompileIt extends FlatSpec with Matchers {
     ("script", "result", "truth"), // only the header of the table
     ("load.pig", "result1.out", "result1.data"),
     ("load2.pig", "result2.out", "result2.data"),
-    ("selfjoin.pig", "joined.out", "joined.data")
+    ("selfjoin.pig", "joined.out", "joined.data"),
+    ("foreach1.pig", "distances.out", "distances.data")
   )
 
   def cleanupResult(dir: String): Unit = {

@@ -55,7 +55,7 @@ object PigBuild extends Build {
       "*FlinkRun.scala"           ||
       "*FlinkCompile.scala"       ||
       "*FlinkCompileIt.scala"     ||
-      "*FlinkCompilerSpec.scala",
+      "*FlinkCompileSpec.scala",
       excludeFilter in unmanagedResources := 
       HiddenFileFilter || 
       "flink-template.stg"

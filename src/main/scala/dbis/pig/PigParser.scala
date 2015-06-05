@@ -95,7 +95,7 @@ class PigParser extends JavaTokenParsers {
       | refExpr
     )
 
-  def func: Parser[ArithmeticExpr] = ident ~ "(" ~ repsep(arithmExpr, ",") ~ ")" ^^ { case f ~ _ ~ p ~ _ => Func(f, p) }
+  def func: Parser[ArithmeticExpr] = className ~ "(" ~ repsep(arithmExpr, ",") ~ ")" ^^ { case f ~ _ ~ p ~ _ => Func(f, p) }
   def refExpr: Parser[ArithmeticExpr] = ref ^^ { r => RefExpr(r) }
 
   def comparisonExpr: Parser[Predicate] = arithmExpr ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ arithmExpr ^^ {

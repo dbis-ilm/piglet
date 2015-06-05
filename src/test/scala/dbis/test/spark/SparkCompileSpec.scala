@@ -5,6 +5,7 @@ package dbis.test.spark
  * Created by kai on 01.04.15.
  */
 
+import dbis.pig.PigCompiler._
 import dbis.pig._
 import org.scalatest.FlatSpec
 
@@ -124,9 +125,9 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val b_kv = b.keyBy(t => {t(0)})
-      |val c_kv = c.keyBy(t => {t(0)})
-      |val a = b_kv.join(c_kv).map{case (k,v) => List(k,v)}""".stripMargin)
+      |val b_kv = b.map(t => (t(0),t))
+      |val c_kv = c.map(t => (t(0),t))
+      |val a = b_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -142,9 +143,9 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val b_kv = b.keyBy(t => {Array(t(0),t(1)).mkString})
-      |val c_kv = c.keyBy(t => {Array(t(1),t(2)).mkString})
-      |val a = b_kv.join(c_kv).map{case (k,v) => List(k,v)}""".stripMargin)
+      |val b_kv = b.map(t => (Array(t(0),t(1)).mkString,t))
+      |val c_kv = c.map(t => (Array(t(1),t(2)).mkString,t))
+      |val a = b_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -161,10 +162,10 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val b_kv = b.keyBy(t => {t(0)})
-      |val c_kv = c.keyBy(t => {t(0)})
-      |val d_kv = d.keyBy(t => {t(0)})
-      |val a = b_kv.join(c_kv).join(d_kv).map{case (k,v) => List(k,v)}""".stripMargin)
+      |val b_kv = b.map(t => (t(0),t))
+      |val c_kv = c.map(t => (t(0),t))
+      |val d_kv = d.map(t => (t(0),t))
+      |val a = b_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.join(d_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -192,6 +193,16 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(t(0),PigFuncs.count(t(1).asInstanceOf[Seq[Any]])))")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a foreach statement with a UDF expression" in {
+    // a = FOREACH b GENERATE $0, distance($1, $2, 1.0, 2.0) AS dist;
+    val plan = parseScript("a = FOREACH b GENERATE $0, Distances.spatialDistance($1, $2, 1.0, 2.0) AS dist;")
+    val op = plan.head
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.map(t => List(t(0),Distances.spatialDistance(t(1),t(2),1.0,2.0)))")
     assert(generatedCode == expectedCode)
   }
 

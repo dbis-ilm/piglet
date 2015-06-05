@@ -36,6 +36,8 @@ sealed abstract class PigOperator (val initialOutPipeName: String, val initialIn
   def inPipeName: String = inPipeNames.head
   def inPipeNames: List[String] = if (inputs.isEmpty) initialInPipeNames else inputs.map(p => p.name)
 
+  def inputSchema =   if (inputs.nonEmpty) inputs.head.producer.schema else None
+
   /**
    * Constructs the output schema of this operator based on the input + the semantics of the operator.
    * The default implementation is to simply take over the schema of the input operator.
@@ -207,7 +209,7 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
   extends PigOperator(initialOutPipeName, initialInPipeName) {
 
   override def constructSchema: Option[Schema] = {
-    val inputSchema = inputs.head.producer.schema
+    // val inputSchema = inputs.head.producer.schema
     // we create a bag of tuples containing fields for each expression in expr
     val fields = expr.map(e => {
       e.alias match {
@@ -232,7 +234,8 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
   }
 
   override def checkSchemaConformance: Boolean = {
-    schema match {
+    // val inputSchema = inputs.head.producer.schema
+    inputSchema match {
       case Some(s) => {
         // if we know the schema we check all named fields
         expr.map(_.expr.traverse(s, Expr.checkExpressionConformance)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
@@ -320,7 +323,7 @@ case class Grouping(override val initialOutPipeName: String, initialInPipeName: 
   }
 
   override def constructSchema: Option[Schema] = {
-    val inputSchema = inputs.head.producer.schema
+    // val inputSchema = inputs.head.producer.schema
     // tuple(group: typeOfGroupingExpr, in:bag(inputSchema))
     val inputType = inputSchema match {
       case Some(s) => s.element.valueType
