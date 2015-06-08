@@ -23,7 +23,7 @@ if [ "$#" -ne 1 ]; then
 else
     if [ "$1" == "spark" ]; then
         if [ -z "$SPARK_JAR" ]; then
-            echo "Please set SPARK_JAR to your Spark jar file"
+            echo "Please set SPARK_JAR to your Spark-assembly-hadoop jar file"
             exit 1
         else
             CP=$SPARK_JAR:$CP
