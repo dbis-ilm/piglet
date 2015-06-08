@@ -21,6 +21,7 @@
 package dbis.pig.tools
 
 import scala.sys.process._
+import org.apache.flink.client.CliFrontend
 
 class FlinkRun extends Run{
   override def execute(master: String, className: String, jarFile: String){
@@ -28,8 +29,13 @@ class FlinkRun extends Run{
       case Some(n) => n
       case None => throw new Exception(s"Please set FLINK_JAR to your flink-dist jar file")
     }
-    val run = s"java -Dscala.usejavacp=true -cp ${flinkJar}:${jarFile} ${className}"
-    println(run)
-    run !
+    if (master.startsWith("local")){
+      val run = s"java -Dscala.usejavacp=true -cp ${flinkJar}:${jarFile} ${className}"
+      println(run)
+      run !
+//      CliFrontend.main(Array("run", "--jobmanager", "localhost:6123", "--class", className, jarFile))
+    }
+    else
+      CliFrontend.main(Array("run", "--jobmanager", master, "--class", className, jarFile))
   }
 }
