@@ -20,7 +20,9 @@ Simply clone the git project, change to the project directory and invoke
 sbt package
 ```
 
-There are several test cases included which should be passed: unit tests can be executed by `sbt test`, integration tests which compile and execute Pig scripts on Spark are executed by `sbt it:test`.
+There are several test cases included which should be passed: unit
+tests can be executed by `sbt test`, integration tests which compile
+and execute Pig scripts on Spark or Flink are executed by `sbt it:test`.
 
 In order to support Pig functions and loaders an additional library `sparklib` is needed. This library can be build by
 
@@ -29,18 +31,25 @@ sbt 'project sparklib' package
 ```
 
 Note that building the compiler requires the most recent Spark jars, but they will be downloaded by sbt automatically.
-A similar library called `flinklib`is availablefor Flink. You can choose the backend which is supported by the Pig compiler
-with an parameter for sbt: `-Dbackend=spark` or `-Dbackend=flink`.
+A similar library called `flinklib` is available for Flink. You can choose the backend which is supported by the Pig compiler
+with an parameter for sbt: `-Dbackend=spark` or `-Dbackend=flink`. If
+you want to use the compiler with the frontend scripts (see below),
+you have to build an assembly:
 
-We provide a simple wrapper script for processing Pig scripts. Just call it with 
+```
+sbt assembly
+```
+
+We provide a simple wrapper script for processing Pig scripts on Spark. Just call it with 
 
 ```
 pigs --master local[4] your_script.pig
 ```
 
-to compile the script and execute it on your local Spark/Flink installation.
+to compile the script and execute it on your local Spark
+installation. A corresponding script called `pigf` exists for Flink.
 
-In addition, there is an interactive Pig shell similar to grunt:
+In addition, there is an interactive Pig shell similar to Grunt:
 
 ```
 pigsh
