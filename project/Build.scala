@@ -77,6 +77,7 @@ object Dependencies {
   lazy val flinkVersion =       "0.9-SNAPSHOT"
   lazy val scoptVersion =       "3.3.0"
   lazy val scalastiVersion =    "2.0.0"
+  lazy val kiamaVersion = "1.8.0"
 
   // Libraries
   val scalaCompiler = "org.scala-lang" % "scala-compiler" % scalaVersion
@@ -89,6 +90,7 @@ object Dependencies {
   val flinkDist = "org.apache.flink" %% "flink-dist" % flinkVersion
   val scopt = "com.github.scopt" %% "scopt" % scoptVersion
   val scalasti = "org.clapper" %% "scalasti" % scalastiVersion
+  val kiama = "com.googlecode.kiama" %% "kiama" % kiamaVersion
 
   // Projects
   val rootDeps = Seq(
@@ -99,7 +101,8 @@ object Dependencies {
     graphCore,
     scopt,
     scalaIoFile,
-    scalasti
+    scalasti,
+    kiama
   )
   val sparkDeps = Seq(
     scalaTest % "test" withSources(),
