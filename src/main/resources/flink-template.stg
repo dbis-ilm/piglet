@@ -1,0 +1,89 @@
+// ----------------- header declaration ----------------- 
+init_code(includes) ::= <<
+import org.apache.flink.streaming.api.scala._
+import dbis.flink._
+import java.util.concurrent.TimeUnit
+
+<\n>
+>>
+// ----------------- BEGIN of code building and initializing the query --------
+begin_query(name) ::= <<
+object <name> {
+    def main(args: Array[String]) {
+        val env = StreamExecutionEnvironment.getExecutionEnvironment<\n>
+>>
+
+// ----------------- LOAD text file -------------------------------------------
+loader(out,file,func,params) ::=<<
+<if (func)>
+        val <out> = <func>().load(env, "<file>"<params>)
+<else>
+        val <out> = env.readTextFile("<file>").map(s => List(s))
+<endif>
+>>
+
+// ------------------ DUMP Results --------------------------------------------
+dump(in) ::=<<
+        <in>.print
+>>
+
+// ------------------ STORE Results on Disk -----------------------------------
+store(in,file,schema) ::=<<
+        <in>.map(_.mkString(",")).writeAsText("<file>")
+<!        
+        if (<in>.getJavaStream.getType.getTypeClass.isInstanceOf[Class[List[Any]]]) 
+            <in>.map(_.mkString(",")).writeAsText("<file>")
+        else 
+            <in>.writeAsText("<file>")
+ !>
+>>
+
+// ------------------ FILTER for a Predicate ----------------------------------
+filter(out,in,pred) ::=<<
+        val <out> = <in>.filter(t => {<pred>})
+>>
+
+// ------------------ Executes an expression FOR EACH input element -----------
+foreach(out,in,expr) ::=<<
+        val <out> = <in>.map(t => <expr>)
+>>
+
+// ------------------ GROUPS elements on an expression ------------------------
+groupBy(out,in,expr) ::=<<
+<if (expr)>
+        val <out> = <in>.groupBy(t => <expr>)
+<else>
+        val <out> = <in>
+<endif>
+>>
+
+// ------------------ Outputs only distinct values ----------------------------
+distinct(out,in) ::=<<
+        val <out> = <in>
+>>
+
+// ------------------ Outputs only num records --------------------------------
+limit(out,in,num) ::=<<
+        val <out> = <in>.window(Count.of(<num>)).every(Time.of(5, TimeUnit.SECONDS))
+>>
+
+// ------------------ Joins two streams on the specified keys -----------------
+join(out,rel1,key1,rel2,key2) ::=<<
+        val <out> = <rel1><rel2,key2:{ r,k |<\\>
+        .join(<r>).onWindow(5, TimeUnit.SECONDS).where(t => <key1>).equalTo(t => <k>)<\\>
+        .map{ t => t._1 ++ t._2 \}<\\>
+        }>
+
+>>
+
+// ------------------ UNIONs multiple streams to one --------------------------
+union(out,in,others) ::=<<
+        val <out> = <in><others:{ e | .merge(<e>)}>
+>>
+
+// ----------------- END of the code implementing the query -------------------
+end_query(name) ::= <<
+        env.execute("<name>")
+    }
+}
+>>
