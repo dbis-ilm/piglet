@@ -17,34 +17,45 @@ else
     CP=$PIG_LIB
 fi
 
-if [ "$#" -ne 1 ]; then
-    echo "Illegal number of parameters. Required 1"
-    exit 1
-else
-    if [ "$1" == "spark" ]; then
+BACKEND=""
+while getopts ":b:" opt; do
+    case $opt in
+        b)
+            BACKEND=$OPTARG
+            shift
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            exit 1
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            exit 1
+            ;;
+    esac
+done
+
+case $BACKEND in
+    "spark")
         if [ -z "$SPARK_JAR" ]; then
             echo "Please set SPARK_JAR to your Spark jar file"
             exit 1
         else
             CP=$SPARK_JAR:$CP
         fi
-#        if [ -z "$HADOOP_JAR" ]; then
-#            echo "Please set HADOOP_JAR to your Hadoop jar file"
-#            exit 1
-#        else
-#            CP=$HADOOP_JAR:$CP
-#        fi
-    elif [ "$1" == "flink" ]; then
+        ;;
+    "flink")
         if [ -z "$FLINK_JAR" ]; then
             echo "Please set FLINK_JAR to your Flink jar file (built with scala 2.11)"
             exit 1
         else
             CP=$FLINK_JAR:$CP
         fi
-    else
-        echo "Unsupported Backend: $1. Supported: spark, flink"
+        ;;
+    *)
+        echo "Unsupported backend $BACKEND. Please specify your backend via the -b option (spark or flink)."
         exit 1
-    fi
-fi
+        ;;
+esac
 
 java -Dscala.usejavacp=true -classpath $CP dbis.pig.PigREPL $*
