@@ -57,7 +57,8 @@ settings(
 lazy val flinklib = (project in file("flinklib")).
 settings(commonSettings: _*).
 settings(
-  libraryDependencies ++= Dependencies.flinkDeps
+  libraryDependencies ++= Dependencies.flinkDeps,
+  resolvers += "Sonatype (releases)" at "https://oss.sonatype.org/content/repositories/releases/"
 )
 
 lazy val eventlib = (project in file("eventlib")).

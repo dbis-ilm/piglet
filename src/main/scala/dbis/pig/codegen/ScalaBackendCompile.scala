@@ -228,6 +228,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         "key"->emitSortKey(node.schema, orderSpec, out, in),"asc"->ascendingSortOrder(orderSpec.head)))
       case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out,"op"->op,"in"->in,
         "params"->emitParamList(node.schema, params)))
+      case ZmqSubscriber(out, address, schema) => callST("zmqSubscriber", Map("out"->out,"addr"->address,"schema"->schema))
+      case ZmqPublisher(in, address) => callST("zmqPublisher", Map("in"->in.head,"addr"->address))
       /*     
        case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
        case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP

@@ -315,4 +315,13 @@ class PigParserSpec extends FlatSpec {
       List(OrderBy("a", "b", List(OrderBySpec(PositionalField(1), OrderByDirection.DescendingOrder),
         OrderBySpec(PositionalField(2), OrderByDirection.AscendingOrder)))))
   }
+
+  it should "parse a zmq subscriber statement using tcp without schema" in {
+    assert(parseScript("a = zmq_subscriber 'tcp://127.0.0.1:5555';") == List(ZmqSubscriber("a", "tcp://127.0.0.1:5555")))
+  }
+ 
+  it should "parse a zmq publisher statement using tcp" in {
+    assert(parseScript("zmq_publisher a to 'tcp://127.0.0.1:5555';") == List(ZmqPublisher("a", "tcp://127.0.0.1:5555")))
+  }
+
 }

@@ -175,7 +175,9 @@ class PigParser extends JavaTokenParsers {
   lazy val andKeyword = "and".ignoreCase
   lazy val orKeyword = "or".ignoreCase
   lazy val notKeyword = "not".ignoreCase
-
+  lazy val toKeyword = "to".ignoreCase
+  lazy val zmqSubscriberKeyword = "zmq_subscriber".ignoreCase
+  lazy val zmqPublisherKeyword = "zmq_publisher".ignoreCase
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
    */
@@ -355,10 +357,39 @@ class PigParser extends JavaTokenParsers {
   }
 
   /*
+   * <A> = ZMQ_SUBSCRIBER <address> [ AS <Schema> ]
+   */
+  def ipMember: Parser[String] = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)".r 
+  def ipv4: Parser[String] = ipMember ~ "." ~ ipMember ~ "." ~ ipMember ~ "." ~ ipMember ^^{
+    case i1 ~ _ ~ i2 ~ _ ~ i3 ~ _ ~i4 => i1 + "." + i2 + "." + i3 + "." + i4
+  }
+  def port: Parser[String] = ":([0-9]{1,5})".r
+  def bindAddress: Parser[String] = (ipv4 | "*" | ident) ~ (port | "*") ^^ { case ip ~ p => ip + p }
+  def tcpSocket: Parser[String] = "tcp://" ~ bindAddress ^^ { case trans ~ addr => trans + addr}
+  def ipcSocket: Parser[String] = "ipc://" ~ (fileName | "*") ^^ { case trans ~  path => trans + path}
+  def inprocSocket: Parser[String] = "inproc://" ~ ident ^^ { case trans ~ name => trans + name}
+  def pgmSocket: Parser[String] = ("pgm://" | "epgm://") ~ (ipv4 | ident) ~ ";" ~ ipv4 ~ port ^^ { 
+      case trans ~ interface ~ _ ~ ip ~ p => trans + interface + ";" + ip + p
+    }
+  //def transports: Parser[String] = "(inproc|ipc|tcp|pgm|epgm)".r
+  def zmqAddress: Parser[String] = "'" ~ (tcpSocket | ipcSocket | inprocSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
+  def zmqSubscriberStmt: Parser[PigOperator] = bag ~ "=" ~ zmqSubscriberKeyword ~ zmqAddress ~ (loadSchemaClause?) ^^ {
+    case out ~ _ ~ _ ~ addr ~ schema => ZmqSubscriber(out, addr, schema)
+  }
+
+  /*
+   * ZMQ_PUBLISHER <A> TO <address>
+   */
+  def zmqPublisherStmt: Parser[PigOperator] = zmqPublisherKeyword ~ bag ~ toKeyword ~ zmqAddress ^^ {
+    case _ ~ b ~ _ ~ addr => ZmqPublisher(b, addr)
+  }
+
+  /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt) ~ ";" ^^ {
+    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    zmqSubscriberStmt | zmqPublisherStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*
