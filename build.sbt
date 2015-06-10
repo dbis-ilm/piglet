@@ -1,4 +1,4 @@
-name := "PigParser"
+name := "Piglet"
 
 lazy val commonSettings = Seq(
   version := "1.0",
@@ -22,13 +22,16 @@ backends := (backendEnv match {
   case "sparkflink" => flinksparkBackend
   case _            => throw new Exception(s"Backend $backendEnv not available")
 })  
-// For Testing:
+
+/*
+ * For testing:
+ */
 lazy val print = taskKey[Unit]("Print out")
 print := println(backends.value.get("default").get("name"))
 
-
-
-//Main Project
+/*
+ * Main Project
+ */
 lazy val root = (project in file(".")).
 configs(IntegrationTest).
 settings(commonSettings: _*).
@@ -39,15 +42,17 @@ settings(
   buildInfoPackage := "dbis.pig",
   buildInfoObject := "BuildSettings",
   bintrayResolverSettings,
-  libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv)
+  libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv),
+  /* used for R integration */
+  unmanagedJars in Compile += file("lib/jvmr_2.11-2.11.2.1.jar")
 ).
 settings(excludes(backendEnv): _*).
 aggregate(backendlib(backendEnv).map(a => a.project): _*).
-dependsOn(backendlib(backendEnv): _*).
-aggregate(eventlib).
-dependsOn(eventlib)
+dependsOn(backendlib(backendEnv): _*)
 
-//Sub-Projects
+/*
+ * Sub projects: supporting classes for Spark and Flink.
+ */
 lazy val sparklib = (project in file("sparklib")).
 settings(commonSettings: _*).
 settings(
@@ -61,17 +66,6 @@ settings(
   resolvers += "Sonatype (releases)" at "https://oss.sonatype.org/content/repositories/releases/"
 )
 
-lazy val eventlib = (project in file("eventlib")).
-settings(commonSettings: _*).
-settings(
-  libraryDependencies ++= Seq(
-    "org.scalatest" % "scalatest_2.11" % "2.2.0" % "test" withSources(),
-    "org.scala-lang" % "scala-compiler" % "2.11.6",
-    "org.apache.spark" %% "spark-core" % "1.3.0" % "provided"
-    // other settings
-  )
-)
-
 def backendlib(backend: String): List[ClasspathDep[ProjectReference]] = backend match {
   case "flink" => List(flinklib)
   case "spark" => List(sparklib)
@@ -79,7 +73,9 @@ def backendlib(backend: String): List[ClasspathDep[ProjectReference]] = backend 
   case _ => throw new Exception(s"Backend $backend not available")
 }
 
-//Extra Settings
+/*
+ * Extra settings
+ */
 mainClass in (Compile, packageBin) := Some("dbis.pig.PigREPL")
 
 mainClass in (Compile, run) := Some("dbis.pig.PigCompiler")
