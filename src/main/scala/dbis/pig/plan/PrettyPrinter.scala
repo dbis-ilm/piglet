@@ -19,8 +19,18 @@ package dbis.pig.plan
 import dbis.pig.op.PigOperator
 
 object PrettyPrinter extends org.kiama.output.PrettyPrinter{
-  def pretty(p: List[PigOperator]): String =
-    super.pretty(show(p))
+  def pretty(op: PigOperator): String = {
+    super.pretty(show(op))
+  }
+
+  def show(op: PigOperator): Doc = {
+    val prettyInputs = op.inputs.map(p => show(p.producer)).toList
+    parens (
+      value(op)
+      <> nest(
+        line
+        <> ssep(prettyInputs, line)))
+  }
 
   def show(p: List[PigOperator]): Doc = any(p)
 }
