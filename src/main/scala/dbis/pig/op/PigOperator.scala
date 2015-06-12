@@ -17,10 +17,11 @@
 package dbis.pig.op
 
 import java.security.MessageDigest
+
 import dbis.pig.plan.Pipe
 import dbis.pig.schema._
-
-import scala.collection.mutable.ArrayBuffer
+import org.kiama.rewriting.Rewritable
+import scala.collection.immutable.Seq
 
 /**
  * PigOperator is the base class for all Pig operators. An operator contains
@@ -32,7 +33,8 @@ import scala.collection.mutable.ArrayBuffer
  * @param initialInPipeNames the list of names of initial input pipes.
  * @param schema
  */
-abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNames: List[String], var schema: Option[Schema]) {
+abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNames: List[String], var schema:
+Option[Schema]) extends Rewritable{
   var inputs: List[Pipe] = List[Pipe]()
   var output: Option[Pipe] = None
 
@@ -107,5 +109,20 @@ abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNam
    */
   def lineageString: String = {
     inputs.map(p => p.producer.lineageString).mkString("%")
+  }
+  def arity = this.inputs.length
+
+  def deconstruct = this.inputs
+
+  def reconstruct(output: Seq[Any]): PigOperator = output match {
+    case inputs: Seq[_] => {
+      this.clone() match {
+        case obj: PigOperator => {
+          obj.inputs = inputs.toList.asInstanceOf[List[Pipe]]
+          obj
+        }
+      }
+    }
+    case _ => illegalArgs("PigOperator", "Pipe", output)
   }
 }
