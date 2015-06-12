@@ -85,7 +85,9 @@ object PigREPL extends PigParser {
       case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
       case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => {
         val plan = new DataflowPlan(buf.toList)
-        println(pretty(plan.operators))
+        for(sink <- plan.sinkNodes) {
+          println(pretty(sink))
+        }
         false
       }
       case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
