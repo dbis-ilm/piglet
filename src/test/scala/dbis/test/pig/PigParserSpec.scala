@@ -132,56 +132,82 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse a simple foreach statement" in {
     assert(parseScript("a = foreach b generate x, y, z;") ==
-      List(Foreach("a", "b", List(
+      List(Foreach("a", "b", GeneratorList(List(
         GeneratorExpr(RefExpr(NamedField("x"))),
         GeneratorExpr(RefExpr(NamedField("y"))),
         GeneratorExpr(RefExpr(NamedField("z")))
-      ))))
+      )))))
   }
 
   it should "parse a foreach statement with aliases for fields" in {
     assert(parseScript("a = foreach b generate $0 as f1, $1 as f2, $2 as f3;") ==
-      List(Foreach("a", "b", List(
+      List(Foreach("a", "b", GeneratorList(List(
         GeneratorExpr(RefExpr(PositionalField(0)), Some(Field("f1"))),
         GeneratorExpr(RefExpr(PositionalField(1)), Some(Field("f2"))),
         GeneratorExpr(RefExpr(PositionalField(2)), Some(Field("f3")))
-      ))))
+      )))))
   }
 
   it should "parse a foreach statement with field expressions" in {
     assert(parseScript("a = foreach b generate $0 + $1 as f1, $1 * 42 as f2;") ==
-      List(Foreach("a", "b", List(
+      List(Foreach("a", "b", GeneratorList(List(
         GeneratorExpr(Add(RefExpr(PositionalField(0)), RefExpr(PositionalField(1))), Some(Field("f1"))),
         GeneratorExpr(Mult(RefExpr(PositionalField(1)), RefExpr(Value("42"))), Some(Field("f2")))
-      ))))
+      )))))
   }
 
   it should "parse a foreach statement with function expressions" in {
     assert(parseScript("""a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);""") ==
-      List(Foreach("a", "b", List(
+      List(Foreach("a", "b", GeneratorList(List(
         GeneratorExpr(Func("TOMAP", List(
           RefExpr(Value(""""field1"""")),
           RefExpr(PositionalField(0)),
           RefExpr(Value(""""field2"""")),
           RefExpr(PositionalField(1)))))
-      ))))
+      )))))
   }
 
   it should "parse a foreach statement with another function expression" in {
     assert(parseScript("a = FOREACH b GENERATE f0, COUNT(f1) AS CNT;") ==
-      List(Foreach("a", "b", List(
+      List(Foreach("a", "b", GeneratorList(List(
         GeneratorExpr(RefExpr(NamedField("f0"))),
         GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("f1")))), Some(Field("CNT", Types.ByteArrayType)))
-      ))))
+      )))))
   }
 
   it should "parse a simple foreach statement with a schema" in {
     assert(parseScript("a = foreach b generate $0 as subj:chararray, $1 as pred, $2 as obj:chararray;") ==
-      List(Foreach("a", "b", List(
+      List(Foreach("a", "b", GeneratorList(List(
         GeneratorExpr(RefExpr(PositionalField(0)), Some(Field("subj", Types.CharArrayType))),
         GeneratorExpr(RefExpr(PositionalField(1)), Some(Field("pred", Types.ByteArrayType))),
         GeneratorExpr(RefExpr(PositionalField(2)), Some(Field("obj", Types.CharArrayType)))
-      ))))
+      )))))
+  }
+
+  it should "parse a simple nested FOREACH statement" in {
+    assert(parseScript(
+      """a = FOREACH b {
+      |generate c, COUNT(d);
+      |};""".stripMargin) ==
+      List(Foreach("a", "b", GeneratorPlan(List(
+        Generate(List(GeneratorExpr(RefExpr(NamedField("c"))),
+          GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("d")))))))
+      )))))
+  }
+
+  it should "parse a nested FOREACH statement with multiple statements" in {
+    assert(parseScript(
+      """a = FOREACH b {
+        |data = d.dat;
+        |unique_d = DISTINCT data;
+        |generate key, COUNT(unique_d);
+        |};""".stripMargin) ==
+    List(Foreach("a", "b", GeneratorPlan(List(
+    ConstructBag("data", DerefTuple(NamedField("d"), NamedField("dat"))),
+    Distinct("unique_d", "data"),
+    Generate(List(GeneratorExpr(RefExpr(NamedField("key"))),
+      GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("unique_d")))))))
+    )))))
   }
 
   it should "detect an invalid statement" in {
@@ -247,26 +273,26 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse expressions with deref operators for map" in {
     assert(parseScript("""a = foreach b generate m1#"k1", m1#"k2";""") ==
-      List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), """"k1""""))),
-        GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), """"k2"""")))))))
+      List(Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), """"k1""""))),
+        GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), """"k2""""))))))))
   }
 
   it should "parse expressions with deref operators on positional fields for map" in {
     assert(parseScript("""a = foreach b generate $0#"k1", $1#"k2";""") ==
-      List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), """"k1""""))),
-        GeneratorExpr(RefExpr(DerefMap(PositionalField(1), """"k2"""")))))))
+      List(Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), """"k1""""))),
+        GeneratorExpr(RefExpr(DerefMap(PositionalField(1), """"k2""""))))))))
   }
 
   it should "parse expressions with deref operators for tuple and bag" in {
     assert(parseScript("""a = foreach b generate t1.k, t2.$0;""") ==
-      List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(NamedField("t1"), NamedField("k")))),
-        GeneratorExpr(RefExpr(DerefTuple(NamedField("t2"), PositionalField(0))))))))
+      List(Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefTuple(NamedField("t1"), NamedField("k")))),
+        GeneratorExpr(RefExpr(DerefTuple(NamedField("t2"), PositionalField(0)))))))))
   }
 
   it should "parse expressions with deref operators on positional fields for tuple and bag" in {
     assert(parseScript("""a = foreach b generate $0.$1, $2.$0;""") ==
-      List(Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
-        GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0))))))))
+      List(Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
+        GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0)))))))))
   }
 
   it should "parse a binary union statement" in {

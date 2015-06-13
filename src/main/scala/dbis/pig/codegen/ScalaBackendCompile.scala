@@ -206,7 +206,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       case Store(in, file) => callST("store", Map("in"->in.head,"file"->file,"schema"->listToTuple(node.schema)))
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in.head,"pred"->emitPredicate(node.schema, pred)))
-      case Foreach(out, in, expr) => callST("foreach", Map("out"->out,"in"->in.head,"expr"->emitGenerator(node.inputSchema, expr)))
+      case Foreach(out, in, gen) => {
+        gen match {
+          case GeneratorList(expr) => callST("foreach", Map("out" -> out, "in" -> in.head, "expr" -> emitGenerator(node.inputSchema, expr)))
+          case GeneratorPlan(plan) => "" // TODO: code generator
+        }
+      }
       case Grouping(out, in, groupExpr) => {
         if (groupExpr.keyList.isEmpty) callST("groupBy", Map("out"->out,"in"->in.head))
         else callST("groupBy", Map("out"->out,"in"->in.head,"expr"->emitGrouping(node.inputSchema, groupExpr)))

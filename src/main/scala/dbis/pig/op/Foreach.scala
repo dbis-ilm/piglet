@@ -20,57 +20,71 @@
  */
 package dbis.pig.op
 
+import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 
 
+trait ForeachGenerator {}
+
 case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None)
+case class GeneratorList(exprs: List[GeneratorExpr]) extends ForeachGenerator
+
+case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
 
 /**
  * Foreach represents the FOREACH operator of Pig.
  *
  * @param initialOutPipeName the name of the output pipe (relation).
  * @param initialInPipeName the name of the input pipe
- * @param expr the generator expression
+ * @param generator the generator (a list of expressions or a subplan)
  */
-case class Foreach(override val initialOutPipeName: String, initialInPipeName: String, expr: List[GeneratorExpr])
+case class Foreach(override val initialOutPipeName: String, initialInPipeName: String, generator: ForeachGenerator)
   extends PigOperator(initialOutPipeName, initialInPipeName) {
 
   override def constructSchema: Option[Schema] = {
-    // val inputSchema = inputs.head.producer.schema
-    // we create a bag of tuples containing fields for each expression in expr
-    val fields = expr.map(e => {
-      e.alias match {
-        // if we have an explicit schema (i.e. a field) then we use it
-        case Some(f) => {
-          if (f.fType == Types.ByteArrayType) {
-            // if the type was only bytearray, we should check the expression if we have a more
-            // specific type
-            val res = e.expr.resultType(inputSchema)
-            Field(f.name, res._2)
+    generator match {
+      case GeneratorList(expr) => {
+        // we create a bag of tuples containing fields for each expression in expr
+        val fields = expr.map(e => {
+          e.alias match {
+            // if we have an explicit schema (i.e. a field) then we use it
+            case Some(f) => {
+              if (f.fType == Types.ByteArrayType) {
+                // if the type was only bytearray, we should check the expression if we have a more
+                // specific type
+                val res = e.expr.resultType(inputSchema)
+                Field(f.name, res._2)
+              }
+              else
+                f
+            }
+            // otherwise we take the field name from the expression and
+            // the input schema
+            case None => val res = e.expr.resultType(inputSchema); Field(res._1, res._2)
           }
-          else
-            f
-        }
-        // otherwise we take the field name from the expression and
-        // the input schema
-        case None => val res = e.expr.resultType(inputSchema); Field(res._1, res._2)
+        }).toArray
+        schema = Some(new Schema(new BagType("", new TupleType("", fields))))
       }
-    }).toArray
-    schema = Some(new Schema(new BagType("", new TupleType("", fields))))
+      case GeneratorPlan(plan) => {
+        // TODO
+      }
+    }
     schema
   }
 
   override def checkSchemaConformance: Boolean = {
-    // val inputSchema = inputs.head.producer.schema
-    inputSchema match {
-      case Some(s) => {
-        // if we know the schema we check all named fields
-        expr.map(_.expr.traverse(s, Expr.checkExpressionConformance)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
+    generator match {
+      case GeneratorList(expr) => inputSchema match {
+        case Some(s) => {
+          // if we know the schema we check all named fields
+          expr.map(_.expr.traverse(s, Expr.checkExpressionConformance)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
+        }
+        case None => {
+          // if we don't have a schema all expressions should contain only positional fields
+          expr.map(_.expr.traverse(null, Expr.containsNoNamedFields)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
+        }
       }
-      case None => {
-        // if we don't have a schema all expressions should contain only positional fields
-        expr.map(_.expr.traverse(null, Expr.containsNoNamedFields)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
-      }
+      case GeneratorPlan(plan) => false // TODO
     }
   }
 
@@ -80,7 +94,29 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""FOREACH%${expr}%""" + super.lineageString
+    generator match {
+      case GeneratorList(expr) => s"""FOREACH%${expr}%""" + super.lineageString
+      case GeneratorPlan(plan) => s"""FOREACH""" + super.lineageString // TODO
+    }
   }
 }
 
+/**
+ * GENERATE represents the final generate statement inside a nested FOREACH.
+ *
+ * @param exprs list of generator expressions
+ */
+case class Generate(exprs: List[GeneratorExpr]) extends PigOperator("", "") {
+  // TODO
+}
+
+/**
+ * This operator is a pseudo operator used inside a nested FOREACH to construct a new bag from an expression.
+ *
+ * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
+ *                           can be changed later.
+ * @param refExpr a reference referring to an expression constructing a relation (bag).
+ */
+case class ConstructBag(override val initialOutPipeName: String, refExpr: Ref) extends PigOperator (initialOutPipeName, "") {
+  // TODO
+}

@@ -18,6 +18,7 @@ package dbis.pig.parser
 
 import dbis.pig._
 import dbis.pig.op._
+import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 
 import scala.util.parsing.combinator.JavaTokenParsers
@@ -239,14 +240,39 @@ class PigParser extends JavaTokenParsers {
   def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ^^ { case _ ~ b ~  _ ~ f => Store(b, f) }
 
   /*
+   * GENERATE expr1, expr2, ...
+   */
+  def generateStmt: Parser[PigOperator] = plainForeachGenerator ^^ { case g => Generate(g.asInstanceOf[GeneratorList].exprs) }
+
+  /*
+   * B = A.C;
+   */
+  def constructBagStmt: Parser[PigOperator] = bag ~ "=" ~ derefBagOrTuple ^^ { case res ~ _ ~ ref => ConstructBag(res, ref) }
+
+  /*
+   * Currently, Pig allows only DISTINCT, LIMIT, FILTER, ORDER BY + GENERATE and assignment inside FOREACH
+   */
+  def nestedStmt: Parser[PigOperator] = (distinctStmt | limitStmt | filterStmt | orderByStmt |
+    generateStmt | constructBagStmt) ~ ";" ^^ { case op ~ _  => op }
+  def nestedScript: Parser[List[PigOperator]] = rep(nestedStmt)
+
+  /*
    * <A> = FOREACH <B> GENERATE <Expr> [ AS <Schema> ]
+   * <A> = FOREACH <B> { <SubPlan> }
    */
   def exprSchema: Parser[Field] = asKeyword ~ fieldSchema ^^ { case _ ~ t => t }
   def genExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
   def generatorList: Parser[List[GeneratorExpr]] = repsep(genExpr, ",")
-  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~ generateKeyword ~ generatorList ^^ {
-    case out ~ _ ~ _ ~ in ~ _ ~ ex => Foreach(out, in, ex)
+  def plainForeachGenerator: Parser[ForeachGenerator] = generateKeyword ~ generatorList ^^ {
+    case _ ~ exList => GeneratorList(exList)
   }
+  def nestedForeachGenerator: Parser[ForeachGenerator] = "{" ~ nestedScript ~ "}" ^^ {
+    case _ ~ opList ~ _ => GeneratorPlan(opList)
+  }
+  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~
+    (plainForeachGenerator | nestedForeachGenerator) ^^ {
+      case out ~ _ ~ _ ~ in ~ ex => Foreach(out, in, ex)
+    }
 
   /*
    * <A> = FILTER <B> BY <Predicate>

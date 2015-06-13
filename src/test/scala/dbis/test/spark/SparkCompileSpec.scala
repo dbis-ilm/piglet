@@ -186,13 +186,13 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code a foreach statement with function expressions" in {
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
-    val op = Foreach("a", "b", List(
+    val op = Foreach("a", "b", GeneratorList(List(
       GeneratorExpr(Func("TOMAP", List(
         RefExpr(Value("\"field1\"")),
         RefExpr(PositionalField(0)),
         RefExpr(Value("\"field2\"")),
         RefExpr(PositionalField(1)))))
-    ))
+    )))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(PigFuncs.toMap(\"field1\",t(0),\"field2\",t(1))))")
@@ -201,10 +201,10 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for a foreach statement with another function expression" in {
     // a = FOREACH b GENERATE $0, COUNT($1) AS CNT;
-    val op = Foreach("a", "b", List(
+    val op = Foreach("a", "b", GeneratorList(List(
         GeneratorExpr(RefExpr(PositionalField(0))),
         GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType)))
-      ))
+      )))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(t(0),PigFuncs.count(t(1).asInstanceOf[Seq[Any]])))")
@@ -223,8 +223,8 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for deref operator on maps in foreach statement" in {
     // a = FOREACH b GENERATE $0#"k1", $1#"k2";
-    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
-      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\"")))))
+    val op = Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
+      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\""))))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -234,8 +234,8 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for deref operator on tuple in foreach statement" in {
     // a = FOREACH b GENERATE $0.$1, $2.$0;
-    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
-      GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0))))))
+    val op = Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
+      GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0)))))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
