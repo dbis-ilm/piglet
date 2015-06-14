@@ -46,18 +46,18 @@ object Rewriter {
   }
 
   private def mergeFilters(pigOperator: Any): Option[Filter] = pigOperator match {
-    case f1 @ Filter(_, in, predicate) => {
-      f1.output match {
-        case None => None
-        case Some(Pipe(_, f2 @ Filter(out, _, predicate2))) => {
+    case f1 @ Filter(out, _, predicate) => {
+      f1.inputs match {
+        case List((Pipe(_, f2 @ Filter(_, in, predicate2)))) => {
           val newFilter = Filter(out, in, And(predicate, predicate2))
           // TODO extract merging PigOperators into a new method, possibly on PigOperator itself
-          // Use the first filters inputs. We don't need to rewrite the inputs output because that always seems to be
+          // Use the second filters inputs. We don't need to rewrite the inputs output because that always seems to be
           // pointing to the input itself?
-          newFilter.inputs = f1.inputs
-          // TODO can there be other objects that have f2 in their input list?
+          newFilter.inputs = f2.inputs
+          // TODO can there be other objects that have f1 in their input list?
           Some(newFilter)
         }
+        case _ => None
       }
     }
     case _ => None
