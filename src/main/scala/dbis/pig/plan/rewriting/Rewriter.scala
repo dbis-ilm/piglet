@@ -16,10 +16,10 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{And, PigOperator, Filter}
-import dbis.pig.plan.{Pipe, DataflowPlan}
-import org.kiama.rewriting.Strategy
+import dbis.pig.op.{And, Filter, PigOperator}
+import dbis.pig.plan.Pipe
 import org.kiama.rewriting.Rewriter._
+import org.kiama.rewriting.Strategy
 
 object Rewriter {
   private var rules: Array[Strategy] = Array()
@@ -35,9 +35,9 @@ object Rewriter {
   }
 
   private def mergeFilters(pigOperator: Any): Option[Filter] = pigOperator match {
-    case f1 @ Filter(out, _, predicate) => {
+    case f1 @ Filter(out, _, predicate) =>
       f1.inputs match {
-        case List((Pipe(_, f2 @ Filter(_, in, predicate2)))) => {
+        case List((Pipe(_, f2 @ Filter(_, in, predicate2)))) =>
           val newFilter = Filter(out, in, And(predicate, predicate2))
           // TODO extract merging PigOperators into a new method, possibly on PigOperator itself
           // Use the second filters inputs. We don't need to rewrite the inputs output because that always seems to be
@@ -45,10 +45,8 @@ object Rewriter {
           newFilter.inputs = f2.inputs
           // TODO can there be other objects that have f1 in their input list?
           Some(newFilter)
-        }
         case _ => None
       }
-    }
     case _ => None
   }
 
