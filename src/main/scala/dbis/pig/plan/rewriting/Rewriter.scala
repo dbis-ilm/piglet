@@ -24,10 +24,21 @@ import org.kiama.rewriting.Strategy
 object Rewriter {
   private var rules: Array[Strategy] = Array()
 
+  /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
+   *
+   * It will be added by [[org.kiama.rewriting.Rewriter.ior]]ing it with the already existing ones.
+   * @param s The new strategy.
+   */
   def addStrategy(s: Strategy) = {
     rules = rules :+ s
   }
 
+  /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
+   * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
+   *
+   * @param sink The sink node to rewrite.
+   * @return The rewritten sink node.
+   */
   def processSink(sink: PigOperator): PigOperator = {
     val strat = rules.reduce((x: Strategy, y: Strategy) => ior(x, y))
     val rewriter = bottomup( attempt (strat))
