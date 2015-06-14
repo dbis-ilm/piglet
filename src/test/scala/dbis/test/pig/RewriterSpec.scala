@@ -29,14 +29,15 @@ class RewriterSpec extends FlatSpec with Matchers{
     val op2 = Filter("b", "a", predicate1)
     val op3 = Filter("c", "b", predicate2)
     val op4 = Dump("c")
+    val op4_2 = op4.copy()
     val opMerged = Filter("c", "a", And(predicate1, predicate2))
 
     val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
-    val planMerged = new DataflowPlan(List(op1, opMerged, op4))
+    val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
     val sink = planUnmerged.sinkNodes.head
     val sinkMerged = planMerged.sinkNodes.head
 
     val rewrittenSink = processSink(sink)
-    rewrittenSink should be (sinkMerged)
+    rewrittenSink.inputs should equal (sinkMerged.inputs)
   }
 }
