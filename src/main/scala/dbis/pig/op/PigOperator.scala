@@ -116,7 +116,7 @@ Option[Schema]) extends Rewritable{
 
   def reconstruct(output: Seq[Any]): PigOperator = output match {
     case inputs: Seq[_] => {
-      this.clone() match {
+      this match {
         case obj: PigOperator => {
           obj.inputs = inputs.toList.asInstanceOf[List[Pipe]]
           obj
