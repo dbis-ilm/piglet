@@ -28,17 +28,6 @@ object Rewriter {
     rules = rules :+ s
   }
 
-  def processPlan(plan: DataflowPlan): DataflowPlan = {
-    for(s <- plan.sourceNodes) {
-      var source = s
-      for(rule <- rules) {
-        val rewriter = bottomup (attempt (rule))
-        source = rewrite (rewriter) (source)
-      }
-    }
-    plan
-  }
-
   def processSink(sink: PigOperator): PigOperator = {
     val strat = rules.reduce((x: Strategy, y: Strategy) => ior(x, y))
     val rewriter = bottomup( attempt (strat))
