@@ -22,7 +22,7 @@ import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
 object Rewriter {
-  private var rules: Array[Strategy] = Array()
+  private var strategy = fail
 
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
    *
@@ -30,7 +30,7 @@ object Rewriter {
    * @param s The new strategy.
    */
   def addStrategy(s: Strategy) = {
-    rules = rules :+ s
+    strategy = ior(strategy, s)
   }
 
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
@@ -40,8 +40,7 @@ object Rewriter {
    * @return The rewritten sink node.
    */
   def processSink(sink: PigOperator): PigOperator = {
-    val strat = rules.reduce((x: Strategy, y: Strategy) => ior(x, y))
-    val rewriter = bottomup( attempt (strat))
+    val rewriter = bottomup( attempt (strategy))
     rewrite(rewriter)(sink)
   }
 
