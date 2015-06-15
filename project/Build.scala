@@ -7,14 +7,14 @@ object PigBuild extends Build {
 
   val flinkSettings = Map(
     "name"  -> "flink",
-    "runClass" -> "dbis.pig.FlinkRun",
+    "runClass" -> "dbis.pig.tools.FlinkRun",
 //    "compilerClass" -> "dbis.pig.FlinkCompile",
     "templateFile" -> "flink-template.stg"//"src/main/resources/flink-template.stg"
   )
 
   val sparkSettings = Map(
     "name"  -> "spark",
-    "runClass" -> "dbis.pig.SparkRun",
+    "runClass" -> "dbis.pig.tools.SparkRun",
 //    "compilerClass" -> "dbis.pig.SparkCompile",
     "templateFile" -> "spark-template.stg"//"src/main/resources/spark-template.stg"
   )
