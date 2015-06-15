@@ -44,6 +44,12 @@ object Rewriter {
     rewrite(rewriter)(sink)
   }
 
+  /** Merges two [[dbis.pig.op.Filter]] operations if one is the only input of the other.
+   *
+   * @param pigOperator A [[dbis.pig.op.Filter]] operator whose only input is another Filter.
+   * @return On success, an Option containing a new [[dbis.pig.op.Filter]] operator with the predicates of both input
+   *         Filters, None otherwise.
+   */
   private def mergeFilters(pigOperator: Any): Option[Filter] = pigOperator match {
     case f1 @ Filter(out, _, predicate) =>
       f1.inputs match {
@@ -60,6 +66,12 @@ object Rewriter {
     case _ => None
   }
 
+  /** Puts [[dbis.pig.op.Filter]] operators before [[dbis.pig.op.OrderBy]] ones.
+   *
+   * @param pigOperator A [[dbis.pig.op.Filter]] operator whose only input is a [[dbis.pig.op.OrderBy]] operator.
+   * @return On success, an Option containing a new [[dbis.pig.op.OrderBy]] operators whose input is the
+   *         [[dbis.pig.op.Filter]] passed into this method, None otherwise.
+   */
   private def filterBeforeOrder(pigOperator: Any): Option[OrderBy] = pigOperator match {
     case f @ Filter(out, in, predicate) =>
       f.inputs match {
