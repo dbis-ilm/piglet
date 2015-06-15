@@ -63,4 +63,24 @@ class RewriterSpec extends FlatSpec with Matchers{
     val rewrittenSink = processSink(sink)
     rewrittenSink.inputs should equal (sinkReordered.inputs)
   }
+
+  it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
+    val op1 = Load("a", "file.csv")
+    val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = Filter("b", "a", predicate)
+    val op3 = Dump("b")
+    val op4 = OrderBy("c", "b", List())
+    val op5 = Dump("c")
+    val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
+
+    val newPlan = processPlan(plan)
+    // Check that for each operator all operators in its input list are sorted before it in the operator list
+    for (op <- newPlan.operators) {
+      val currentIndex = newPlan.operators.indexOf(op)
+      for (input <- op.inputs.map(_.producer)) {
+        val inputIndex = newPlan.operators.indexOf(input)
+        assert(currentIndex > inputIndex)
+      }
+    }
+  }
 }

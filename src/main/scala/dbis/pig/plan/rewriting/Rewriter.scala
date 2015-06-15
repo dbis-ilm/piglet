@@ -16,10 +16,12 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{OrderBy, And, Filter, PigOperator}
-import dbis.pig.plan.Pipe
+import dbis.pig.op.{And, Filter, OrderBy, PigOperator}
+import dbis.pig.plan.{DataflowPlan, Pipe}
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
+
+import scala.collection.mutable.LinkedHashSet
 
 object Rewriter {
   private var strategy = fail
@@ -42,6 +44,51 @@ object Rewriter {
   def processSink(sink: PigOperator): PigOperator = {
     val rewriter = bottomup( attempt (strategy))
     rewrite(rewriter)(sink)
+  }
+
+  /** Apply all rewriting rules of this Rewriter to a [[dbis.pig.plan.DataflowPlan]].
+    *
+    * @param plan
+    * @return A rewritten [[dbis.pig.plan.DataflowPlan]]
+    */
+  def processPlan(plan: DataflowPlan): DataflowPlan = {
+    // This looks innocent, but this is where the rewriting happens.
+    val newSinks = plan.sinkNodes.map(processSink)
+
+    var newPlanNodes = LinkedHashSet[PigOperator]() ++= newSinks
+    var nodesToProcess = newSinks.toList
+
+    // We can't modify nodesToProcess while iterating over it. Therefore we'll iterate over a copy of it as long as
+    // it contains elements.
+    while (nodesToProcess.length > 0) {
+      val iter = nodesToProcess.iterator
+      nodesToProcess = List[PigOperator]()
+      for (sink <- iter) {
+        // newPlanNodes might already contain this PigOperator, but we encountered it again. Remove it to later add it
+        // again, thereby "pushing" it to an earlier position in the new plans list of operators because a
+        // LinkedHashSet iterates over the elements in the order of insertion and we later *reverse* the the whole
+        // thing, so PigOperators inserted later get emitted first.
+        // This is to make sure that that sink is emitted before all other operators that need its data.
+        newPlanNodes -= sink
+        // And remove its inputs as well to revisit them later on.
+        newPlanNodes --= sink.inputs.map(_.producer)
+
+        newPlanNodes += sink
+        for (input <- sink.inputs) {
+          val producer = input.producer
+          // We've found a new node - it needs to be included in the new plan, so add it to the new plans nodes.
+          newPlanNodes += producer
+          // And we need to process its input nodes in the future.
+          // If we already processed a nodes input, they'll be removed again and put at the head of the new plans list
+          // of operators.
+          nodesToProcess ++= producer.inputs.map(_.producer)
+        }
+      }
+    }
+
+    var newPlan = new DataflowPlan(newPlanNodes.toList.reverse)
+    newPlan.additionalJars ++= plan.additionalJars
+    newPlan
   }
 
   /** Merges two [[dbis.pig.op.Filter]] operations if one is the only input of the other.
