@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{And, Filter, PigOperator}
+import dbis.pig.op.{OrderBy, And, Filter, PigOperator}
 import dbis.pig.plan.Pipe
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
@@ -60,5 +60,24 @@ object Rewriter {
     case _ => None
   }
 
+  private def filterBeforeOrder(pigOperator: Any): Option[OrderBy] = pigOperator match {
+    case f @ Filter(out, in, predicate) =>
+      f.inputs match {
+        case List((Pipe(_, order @ OrderBy(out2, in2, orderSpec)))) =>
+          // Reorder the operations and swap their input and output names
+          val newOrder = order.copy(out, in, orderSpec)
+          val newFilter = f.copy(out2, in2, predicate)
+
+          newOrder.inputs = List(Pipe(in, newFilter))
+
+          newFilter.inputs = order.inputs
+
+          Some(newOrder)
+        case _ => None
+      }
+    case _ => None
+  }
+
   addStrategy(strategyf(t => mergeFilters(t)))
+  addStrategy(strategyf(t => filterBeforeOrder(t)))
 }

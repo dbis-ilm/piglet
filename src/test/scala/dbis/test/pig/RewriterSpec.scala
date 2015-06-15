@@ -40,4 +40,27 @@ class RewriterSpec extends FlatSpec with Matchers{
     val rewrittenSink = processSink(sink)
     rewrittenSink.inputs should equal (sinkMerged.inputs)
   }
+
+  it should "order Filter operations before Order By ones" in {
+    val op1 = Load("a", "file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op2 = OrderBy("b", "a", List())
+    val op3 = Filter("c", "b", predicate1)
+    val op4 = Dump("c")
+
+    // ops after reordering
+    val op2_2 = Filter("b", "a", predicate1)
+    val op3_2 = OrderBy("c", "b", List())
+    val op4_2 = op4.copy()
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val planReordered = new DataflowPlan(List(op1, op2_2, op3_2, op4_2))
+    val sink = plan.sinkNodes.head
+    val sinkReordered = planReordered.sinkNodes.head
+
+    val rewrittenSink = processSink(sink)
+    rewrittenSink.inputs should equal (sinkReordered.inputs)
+  }
 }
