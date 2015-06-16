@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan
 
-import dbis.pig.op.{Register, PigOperator}
+import dbis.pig.op._
 import dbis.pig.schema.SchemaException
 
 import scala.collection.mutable.{ListBuffer, Map}
@@ -65,11 +65,11 @@ class DataflowPlan(var operators: List[PigOperator]) {
      */
     try {
       planOps.foreach(op => {
+        // println("op: " + op)
         op.output = if (op.initialOutPipeName != "") pipes.get(op.initialOutPipeName) else None
         op.inputs = op.initialInPipeNames.map(p => pipes(p))
+        op.preparePlan
         op.constructSchema
-
-        // println("op: " + op)
       })
     }
     catch {

@@ -52,6 +52,8 @@ abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNam
 
   def inputSchema =   if (inputs.nonEmpty) inputs.head.producer.schema else None
 
+  def preparePlan: Unit = {}
+
   /**
    * Constructs the output schema of this operator based on the input + the semantics of the operator.
    * The default implementation is to simply take over the schema of the input operator.

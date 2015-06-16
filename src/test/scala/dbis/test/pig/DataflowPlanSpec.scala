@@ -308,6 +308,18 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
+  it should "process a nested FOREACH statement with multiple statements" in {
+    val ops = parseScript(
+      """daily = load 'data.csv' as (exchange, symbol);
+        |grpd  = group daily by exchange;
+        |uniqcnt  = foreach grpd {
+        |           sym      = daily.symbol;
+        |           uniq_sym = distinct sym;
+        |           generate group, COUNT(uniq_sym);
+        |};""".stripMargin)
+    val plan = new DataflowPlan(ops)
+  }
+
   it should "be consistent after adding a new operator using insertAfter" in {
     val plan = new DataflowPlan(parseScript("""
          |a = load 'file.csv';

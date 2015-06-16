@@ -24,11 +24,33 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 
 
+/**
+ * A trait for the GENERATE part of a FOREACH operator.
+ */
 trait ForeachGenerator {}
 
+/**
+ * GeneratorExpr represents a single expression of a Generator.
+ *
+ * @param expr
+ * @param alias
+ */
 case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None)
+
+/**
+ * GeneratorList implements the ForeachGenerator trait and is used to represent
+ * the FOREACH ... GENERATE operator.
+ *
+ * @param exprs
+ */
 case class GeneratorList(exprs: List[GeneratorExpr]) extends ForeachGenerator
 
+/**
+ * GeneratorPlan implements the ForeachGenerator trait and is used to represent
+ * a nested FOREACH.
+ *
+ * @param subPlan
+ */
 case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
 
 /**
@@ -40,6 +62,25 @@ case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
  */
 case class Foreach(override val initialOutPipeName: String, initialInPipeName: String, generator: ForeachGenerator)
   extends PigOperator(initialOutPipeName, initialInPipeName) {
+
+  var subPlan: Option[DataflowPlan] = None
+
+  override def preparePlan: Unit = {
+    /*
+     * TODO: nested foreach require special handling
+     * a) we have to add an input pipe
+     * b) the final generate operator doesn't need an input pipe
+     * c) we construct a subplan for the operator list
+     */
+    generator match {
+      case GeneratorPlan(opList) => {
+        // TODO:
+        // println("----> generate subplan: " + opList)
+        subPlan = Some(new DataflowPlan(opList))
+      }
+      case _ => {}
+    }
+  }
 
   override def constructSchema: Option[Schema] = {
     generator match {
@@ -66,7 +107,7 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
         schema = Some(new Schema(new BagType("", new TupleType("", fields))))
       }
       case GeneratorPlan(plan) => {
-        // TODO
+        // TODO: implement constructSchema for nested foreach
       }
     }
     schema
@@ -84,7 +125,7 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
           expr.map(_.expr.traverse(null, Expr.containsNoNamedFields)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
         }
       }
-      case GeneratorPlan(plan) => false // TODO
+      case GeneratorPlan(plan) => false // TODO: implement checkSchemaConformance for nested foreach
     }
   }
 
@@ -96,7 +137,7 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
   override def lineageString: String = {
     generator match {
       case GeneratorList(expr) => s"""FOREACH%${expr}%""" + super.lineageString
-      case GeneratorPlan(plan) => s"""FOREACH""" + super.lineageString // TODO
+      case GeneratorPlan(plan) => s"""FOREACH""" + super.lineageString // TODO: implement lineageString for nested foreach
     }
   }
 }
@@ -106,8 +147,8 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
  *
  * @param exprs list of generator expressions
  */
-case class Generate(exprs: List[GeneratorExpr]) extends PigOperator("", "") {
-  // TODO
+case class Generate(exprs: List[GeneratorExpr]) extends PigOperator("") {
+  // TODO: what do we need here?
 }
 
 /**
@@ -117,6 +158,6 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator("", "") {
  *                           can be changed later.
  * @param refExpr a reference referring to an expression constructing a relation (bag).
  */
-case class ConstructBag(override val initialOutPipeName: String, refExpr: Ref) extends PigOperator (initialOutPipeName, "") {
-  // TODO
+case class ConstructBag(override val initialOutPipeName: String, refExpr: Ref) extends PigOperator (initialOutPipeName) {
+  // TODO: what do we need here?
 }
