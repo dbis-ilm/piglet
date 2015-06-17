@@ -174,6 +174,11 @@ class PigParser extends JavaTokenParsers {
   lazy val toKeyword = "to".ignoreCase
   lazy val zmqSubscriberKeyword = "zmq_subscriber".ignoreCase
   lazy val zmqPublisherKeyword = "zmq_publisher".ignoreCase
+  lazy val windowKeyword = "window".ignoreCase
+  lazy val rowsKeyword = "rows".ignoreCase
+  lazy val rangeKeyword = "range".ignoreCase
+  lazy val slideKeyword = "slide".ignoreCase
+
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
    */
@@ -284,6 +289,20 @@ class PigParser extends JavaTokenParsers {
   def limitStmt: Parser[PigOperator] = bag ~ "=" ~ limitKeyword ~ bag ~ num ^^ { case out ~ _ ~ _ ~ in ~ num => Limit(out, in, num) }
 
   /*
+   * <A> = WINDOW <B> ROWS  <Num> SLIDE ROWS <Num>
+   * <A> = WINDOW <B> ROWS  <Num> SLIDE RANGE <Num> <Unit>
+   * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE ROWS <Num>
+   * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE RANGE <Num> <Unit>
+   */
+  def timeUnit: Parser[String] = ("seconds".ignoreCase | "minutes".ignoreCase)
+  def rangeParam: Parser[Tuple2[Int,String]] = rangeKeyword ~ num ~ timeUnit ^^ {case _ ~ n ~ u => (n,u)}
+  def rowsParam: Parser[Tuple2[Int,String]] = rowsKeyword ~ num ^^ {case _ ~ n => (n, "")}
+  def windowParam: Parser[Tuple2[Int,String]] = (rangeParam | rowsParam)
+  def windowStmt: Parser[PigOperator] = bag ~ "=" ~ windowKeyword ~ bag ~ windowParam ~ slideKeyword ~ windowParam ^^ {
+    case out ~ _ ~ _ ~ in ~ on ~ _ ~ slide => Window(out, in, on, slide)
+  }
+
+  /*
    * <A> = JOIN <B> BY <Ref>, <C> BY <Ref>, ...
    * <A> = JOIN <B> BY ( <ListOfRefs> ), <C> BY ( <ListOfRefs>), ...
    */
@@ -353,7 +372,7 @@ class PigParser extends JavaTokenParsers {
   }
 
   /*
-   * <A> = ZMQ_SUBSCRIBER <address> [ AS <Schema> ]
+   * <A> = ZMQ_SUBSCRIBER '<address>' [ AS <Schema> ]
    */
   def ipMember: Parser[String] = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)".r 
   def ipv4: Parser[String] = ipMember ~ "." ~ ipMember ~ "." ~ ipMember ~ "." ~ ipMember ^^{
@@ -385,7 +404,7 @@ class PigParser extends JavaTokenParsers {
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    zmqSubscriberStmt | zmqPublisherStmt) ~ ";" ^^ {
+    zmqSubscriberStmt | zmqPublisherStmt | windowStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*

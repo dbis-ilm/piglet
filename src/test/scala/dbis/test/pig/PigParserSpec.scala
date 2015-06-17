@@ -338,4 +338,12 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("zmq_publisher a to 'tcp://127.0.0.1:5555';") == List(ZmqPublisher("a", "tcp://127.0.0.1:5555")))
   }
 
+  it should "parse a window statement using Rows for window and slider" in {
+    assert(parseScript("a = window b rows 100 slide rows 10;") == List(Window("a", "b", (100,""), (10,""))))
+  }
+ 
+  it should "parse a window statement using Range for window and slider" in {
+    assert(parseScript("a = window b range 100 seconds slide range 10 seconds;") == List(Window("a", "b", (100,"seconds"), (10,"seconds"))))
+  }
+
 }

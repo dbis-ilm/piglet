@@ -67,6 +67,23 @@ limit(out,in,num) ::=<<
         val <out> = <in>.window(Count.of(<num>)).every(Time.of(5, TimeUnit.SECONDS))
 >>
 
+// ------------------ Passes Stream through a Window Operator -----------------
+window(out,in,window,wUnit,slider,sUnit) ::=<<
+<if (wUnit)>
+    <if (sUnit)>
+        val <out> = <in>.window(Time.of(<window>, TimeUnit.<wUnit>)).every(Time.of(<slider>, TimeUnit.<sUnit>))
+    <else>
+        val <out> = <in>.window(Time.of(<window>, TimeUnit.<wUnit>)).every(Count.of(<slider>))
+    <endif>
+<else>
+    <if (sUnit)>
+        val <out> = <in>.window(Count.of(<window>)).every(Time.of(<slider>, TimeUnit.<sUnit>))
+    <else>
+        val <out> = <in>.window(Count.of(<window>)).every(Count.of(<slider>))
+    <endif>
+<endif>
+>>
+
 // ------------------ Joins two streams on the specified keys -----------------
 join(out,rel1,key1,rel2,key2) ::=<<
         val <out> = <rel1><rel2,key2:{ r,k |<\\>
@@ -88,7 +105,7 @@ zmqSubscriber(out,addr,schema) ::=<<
 
 // ------------------ Publish to a socket with ZMQ ----------------------------
 zmqPublisher(in,addr) ::=<<
-        <in>.addSink(new ZmqPublisher("<addr>"))
+        <in>.addSink(new ZmqPublisher("<addr>")).setParallelism(1)
 >>
 
 // ----------------- END of the code implementing the query -------------------
