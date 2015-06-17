@@ -7,7 +7,7 @@ lazy val commonSettings = Seq(
 )
 
 // scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
-
+testOptions in IntegrationTest += Tests.Argument("-oDF")
 
 /*  
  * define the backend for the compiler: currently we support spark and flink
@@ -22,12 +22,6 @@ backends := (backendEnv match {
   case "sparkflink" => flinksparkBackend
   case _            => throw new Exception(s"Backend $backendEnv not available")
 })  
-
-/*
- * For testing:
- */
-lazy val print = taskKey[Unit]("Print out")
-print := println(backends.value.get("default").get("name"))
 
 /*
  * Main Project
