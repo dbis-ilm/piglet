@@ -14,22 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.test.pig
+package dbis.pig.plan
 
-import dbis.pig._
-import dbis.pig.op._
-import dbis.pig.schema._
-import org.scalatest.{FlatSpec, Matchers}
+import dbis.pig.op.PigOperator
 
-import org.ddahl.jvmr.RInScala
-
-class RIntegrationSpec extends FlatSpec with Matchers {
-  "The R integration" should "allow to invoke a R script" in {
-    val R = RInScala()
-    R.x = Array(10.0, 20.0, 30.0)
-    R.y = Array(5.0, 6.0, 7.0)
-    R.eval("res <- x + y")
-    val res = R.toVector[Double]("res")
-    res should be (Array(15.0, 26.0, 37.0))
+object PrettyPrinter extends org.kiama.output.PrettyPrinter{
+  def pretty(op: PigOperator): String = {
+    super.pretty(show(op))
   }
+
+  def show(op: PigOperator): Doc = {
+    val prettyInputs = op.inputs.map(p => show(p.producer)).toList
+    parens (
+      value(op)
+      <> nest(
+        line
+        <> ssep(prettyInputs, line)))
+  }
+
+  def show(p: List[PigOperator]): Doc = any(p)
 }
