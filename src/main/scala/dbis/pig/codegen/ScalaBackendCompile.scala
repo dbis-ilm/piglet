@@ -94,11 +94,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   def quote(s: String): String = s.replace('\'', '"')
 
   def emitLoader(out: String, file: String, loaderFunc: String, loaderParams: List[String]): String = {
+    val path = if(file.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
     if (loaderFunc == "")
-      callST("loader", Map("out"->out,"file"->file))
+      callST("loader", Map("out"->out,"file"->(path + file)))
     else {
       val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams/*.map(quote(_))*/.mkString(",") else ""
-      callST("loader", Map("out"->out,"file"->file,"func"->loaderFunc,"params"->params))
+      callST("loader", Map("out"->out,"file"->(path + file),"func"->loaderFunc,"params"->params))
     }
   }
 
@@ -207,7 +208,10 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out, file, func, params)
       case Dump(in) => callST("dump", Map("in"->in.head)) 
-      case Store(in, file) => callST("store", Map("in"->in.head,"file"->file,"schema"->listToTuple(node.schema)))
+      case Store(in, file) => {
+        val path = if(file.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
+        callST("store", Map("in"->in.head,"file"->(path + file),"schema"->listToTuple(node.schema)))
+    }
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in.head,"pred"->emitPredicate(node.schema, pred)))
       case Foreach(out, in, expr) => callST("foreach", Map("out"->out,"in"->in.head,"expr"->emitGenerator(node.inputSchema, expr)))

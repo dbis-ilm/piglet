@@ -49,7 +49,8 @@ class FlinkCompileSpec extends FlatSpec {
     val op = Load("a", "file.csv")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = env.readTextFile("file.csv").map(s => List(s))""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val expectedCode = cleanString(s"""val a = env.readTextFile("${file}").map(s => List(s))""")
     assert(generatedCode == expectedCode)
   }
 
@@ -57,7 +58,8 @@ class FlinkCompileSpec extends FlatSpec {
     val op = Load("a", "file.csv", Option(Schema(BagType("",TupleType("",Array(Field("a1"),Field("a2"),Field("a3")))))), "PigStorage", List("\",\""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStorage().load(env, "file.csv", ",")""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ",")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -65,7 +67,8 @@ class FlinkCompileSpec extends FlatSpec {
     val op = Load("a", "file.n3", None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = RDFFileStorage().load(env, "file.n3")""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -89,7 +92,8 @@ class FlinkCompileSpec extends FlatSpec {
     val op = Store("a", "file.csv")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""a.map(_.mkString(",")).writeAsText("file.csv")""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val expectedCode = cleanString(s"""a.map(_.mkString(",")).writeAsText("${file}")""")
     assert(generatedCode == expectedCode)
   }
 
