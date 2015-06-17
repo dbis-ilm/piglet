@@ -14,7 +14,7 @@ object PigBuild extends Build {
 
   val sparkSettings = Map(
     "name"  -> "spark",
-    "runClass" -> "dbis.pig.tools.SparkRun",
+    "runClass" -> "dbis.pig.SparkRun",
 //    "compilerClass" -> "dbis.pig.SparkCompile",
     "templateFile" -> "spark-template.stg"//"src/main/resources/spark-template.stg"
   )
