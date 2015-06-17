@@ -53,7 +53,8 @@ class SparkCompileSpec extends FlatSpec {
     val op = Load("a", "file.csv")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = sc.textFile("file.csv").map(s => List(s))""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val expectedCode = cleanString(s"""val a = sc.textFile("${file}").map(s => List(s))""")
     assert(generatedCode == expectedCode)
   }
 
@@ -61,7 +62,8 @@ class SparkCompileSpec extends FlatSpec {
     val op = Load("a", "file.csv", None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStorage().load(sc, "file.csv", ',')""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
@@ -69,7 +71,8 @@ class SparkCompileSpec extends FlatSpec {
     val op = Load("a", "file.n3", None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = RDFFileStorage().load(sc, "file.n3")""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -93,7 +96,8 @@ class SparkCompileSpec extends FlatSpec {
     val op = Store("a", "file.csv")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""a.map(t => t(0)).coalesce(1, true).saveAsTextFile("file.csv")""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val expectedCode = cleanString(s"""a.map(t => t(0)).coalesce(1, true).saveAsTextFile("${file}")""")
     assert(generatedCode == expectedCode)
   }
 

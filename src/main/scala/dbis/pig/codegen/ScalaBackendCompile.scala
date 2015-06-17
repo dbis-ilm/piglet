@@ -225,7 +225,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       case Union(out, rels) => callST("union", Map("out"->out,"in"->rels.head,"others"->rels.tail)) 
       case Sample(out, in, expr) => callST("sample", Map("out"->out,"in"->in.head,"expr"->emitExpr(node.schema, expr)))
       case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out,"in"->in.head,
-        "key"->emitSortKey(node.schema, orderSpec, out, in),"asc"->ascendingSortOrder(orderSpec.head)))
+        "key"->emitSortKey(node.schema, orderSpec, out, in),"asc"->ascendingSortOrder(orderSpec.head).toString))
       case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out,"op"->op,"in"->in,
         "params"->emitParamList(node.schema, params)))
       case ZmqSubscriber(out, address, schema) => callST("zmqSubscriber", Map("out"->out,"addr"->address,"schema"->schema))
