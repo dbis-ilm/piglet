@@ -77,7 +77,7 @@ object Dependencies {
   lazy val flinkVersion =       "0.9-SNAPSHOT"
   lazy val scoptVersion =       "3.3.0"
   lazy val scalastiVersion =    "2.0.0"
-  lazy val zeromqVersion =      "0.0.7"
+  lazy val jeromqVersion =      "0.3.4"
 
   // Libraries
   val scalaCompiler = "org.scala-lang" % "scala-compiler" % scalaVersion
@@ -90,7 +90,7 @@ object Dependencies {
   val flinkDist = "org.apache.flink" %% "flink-dist" % flinkVersion
   val scopt = "com.github.scopt" %% "scopt" % scoptVersion
   val scalasti = "org.clapper" %% "scalasti" % scalastiVersion
-  val zeromq = "org.zeromq" % "zeromq-scala-binding_2.11.0-M3" % zeromqVersion
+  val jeromq = "org.zeromq" % "jeromq" % jeromqVersion //"org.zeromq" % "zeromq-scala-binding_2.11.0-M3" % zeromqVersion
 
   // Projects
   val rootDeps = Seq(
@@ -111,7 +111,7 @@ object Dependencies {
   val flinkDeps = Seq(
     scalaTest % "test" withSources(),
     scalaCompiler,
-    zeromq,
+    jeromq,
     flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
   )
 }
