@@ -40,33 +40,48 @@ class DataflowPlan(var operators: List[PigOperator]) {
   def constructPlan(ops: List[PigOperator]) : Unit = {
     def unquote(s: String): String = s.substring(1, s.length - 1)
 
-    var pipes: Map[String, Pipe] = Map[String, Pipe]()
+    // This maps a String (the relations name, a string) to the single operator that writes it and the list of
+    // operators that read it.
+    val pipes: Map[String, (PigOperator, List[PigOperator])] = Map[String, (PigOperator, List[PigOperator])]()
 
     /*
-     * 0. we remove all Register operators: they are just pseudo-operators.
+     * 0. We remove all Register operators: they are just pseudo-operators.
      *    Instead, we add their arguments to the additionalJars list
      */
     ops.filter(_.isInstanceOf[Register]).foreach(op => additionalJars += unquote(op.asInstanceOf[Register].jarFile))
     val planOps = ops.filterNot(_.isInstanceOf[Register])
 
     /*
-     * 1. we create pipes for all outPipeNames and make sure they are unique
+     * 1. We create the mapping from names to the operators that *write* them.
      */
     planOps.foreach(op => {
       if (op.initialOutPipeName != "") {
         if (pipes.contains(op.initialOutPipeName))
           throw new InvalidPlanException("duplicate pipe: " + op.initialOutPipeName)
-        pipes(op.initialOutPipeName) = Pipe(op.initialOutPipeName, op)
+        pipes(op.initialOutPipeName) = (op, List())
+      }
+    })
+
+    /*
+     * 2. We add operators that *read* a name to the mapping
+     */
+    planOps.foreach(op => {
+      if (op.initialInPipeNames.nonEmpty) {
+        for (inPipeName <- op.initialInPipeNames) {
+          val element = pipes(inPipeName)
+          pipes(inPipeName) = element.copy(_2 = element._2 :+ op)
+        }
       }
     })
     /*
-     * 2. we assign the pipe objects to the input and output pipes of all operators
+     * 3. We assign the pipe objects to the input and output pipes of all operators
      *    based on their names
      */
     try {
       planOps.foreach(op => {
-        op.output = if (op.initialOutPipeName != "") pipes.get(op.initialOutPipeName) else None
-        op.inputs = op.initialInPipeNames.map(p => pipes(p))
+        op.inputs = op.initialInPipeNames.map(p => Pipe(p, pipes(p)._1))
+        op.output = if (op.initialOutPipeName != "") Some(op.initialOutPipeName) else None
+        op.outputs = if (op.initialOutPipeName != "") pipes(op.initialOutPipeName)._2 else op.outputs
         op.constructSchema
 
         // println("op: " + op)
@@ -78,7 +93,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
     operators = planOps
   }
 
-  def sinkNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.output.isEmpty).toSet[PigOperator]
+  def sinkNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.outputs.isEmpty).toSet[PigOperator]
   
   def sourceNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.inputs.isEmpty).toSet[PigOperator]
 
