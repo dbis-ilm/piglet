@@ -97,13 +97,14 @@ object PigCompiler extends PigParser {
     // 3. now, we should apply optimizations
     plan = processPlan(plan)
 
-
     if (FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend)) {
       val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
 
-      // 4. and finally deploy/submit
-      val runner = FileTools.getRunner(backend)
-      runner.execute(master, scriptName, jarFile)
+      if (!compileOnly) {
+        // 4. and finally deploy/submit
+        val runner = FileTools.getRunner(backend)
+        runner.execute(master, scriptName, jarFile)
+      }
     }
   }
 

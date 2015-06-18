@@ -125,7 +125,7 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
           expr.map(_.expr.traverse(null, Expr.containsNoNamedFields)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
         }
       }
-      case GeneratorPlan(plan) => false // TODO: implement checkSchemaConformance for nested foreach
+      case GeneratorPlan(plan) => true // TODO: implement checkSchemaConformance for nested foreach
     }
   }
 
