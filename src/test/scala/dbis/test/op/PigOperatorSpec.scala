@@ -36,6 +36,16 @@ class PigOperatorSpec extends FlatSpec with Matchers {
     }
   }
 
+  it should "not allow unsetting its output relation if it has outputs" in {
+    val op = Limit("b", "a", 5)
+    val op2 = Limit("c", "b", 3)
+    op.output = Some("b")
+    op.outputs = List(op2)
+    intercept[IllegalStateException] {
+      op.output = None
+    }
+  }
+
   it should "not allow updating its outputs if it doesn't return a relation" in {
     val op = Store("a", "foo.csv")
     val op2 = Limit("a", "b", 5)
@@ -49,6 +59,15 @@ class PigOperatorSpec extends FlatSpec with Matchers {
     op.output = Some("b")
     val op2 = Limit("c", "b", 3)
     op.outputs = List(op2)
+  }
+
+  it should "not allow updating its outputs if the new ones don't read from it" in {
+    val op = Limit("b", "a", 5)
+    op.output = Some("b")
+    val op2 = Limit("d", "c", 3)
+    intercept[IllegalArgumentException] {
+      op.outputs = List(op2)
+    }
   }
 
   it should "allow unsetting its outputs" in {

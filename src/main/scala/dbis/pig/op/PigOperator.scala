@@ -42,6 +42,7 @@ Option[Schema]) extends Rewritable{
   private var _output: Option[String] = None
   def output = _output
 
+  @throws[IllegalStateException]("if an output name is going to be unset, but there are outputs")
   @throws[IllegalArgumentException]("if any of the existing outputs doesn't read from the new name")
   def output_=(newOutput: Option[String]) = _outputs match {
     case Nil => _output = newOutput
@@ -56,7 +57,7 @@ Option[Schema]) extends Rewritable{
           _output = newOutput
         }
         case None => {
-          _output = newOutput
+          throw new IllegalStateException("Can't unset the relation name of an operator with outputs")
         }
       }
     }
