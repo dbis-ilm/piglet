@@ -255,13 +255,12 @@ class SparkCompileSpec extends FlatSpec {
     val plan = new DataflowPlan(ops)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("uniqcnt").get))
-    println("---> " + generatedCode)
-    /*
-    val expectedCode = cleanString("""
-        ||val a = b.map(t => List(t(0).asInstanceOf[List[Any]](1),t(2).asInstanceOf[List[Any]](0)))""".stripMargin)
+
+    val expectedCode = cleanString(
+      """val uniqcnt = grpd.map(t => { val sym = t(1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]](1))
+        |val uniq_sym = sym.distinct ( List(t(0),PigFuncs.count(uniq_sym.asInstanceOf[Seq[Any]])) )})""".stripMargin)
 
     assert(generatedCode == expectedCode)
-    */
   }
 
   it should "contain code for a union operator on two relations" in {
