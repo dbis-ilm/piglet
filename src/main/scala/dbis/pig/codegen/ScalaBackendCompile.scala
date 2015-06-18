@@ -73,7 +73,6 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         else {
           if (requiresTypeCast) {
             val field = s.field(idx)
-            println("field -> " + field + " - " + field.fType)
             val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
             s"${tuplePrefix}(${idx}).to${typeCast}"
           }
@@ -141,7 +140,6 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         val udf = funcTable(f)
         // TODO: check size of params
         if (udf.isAggregate) {
-          println("params.head -->" + params.head)
           s"${udf.name}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
         }
         else
@@ -239,7 +237,6 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     "{\n" + plan.operators.map {
       case Generate(expr) => s"""( ${emitGenerator(schema, expr)} )"""
       case ConstructBag(out, ref) => ref match {
-          // TODO: 1 ersetzen
         case DerefTuple(r1, r2) => {
           val p1 = findFieldPosition(schema, r1)
           val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
@@ -261,7 +258,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out, file, func, params)
       case Dump(in) => callST("dump", Map("in"->in))
-      case Store(in, file) => callST("store", Map("in"->in.head,"file"->file,"schema"->listToTuple(node.schema)))
+      case Store(in, file) => callST("store", Map("in"->in,"file"->file,"schema"->listToTuple(node.schema)))
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(node.schema, pred)))
       case Foreach(out, in, gen) => {

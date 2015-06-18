@@ -20,7 +20,7 @@
  */
 package dbis.pig.op
 
-import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.{InvalidPlanException, DataflowPlan}
 import dbis.pig.schema._
 
 
@@ -66,25 +66,40 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
   var subPlan: Option[DataflowPlan] = None
 
   override def preparePlan: Unit = {
-    /*
-     * TODO: nested foreach require special handling
-     * a) we have to add an input pipe
-     * b) the final generate operator doesn't need an input pipe
-     * c) we construct a subplan for the operator list
-     */
+    // nested foreach require special handling: we construct a subplan for the operator list
     generator match {
       case GeneratorPlan(opList) => {
-        // TODO:
-        // println("----> generate subplan: " + opList)
         subPlan = Some(new DataflowPlan(opList))
       }
       case _ => {}
     }
   }
 
+  def constructFieldList(exprs: List[GeneratorExpr]): Array[Field] =
+    exprs.map(e => {
+      e.alias match {
+        // if we have an explicit schema (i.e. a field) then we use it
+        case Some(f) => {
+          if (f.fType == Types.ByteArrayType) {
+            // if the type was only bytearray, we should check the expression if we have a more
+            // specific type
+            val res = e.expr.resultType(inputSchema)
+            Field(f.name, res._2)
+          }
+          else
+            f
+        }
+        // otherwise we take the field name from the expression and
+        // the input schema
+        case None => val res = e.expr.resultType(inputSchema); Field(res._1, res._2)
+      }
+    }).toArray
+
   override def constructSchema: Option[Schema] = {
     generator match {
       case GeneratorList(expr) => {
+        val fields = constructFieldList(expr)
+      /*{
         // we create a bag of tuples containing fields for each expression in expr
         val fields = expr.map(e => {
           e.alias match {
@@ -103,11 +118,19 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
             // the input schema
             case None => val res = e.expr.resultType(inputSchema); Field(res._1, res._2)
           }
-        }).toArray
+        }).toArray*/
         schema = Some(new Schema(new BagType("", new TupleType("", fields))))
       }
       case GeneratorPlan(plan) => {
         // TODO: implement constructSchema for nested foreach
+        val genOp = plan.last
+        if (genOp.isInstanceOf[Generate]) {
+          val exprs = genOp.asInstanceOf[Generate].exprs
+          val fields = constructFieldList(exprs)
+          schema = Some(new Schema(new BagType("", new TupleType("", fields))))
+        }
+        else
+          throw new InvalidPlanException("last statement in nested foreach must be a generate")
       }
     }
     schema
