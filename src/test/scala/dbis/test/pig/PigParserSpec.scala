@@ -156,6 +156,14 @@ class PigParserSpec extends FlatSpec {
       )))))
   }
 
+  it should "parse a foreach statement with flatten" in {
+    assert(parseScript("a = foreach b generate $0, flatten($1);") ==
+      List(Foreach("a", "b", GeneratorList(List(
+        GeneratorExpr(RefExpr(PositionalField(0))),
+        GeneratorExpr(FlattenExpr(RefExpr(PositionalField(1))))
+      )))))
+  }
+
   it should "parse a foreach statement with function expressions" in {
     assert(parseScript("""a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);""") ==
       List(Foreach("a", "b", GeneratorList(List(

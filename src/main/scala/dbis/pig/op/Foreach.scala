@@ -99,30 +99,10 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
     generator match {
       case GeneratorList(expr) => {
         val fields = constructFieldList(expr)
-      /*{
-        // we create a bag of tuples containing fields for each expression in expr
-        val fields = expr.map(e => {
-          e.alias match {
-            // if we have an explicit schema (i.e. a field) then we use it
-            case Some(f) => {
-              if (f.fType == Types.ByteArrayType) {
-                // if the type was only bytearray, we should check the expression if we have a more
-                // specific type
-                val res = e.expr.resultType(inputSchema)
-                Field(f.name, res._2)
-              }
-              else
-                f
-            }
-            // otherwise we take the field name from the expression and
-            // the input schema
-            case None => val res = e.expr.resultType(inputSchema); Field(res._1, res._2)
-          }
-        }).toArray*/
+
         schema = Some(new Schema(new BagType("", new TupleType("", fields))))
       }
       case GeneratorPlan(plan) => {
-        // TODO: implement constructSchema for nested foreach
         val genOp = plan.last
         if (genOp.isInstanceOf[Generate]) {
           val exprs = genOp.asInstanceOf[Generate].exprs

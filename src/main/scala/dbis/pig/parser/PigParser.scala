@@ -108,6 +108,7 @@ class PigParser extends JavaTokenParsers {
   def factor: Parser[ArithmeticExpr] =  (
      "(" ~ castTypeSpec ~ ")" ~ refExpr ^^ { case _ ~ t ~ _ ~ e => CastExpr(t, e) }
       | "(" ~ arithmExpr ~ ")" ^^ { case _ ~ e ~ _ => e }
+       | "flatten" ~ "(" ~ refExpr ~ ")" ^^ { case _ ~ _ ~ e ~ _  => FlattenExpr(e) }
       | func
       | refExpr
     )
