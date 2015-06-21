@@ -102,7 +102,10 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   }
 
   def emitGrouping(schema: Option[Schema], groupingExpr: GroupingExpression): String = {
-    groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",")
+    if (groupingExpr.keyList.size == 1)
+      groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString
+    else
+      "(" + groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",") + ")"
   }
 
   def emitJoinKey(schema: Option[Schema], joinExpr: List[Ref]): String = {
@@ -203,6 +206,24 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       if (col == num) s"{ this.c$col compare that.c$col }"
       else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col+1, num)} else this.c$col compare that.c$col }"
 
+    /**
+     * Generates a function for producing a string representation of a tuple. This is needed because
+     * Spark's saveAsTextFile simply calls the toString method which results in "List(...)" or
+     * "CompactBuffer(...)" in the output.
+     *
+     * @param schema a schema describing the tuple structure
+     * @return the string representation
+     */
+    def genStringRepOfTuple(schema: Option[Schema]): String = schema match {
+      case Some(s) => (0 to s.fields.length-1).toList.map{ i => s.field(i).fType match {
+          // TODO: this should be processed recursively
+        case BagType(n, t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
+        case TupleType(n, f) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
+        case _ => s".append(t($i))"
+      }}.mkString("\n.append(\",\")\n")
+      case None => s".append(t(0))\n"
+    }
+
     node match {
       case OrderBy(out, in, orderSpec) => {
         val cname = s"custKey_${out}_${in}"
@@ -214,13 +235,27 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
           |  def compare(that: ${cname}) = $cmpExpr
           |}""".stripMargin
       }
+      case Store(in, file) => { s"""
+        |def tuple${in}ToString(t: List[Any]): String = {
+        |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
+        |
+        |  val sb = new StringBuilder
+        |  sb${genStringRepOfTuple(node.schema)}
+        |  sb.toString
+        |}""".stripMargin
+
+      }
       case _ => ""
     }
   }
 
   def listToTuple(schema: Option[Schema]): String = schema match {
-    case Some(s) => '"' + (0 to s.fields.length-1).toList.map(i => s"%s").mkString(",") + '"' +
-    ".format(" + (0 to s.fields.length-1).toList.map(i => s"t($i)").mkString(",") + ")" 
+    case Some(s) => '"' + (0 to s.fields.length-1).toList.map(i => if (s.field(i).isBagType) s"{%s}" else s"%s").mkString(",") + '"' +
+    ".format(" + (0 to s.fields.length-1).toList.map(i =>
+      if (s.field(i).isBagType)
+        s"""t($i).asInstanceOf[Seq[Any]].mkString(",")"""
+      else
+        s"t($i)").mkString(",") + ")"
     case None => s"t(0)"
   }
 
@@ -258,7 +293,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out, file, func, params)
       case Dump(in) => callST("dump", Map("in"->in))
-      case Store(in, file) => callST("store", Map("in"->in,"file"->file,"schema"->listToTuple(node.schema)))
+      case Store(in, file) => callST("store", Map("in"->in,"file"->file,"schema"->s"tuple${in}ToString(t)"/*listToTuple(node.schema)*/))
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(node.schema, pred)))
       case Foreach(out, in, gen) => {
@@ -307,7 +342,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
 
   def emitImport: String = callST("init_code")
 
-  def emitHeader(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
+  def emitHeader1(scriptName: String): String = callST("query_object", Map("name" -> scriptName))
+  def emitHeader2(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
 
   def emitFooter: String = callST("end_query", Map("name" -> "Starting Query"))
 

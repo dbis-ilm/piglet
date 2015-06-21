@@ -29,7 +29,10 @@ class SparkCompileSpec extends FlatSpec {
   val templateFile = "src/main/resources/spark-template.stg"
   "The compiler output" should "contain the Spark header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitImport + codeGenerator.emitHeader("test") + codeGenerator.emitFooter)
+    val generatedCode = cleanString(codeGenerator.emitImport
+      + codeGenerator.emitHeader1("test")
+      + codeGenerator.emitHeader2("test")
+      + codeGenerator.emitFooter)
 //        |import dbis.spark._
     val expectedCode = cleanString("""
         |import org.apache.spark.SparkContext
@@ -53,7 +56,7 @@ class SparkCompileSpec extends FlatSpec {
     val op = Load("a", "file.csv")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = sc.textFile("file.csv").map(s => List(s))""")
+    val expectedCode = cleanString("""val a = PigStorage().load(sc, "file.csv", '\t')""")
     assert(generatedCode == expectedCode)
   }
 
@@ -90,10 +93,10 @@ class SparkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for STORE" in {
-    val op = Store("a", "file.csv")
+    val op = Store("A", "file.csv")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""a.map(t => t(0)).coalesce(1, true).saveAsTextFile("file.csv")""")
+    val expectedCode = cleanString("""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("file.csv")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -110,6 +113,14 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.groupBy(t => {t(0)}).map{case (k,v) => List(k,v)}")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for GROUP BY with multiple keys" in {
+    val op = Grouping("aa", "bb", GroupingExpression(List(PositionalField(0), PositionalField(1))))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val aa = bb.groupBy(t => {(t(0),t(1))}).map{case (k,v) => List(k,v)}")
     assert(generatedCode == expectedCode)
   }
 
