@@ -100,6 +100,27 @@ class SparkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for the STORE helper function" in {
+    val op = Store("A", "file.csv")
+    op.schema = Some(new Schema(BagType("s", TupleType("t", Array(
+      Field("f1", Types.IntType),
+      Field("f2", BagType("b", TupleType("", Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType)))))
+    )))))
+
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitHelperClass(op))
+    val expectedCode = cleanString("""
+        |def tupleAToString(t: List[Any]): String = {
+        |implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
+        |val sb = new StringBuilder
+        |sb.append(t(0))
+        |.append(",")
+        |.append(t(1).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))
+        |sb.toString
+        |}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
   it should "contain code for GROUP BY ALL" in {
     val op = Grouping("aa", "bb", GroupingExpression(List()))
     val codeGenerator = new ScalaBackendGenCode(templateFile)

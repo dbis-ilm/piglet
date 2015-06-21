@@ -173,6 +173,8 @@ class PigParser extends JavaTokenParsers {
   lazy val andKeyword = "and".ignoreCase
   lazy val orKeyword = "or".ignoreCase
   lazy val notKeyword = "not".ignoreCase
+  lazy val splitKeyword = "split".ignoreCase
+  lazy val ifKeyword = "if".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)

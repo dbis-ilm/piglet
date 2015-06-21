@@ -6,9 +6,14 @@ import java.util.concurrent.TimeUnit
 
 <\n>
 >>
+
+// ----------------- BEGIN of code building and initializing the query --------
+query_object(name) ::= <<
+object <name> {
+>>
+
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name) ::= <<
-object <name> {
     def main(args: Array[String]) {
         val env = StreamExecutionEnvironment.getExecutionEnvironment<\n>
 >>
