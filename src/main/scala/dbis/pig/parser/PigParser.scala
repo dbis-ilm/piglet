@@ -18,6 +18,7 @@ package dbis.pig.parser
 
 import dbis.pig._
 import dbis.pig.op._
+import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 
 import scala.util.parsing.combinator.JavaTokenParsers
@@ -107,6 +108,7 @@ class PigParser extends JavaTokenParsers {
   def factor: Parser[ArithmeticExpr] =  (
      "(" ~ castTypeSpec ~ ")" ~ refExpr ^^ { case _ ~ t ~ _ ~ e => CastExpr(t, e) }
       | "(" ~ arithmExpr ~ ")" ^^ { case _ ~ e ~ _ => e }
+       | "flatten" ~ "(" ~ refExpr ~ ")" ^^ { case _ ~ _ ~ e ~ _  => FlattenExpr(e) }
       | func
       | refExpr
     )
@@ -171,6 +173,8 @@ class PigParser extends JavaTokenParsers {
   lazy val andKeyword = "and".ignoreCase
   lazy val orKeyword = "or".ignoreCase
   lazy val notKeyword = "not".ignoreCase
+  lazy val splitKeyword = "split".ignoreCase
+  lazy val ifKeyword = "if".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
@@ -239,14 +243,39 @@ class PigParser extends JavaTokenParsers {
   def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ^^ { case _ ~ b ~  _ ~ f => Store(b, f) }
 
   /*
+   * GENERATE expr1, expr2, ...
+   */
+  def generateStmt: Parser[PigOperator] = plainForeachGenerator ^^ { case g => Generate(g.asInstanceOf[GeneratorList].exprs) }
+
+  /*
+   * B = A.C;
+   */
+  def constructBagStmt: Parser[PigOperator] = bag ~ "=" ~ derefBagOrTuple ^^ { case res ~ _ ~ ref => ConstructBag(res, ref) }
+
+  /*
+   * Currently, Pig allows only DISTINCT, LIMIT, FILTER, ORDER BY + GENERATE and assignment inside FOREACH
+   */
+  def nestedStmt: Parser[PigOperator] = (distinctStmt | limitStmt | filterStmt | orderByStmt |
+    generateStmt | constructBagStmt) ~ ";" ^^ { case op ~ _  => op }
+  def nestedScript: Parser[List[PigOperator]] = rep(nestedStmt)
+
+  /*
    * <A> = FOREACH <B> GENERATE <Expr> [ AS <Schema> ]
+   * <A> = FOREACH <B> { <SubPlan> }
    */
   def exprSchema: Parser[Field] = asKeyword ~ fieldSchema ^^ { case _ ~ t => t }
   def genExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
   def generatorList: Parser[List[GeneratorExpr]] = repsep(genExpr, ",")
-  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~ generateKeyword ~ generatorList ^^ {
-    case out ~ _ ~ _ ~ in ~ _ ~ ex => Foreach(out, in, ex)
+  def plainForeachGenerator: Parser[ForeachGenerator] = generateKeyword ~ generatorList ^^ {
+    case _ ~ exList => GeneratorList(exList)
   }
+  def nestedForeachGenerator: Parser[ForeachGenerator] = "{" ~ nestedScript ~ "}" ^^ {
+    case _ ~ opList ~ _ => GeneratorPlan(opList)
+  }
+  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~
+    (plainForeachGenerator | nestedForeachGenerator) ^^ {
+      case out ~ _ ~ _ ~ in ~ ex => Foreach(out, in, ex)
+    }
 
   /*
    * <A> = FILTER <B> BY <Predicate>
@@ -351,10 +380,20 @@ class PigParser extends JavaTokenParsers {
   }
 
   /*
+   * SPLIT <A> INTO <B> IF <Cond>, <C> IF <Cond> ...
+   */
+  def splitBranch: Parser[SplitBranch] = bag ~ ifKeyword ~ logicalExpr ^^ { case out ~ _ ~ expr => SplitBranch(out, expr)}
+
+  def splitStmt: Parser[PigOperator] = splitKeyword ~ bag ~ intoKeyword ~ repsep(splitBranch, ",") ^^ {
+    case _ ~ in ~ _ ~ splitList => SplitInto(in, splitList)
+  }
+
+  /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt) ~ ";" ^^ {
+    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    splitStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*

@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan
 
-import dbis.pig.op.{Register, PigOperator}
+import dbis.pig.op._
 import dbis.pig.schema.SchemaException
 
 import scala.collection.mutable.{ListBuffer, Map}
@@ -82,9 +82,9 @@ class DataflowPlan(var operators: List[PigOperator]) {
         op.inputs = op.initialInPipeNames.map(p => Pipe(p, pipes(p)._1))
         op.output = if (op.initialOutPipeName != "") Some(op.initialOutPipeName) else None
         op.outputs = if (op.initialOutPipeName != "") pipes(op.initialOutPipeName)._2 else op.outputs
-        op.constructSchema
-
         // println("op: " + op)
+        op.preparePlan
+        op.constructSchema
       })
     }
     catch {
@@ -98,6 +98,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
   def sourceNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.inputs.isEmpty).toSet[PigOperator]
 
   def checkConnectivity: Boolean = {
+    // TODO: check connectivity of subplans in nested foreach
     // we simply construct a graph and check its connectivity
     var graph = Graph[PigOperator,DiEdge]()
     operators.foreach(op => op.inputs.foreach(p => graph += p.producer ~> op))
@@ -125,8 +126,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
   def findOperatorForAlias(s: String): Option[PigOperator] = operators.find(o => o.outPipeName == s)
 
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
-    // graph.nodes.filter(n => pred(n)).map(o => o.value.asInstanceOf[PigOperator]).toList
-
 
   /**
    * Swaps the two operators in the dataflow plan. Both operators are unary operators and have to be already
