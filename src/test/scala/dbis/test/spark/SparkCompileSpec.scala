@@ -17,7 +17,6 @@
 package dbis.test.spark
 
 import dbis.pig.PigCompiler._
-import dbis.pig._
 import dbis.pig.codegen.ScalaBackendGenCode
 import dbis.pig.op._
 import dbis.pig.plan.{DataflowPlan, Pipe}
