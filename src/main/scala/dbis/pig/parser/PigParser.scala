@@ -380,10 +380,20 @@ class PigParser extends JavaTokenParsers {
   }
 
   /*
+   * SPLIT <A> INTO <B> IF <Cond>, <C> IF <Cond> ...
+   */
+  def splitBranch: Parser[SplitBranch] = bag ~ ifKeyword ~ logicalExpr ^^ { case out ~ _ ~ expr => SplitBranch(out, expr)}
+
+  def splitStmt: Parser[PigOperator] = splitKeyword ~ bag ~ intoKeyword ~ repsep(splitBranch, ",") ^^ {
+    case _ ~ in ~ _ ~ splitList => SplitInto(in, splitList)
+  }
+
+  /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt) ~ ";" ^^ {
+    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    splitStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*

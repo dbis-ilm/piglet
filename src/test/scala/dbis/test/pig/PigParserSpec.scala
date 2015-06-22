@@ -363,4 +363,13 @@ class PigParserSpec extends FlatSpec {
       List(OrderBy("a", "b", List(OrderBySpec(PositionalField(1), OrderByDirection.DescendingOrder),
         OrderBySpec(PositionalField(2), OrderByDirection.AscendingOrder)))))
   }
+
+  it should "parse a SPLIT INTO statement" in {
+    assert(parseScript("SPLIT a INTO b IF $0 > 12, c IF $0 < 12, d IF $0 == 0;") ==
+      List(SplitInto("a", List(
+        SplitBranch("b", Gt(RefExpr(PositionalField(0)), RefExpr(Value("12")))),
+        SplitBranch("c", Lt(RefExpr(PositionalField(0)), RefExpr(Value("12")))),
+        SplitBranch("d", Eq(RefExpr(PositionalField(0)), RefExpr(Value("0"))))
+    ))))
+  }
 }
