@@ -20,6 +20,7 @@ package dbis.test.pig
 import dbis.pig._
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
+import dbis.pig.parser.LanguageFeature
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
 
@@ -372,4 +373,15 @@ class PigParserSpec extends FlatSpec {
         SplitBranch("d", Eq(RefExpr(PositionalField(0)), RefExpr(Value("0"))))
     ))))
   }
+
+  it should "reject statements not supported in the plain language feature" in {
+    intercept[java.lang.IllegalArgumentException] {
+      parseScript("a = TUPLIFY b ON $0;")
+    }
+  }
+
+  it should "accept TUPLIFY in SparqlPig" in {
+    parseScript("a = TUPLIFY b ON $0;", LanguageFeature.SparqlPig)
+  }
+
 }
