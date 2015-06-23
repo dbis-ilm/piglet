@@ -39,6 +39,15 @@ case class RefExpr(r: Ref) extends ArithmeticExpr {
   }
 }
 
+case class FlattenExpr(a: ArithmeticExpr) extends ArithmeticExpr {
+  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    a.traverse(schema, traverser)
+  }
+
+  // TODO: implement resultType
+  override def resultType(schema: Option[Schema]): (String, PigType) = a.resultType(schema)
+}
+
 case class CastExpr(t: PigType, a: ArithmeticExpr) extends ArithmeticExpr {
   override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
     traverser(schema, this) && a.traverse(schema, traverser)

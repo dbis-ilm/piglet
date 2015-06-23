@@ -10,8 +10,12 @@ import dbis.spark._
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+query_object(name) ::= <<
 object <name> {
+>>
+
+// ----------------- BEGIN of code building and initializing the query --------
+begin_query(name) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
@@ -23,21 +27,21 @@ loader(out,file,func,params) ::=<<
 <if (func)>
         val <out> = <func>().load(sc, "<file>"<params>)
 <else>
-        val <out> = sc.textFile("<file>").map(s => List(s))
+        val <out> = PigStorage().load(sc, "<file>", '\t')
 <endif>
 >>
 
-// ------------------ DUMP Results --------------------------------------------
+// ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
         <in>.collect.map(t => println(t.mkString(",")))
 >>
 
-// ------------------ STORE Results on Disk -----------------------------------
+// ------------------ STORE Results on disk -----------------------------------
 store(in,file,schema) ::=<<
         <in>.map(t => <schema>).coalesce(1, true).saveAsTextFile("<file>")
 >>
 
-// ------------------ FILTER for a Predicate ----------------------------------
+// ------------------ FILTER for a predicate ----------------------------------
 filter(out,in,pred) ::=<<
         val <out> = <in>.filter(t => {<pred>})
 >>

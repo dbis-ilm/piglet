@@ -148,6 +148,7 @@ object Types {
 
 case class Field(name: String, fType: PigType = Types.ByteArrayType) {
   override def toString = s"${name}: ${fType.descriptionString}"
+  def isBagType = fType.isInstanceOf[BagType]
 }
 
 case class TupleType(s: String, var fields: Array[Field]) extends PigType(s) {

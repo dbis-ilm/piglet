@@ -25,7 +25,8 @@ import dbis.pig.plan.DataflowPlan
 trait GenCodeBase {
   def emitNode(node: PigOperator): String
   def emitImport: String
-  def emitHeader(scriptName: String): String
+  def emitHeader1(scriptName: String): String
+  def emitHeader2(scriptName: String): String
   def emitFooter: String
   def emitHelperClass(node: PigOperator): String
 
@@ -59,13 +60,16 @@ trait Compile {
     // generate import statements
     var code = codeGen.emitImport
 
+    code = code + codeGen.emitHeader1(scriptName)
+
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
       code = code + codeGen.emitHelperClass(n) + "\n"
     }
 
     // generate the object definition representing the script
-    code = code + codeGen.emitHeader(scriptName)
+    code = code + codeGen.emitHeader2(scriptName)
+
     for (n <- plan.operators) {
       code = code + codeGen.emitNode(n) + "\n"
     }
