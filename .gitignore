@@ -9,11 +9,11 @@ dist
 /.idea
 /*.iml
 /out
-/.idea_modules
-/.classpath
-/.project
+.idea_modules
+.classpath
+.project
 /RUNNING_PID
-/.settings
+.settings
 .target
 /bin
 *.jpage
