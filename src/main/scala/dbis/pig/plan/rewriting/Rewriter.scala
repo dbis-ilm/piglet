@@ -31,9 +31,11 @@ object Rewriter {
    * It will be added by [[org.kiama.rewriting.Rewriter.ior]]ing it with the already existing ones.
    * @param s The new strategy.
    */
-  def addStrategy(s: Strategy) = {
+  def addStrategy(s: Strategy): Unit = {
     strategy = ior(strategy, s)
   }
+
+  def addStrategy[T <: Any](f: Any => Option[T]): Unit = addStrategy(strategyf(t => f(t)))
 
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
    * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
@@ -137,6 +139,6 @@ object Rewriter {
     case _ => None
   }
 
-  addStrategy(strategyf(t => mergeFilters(t)))
-  addStrategy(strategyf(t => filterBeforeOrder(t)))
+  addStrategy(mergeFilters _)
+  addStrategy(filterBeforeOrder _)
 }
