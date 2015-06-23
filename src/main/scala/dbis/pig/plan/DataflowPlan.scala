@@ -127,6 +127,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
 
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
 
+  def containsOperator(op: PigOperator): Boolean = operators.contains(op)
+  
   /**
    * Swaps the two operators in the dataflow plan. Both operators are unary operators and have to be already
    * part of the plan.
