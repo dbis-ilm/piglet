@@ -25,6 +25,20 @@ import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.input.CharSequenceReader
 
 /**
+ * An enumeration type representing the various language sets
+ * supported by the Pig compiler.
+ */
+object LanguageFeature extends Enumeration {
+  type LanguageFeature = Value
+  val PlainPig, // standard Pig conforming to Apache Pig
+  SparqlPig,    // Pig + SPARQL extensions (TUPLIFY, BGP filter)
+  StreamingPig  // Pig for data stream processing
+    = Value
+}
+
+import dbis.pig.parser.LanguageFeature._
+
+/**
  * A parser for the (extended) Pig language.
  */
 class PigParser extends JavaTokenParsers {
@@ -397,24 +411,54 @@ class PigParser extends JavaTokenParsers {
     case op ~ _  => op }
 
   /*
-   * A script is a list of statements.
+   * A plain Pig script is a list of statements.
    */
-  def script: Parser[List[PigOperator]] = rep(stmt)
+  def plainPigScript: Parser[List[PigOperator]] = rep(stmt)
 
-  def parseScript(s: CharSequence): List[PigOperator] = {
-    parseScript(new CharSequenceReader(s))
+  /* ---------------------------------------------------------------------------------------------------------------- */
+  /*
+   * Pig extensions for processing RDF data and supporting SPARQL BGPs.
+   */
+  lazy val tuplifyKeyword = "tuplify".ignoreCase
+  lazy val onKeyword = "on".ignoreCase
+
+  def tuplifyStmt: Parser[PigOperator] = bag ~ "=" ~ tuplifyKeyword ~ bag ~ onKeyword ~ ref ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ r => Tuplify(out, in, r) }
+
+  def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
+    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    splitStmt | tuplifyStmt) ~ ";" ^^ {
+    case op ~ _  => op }
+
+
+  def sparqlPigScript: Parser[List[PigOperator]] = rep(sparqlStmt)
+
+  /* ---------------------------------------------------------------------------------------------------------------- */
+  /*
+   * Pig extensions for processing streaming data.
+   */
+
+  def streamingPigScript: Parser[List[PigOperator]] = rep(stmt)
+
+  /* ---------------------------------------------------------------------------------------------------------------- */
+
+  def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
+    parseScript(new CharSequenceReader(s), feature)
   }
 
-  def parseScript(input: CharSequenceReader): List[PigOperator] = {
-    parsePhrase(input) match {
+  def parseScript(input: CharSequenceReader, feature: LanguageFeature): List[PigOperator] = {
+    parsePhrase(input, feature) match {
       case Success(t, _) => t
       case NoSuccess(msg, next) => 
         throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
     }
   }
 
-  def parsePhrase(input: CharSequenceReader): ParseResult[List[PigOperator]] = {
-    phrase(script)(input)
-  }
+  def parsePhrase(input: CharSequenceReader, feature: LanguageFeature): ParseResult[List[PigOperator]] =
+    feature match {
+      case PlainPig => phrase(plainPigScript)(input)
+      case SparqlPig => phrase(sparqlPigScript)(input)
+      case StreamingPig => phrase(streamingPigScript)(input)
+    }
 
 }
