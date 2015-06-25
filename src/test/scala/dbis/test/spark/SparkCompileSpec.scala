@@ -167,7 +167,7 @@ class SparkCompileSpec extends FlatSpec {
                                                               Field("f3", Types.IntType)))))
     val input1 = Pipe("bb",Load("bb", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("cc",Load("cc", "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    op.inputs=List(input1,input2)
+    op.inputs = List(input1,input2)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -390,5 +390,24 @@ class SparkCompileSpec extends FlatSpec {
         |                                   this.c1 compare that.c1 }
         |}""".stripMargin)
     assert(generatedHelperCode == expectedHelperCode)
+  }
+
+  it should "contain code for flattening a tuple in FOREACH" in {
+    val ops = parseScript("a = foreach b generate $0, flatten($1);")
+    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+                                                              Field("f2", TupleType("t2", Array(Field("f3", Types.IntType))))
+    ))))
+    ops.head.schema = Some(schema)
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(ops.head))
+    println("---> " + generatedCode)
+    val expectedCode = cleanString("""
+        |val a = b.map(t => PigFuncs.flatTuple(List(t(0),t(1))))""".stripMargin)
+    assert(generatedCode == expectedCode)
+
+  }
+
+  it should "contain code for flattening a bag in FOREACH" in {
+
   }
 }

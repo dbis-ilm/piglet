@@ -153,7 +153,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
       }
     }
-    case _ => ""
+    case FlattenExpr(e) => emitExpr(schema, e)
+    case _ => println("unsupported expression: " + expr); ""
   }
 
   def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
@@ -169,7 +170,19 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
    * @return
    */
   def emitFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"PigFuncs.flatTuple(${emitGenerator(schema, genExprs)}})"
+    println("----> " + genExprs.mkString(","))
+    s"PigFuncs.flatTuple(${emitGenerator(schema, genExprs)})"
+  }
+
+  def emitBagFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
+    val flattenExprs = genExprs.filter(e => e.expr.traverseOr(schema.getOrElse(null), Expr.containsFlattenOnBag))
+    val otherExprs = genExprs.diff(flattenExprs)
+    if (flattenExprs.size == 1) {
+      val ex = flattenExprs.head.expr
+      s"List(${emitExpr(schema, ex, false)}.asInstanceOf[Seq[Any]].map(s => (${otherExprs.map(e => emitExpr(schema, e.expr, false))}, s))"
+    }
+    else
+      s"" // i.flatMap(t => t(1).asInstanceOf[Seq[Any]].map(s => List(t(0),s)))
   }
 
   def emitParamList(schema: Option[Schema], params: Option[List[Ref]]): String = params match {
@@ -315,7 +328,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         gen match {
           case GeneratorList(expr) => {
             if (requiresFlatMap)
-              callST("foreachFlatMap", Map("out" -> out, "in" -> in, "expr" -> "TODO"))
+              callST("foreachFlatMap", Map("out" -> out, "in" -> in, "expr" -> emitBagFlattenGenerator(node.inputSchema, expr)))
             else
               callST("foreach", Map("out" -> out, "in" -> in,
                 "expr" -> { if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
