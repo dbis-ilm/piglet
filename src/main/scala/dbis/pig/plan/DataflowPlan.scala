@@ -152,7 +152,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
     
     old.outputs = (old.outputs :+ op)
     
-    op.inputs = op.inputs :+ Pipe(op.initialInPipeNames.head, old)
+    op.inputs = op.inputs :+ Pipe(old.initialOutPipeName, old)
     
     operators = operators :+ op
     
@@ -186,8 +186,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
     old.inputs = List.empty
     
     // 2. copy outputs
-    repl.outputs = old.outputs
     repl.output = old.output
+    repl.outputs = old.outputs
     
     // 3. update the pipes to point to repl (instead of old)
     for(out <- old.outputs) {
@@ -199,8 +199,12 @@ class DataflowPlan(var operators: List[PigOperator]) {
       out.inputs = ins.toList
     }
     
-    // 4. finally, remove old from the operator list
-    operators = operators.filter(_ != old)
+    // 4. clear old's outputs
+    old.outputs = List.empty
+    old.output = None
+    
+    // 5. finally, remove old from the operator list
+    operators = operators.filter(_ != old) :+ repl
     
     this
   }
