@@ -22,42 +22,99 @@ trait Predicate extends Expr
 
 case class Eq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
+
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && left.traverseAnd(schema, traverser) && right.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
 case class Neq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
+
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && left.traverseAnd(schema, traverser) && right.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
 case class Geq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
+
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && left.traverseAnd(schema, traverser) && right.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
 case class Leq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
+
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && left.traverseAnd(schema, traverser) && right.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
 case class Gt(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
+
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && left.traverseAnd(schema, traverser) && right.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
 case class Lt(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
+
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && left.traverseAnd(schema, traverser) && right.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
 case class And(a: Predicate, b: Predicate) extends Predicate {
-  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = true
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && a.traverseAnd(schema, traverser) && b.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || a.traverseAnd(schema, traverser) || b.traverseAnd(schema, traverser)
 
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 }
 
 case class Or(a: Predicate, b: Predicate) extends Predicate {
-  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = true
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && a.traverseAnd(schema, traverser) && b.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || a.traverseAnd(schema, traverser) || b.traverseAnd(schema, traverser)
 
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 }
 
 case class Not(a: Predicate) extends Predicate {
-  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = true
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && a.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || a.traverseAnd(schema, traverser)
 
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 }

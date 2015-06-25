@@ -84,7 +84,7 @@ class FuncsSpec extends FlatSpec with Matchers {
     PigFuncs.tokenize(s) should be (List("1", "2", "3", "4", "5", "6"))
   }
 
-  "The tokenize function" should "split a string on '|'" in {
+  "The tokenize function" should "split a string on '&'" in {
     val s = "1&2&3&4&5&6"
     PigFuncs.tokenize(s, "&") should be (List("1", "2", "3", "4", "5", "6"))
   }
@@ -92,6 +92,12 @@ class FuncsSpec extends FlatSpec with Matchers {
   "The toMap function" should "produce a map from a list" in {
     PigFuncs.toMap("a", 1, "b", 2, "c", 3, "d", 4) should be (
       Map("a" -> 1, "b" -> 2, "c" -> 3, "d" -> 4)
+    )
+  }
+
+  "The flatTuple function" should "produce a flat list from a nested list" in {
+    PigFuncs.flatTuple(List(1, 2, List(3, 4, 5), 6)) should be (
+      List(1, 2, 3, 4, 5, 6)
     )
   }
 }

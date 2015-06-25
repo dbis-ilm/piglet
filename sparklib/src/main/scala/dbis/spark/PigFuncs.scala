@@ -37,4 +37,9 @@ object PigFuncs {
     for (i <- 0 to pList.length-1 by 2) { m += (pList(i).toString -> pList(i+1)) }
     m
   }
+
+  def flatTuple(tup: List[Any]): List[Any] = tup flatten {
+    case tup: List[Any] =>  flatTuple(tup)
+    case c => List(c)
+  }
 }

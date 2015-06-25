@@ -160,6 +160,18 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     s"List(${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(",")})"
   }
 
+  /**
+   * Constructs the GENERATE expression list in FOREACH for cases where this list contains the FLATTEN
+   * operator. This case requires to unwrap the list in flatten.
+   *
+   * @param schema
+   * @param genExprs
+   * @return
+   */
+  def emitFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
+    s"PigFuncs.flatTuple(${emitGenerator(schema, genExprs)}})"
+  }
+
   def emitParamList(schema: Option[Schema], params: Option[List[Ref]]): String = params match {
     case Some(refList) => s",${refList.map(r => emitRef(schema, r)).mkString(",")}"
     case None => ""
@@ -297,8 +309,18 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(node.schema, pred)))
       case Foreach(out, in, gen) => {
+        // we need to know if the generator contains flatten on tuples or even on bags (which require flatMap)
+        val requiresPlainFlatten = node.asInstanceOf[Foreach].containsFlatten(onBag = false)
+        val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
         gen match {
-          case GeneratorList(expr) => callST("foreach", Map("out" -> out, "in" -> in, "expr" -> emitGenerator(node.inputSchema, expr)))
+          case GeneratorList(expr) => {
+            if (requiresFlatMap)
+              callST("foreachFlatMap", Map("out" -> out, "in" -> in, "expr" -> "TODO"))
+            else
+              callST("foreach", Map("out" -> out, "in" -> in,
+                "expr" -> { if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
+                            else emitGenerator(node.inputSchema, expr) }))
+          }
           case GeneratorPlan(plan) => {
             val subPlan = node.asInstanceOf[Foreach].subPlan.get
             callST("foreach", Map("out" -> out, "in" -> in,

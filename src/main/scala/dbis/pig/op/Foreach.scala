@@ -121,11 +121,11 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
       case GeneratorList(expr) => inputSchema match {
         case Some(s) => {
           // if we know the schema we check all named fields
-          expr.map(_.expr.traverse(s, Expr.checkExpressionConformance)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
+          expr.map(_.expr.traverseAnd(s, Expr.checkExpressionConformance)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
         }
         case None => {
           // if we don't have a schema all expressions should contain only positional fields
-          expr.map(_.expr.traverse(null, Expr.containsNoNamedFields)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
+          expr.map(_.expr.traverseAnd(null, Expr.containsNoNamedFields)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
         }
       }
       case GeneratorPlan(plan) => true // TODO: implement checkSchemaConformance for nested foreach
@@ -142,6 +142,16 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
       case GeneratorList(expr) => s"""FOREACH%${expr}%""" + super.lineageString
       case GeneratorPlan(plan) => s"""FOREACH""" + super.lineageString // TODO: implement lineageString for nested foreach
     }
+  }
+
+  def containsFlatten(onBag: Boolean = false): Boolean = generator match {
+    case GeneratorList(exprs) =>
+      if (onBag)
+        exprs.map(g => g.expr.traverseOr(schema.getOrElse(null), Expr.containsFlattenOnBag)).exists(b => b)
+      else
+        exprs.map(g => g.expr.traverseOr(schema.getOrElse(null), Expr.containsFlatten)).exists(b => b)
+    case GeneratorPlan(plan) =>
+      false // TODO: what happens if GENERATE contains flatten?
   }
 }
 

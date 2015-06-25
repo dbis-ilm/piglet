@@ -46,9 +46,14 @@ filter(out,in,pred) ::=<<
         val <out> = <in>.filter(t => {<pred>})
 >>
 
-// ------------------ Executes an expression FOR EACH input element -----------
+// ------------------ Executes an expression FOREACH input element -----------
 foreach(out,in,expr) ::=<<
         val <out> = <in>.map(t => <expr>)
+>>
+
+// ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
+foreachFlatMap(out,in,expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>)
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
