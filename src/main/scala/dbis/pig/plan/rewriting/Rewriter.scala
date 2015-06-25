@@ -35,7 +35,7 @@ object Rewriter {
     strategy = ior(strategy, s)
   }
 
-  def addStrategy[T <: Any](f: Any => Option[T]): Unit = addStrategy(strategyf(t => f(t)))
+  def addStrategy(f: Any => Option[PigOperator]): Unit = addStrategy(strategyf(t => f(t)))
 
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
    * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
