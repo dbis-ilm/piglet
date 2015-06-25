@@ -32,6 +32,7 @@ import dbis.pig.op.Materialize
 import scala.collection.mutable.ListBuffer
 import dbis.pig.op.Load
 import dbis.pig.op.Store
+import dbis.pig.op.Materialize
 
 object Rewriter {
   private var strategy = fail
@@ -185,6 +186,12 @@ object Rewriter {
       if(data.isDefined) {
         val loader = Load(materialize.initialOutPipeName, data.get, materialize.constructSchema)
         val matInput = materialize.inputs(0).producer
+        
+        
+        for(prodPipe <- matInput.inputs) {
+          plan.disconnect(prodPipe.producer, matInput)
+        }
+        
         plan.replace(matInput, loader)
         /* TODO: do we need to remove all other nodes that get disconnected now by hand
          * or do they get removed during code generation (because there is no sink?)

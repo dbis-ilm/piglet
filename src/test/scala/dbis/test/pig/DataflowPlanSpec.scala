@@ -324,17 +324,39 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
          |a = load 'file.csv';
          |b = filter a by $0 > 0;
          |""".stripMargin))
+    
     val ops = plan.findOperator(o => o.outPipeName == "a")
-    ops.size should be (1)
+    withClue("did not find operator a") {ops.size should be (1)}
+    
+    val newOp = Distinct("c", "a")
+    
     val op = ops.head
+    
     op.outPipeName should be ("a")
-    plan.insertAfter(op, Distinct("c", "a"))
+    
+    plan.insertAfter(op, newOp)
+    
+    val fs = plan.findOperator { _.outPipeName == "c" }
+    withClue("did not find operator c") {fs.size shouldBe 1}
+    
+    val f = fs.head
+    withClue("unexpected number of inputs") {f.inputs.size shouldBe 1}
+    
+    f.inputs.head.name shouldBe "c"
+    
+    plan.operators should contain (newOp)
+    
     println(op)
   }
 
-  it should "be consistent after exchanging two operators" in {
+  it should "be consistent after swapping two operators" in {
 
   }
+  
+  it should "be consistent after replacing an operator" in {
+    
+  }
+  
   it should "be consistent after removing an operator" in {
 
   }

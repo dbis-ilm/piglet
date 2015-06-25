@@ -149,6 +149,13 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return the resulting dataflow plan
    */
   def insertAfter(old: PigOperator, op: PigOperator) : DataflowPlan =  {
+    
+    old.outputs = (old.outputs :+ op)
+    
+    op.inputs = op.inputs :+ Pipe(op.initialInPipeNames.head, old)
+    
+    operators = operators :+ op
+    
     this
   }
 
@@ -170,6 +177,42 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return the resulting dataflow plan
    */
   def replace(old: PigOperator, repl: PigOperator) : DataflowPlan =  {
+    require(operators.contains(old), "operator to replace is not member of the plan")
+    
+    /* 1. set intputs for new op as inputs of old op
+     * and clear old's inputs
+     */
+    repl.inputs = old.inputs
+    old.inputs = List.empty
+    
+    // 2. copy outputs
+    repl.outputs = old.outputs
+    repl.output = old.output
+    
+    // 3. update the pipes to point to repl (instead of old)
+    for(out <- old.outputs) {
+      val ins = ListBuffer.empty[Pipe]
+      for(in <- out.inputs) {
+        val p = Pipe(in.name, repl)
+        ins += p
+      }
+      out.inputs = ins.toList
+    }
+    
+    // 4. finally, remove old from the operator list
+    operators = operators.filter(_ != old)
+    
+    this
+  }
+  
+  def disconnect(op1: PigOperator, op2: PigOperator): DataflowPlan = {
+    require(operators.contains(op1), s"operator is not member of the plan: $op1")
+    require(operators.contains(op2), s"operator is not member of the plan: $op2")
+    
+    op2.inputs = op2.inputs.filter { op => op.producer != op1 }
+    op1 outputs = op1.outputs.filter { op => op != op2 }
+    
+    
     this
   }
 
