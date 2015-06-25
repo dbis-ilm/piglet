@@ -4,9 +4,13 @@ import java.io.File
 import scala.io.Source
 import java.io.PrintWriter
 import java.io.FileWriter
+import dbis.pig.tools.Conf
 
-class MaterializationManager(val mapFile: File, val matBaseDir: File) {
+class MaterializationManager() {
 
+  private val mapFile: File = Conf.materializationMapFile
+  private val matBaseDir: File = Conf.materializationBaseDir
+  
   require(mapFile != null, "the mapFile must not be null")
   require(!mapFile.exists(), s"mapFile $mapFile does not exist")
   require(mapFile.canRead() && mapFile.canWrite(), s"need to have read and write access to $mapFile" )
