@@ -20,6 +20,11 @@ import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import org.scalatest.{FlatSpec, Matchers}
+import dbis.pig.PigCompiler._
+import dbis.pig.plan.MaterializationManager
+import java.io.File
+import dbis.pig.plan.PrettyPrinter
+import java.io.PrintWriter
 
 class RewriterSpec extends FlatSpec with Matchers{
   "The rewriter" should "merge two Filter operations" in {
@@ -82,5 +87,50 @@ class RewriterSpec extends FlatSpec with Matchers{
         assert(currentIndex > inputIndex)
       }
     }
+  }
+  
+  it should "add store for materialize" in {
+    val plan = new DataflowPlan(parseScript("""
+         |a = load 'file.csv';
+         |b = filter a by $0 > 0;
+         |materialize b;
+         |c = distinct b;
+         |""".stripMargin))    
+    
+    /* TODO: test setup
+     * create mappings.txt and directory
+     * if file exists clear it
+     */
+    
+    val baseDir = new File("/tmp/piglet_test")
+    val matFile = new File(baseDir, "mappings.txt")
+    
+    if(!baseDir.exists())
+      baseDir.mkdirs()
+      
+    if(matFile.exists()) {
+      // empty the file
+      val p = new PrintWriter(matFile)      
+      p.write("")
+      p.close()
+    }
+    
+    val mm = new MaterializationManager(matFile, baseDir)
+    
+    val plan2 = processMaterializations(plan, mm)
+    
+    var matOp: Option[Store] = None
+    
+    for(op <- plan2.operators) {
+      op match {
+        case f : Store => matOp = Some(f) 
+        case _ => 
+      }
+    }
+    
+//    plan.sinkNodes.map(PrettyPrinter.pretty).foreach(println)
+    
+    matOp shouldBe defined
+    
   }
 }

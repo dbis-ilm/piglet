@@ -184,12 +184,11 @@ object Rewriter {
        * with the loader.
        */
       if(data.isDefined) {
-        val loader = Load(materialize.initialOutPipeName, data.get, materialize.constructSchema)
+        val loader = Load(materialize.initialInPipeName, data.get, materialize.constructSchema)
         val matInput = materialize.inputs(0).producer
         
-        
-        for(prodPipe <- matInput.inputs) {
-          plan.disconnect(prodPipe.producer, matInput)
+        for(inPipe <- matInput.inputs) {
+          plan.disconnect(inPipe.producer, matInput)
         }
         
         plan.replace(matInput, loader)
@@ -198,6 +197,7 @@ object Rewriter {
          */
         
         plan.remove(materialize)
+        
       } else {
         /* there is a MATERIALIZE operator, for which no results could be found
          * --> store them by adding a STORE operator to the MATERIALIZE operator's input op

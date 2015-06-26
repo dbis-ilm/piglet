@@ -162,10 +162,29 @@ class DataflowPlan(var operators: List[PigOperator]) {
   /**
    * Remove the given operator from the dataflow plan.
    *
-   * @param n the operator to be removed from the plan
+   * @param op the operator to be removed from the plan
    * @return the resulting dataflow plan
    */
-  def remove(n: PigOperator) : DataflowPlan = {
+  def remove(op: PigOperator) : DataflowPlan = {
+    
+    require(operators.contains(op), "operator to remove is not member of the plan")
+    require(op.inputs.size == 1, "Currently, only one input operator is allowed")
+    
+    val succs = op.outputs
+    val pred = op.inputs.head.producer
+    
+    pred.outputs = pred.outputs.filter { o => o != op }
+    
+    for(succ <- succs) {
+      succ.inputs = succ.inputs.filter { pipe => pipe.producer != op }
+    }
+    
+    op.inputs = List.empty
+    op.outputs = List.empty
+    op.output = None
+    
+    operators = operators.filter(_ != op)
+
     this
   }
 
@@ -214,7 +233,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
     require(operators.contains(op2), s"operator is not member of the plan: $op2")
     
     op2.inputs = op2.inputs.filter { op => op.producer != op1 }
-    op1 outputs = op1.outputs.filter { op => op != op2 }
+    op1.outputs = op1.outputs.filter { op => op != op2 }
     
     
     this

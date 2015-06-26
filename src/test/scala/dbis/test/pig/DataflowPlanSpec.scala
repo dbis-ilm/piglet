@@ -412,7 +412,23 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
   
   it should "be consistent after removing an operator" in {
+    val plan = new DataflowPlan(parseScript("""
+         |a = load 'file.csv';
+         |b = filter a by $0 > 0;
+         |c = distinct b;
+         |""".stripMargin))
+    
+    val b = plan.findOperatorForAlias("b").get
+    
+    plan.remove(b)
+    
+    withClue("operators: ") {plan.operators should not contain b}
 
+    val a = plan.findOperatorForAlias("a").get
+    withClue("a outputs: ") {a.outputs should not contain b}
+    
+    val c = plan.findOperatorForAlias("c").get
+    withClue("c inputs: ") {c.inputs.map(_.producer) should not contain b}
   }
 
   it should "correctly assign inputs and outputs" in {
@@ -448,4 +464,5 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     op5.output shouldBe None
     op5.outputs shouldBe empty
   }
+  
 }

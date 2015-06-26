@@ -160,6 +160,7 @@ Option[Schema]) extends Rewritable{
   def lineageString: String = {
     inputs.map(p => p.producer.lineageString).mkString("%")
   }
+  
   def arity = this.inputs.length
 
   def deconstruct = this.inputs
