@@ -17,7 +17,7 @@
 package dbis.test.pig
 
 import dbis.pig.op._
-import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.{DataflowPlan, Pipe}
 import dbis.pig.plan.rewriting.Rewriter._
 import org.scalatest.{FlatSpec, Matchers}
 import dbis.pig.PigCompiler._
@@ -89,7 +89,7 @@ class RewriterSpec extends FlatSpec with Matchers{
     }
   }
   
-  it should "add store for materialize" in {
+  it should "add store for (non existing) materialize results" in {
     val plan = new DataflowPlan(parseScript("""
          |a = load 'file.csv';
          |b = filter a by $0 > 0;
@@ -97,23 +97,15 @@ class RewriterSpec extends FlatSpec with Matchers{
          |c = distinct b;
          |""".stripMargin))    
     
-    /* TODO: test setup
-     * create mappings.txt and directory
-     * if file exists clear it
-     */
-    
     val baseDir = new File("/tmp/piglet_test")
     val matFile = new File(baseDir, "mappings.txt")
     
     if(!baseDir.exists())
       baseDir.mkdirs()
       
-    if(matFile.exists()) {
-      // empty the file
-      val p = new PrintWriter(matFile)      
-      p.write("")
-      p.close()
-    }
+    val p = new PrintWriter(matFile)      
+    p.write("")
+    p.close()
     
     val mm = new MaterializationManager(matFile, baseDir)
     
@@ -131,6 +123,70 @@ class RewriterSpec extends FlatSpec with Matchers{
 //    plan.sinkNodes.map(PrettyPrinter.pretty).foreach(println)
     
     matOp shouldBe defined
+    
+  }
+  
+  it should "add LOAD for existing materialize results" in {
+    val plan = new DataflowPlan(parseScript("""
+         |a = load 'file.csv';
+         |b = filter a by $0 > 0;
+         |materialize b;
+         |c = distinct b;
+         |""".stripMargin))    
+    
+    val baseDir = new File("/tmp/piglet_test")
+    val matFile = new File(baseDir, "mappings.txt")
+    
+    if(!baseDir.exists())
+      baseDir.mkdirs()
+      
+    val mat = plan.findOperator { o => o.isInstanceOf[Materialize] }.head match {
+      case o: Materialize => o
+      case _ => throw new ClassCastException
+    }  
+      
+    // empty the file
+    val matResultFile = s"$baseDir/blubb.txt"
+    val lineage = mat.lineageSignature 
+    val p = new PrintWriter(matFile)      
+    p.write(s"$lineage;$matResultFile\n")
+    p.close()
+    
+    val mm = new MaterializationManager(matFile, baseDir)
+    
+    val plan2 = processMaterializations(plan, mm)
+    
+//    println(plan2.operators)
+    
+    var loadOp: Option[Load] = None
+    
+    /* FIXME: this finds the original load operator, because it was not 
+     * removed from the plan
+     * 
+     * Adding the load just inserts a load and disconnects the subplans
+     * However, the now unused subplan still exists and this test finds
+     * the unused load operator... :(
+     */
+    for(op <- plan2.operators) {
+      op match {
+        case f : Load if f.file != "file.csv" => loadOp = Some(f) // bad workaround for the aforementioned issue 
+        case _ => 
+      }
+    }
+    
+//    plan.sinkNodes.map(PrettyPrinter.pretty).foreach(println)
+    
+    withClue("load operator") {loadOp shouldBe defined}
+    
+    val op = loadOp.get
+    
+    withClue("loader file name: ") {op.file shouldBe matResultFile}
+    
+    withClue("loader inputs") {op.inputs shouldBe empty}
+    
+    val c = plan2.findOperatorForAlias("c").get
+    withClue("load's successor's input size") {c.inputs.size shouldBe 1}
+    withClue("load's successor's input op") {c.inputs(0) shouldBe Pipe("b", op)}
     
   }
 }
