@@ -34,7 +34,7 @@ import scala.collection.immutable.Seq
  * @param schema
  */
 abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNames: List[String], var schema:
-Option[Schema]) extends Rewritable{
+Option[Schema]) extends Rewritable {
   // A list of all pipes that this operator reads from.
   var inputs: List[Pipe] = List[Pipe]()
 

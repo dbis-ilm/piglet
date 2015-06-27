@@ -42,7 +42,7 @@ case class Union(override val initialOutPipeName: String, override val initialIn
       for ((f1, f2) <- fieldPairs) {
         newFields += Field(f1.name, Types.escalateTypes(f1.fType, f2.fType))
       }
-      BagType(b1.s, TupleType(b1.valueType.s, newFields.toArray))
+      BagType(TupleType(newFields.toArray, b1.valueType.s), b1.s)
     }
 
     // case 1: one of the input schema isn't known -> output schema = None

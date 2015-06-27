@@ -19,14 +19,16 @@ package dbis.pig.codegen
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
+import dbis.pig.udf._
 import org.clapper.scalasti._
 
 class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
 
-  case class UDF(name: String, numParams: Int, isAggregate: Boolean)
+  // case class UDF(name: String, numParams: Int, isAggregate: Boolean)
   case class TemplateException(msg: String) extends Exception(msg)
   
-//  val templateFile = "src/main/resources/flink-template.stg"
+
+/*//  val templateFile = "src/main/resources/flink-template.stg"
 
   val funcTable = Map("COUNT" -> UDF("PigFuncs.count", 1, true),
                       "AVG" -> UDF("PigFuncs.average", 1, true),
@@ -36,6 +38,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
                       "TOKENIZE" -> UDF("PigFuncs.tokenize", 1, false),
                       "TOMAP" -> UDF("PigFuncs.toMap", Int.MaxValue, false)
   )
+  */
 
   // TODO: complex types
   val scalaTypeMappingTable = Map[PigType, String](Types.IntType -> "Int",
@@ -59,7 +62,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     if (tp == None)
       None
     else
-      Some(new Schema( if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType("", tp.asInstanceOf[TupleType])))
+      Some(new Schema( if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType(tp.asInstanceOf[TupleType])))
   }
 
   def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true): String = ref match {
@@ -139,6 +142,17 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
     case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast)}"
     case Func(f, params) => {
+      val pTypes = params.map(p => p.resultType(schema)._2)
+      UDFTable.findUDF(f, pTypes) match {
+        case Some(udf) => { if (udf.isAggregate) s"${udf.scalaName}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
+                            else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+        }
+        case None => {
+          // TODO: we don't know the function yet, let's assume there is a corresponding Scala function
+          s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+        }
+      }
+      /*
       if (funcTable.contains(f)) {
         val udf = funcTable(f)
         // TODO: check size of params
@@ -152,6 +166,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         // TODO: we don't know the function yet, let's assume there is a corresponding Scala function
         s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
       }
+      */
     }
     case FlattenExpr(e) => emitExpr(schema, e)
     case _ => println("unsupported expression: " + expr); ""
@@ -170,7 +185,6 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
    * @return
    */
   def emitFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    println("----> " + genExprs.mkString(","))
     s"PigFuncs.flatTuple(${emitGenerator(schema, genExprs)})"
   }
 

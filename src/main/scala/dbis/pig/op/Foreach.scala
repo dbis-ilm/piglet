@@ -100,14 +100,14 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
       case GeneratorList(expr) => {
         val fields = constructFieldList(expr)
 
-        schema = Some(new Schema(new BagType("", new TupleType("", fields))))
+        schema = Some(new Schema(new BagType(new TupleType(fields))))
       }
       case GeneratorPlan(plan) => {
         val genOp = plan.last
         if (genOp.isInstanceOf[Generate]) {
           val exprs = genOp.asInstanceOf[Generate].exprs
           val fields = constructFieldList(exprs)
-          schema = Some(new Schema(new BagType("", new TupleType("", fields))))
+          schema = Some(new Schema(new BagType(new TupleType(fields))))
         }
         else
           throw new InvalidPlanException("last statement in nested foreach must be a generate")
@@ -146,8 +146,9 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
 
   def containsFlatten(onBag: Boolean = false): Boolean = generator match {
     case GeneratorList(exprs) =>
-      if (onBag)
+      if (onBag) {
         exprs.map(g => g.expr.traverseOr(schema.getOrElse(null), Expr.containsFlattenOnBag)).exists(b => b)
+      }
       else
         exprs.map(g => g.expr.traverseOr(schema.getOrElse(null), Expr.containsFlatten)).exists(b => b)
     case GeneratorPlan(plan) =>

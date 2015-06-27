@@ -28,7 +28,7 @@ case class TypeException(msg: String) extends Exception(msg)
  */
 object TypeCode extends Enumeration {
   type TypeCode = Value
-  val IntType, LongType, FloatType, BooleanType, DoubleType, ByteArrayType, CharArrayType = Value
+  val AnyType, IntType, LongType, FloatType, BooleanType, DoubleType, ByteArrayType, CharArrayType = Value
 }
 
 import dbis.pig.schema.TypeCode._
@@ -126,6 +126,7 @@ object Types {
 
   def isNumericType(t: PigType): Boolean = t == IntType || t == LongType || t == FloatType || t == DoubleType
 
+  val AnyType = SimpleType("nothing", TypeCode.AnyType)
   val IntType = SimpleType("int", TypeCode.IntType)
   val LongType = SimpleType("long", TypeCode.LongType)
   val BooleanType = SimpleType("boolean", TypeCode.BooleanType)
@@ -151,9 +152,9 @@ case class Field(name: String, fType: PigType = Types.ByteArrayType) {
   def isBagType = fType.isInstanceOf[BagType]
 }
 
-case class TupleType(s: String, var fields: Array[Field]) extends PigType(s) {
+case class TupleType(var fields: Array[Field], s: String = "") extends PigType(s) {
   override def equals(that: Any): Boolean = that match {
-    case TupleType(name, fields) => this.name == name && this.fields.deep == fields.deep
+    case TupleType(fields, name) => this.name == name && this.fields.deep == fields.deep
     case _ => false
   }
 
@@ -164,10 +165,10 @@ case class TupleType(s: String, var fields: Array[Field]) extends PigType(s) {
   def plainDescriptionString = fields.mkString(", ")
 }
 
-case class BagType(s: String, var valueType: TupleType) extends PigType(s) {
+case class BagType(var valueType: TupleType, s: String = "") extends PigType(s) {
   override def descriptionString = "{" + valueType.plainDescriptionString + "}"
 }
 
-case class MapType(s: String, var valueType: PigType) extends PigType(s) {
+case class MapType(var valueType: PigType, s: String = "") extends PigType(s) {
   override def descriptionString = "[" + valueType.descriptionString + "]"
 }

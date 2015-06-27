@@ -180,7 +180,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.field(0) should equal (Field("", Types.IntType))
-        s.field(1) should equal (Field("f1", TupleType("", Array(Field("", Types.IntType),
+        s.field(1) should equal (Field("f1", TupleType(Array(Field("", Types.IntType),
                                                                 Field("", Types.IntType),
                                                                 Field("", Types.FloatType)))))
       }
@@ -198,9 +198,9 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
       case Some(s) => {
         s.fields.length should equal (2)
         s.field(0) should equal(Field("group", Types.IntType))
-        s.field(1) should equal(Field("a", BagType("", TupleType("", Array(Field("f1", Types.IntType),
+        s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.IntType),
                                                                       Field("f2", Types.DoubleType),
-                                                                      Field("f3", MapType("", Types.ByteArrayType))
+                                                                      Field("f3", MapType(Types.ByteArrayType))
         )))))
       }
       case None => fail()

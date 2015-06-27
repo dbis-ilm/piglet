@@ -47,7 +47,7 @@ settings(
   unmanagedJars in Compile += file("lib/jvmr_2.11-2.11.2.1.jar")
 ).
 settings(excludes(backendEnv): _*).
-aggregate(backendlib(backendEnv).map(a => a.project): _*).
+// aggregate(backendlib(backendEnv).map(a => a.project): _*).
 dependsOn(backendlib(backendEnv): _*)
 
 /*

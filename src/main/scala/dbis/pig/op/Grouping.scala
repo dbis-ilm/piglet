@@ -51,12 +51,12 @@ case class Grouping(override val initialOutPipeName: String, initialInPipeName: 
     // tuple(group: typeOfGroupingExpr, in:bag(inputSchema))
     val inputType = inputSchema match {
       case Some(s) => s.element.valueType
-      case None => TupleType("", Array(Field("", Types.ByteArrayType)))
+      case None => TupleType(Array(Field("", Types.ByteArrayType)))
     }
     val groupingType = Types.IntType
     val fields = Array(Field("group", groupingType),
-      Field(inputs.head.name, BagType("", inputType)))
-    schema = Some(new Schema(new BagType("", new TupleType("", fields))))
+      Field(inputs.head.name, BagType(inputType)))
+    schema = Some(new Schema(new BagType(new TupleType(fields, ""), "")))
     schema
   }
 

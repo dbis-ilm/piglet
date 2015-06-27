@@ -39,7 +39,7 @@ case class Join(override val outPipeName: String, override val inPipeNames: List
       case Some(s) => newFields ++= s.fields
       case None => ???
     })
-    schema = Some(new Schema(BagType("", TupleType("", newFields.toArray))))
+    schema = Some(new Schema(BagType(TupleType(newFields.toArray))))
     schema
   }
 

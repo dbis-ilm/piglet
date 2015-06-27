@@ -60,7 +60,7 @@ abstract class BinaryExpr(left: Expr, right: Expr) extends Expr {
 
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
-    traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
+    traverser(schema, this) || left.traverseOr(schema, traverser) || right.traverseOr(schema, traverser)
 
 }
 

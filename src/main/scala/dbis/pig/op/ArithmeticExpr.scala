@@ -44,7 +44,7 @@ case class FlattenExpr(a: ArithmeticExpr) extends ArithmeticExpr {
   }
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
-    traverser(schema, this) || a.traverseAnd(schema, traverser)
+    traverser(schema, this) || a.traverseOr(schema, traverser)
   }
 
   // TODO: implement resultType
@@ -57,7 +57,7 @@ case class CastExpr(t: PigType, a: ArithmeticExpr) extends ArithmeticExpr {
   }
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
-    traverser(schema, this) || a.traverseAnd(schema, traverser)
+    traverser(schema, this) || a.traverseOr(schema, traverser)
   }
 
   override def resultType(schema: Option[Schema]): (String, PigType) = (a.resultType(schema)._1, t)
