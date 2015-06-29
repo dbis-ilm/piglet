@@ -125,6 +125,9 @@ object Rewriter {
     case f @ Filter(out, in, predicate) =>
       f.inputs match {
         case List((Pipe(_, order @ OrderBy(out2, in2, orderSpec)))) =>
+          if (order.outputs.length > 1) {
+            return None
+          }
           // Reorder the operations and swap their input and output names
           val newOrder = order.copy(out, in, orderSpec)
           val newFilter = f.copy(out2, in2, predicate)

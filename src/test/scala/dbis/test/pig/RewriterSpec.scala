@@ -83,4 +83,22 @@ class RewriterSpec extends FlatSpec with Matchers{
       }
     }
   }
+
+  it should "not reorder operators if the first one has more than one output" in {
+    val op1 = Load("a", "file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op2 = OrderBy("b", "a", List())
+    val op3 = Filter("c", "b", predicate1)
+    val op4 = Dump("c")
+    val op5 = Dump("b")
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
+    val sink = plan.sinkNodes.head
+
+    val rewrittenSink = processSink(sink)
+    rewrittenSink.inputs.head.name shouldBe "c"
+    rewrittenSink.inputs.head.producer should equal (op3)
+  }
 }
