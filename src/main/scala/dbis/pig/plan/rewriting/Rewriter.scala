@@ -22,6 +22,7 @@ import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
 import scala.collection.mutable.LinkedHashSet
+import scala.reflect.{ClassTag, classTag}
 
 object Rewriter {
   private var strategy = fail
@@ -99,20 +100,12 @@ object Rewriter {
    * @return On success, an Option containing a new [[dbis.pig.op.Filter]] operator with the predicates of both input
    *         Filters, None otherwise.
    */
-  private def mergeFilters(pigOperator: Any): Option[Filter] = pigOperator match {
-    case f1 @ Filter(out, _, predicate) =>
-      f1.inputs match {
-        case List((Pipe(_, f2 @ Filter(_, in, predicate2)))) =>
-          val newFilter = Filter(out, in, And(predicate, predicate2))
-          // TODO extract merging PigOperators into a new method, possibly on PigOperator itself
-          // Use the second filters inputs. We don't need to rewrite the inputs output because that always seems to be
-          // pointing to the input itself?
-          newFilter.inputs = f2.inputs
-          // TODO can there be other objects that have f1 in their input list?
-          Some(newFilter)
-        case _ => None
-      }
-    case _ => None
+  private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
+    val newFilter = Filter(parent.output.get, child.initialInPipeName, And(parent.pred, child.pred))
+    newFilter.inputs = child.inputs
+    newFilter.output = parent.output
+    newFilter.outputs = parent.outputs
+    Some(newFilter)
   }
 
   /** Puts [[dbis.pig.op.Filter]] operators before [[dbis.pig.op.OrderBy]] ones.
@@ -142,6 +135,38 @@ object Rewriter {
     case _ => None
   }
 
-  addStrategy(mergeFilters _)
   addStrategy(filterBeforeOrder _)
+
+  /** Add a new strategy for merging operators of two types.
+    *
+    * @param f The function to perform the merge.
+    * @tparam T The type of the first operator.
+    * @tparam T2 The type of the second operator.
+    */
+  def merge[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: Function2[T, T2, Option[PigOperator]]): Unit = {
+    val strategy = (op: Any) => {
+      op match {
+        case op if classTag[T].runtimeClass.isInstance(op) => {
+          val parent = op.asInstanceOf[T]
+          if (parent.inputs.length == 1) {
+            val op2 = parent.inputs.head.producer
+            op2 match {
+              case op2 if classTag[T2].runtimeClass.isInstance(op2) => {
+                val child = op2.asInstanceOf[T2]
+                f(parent, child)
+              }
+              case _ => None
+            }
+          }
+          else {
+            None
+          }
+        }
+        case _ => None
+      }
+    }
+    addStrategy(strategy)
+  }
+
+  merge[Filter, Filter](mergeFilters)
 }
