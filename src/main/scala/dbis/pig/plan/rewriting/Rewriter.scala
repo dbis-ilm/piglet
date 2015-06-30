@@ -102,9 +102,6 @@ object Rewriter {
    */
   private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
     val newFilter = Filter(parent.output.get, child.initialInPipeName, And(parent.pred, child.pred))
-    newFilter.inputs = child.inputs
-    newFilter.output = parent.output
-    newFilter.outputs = parent.outputs
     Some(newFilter)
   }
 
@@ -139,11 +136,26 @@ object Rewriter {
 
   /** Add a new strategy for merging operators of two types.
     *
-    * @param f The function to perform the merge.
+    * @param f The function to perform the merge. It does not have to modify inputs and outputs, this will be done
+    *          automatically.
     * @tparam T The type of the first operator.
     * @tparam T2 The type of the second operator.
     */
   def merge[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: Function2[T, T2, Option[PigOperator]]): Unit = {
+    val strategy = (parent: T, child: T2) => {
+      val result = f(parent, child)
+      result.map((op: PigOperator) => {
+        op.inputs = child.inputs
+        op.output = parent.output
+        op.outputs = parent.outputs
+        op
+      })
+    }
+    addBinaryPigOperatorStrategy(strategy)
+  }
+
+  private def addBinaryPigOperatorStrategy[T2 <: PigOperator : ClassTag, T <: PigOperator : ClassTag](f: (T, T2)
+    => Option[PigOperator]): Unit = {
     val strategy = (op: Any) => {
       op match {
         case op if classTag[T].runtimeClass.isInstance(op) => {
