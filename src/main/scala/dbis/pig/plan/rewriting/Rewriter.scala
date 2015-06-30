@@ -107,11 +107,12 @@ object Rewriter {
   }
 
   /** Puts [[dbis.pig.op.Filter]] operators before [[dbis.pig.op.OrderBy]] ones.
-   *
-   * @param pigOperator A [[dbis.pig.op.Filter]] operator whose only input is a [[dbis.pig.op.OrderBy]] operator.
-   * @return On success, an Option containing a new [[dbis.pig.op.OrderBy]] operators whose input is the
-   *         [[dbis.pig.op.Filter]] passed into this method, None otherwise.
-   */
+    *
+    * @param parent The parent operator, in this case, a [[dbis.pig.op.Filter]] object.
+    * @param child The child operator, in this case, a [[dbis.pig.op.OrderBy]] object.
+    * @return On success, an Option containing a new [[dbis.pig.op.OrderBy]] operators whose input is the
+    *         [[dbis.pig.op.Filter]] passed into this method, None otherwise.
+    */
   private def filterBeforeOrder(parent: Filter, child: OrderBy): Option[(OrderBy, Filter)] = {
     val newOrder = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.orderSpec)
     val newFilter = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.pred)
