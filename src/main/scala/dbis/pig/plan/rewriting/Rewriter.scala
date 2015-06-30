@@ -146,12 +146,6 @@ object Rewriter {
     val strategy = (parent: T, child: T2) => {
       val result = f(parent, child)
       result.map(tup => fixInputsAndOutputs(parent, tup._1, child, tup._2))
-      if (result.isDefined) {
-        Some(result.get._1)
-      }
-      else {
-        None
-      }
     }
     addBinaryPigOperatorStrategy(strategy)
   }
