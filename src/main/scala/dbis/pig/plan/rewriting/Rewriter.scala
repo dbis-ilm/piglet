@@ -134,6 +134,13 @@ object Rewriter {
     addBinaryPigOperatorStrategy(strategy)
   }
 
+  /** Add a new strategy for reordering two operators.
+    *
+    * @param f The function to perform the reordering. It does not have to modify inputs and outputs, this will be
+    *          done automatically.
+    * @tparam T The type of the first operator.
+    * @tparam T2 The type of the second operator.
+    */
   def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: Function2[T, T2, Option[(T2, T)]]):
   Unit = {
     val strategy = (parent: T, child: T2) => {
@@ -149,6 +156,12 @@ object Rewriter {
     addBinaryPigOperatorStrategy(strategy)
   }
 
+  /** Add a strategy that applies a function to two operators.
+    *
+    * @param f The function to apply.
+    * @tparam T2 The second operators type.
+    * @tparam T The first operators type.
+    */
   private def addBinaryPigOperatorStrategy[T2 <: PigOperator : ClassTag, T <: PigOperator : ClassTag](f: (T, T2)
     => Option[PigOperator]): Unit = {
     val strategy = (op: Any) => {
@@ -175,6 +188,16 @@ object Rewriter {
     addStrategy(strategy)
   }
 
+  /** Fix the inputs and outputs attributes of PigOperators after an operation merged two of them into one.
+    *
+    * @param oldParent The old parent operator.
+    * @param oldChild The old child operator.
+    * @param newParent The new operator.
+    * @tparam T The type of the old parent operator.
+    * @tparam T2 The type of the old child operator.
+    * @tparam T3 The type of the new operator.
+    * @return
+    */
   private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                           newParent: T3): T3 = {
     newParent.inputs = oldChild.inputs
@@ -191,6 +214,16 @@ object Rewriter {
     newParent
   }
 
+  /** Fix the inputs and outputs attributes of PigOperators after two of them have been reordered.
+    *
+    * @param oldParent The old parent operator.
+    * @param newParent The new parent operator.
+    * @param oldChild The old child operator.
+    * @param newChild The new child Operator.
+    * @tparam T The type of the old parent and new child operators.
+    * @tparam T2 The type of the old child and new parent operators.
+    * @return
+    */
   private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                        newChild: T): T2 = {
     newChild.inputs = oldChild.inputs
@@ -207,6 +240,7 @@ object Rewriter {
       op.outputs = op.outputs.filter(_ != oldChild) :+ newChild
     }
 
+    // Replacing oldParent with newParent in oldParents input list is done via kiamas Rewritable trait
     newParent
   }
 
