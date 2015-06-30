@@ -111,28 +111,12 @@ object Rewriter {
    * @return On success, an Option containing a new [[dbis.pig.op.OrderBy]] operators whose input is the
    *         [[dbis.pig.op.Filter]] passed into this method, None otherwise.
    */
-  private def filterBeforeOrder(pigOperator: Any): Option[OrderBy] = pigOperator match {
-    case f @ Filter(out, in, predicate) =>
-      f.inputs match {
-        case List((Pipe(_, order @ OrderBy(out2, in2, orderSpec)))) =>
-          if (order.outputs.length > 1) {
-            return None
-          }
-          // Reorder the operations and swap their input and output names
-          val newOrder = order.copy(out, in, orderSpec)
-          val newFilter = f.copy(out2, in2, predicate)
-
-          newOrder.inputs = List(Pipe(in, newFilter))
-
-          newFilter.inputs = order.inputs
-
-          Some(newOrder)
-        case _ => None
-      }
-    case _ => None
+  private def filterBeforeOrder(parent: Filter, child: OrderBy): Option[(OrderBy, Filter)] = {
+    val newOrder = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.orderSpec)
+    val newFilter = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.pred)
+    Some((newOrder, newFilter))
   }
 
-  addStrategy(filterBeforeOrder _)
 
   /** Add a new strategy for merging operators of two types.
     *
@@ -227,4 +211,5 @@ object Rewriter {
   }
 
   merge[Filter, Filter](mergeFilters)
+  reorder[Filter, OrderBy](filterBeforeOrder)
 }
