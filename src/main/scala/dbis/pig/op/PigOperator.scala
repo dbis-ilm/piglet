@@ -63,7 +63,6 @@ Option[Schema]) extends Rewritable{
     }
   }
 
-
   // If the operator writes a relation, this is a list of all operators the read that one.
   private var _outputs: List[PigOperator] = List[PigOperator]()
   def outputs = _outputs

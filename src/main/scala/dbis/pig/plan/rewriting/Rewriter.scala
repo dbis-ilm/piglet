@@ -150,6 +150,21 @@ object Rewriter {
     addBinaryPigOperatorStrategy(strategy)
   }
 
+  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: Function2[T, T2, Option[(T2, T)]]):
+  Unit = {
+    val strategy = (parent: T, child: T2) => {
+      val result = f(parent, child)
+      result.map(tup => fixInputsAndOutputs(parent, tup._1, child, tup._2))
+      if (result.isDefined) {
+        Some(result.get._1)
+      }
+      else {
+        None
+      }
+    }
+    addBinaryPigOperatorStrategy(strategy)
+  }
+
   private def addBinaryPigOperatorStrategy[T2 <: PigOperator : ClassTag, T <: PigOperator : ClassTag](f: (T, T2)
     => Option[PigOperator]): Unit = {
     val strategy = (op: Any) => {
@@ -159,7 +174,7 @@ object Rewriter {
           if (parent.inputs.length == 1) {
             val op2 = parent.inputs.head.producer
             op2 match {
-              case op2 if classTag[T2].runtimeClass.isInstance(op2) => {
+              case op2 if classTag[T2].runtimeClass.isInstance(op2) && op2.outputs.length == 1 => {
                 val child = op2.asInstanceOf[T2]
                 f(parent, child)
               }
@@ -189,6 +204,25 @@ object Rewriter {
     }
 
     // Replacing oldParent with newParent in oldParents input list is done via kiamas Rewritable trait
+    newParent
+  }
+
+  private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
+                                                                       newChild: T): T2 = {
+    newChild.inputs = oldChild.inputs
+    newChild.output = oldChild.output
+    newChild.outputs = oldChild.outputs
+
+    newParent.inputs = List(Pipe(newChild.output.get, newChild))
+    newParent.output = oldParent.output
+    newParent.outputs = oldParent.outputs
+
+    // Fix replace oldChild in its inputs outputs attribute with newChild
+    for(out <- oldChild.inputs) {
+      val op = out.producer
+      op.outputs = op.outputs.filter(_ != oldChild) :+ newChild
+    }
+
     newParent
   }
 
