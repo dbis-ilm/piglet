@@ -141,15 +141,11 @@ object Rewriter {
     * @tparam T The type of the first operator.
     * @tparam T2 The type of the second operator.
     */
-  def merge[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: Function2[T, T2, Option[PigOperator]]): Unit = {
+  def merge[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: Function2[T, T2, Option[PigOperator]]):
+  Unit = {
     val strategy = (parent: T, child: T2) => {
       val result = f(parent, child)
-      result.map((op: PigOperator) => {
-        op.inputs = child.inputs
-        op.output = parent.output
-        op.outputs = parent.outputs
-        op
-      })
+      result.map(fixInputsAndOutputs(parent, child, _))
     }
     addBinaryPigOperatorStrategy(strategy)
   }
@@ -178,6 +174,22 @@ object Rewriter {
       }
     }
     addStrategy(strategy)
+  }
+
+  private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
+                                                                                          newParent: T3): T3 = {
+    newParent.inputs = oldChild.inputs
+    newParent.output = oldParent.output
+    newParent.outputs = oldParent.outputs
+
+    // Fix replace oldChild in its inputs outputs attribute with newParent
+    for(out <- oldChild.inputs) {
+      val op = out.producer
+      op.outputs = op.outputs.filter(_ != oldChild) :+ newParent
+    }
+
+    // Replacing oldParent with newParent in oldParents input list is done via kiamas Rewritable trait
+    newParent
   }
 
   merge[Filter, Filter](mergeFilters)
