@@ -29,7 +29,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   "The compiler output" should "contain the Flink header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitImport + codeGenerator.emitHeader("test") + codeGenerator.emitFooter)
+    val generatedCode = cleanString(codeGenerator.emitImport + codeGenerator.emitHeader1("test") + codeGenerator.emitFooter)
     val expectedCode = cleanString("""
       |import org.apache.flink.streaming.api.scala._
       |import dbis.flink._

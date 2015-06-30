@@ -23,9 +23,9 @@ begin_query(name) ::= <<
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,func,params) ::=<<
+loader(out,file,func,schema,params) ::=<<
 <if (func)>
-        val <out> = <func>().load(sc, "<file>"<params>)
+        val <out> = <func>().load(sc, "<file>"<params>).asInstanceOf[RDD[<schema>]]
 <else>
         val <out> = PigStorage().load(sc, "<file>", '\t')
 <endif>
@@ -37,8 +37,13 @@ dump(in) ::=<<
 >>
 
 // ------------------ STORE Results on disk -----------------------------------
-store(in,file,schema) ::=<<
-        <in>.map(t => <schema>).coalesce(1, true).saveAsTextFile("<file>")
+
+store(in,file,schema,func) ::=<<
+<if (func)>
+        <func>().write(sc, "<file>", <in>)
+<else>
+		<in>.map(t => <schema>).coalesce(1, true).saveAsTextFile("<file>")
+<endif>		
 >>
 
 // ------------------ FILTER for a predicate ----------------------------------

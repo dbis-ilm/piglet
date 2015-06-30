@@ -19,6 +19,10 @@ package dbis.spark
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
+import java.io.FileInputStream
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import java.io.FileOutputStream
 
 class PigStorage extends java.io.Serializable {
   def load(sc: SparkContext, path: String, delim: Char = ' '): RDD[List[String]] = {
@@ -61,4 +65,40 @@ object RDFFileStorage {
   def apply(): RDFFileStorage = {
     new RDFFileStorage
   }
+}
+
+
+class BinStorage extends java.io.Serializable {
+  
+  def load(sc: SparkContext, path: String): RDD[Any] = {
+    
+    var ois: Option[ObjectInputStream] = None
+    
+    try {
+      ois = Some(new ObjectInputStream(new FileInputStream(path)))
+      val rdd = ois.get.readObject().asInstanceOf[RDD[Any]]
+      return rdd  
+      
+    } finally {
+      if(ois.isDefined)
+        ois.get.close()
+    }
+  }
+  
+  def write(sc: SparkContext, path: String, rdd: RDD[Any]) = {
+    var oos: Option[ObjectOutputStream] = None
+    
+    try {
+      oos = Some(new ObjectOutputStream(new FileOutputStream(path)))
+      oos.get.writeObject(rdd)
+    } finally {
+      if(oos.isDefined)
+        oos.get.close()
+    }
+  }
+  
+}
+
+object BinStorage {
+  def apply(): BinStorage = new BinStorage
 }

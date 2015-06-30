@@ -235,7 +235,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
           |  def compare(that: ${cname}) = $cmpExpr
           |}""".stripMargin
       }
-      case Store(in, file) => { s"""
+      case Store(in, file, func) => { s"""
         |def tuple${in}ToString(t: List[Any]): String = {
         |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
         |
@@ -293,7 +293,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out, file, func, params)
       case Dump(in) => callST("dump", Map("in"->in))
-      case Store(in, file) => callST("store", Map("in"->in,"file"->file,"schema"->s"tuple${in}ToString(t)"/*listToTuple(node.schema)*/))
+      case Store(in, file, func) => callST("store", Map("in"->in,"file"->file,"schema"->s"tuple${in}ToString(t)"/*listToTuple(node.schema)*/,"func"->func))
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(node.schema, pred)))
       case Foreach(out, in, gen) => {

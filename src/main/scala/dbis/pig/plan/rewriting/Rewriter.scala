@@ -205,7 +205,7 @@ object Rewriter {
          */
         
         val file = mm.saveMapping(materialize.lineageSignature)
-        val storer = new Store(materialize.initialInPipeName, file)
+        val storer = new Store(materialize.initialInPipeName, file, "BinStorage")
         
         plan.insertAfter(materialize.inputs(0).producer, storer)
         plan.remove(materialize)

@@ -11,7 +11,7 @@ class MaterializationManager(private val mapFile: File, private val matBaseDir: 
   def this() = this(Conf.materializationMapFile, Conf.materializationBaseDir)
   
   require(mapFile != null, "the mapFile must not be null")
-  require(mapFile.exists(), s"mapFile $mapFile does not exist")
+//  require(mapFile.exists(), s"mapFile $mapFile does not exist")
   require(mapFile.canRead() && mapFile.canWrite(), s"need to have read and write access to $mapFile" )
   require(matBaseDir != null, "Base directory for materialization must not be null")
   
