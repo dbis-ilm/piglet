@@ -95,11 +95,12 @@ object Rewriter {
   }
 
   /** Merges two [[dbis.pig.op.Filter]] operations if one is the only input of the other.
-   *
-   * @param pigOperator A [[dbis.pig.op.Filter]] operator whose only input is another Filter.
-   * @return On success, an Option containing a new [[dbis.pig.op.Filter]] operator with the predicates of both input
-   *         Filters, None otherwise.
-   */
+    *
+    * @param parent The parent filter.
+    * @param child The child filter.
+    * @return On success, an Option containing a new [[dbis.pig.op.Filter]] operator with the predicates of both input
+    *         Filters, None otherwise.
+    */
   private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
     val newFilter = Filter(parent.output.get, child.initialInPipeName, And(parent.pred, child.pred))
     Some(newFilter)
