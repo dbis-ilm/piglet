@@ -42,8 +42,8 @@ class RewriterSpec extends FlatSpec with Matchers{
     rewrittenSink.inputs should equal (sinkMerged.inputs)
 
     val pPlan = processPlan(planUnmerged)
-    pPlan.findOperatorForAlias("c").get should be (opMerged)
-    pPlan.findOperatorForAlias("a").get.outputs should contain only(opMerged)
+    pPlan.findOperatorForAlias("c").value should be (opMerged)
+    pPlan.findOperatorForAlias("a").value.outputs should contain only(opMerged)
   }
 
   it should "order Filter operations before Order By ones" in {
@@ -66,7 +66,10 @@ class RewriterSpec extends FlatSpec with Matchers{
     val sinkReordered = planReordered.sinkNodes.head
 
     val rewrittenSink = processSink(sink)
-    rewrittenSink.inputs should equal (sinkReordered.inputs)
+    rewrittenSink.inputs.head should equal (sinkReordered.inputs.head)
+
+    val pPlan = processPlan(plan)
+    pPlan.findOperatorForAlias("b").value should be (op2_2)
   }
 
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
