@@ -25,7 +25,7 @@ import scala.collection.mutable.LinkedHashSet
 import scala.reflect.{ClassTag, classTag}
 
 object Rewriter {
-  private var strategy = fail
+  private var ourStrategy = fail
 
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
    *
@@ -33,7 +33,7 @@ object Rewriter {
    * @param s The new strategy.
    */
   def addStrategy(s: Strategy): Unit = {
-    strategy = ior(strategy, s)
+    ourStrategy = ior(ourStrategy, s)
   }
 
   def addStrategy(f: Any => Option[PigOperator]): Unit = addStrategy(strategyf(t => f(t)))
@@ -45,6 +45,16 @@ object Rewriter {
    * @return The rewritten sink node.
    */
   def processSink(sink: PigOperator): PigOperator = {
+    processSink(sink, ourStrategy)
+  }
+
+  /** Process a sink with a specified strategy
+    *
+    * @param sink
+    * @param strategy
+    * @return
+    */
+  def processSink(sink: PigOperator, strategy: Strategy): PigOperator = {
     val rewriter = bottomup( attempt (strategy))
     rewrite(rewriter)(sink)
   }
@@ -54,9 +64,11 @@ object Rewriter {
     * @param plan
     * @return A rewritten [[dbis.pig.plan.DataflowPlan]]
     */
-  def processPlan(plan: DataflowPlan): DataflowPlan = {
+  def processPlan(plan: DataflowPlan): DataflowPlan = processPlan(plan, ourStrategy)
+
+  def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
     // This looks innocent, but this is where the rewriting happens.
-    val newSinks = plan.sinkNodes.map(processSink)
+    val newSinks = plan.sinkNodes.map(processSink(_, strategy))
 
     var newPlanNodes = LinkedHashSet[PigOperator]() ++= newSinks
     var nodesToProcess = newSinks.toList
@@ -150,6 +162,28 @@ object Rewriter {
       result.map(tup => fixInputsAndOutputs(parent, tup._1, child, tup._2))
     }
     addBinaryPigOperatorStrategy(strategy)
+  }
+
+  /** Replace `old` with `repl` in `plan`.
+    *
+    * @param plan
+    * @param old
+    * @param repl
+    * @return A new [[dbis.pig.plan.DataflowPlan]] in which `old` has been replaced with `repl`.
+    */
+  def replace(plan: DataflowPlan, old: PigOperator, repl: PigOperator): DataflowPlan = {
+    val strategy = (op: Any) => {
+      if (op == old) {
+        repl.inputs = old.inputs
+        repl.output = old.output
+        repl.outputs = old.outputs
+        Some(repl)
+      }
+      else {
+        None
+      }
+    }
+    processPlan(plan, strategyf(t => strategy(t)))
   }
 
   /** Add a strategy that applies a function to two operators.

@@ -17,6 +17,7 @@
 package dbis.pig.plan
 
 import dbis.pig.op._
+import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.schema.SchemaException
 
 import scala.collection.mutable.{ListBuffer, Map}
@@ -168,7 +169,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return the resulting dataflow plan
    */
   def replace(old: PigOperator, repl: PigOperator) : DataflowPlan =  {
-    this
+    Rewriter.replace(this, old, repl)
   }
 
 }

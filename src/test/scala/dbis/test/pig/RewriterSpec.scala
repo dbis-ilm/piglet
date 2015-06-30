@@ -19,8 +19,8 @@ package dbis.test.pig
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
-import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.OptionValues._
+import org.scalatest.{FlatSpec, Matchers}
 
 class RewriterSpec extends FlatSpec with Matchers{
   "The rewriter" should "merge two Filter operations" in {

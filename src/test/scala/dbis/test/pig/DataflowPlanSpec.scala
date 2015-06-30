@@ -20,6 +20,7 @@ import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.plan.{Pipe, DataflowPlan, InvalidPlanException}
 import dbis.pig.schema._
+import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
 
 class DataflowPlanSpec extends FlatSpec with Matchers {
@@ -371,5 +372,18 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     op5.inputs should contain only (Pipe("c", op4))
     op5.output shouldBe None
     op5.outputs shouldBe empty
+  }
+
+  it should "be consistent after replacing an operator" in {
+    val op1 = Load("a", "file.csv")
+    val op2 = Load("a", "file2.csv")
+
+    val op3 = Dump("a")
+
+    val plan = new DataflowPlan(List(op1, op3))
+    val newPlan = plan.replace(op1, op2)
+    newPlan.sinkNodes.headOption.value.inputs should contain only(Pipe("a", op2))
+    newPlan.sourceNodes.headOption.value should equal(op2)
+    newPlan.sourceNodes.headOption.value.outputs should contain only(op3)
   }
 }
