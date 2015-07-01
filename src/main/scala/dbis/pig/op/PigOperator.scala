@@ -161,17 +161,18 @@ Option[Schema]) extends Rewritable{
   }
   def arity = this.inputs.length
 
-  def deconstruct = this.inputs
+  def deconstruct = this.inputs.map(_.producer)
 
   def reconstruct(output: Seq[Any]): PigOperator = output match {
     case inputs: Seq[_] => {
       this match {
         case obj: PigOperator => {
-          obj.inputs = inputs.toList.asInstanceOf[List[Pipe]]
+          obj.inputs = inputs.toList.asInstanceOf[List[PigOperator]].map(op => Pipe(op.output.get, op))
           obj
         }
+        case _ => illegalArgs("PigOperator", "PigOperator", output)
       }
     }
-    case _ => illegalArgs("PigOperator", "Pipe", output)
+    case _ => illegalArgs("PigOperator", "PigOperator", output)
   }
 }
