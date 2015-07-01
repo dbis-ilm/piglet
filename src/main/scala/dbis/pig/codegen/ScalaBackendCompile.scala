@@ -26,9 +26,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   case class UDF(name: String, numParams: Int, isAggregate: Boolean)
   case class TemplateException(msg: String) extends Exception(msg)
   
-//  val templateFile = "src/main/resources/flink-template.stg"
-
-  val funcTable = Map("COUNT" -> UDF("PigFuncs.count", 1, true),
+  
+  private val funcTable = Map("COUNT" -> UDF("PigFuncs.count", 1, true),
                       "AVG" -> UDF("PigFuncs.average", 1, true),
                       "SUM" -> UDF("PigFuncs.sum", 1, true),
                       "MIN" -> UDF("PigFuncs.min", 1, true),
@@ -38,12 +37,47 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   )
 
   // TODO: complex types
-  val scalaTypeMappingTable = Map[PigType, String](Types.IntType -> "Int",
+  private val scalaTypeMappingTable = Map[PigType, String](Types.IntType -> "Int",
     Types.LongType -> "Long",
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",
     Types.ByteArrayType -> "String")
+  
+  private def generateTypeString(schema: Option[Schema]): String = {
+    if(schema.isEmpty)
+      "Any"
+    else
+      fieldTypesToString(schema.get.fields)
+  }
+  
+  private def fieldTypesToString(fields: Array[Field]): String = {
+    val schemaString = new StringBuilder
+    schemaString.append("(")
+    
+    for(field <- fields.zipWithIndex) {
+      
+      if(field._2 > 0)
+        schemaString.append(",")
+      
+      val f = field._1
+      if(f.isBagType) {
+        val bagFields = f.asInstanceOf[BagType].valueType.fields
+        val bagFieldsString = s"List[${fieldTypesToString(bagFields)}]"
+        schemaString.append(bagFieldsString)
+      } else {
+        val fieldTypeString = scalaTypeMappingTable(f.fType)
+        schemaString.append(fieldTypeString)
+      }
+    }
+    
+    schemaString.append(")")
+    
+    schemaString.toString()
+  }
+//  val templateFile = "src/main/resources/flink-template.stg"
+
+  
 
   def tupleSchema(schema: Option[Schema], ref: Ref): Option[Schema] = {
     val tp = ref match {
@@ -117,15 +151,18 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
 
   def quote(s: String): String = s.replace('\'', '"')
 
-  def emitLoader(out: String, file: String, loaderFunc: String, loaderParams: List[String]): String = {
+  def emitLoader(out: String, file: String, loaderFunc: String, schema: Option[Schema], loaderParams: List[String]): String = {
     if (loaderFunc == "")
       callST("loader", Map("out"->out,"file"->file))
     else {
       val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams/*.map(quote(_))*/.mkString(",") else ""
-      callST("loader", Map("out"->out,"file"->file,"func"->loaderFunc,"params"->params))
+        
+      val schemaString = generateTypeString(schema)        
+        
+      callST("loader", Map("out"->out,"file"->file,"func"->loaderFunc,"params"->params, "schema"->schemaString))
     }
-  }
-
+  }  
+  
   def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
@@ -291,7 +328,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   def emitNode(node: PigOperator): String = {
     val group = STGroupFile(templateFile)
     node match {
-      case Load(out, file, schema, func, params) => emitLoader(out, file, func, params)
+      case Load(out, file, schema, func, params) => emitLoader(out, file, func, schema, params)
       case Dump(in) => callST("dump", Map("in"->in))
       case Store(in, file, func) => callST("store", Map("in"->in,"file"->file,"schema"->s"tuple${in}ToString(t)"/*listToTuple(node.schema)*/,"func"->func))
       case Describe(in) => s"""println("${node.schemaToString}")"""
@@ -362,8 +399,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     }
     else throw new TemplateException(s"Template '$template' not implemented or not found") 
   }
-  
 }
+
 
 class ScalaBackendCompile(templateFile: String) extends Compile {
   override val codeGen = new ScalaBackendGenCode(templateFile)

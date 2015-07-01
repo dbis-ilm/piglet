@@ -184,7 +184,7 @@ object Rewriter {
        * with the loader.
        */
       if(data.isDefined) {
-        val loader = Load(materialize.initialInPipeName, data.get, materialize.constructSchema)
+        val loader = Load(materialize.initialInPipeName, data.get, materialize.constructSchema, "BinStorage")
         val matInput = materialize.inputs(0).producer
         
         for(inPipe <- matInput.inputs) {
