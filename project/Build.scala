@@ -78,6 +78,7 @@ object Dependencies {
   lazy val scoptVersion =       "3.3.0"
   lazy val scalastiVersion =    "2.0.0"
   lazy val kiamaVersion = "1.8.0"
+  lazy val configVersion = "1.3.0"
 
   // Libraries
   val scalaCompiler = "org.scala-lang" % "scala-compiler" % scalaVersion
@@ -91,6 +92,7 @@ object Dependencies {
   val scopt = "com.github.scopt" %% "scopt" % scoptVersion
   val scalasti = "org.clapper" %% "scalasti" % scalastiVersion
   val kiama = "com.googlecode.kiama" %% "kiama" % kiamaVersion
+  val config = "com.typesafe" %% "config" % configVersion
 
   // Projects
   val rootDeps = Seq(
@@ -102,7 +104,8 @@ object Dependencies {
     scopt,
     scalaIoFile,
     scalasti,
-    kiama
+    kiama,
+    config
   )
   val sparkDeps = Seq(
     scalaTest % "test" withSources(),
