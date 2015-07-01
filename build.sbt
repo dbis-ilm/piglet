@@ -42,9 +42,7 @@ settings(
   buildInfoPackage := "dbis.pig",
   buildInfoObject := "BuildSettings",
   bintrayResolverSettings,
-  libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv),
-  /* used for R integration */
-  unmanagedJars in Compile += file("lib/jvmr_2.11-2.11.2.1.jar")
+  libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv)
 ).
 settings(excludes(backendEnv): _*).
 // aggregate(backendlib(backendEnv).map(a => a.project): _*).
