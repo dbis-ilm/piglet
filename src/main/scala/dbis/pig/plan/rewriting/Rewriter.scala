@@ -226,7 +226,13 @@ object Rewriter {
     */
   private def addBinaryPigOperatorStrategy[T2 <: PigOperator : ClassTag, T <: PigOperator : ClassTag](f: (T, T2)
     => Option[PigOperator]): Unit = {
-    val strategy = (op: Any) => {
+    val strategy = buildBinaryPigOperatorStrategy(f)
+    addStrategy(strategy)
+  }
+
+  private def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+    (f: (T, T2) => Option[PigOperator]): Strategy = {
+    return strategyf(op => {
       op match {
         case op if classTag[T].runtimeClass.isInstance(op) => {
           val parent = op.asInstanceOf[T]
@@ -246,8 +252,7 @@ object Rewriter {
         }
         case _ => None
       }
-    }
-    addStrategy(strategy)
+    })
   }
 
   /** Fix the inputs and outputs attributes of PigOperators after an operation merged two of them into one.
