@@ -17,7 +17,8 @@
 package dbis.pig.codegen
 
 import dbis.pig.op._
-import dbis.pig.schema.{PigType, Schema, SchemaException, Types}
+import dbis.pig.plan.DataflowPlan
+import dbis.pig.schema._
 import org.clapper.scalasti._
 
 class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
@@ -41,27 +42,51 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     Types.LongType -> "Long",
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
-    Types.CharArrayType -> "String")
+    Types.CharArrayType -> "String",
+    Types.ByteArrayType -> "String")
+
+  def tupleSchema(schema: Option[Schema], ref: Ref): Option[Schema] = {
+    val tp = ref match {
+      case NamedField(f) => schema match {
+        case Some(s) => s.field(f).fType
+        case None => throw new SchemaException(s"unknown schema for field $f")
+      }
+      case PositionalField(p) => schema match {
+        case Some(s) => s.field(p).fType
+        case None => None
+      }
+    }
+    if (tp == None)
+      None
+    else
+      Some(new Schema( if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType("", tp.asInstanceOf[TupleType])))
+  }
 
   def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true): String = ref match {
     case NamedField(f) => schema match {
       case Some(s) => {
         val idx = s.indexOfField(f)
-        if (idx == -1) println("----------> " + f)
-        require(idx >= 0) // the field doesn't exist in the schema: shouldn't occur because it was checked before
-        if (requiresTypeCast) {
-          val field = s.field(idx)
-          val typeCast = scalaTypeMappingTable(field.fType)
-          s"${tuplePrefix}(${idx}).to${typeCast}"
+        if (idx == -1) {
+          // TODO: field name not found, for now we assume that it refers to a bag (relation)
+          f
         }
-        else
-          s"${tuplePrefix}(${idx})"
+        else {
+          if (requiresTypeCast) {
+            val field = s.field(idx)
+            val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
+            s"${tuplePrefix}(${idx}).to${typeCast}"
+          }
+          else
+            s"${tuplePrefix}(${idx})"
+        }
       }
       case None => throw new SchemaException(s"unknown schema for field $f")
     } // TODO: should be position of field
     case PositionalField(pos) => s"$tuplePrefix($pos)"
     case Value(v) => v.toString
-    case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
+    // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
+    // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
+    case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
     case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
     case _ => { "" }
   }
@@ -77,7 +102,10 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   }
 
   def emitGrouping(schema: Option[Schema], groupingExpr: GroupingExpression): String = {
-    groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",")
+    if (groupingExpr.keyList.size == 1)
+      groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString
+    else
+      "(" + groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",") + ")"
   }
 
   def emitJoinKey(schema: Option[Schema], joinExpr: List[Ref]): String = {
@@ -99,7 +127,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     }
   }
 
-  def emitExpr(schema: Option[Schema], expr: ArithmeticExpr): String = expr match {
+  def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
       val targetType = scalaTypeMappingTable(t)
@@ -110,13 +138,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     case Minus(e1, e2) => s"${emitExpr(schema, e1)} - ${emitExpr(schema, e2)}"
     case Mult(e1, e2) => s"${emitExpr(schema, e1)} * ${emitExpr(schema, e2)}"
     case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
-    case RefExpr(e) => s"${emitRef(schema, e)}"
+    case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast)}"
     case Func(f, params) => {
       if (funcTable.contains(f)) {
         val udf = funcTable(f)
         // TODO: check size of params
-        if (udf.isAggregate)
+        if (udf.isAggregate) {
           s"${udf.name}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
+        }
         else
           s"${udf.name}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
       }
@@ -129,7 +158,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   }
 
   def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"List(${genExprs.map(e => emitExpr(schema, e.expr)).mkString(",")})"
+    s"List(${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(",")})"
   }
 
   def emitParamList(schema: Option[Schema], params: Option[List[Ref]]): String = params match {
@@ -178,6 +207,24 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       if (col == num) s"{ this.c$col compare that.c$col }"
       else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col+1, num)} else this.c$col compare that.c$col }"
 
+    /**
+     * Generates a function for producing a string representation of a tuple. This is needed because
+     * Spark's saveAsTextFile simply calls the toString method which results in "List(...)" or
+     * "CompactBuffer(...)" in the output.
+     *
+     * @param schema a schema describing the tuple structure
+     * @return the string representation
+     */
+    def genStringRepOfTuple(schema: Option[Schema]): String = schema match {
+      case Some(s) => (0 to s.fields.length-1).toList.map{ i => s.field(i).fType match {
+          // TODO: this should be processed recursively
+        case BagType(n, t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
+        case TupleType(n, f) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
+        case _ => s".append(t($i))"
+      }}.mkString("\n.append(\",\")\n")
+      case None => s".append(t(0))\n"
+    }
+
     node match {
       case OrderBy(out, in, orderSpec) => {
         val cname = s"custKey_${out}_${in}"
@@ -189,42 +236,94 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
           |  def compare(that: ${cname}) = $cmpExpr
           |}""".stripMargin
       }
+      case Store(in, file) => { s"""
+        |def tuple${in}ToString(t: List[Any]): String = {
+        |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
+        |
+        |  val sb = new StringBuilder
+        |  sb${genStringRepOfTuple(node.schema)}
+        |  sb.toString
+        |}""".stripMargin
+
+      }
       case _ => ""
     }
   }
 
   def listToTuple(schema: Option[Schema]): String = schema match {
-    case Some(s) => '"' + (0 to s.fields.length-1).toList.map(i => s"%s").mkString(",") + '"' +
-    ".format(" + (0 to s.fields.length-1).toList.map(i => s"t($i)").mkString(",") + ")" 
+    case Some(s) => '"' + (0 to s.fields.length-1).toList.map(i => if (s.field(i).isBagType) s"{%s}" else s"%s").mkString(",") + '"' +
+    ".format(" + (0 to s.fields.length-1).toList.map(i =>
+      if (s.field(i).isBagType)
+        s"""t($i).asInstanceOf[Seq[Any]].mkString(",")"""
+      else
+        s"t($i)").mkString(",") + ")"
     case None => s"t(0)"
+  }
+
+  def findFieldPosition(schema: Option[Schema], field: Ref): Int = field match {
+   case NamedField(f) => schema match {
+     case Some(s) => s.indexOfField(f)
+     case None => -1
+    }
+    case PositionalField(p) => p
+    case _ => -1
+  }
+
+  def emitNestedPlan(schema: Option[Schema], plan: DataflowPlan): String = {
+    "{\n" + plan.operators.map {
+      case Generate(expr) => s"""( ${emitGenerator(schema, expr)} )"""
+      case ConstructBag(out, ref) => ref match {
+        case DerefTuple(r1, r2) => {
+          val p1 = findFieldPosition(schema, r1)
+          val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
+          require(p1 >= 0 && p2 >= 0)
+          s"""val $out = t($p1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]]($p2))"""
+        }
+        case _ => "" // should not happen
+      }
+      case Distinct(out, in) => callST("distinct", Map("out" -> out, "in" -> in))
+      case n@Filter(out, in, pred) => callST("filter", Map("out" -> out, "in" -> in, "pred" -> emitPredicate(n.schema, pred)))
+      case Limit(out, in, num) => callST("limit", Map("out" -> out, "in" -> in, "num" -> num))
+      case OrderBy(out, in, orderSpec) => ""
+      case _ => ""
+    }.mkString("\n") + "}"
   }
 
   def emitNode(node: PigOperator): String = {
     val group = STGroupFile(templateFile)
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out, file, func, params)
-      case Dump(in) => callST("dump", Map("in"->in.head)) 
+      case Dump(in) => callST("dump", Map("in"->in)) 
       case Store(in, file) => {
         val path = if(file.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
-        callST("store", Map("in"->in.head,"file"->(path + file),"schema"->listToTuple(node.schema)))
-    }
-      case Describe(in) => s"""println("${node.schemaToString}")"""
-      case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in.head,"pred"->emitPredicate(node.schema, pred)))
-      case Foreach(out, in, expr) => callST("foreach", Map("out"->out,"in"->in.head,"expr"->emitGenerator(node.inputSchema, expr)))
-      case Grouping(out, in, groupExpr) => {
-        if (groupExpr.keyList.isEmpty) callST("groupBy", Map("out"->out,"in"->in.head))
-        else callST("groupBy", Map("out"->out,"in"->in.head,"expr"->emitGrouping(node.inputSchema, groupExpr)))
+        callST("store", Map("in"->in,"file"->(path + file),"schema"->s"tuple${in}ToString(t)"/*listToTuple(node.schema)*/))
       }
-      case Distinct(out, in) => callST("distinct", Map("out"->out,"in"->in.head))
-      case Limit(out, in, num) => callST("limit", Map("out"->out,"in"->in.head,"num"->num))
+      case Describe(in) => s"""println("${node.schemaToString}")"""
+      case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(node.schema, pred)))
+      case Foreach(out, in, gen) => {
+        gen match {
+          case GeneratorList(expr) => callST("foreach", Map("out" -> out, "in" -> in, "expr" -> emitGenerator(node.inputSchema, expr)))
+          case GeneratorPlan(plan) => {
+            val subPlan = node.asInstanceOf[Foreach].subPlan.get
+            callST("foreach", Map("out" -> out, "in" -> in,
+              "expr" -> emitNestedPlan(node.inputSchema, subPlan)))
+          }
+        }
+      }
+      case Grouping(out, in, groupExpr) => {
+        if (groupExpr.keyList.isEmpty) callST("groupBy", Map("out"->out,"in"->in))
+        else callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGrouping(node.inputSchema, groupExpr)))
+      }
+      case Distinct(out, in) => callST("distinct", Map("out"->out,"in"->in))
+      case Limit(out, in, num) => callST("limit", Map("out"->out,"in"->in,"num"->num))
       case Join(out, rels, exprs) => { //TODO: Window Parameters
         val res = node.inputs.zip(exprs)
         val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
         callST("join", Map("out"->out,"rel1"->rels.head,"key1"->keys.head,"rel2"->rels.tail,"key2"->keys.tail)) 
       }
       case Union(out, rels) => callST("union", Map("out"->out,"in"->rels.head,"others"->rels.tail)) 
-      case Sample(out, in, expr) => callST("sample", Map("out"->out,"in"->in.head,"expr"->emitExpr(node.schema, expr)))
-      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out,"in"->in.head,
+      case Sample(out, in, expr) => callST("sample", Map("out"->out,"in"->in,"expr"->emitExpr(node.schema, expr)))
+      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out,"in"->in,
         "key"->emitSortKey(node.schema, orderSpec, out, in),"asc"->ascendingSortOrder(orderSpec.head).toString))
       case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out,"op"->op,"in"->in,
         "params"->emitParamList(node.schema, params)))
@@ -249,7 +348,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
 
   def emitImport: String = callST("init_code")
 
-  def emitHeader(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
+  def emitHeader1(scriptName: String): String = callST("query_object", Map("name" -> scriptName))
+  def emitHeader2(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
 
   def emitFooter: String = callST("end_query", Map("name" -> "Starting Query"))
 

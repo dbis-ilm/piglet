@@ -17,11 +17,10 @@
 package dbis.test.pig
 
 import dbis.pig.PigCompiler._
-import dbis.pig._
 import dbis.pig.op._
-import dbis.pig.plan.{InvalidPlanException, DataflowPlan}
+import dbis.pig.plan.{Pipe, DataflowPlan, InvalidPlanException}
 import dbis.pig.schema._
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest.{FlatSpec, Matchers}
 
 class DataflowPlanSpec extends FlatSpec with Matchers {
   /*
@@ -308,6 +307,18 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
+  it should "process a nested FOREACH statement with multiple statements" in {
+    val ops = parseScript(
+      """daily = load 'data.csv' as (exchange, symbol);
+        |grpd  = group daily by exchange;
+        |uniqcnt  = foreach grpd {
+        |           sym      = daily.symbol;
+        |           uniq_sym = distinct sym;
+        |           generate group, COUNT(uniq_sym);
+        |};""".stripMargin)
+    val plan = new DataflowPlan(ops)
+  }
+
   it should "be consistent after adding a new operator using insertAfter" in {
     val plan = new DataflowPlan(parseScript("""
          |a = load 'file.csv';
@@ -326,5 +337,39 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
   it should "be consistent after removing an operator" in {
 
+  }
+
+  it should "correctly assign inputs and outputs" in {
+    val op1 = Load("a", "file.csv")
+    val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = Filter("b", "a", predicate)
+    val op3 = Dump("b")
+    val op4 = OrderBy("c", "b", List())
+    val op5 = Dump("c")
+    val ops = List[PigOperator](op1, op2, op3, op4, op5)
+    for(op <- ops) {
+      op.inputs shouldBe empty
+      op.outputs shouldBe empty
+    }
+    val plan = new DataflowPlan(ops)
+
+    op1.output shouldBe Some("a")
+    op1.outputs should contain only (op2)
+
+    op2.inputs should contain only (Pipe("a", op1))
+    op2.output shouldBe Some("b")
+    op2.outputs should contain allOf(op3, op4)
+
+    op3.inputs should contain only (Pipe("b", op2))
+    op3.output shouldBe None
+    op3.outputs shouldBe empty
+
+    op4.inputs should contain only (Pipe("b", op2))
+    op4.output shouldBe Some("c")
+    op4.outputs should contain only(op5)
+
+    op5.inputs should contain only (Pipe("c", op4))
+    op5.output shouldBe None
+    op5.outputs shouldBe empty
   }
 }

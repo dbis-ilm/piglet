@@ -18,10 +18,25 @@ package dbis.pig.parser
 
 import dbis.pig._
 import dbis.pig.op._
+import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 
 import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.input.CharSequenceReader
+
+/**
+ * An enumeration type representing the various language sets
+ * supported by the Pig compiler.
+ */
+object LanguageFeature extends Enumeration {
+  type LanguageFeature = Value
+  val PlainPig, // standard Pig conforming to Apache Pig
+  SparqlPig,    // Pig + SPARQL extensions (TUPLIFY, BGP filter)
+  StreamingPig  // Pig for data stream processing
+    = Value
+}
+
+import dbis.pig.parser.LanguageFeature._
 
 /**
  * A parser for the (extended) Pig language.
@@ -107,6 +122,7 @@ class PigParser extends JavaTokenParsers {
   def factor: Parser[ArithmeticExpr] =  (
      "(" ~ castTypeSpec ~ ")" ~ refExpr ^^ { case _ ~ t ~ _ ~ e => CastExpr(t, e) }
       | "(" ~ arithmExpr ~ ")" ^^ { case _ ~ e ~ _ => e }
+       | "flatten" ~ "(" ~ refExpr ~ ")" ^^ { case _ ~ _ ~ e ~ _  => FlattenExpr(e) }
       | func
       | refExpr
     )
@@ -178,6 +194,8 @@ class PigParser extends JavaTokenParsers {
   lazy val rowsKeyword = "rows".ignoreCase
   lazy val rangeKeyword = "range".ignoreCase
   lazy val slideKeyword = "slide".ignoreCase
+  lazy val splitKeyword = "split".ignoreCase
+  lazy val ifKeyword = "if".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
@@ -246,14 +264,39 @@ class PigParser extends JavaTokenParsers {
   def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ^^ { case _ ~ b ~  _ ~ f => Store(b, f) }
 
   /*
+   * GENERATE expr1, expr2, ...
+   */
+  def generateStmt: Parser[PigOperator] = plainForeachGenerator ^^ { case g => Generate(g.asInstanceOf[GeneratorList].exprs) }
+
+  /*
+   * B = A.C;
+   */
+  def constructBagStmt: Parser[PigOperator] = bag ~ "=" ~ derefBagOrTuple ^^ { case res ~ _ ~ ref => ConstructBag(res, ref) }
+
+  /*
+   * Currently, Pig allows only DISTINCT, LIMIT, FILTER, ORDER BY + GENERATE and assignment inside FOREACH
+   */
+  def nestedStmt: Parser[PigOperator] = (distinctStmt | limitStmt | filterStmt | orderByStmt |
+    generateStmt | constructBagStmt) ~ ";" ^^ { case op ~ _  => op }
+  def nestedScript: Parser[List[PigOperator]] = rep(nestedStmt)
+
+  /*
    * <A> = FOREACH <B> GENERATE <Expr> [ AS <Schema> ]
+   * <A> = FOREACH <B> { <SubPlan> }
    */
   def exprSchema: Parser[Field] = asKeyword ~ fieldSchema ^^ { case _ ~ t => t }
   def genExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
   def generatorList: Parser[List[GeneratorExpr]] = repsep(genExpr, ",")
-  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~ generateKeyword ~ generatorList ^^ {
-    case out ~ _ ~ _ ~ in ~ _ ~ ex => Foreach(out, in, ex)
+  def plainForeachGenerator: Parser[ForeachGenerator] = generateKeyword ~ generatorList ^^ {
+    case _ ~ exList => GeneratorList(exList)
   }
+  def nestedForeachGenerator: Parser[ForeachGenerator] = "{" ~ nestedScript ~ "}" ^^ {
+    case _ ~ opList ~ _ => GeneratorPlan(opList)
+  }
+  def foreachStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~
+    (plainForeachGenerator | nestedForeachGenerator) ^^ {
+      case out ~ _ ~ _ ~ in ~ ex => Foreach(out, in, ex)
+    }
 
   /*
    * <A> = FILTER <B> BY <Predicate>
@@ -400,32 +443,71 @@ class PigParser extends JavaTokenParsers {
   }
 
   /*
+   * SPLIT <A> INTO <B> IF <Cond>, <C> IF <Cond> ...
+   */
+  def splitBranch: Parser[SplitBranch] = bag ~ ifKeyword ~ logicalExpr ^^ { case out ~ _ ~ expr => SplitBranch(out, expr)}
+
+  def splitStmt: Parser[PigOperator] = splitKeyword ~ bag ~ intoKeyword ~ repsep(splitBranch, ",") ^^ {
+    case _ ~ in ~ _ ~ splitList => SplitInto(in, splitList)
+  }
+
+  /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    zmqSubscriberStmt | zmqPublisherStmt | windowStmt) ~ ";" ^^ {
+    zmqSubscriberStmt | zmqPublisherStmt | windowStmt | splitStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*
-   * A script is a list of statements.
+   * A plain Pig script is a list of statements.
    */
-  def script: Parser[List[PigOperator]] = rep(stmt)
+  def plainPigScript: Parser[List[PigOperator]] = rep(stmt)
 
-  def parseScript(s: CharSequence): List[PigOperator] = {
-    parseScript(new CharSequenceReader(s))
+  /* ---------------------------------------------------------------------------------------------------------------- */
+  /*
+   * Pig extensions for processing RDF data and supporting SPARQL BGPs.
+   */
+  lazy val tuplifyKeyword = "tuplify".ignoreCase
+  lazy val onKeyword = "on".ignoreCase
+
+  def tuplifyStmt: Parser[PigOperator] = bag ~ "=" ~ tuplifyKeyword ~ bag ~ onKeyword ~ ref ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ r => Tuplify(out, in, r) }
+
+  def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
+    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    splitStmt | tuplifyStmt) ~ ";" ^^ {
+    case op ~ _  => op }
+
+
+  def sparqlPigScript: Parser[List[PigOperator]] = rep(sparqlStmt)
+
+  /* ---------------------------------------------------------------------------------------------------------------- */
+  /*
+   * Pig extensions for processing streaming data.
+   */
+
+  def streamingPigScript: Parser[List[PigOperator]] = rep(stmt)
+
+  /* ---------------------------------------------------------------------------------------------------------------- */
+
+  def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
+    parseScript(new CharSequenceReader(s), feature)
   }
 
-  def parseScript(input: CharSequenceReader): List[PigOperator] = {
-    parsePhrase(input) match {
+  def parseScript(input: CharSequenceReader, feature: LanguageFeature): List[PigOperator] = {
+    parsePhrase(input, feature) match {
       case Success(t, _) => t
       case NoSuccess(msg, next) => 
         throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
     }
   }
 
-  def parsePhrase(input: CharSequenceReader): ParseResult[List[PigOperator]] = {
-    phrase(script)(input)
-  }
+  def parsePhrase(input: CharSequenceReader, feature: LanguageFeature): ParseResult[List[PigOperator]] =
+    feature match {
+      case PlainPig => phrase(plainPigScript)(input)
+      case SparqlPig => phrase(sparqlPigScript)(input)
+      case StreamingPig => phrase(streamingPigScript)(input)
+    }
 
 }

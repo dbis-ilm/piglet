@@ -14,12 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package dbis.pig.tools
+package dbis.pig.op
 
 /**
-  * Defines the interface to the backend execution.
-  */
-trait Run {
-  def execute(master: String, className: String, jarFile: String): Unit
+ *
+ * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
+ *                           can be changed later.
+ * @param initialInPipeName
+ * @param ref a reference des
+ */
+case class Tuplify(override val initialOutPipeName: String, initialInPipeName: String, ref: Ref)
+  extends PigOperator(initialOutPipeName, initialInPipeName) {
+  override def lineageString: String = s"""TUPLIFY%""" + super.lineageString
+
+  // TODO
+  override def checkSchemaConformance: Boolean = true
 }

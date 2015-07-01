@@ -29,7 +29,10 @@ class FlinkCompileSpec extends FlatSpec {
 
   "The compiler output" should "contain the Flink header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitImport + codeGenerator.emitHeader("test") + codeGenerator.emitFooter)
+    val generatedCode = cleanString(codeGenerator.emitImport 
+      + codeGenerator.emitHeader1("test") 
+      + codeGenerator.emitHeader2("test") 
+      + codeGenerator.emitFooter)
     val expectedCode = cleanString("""
       |import org.apache.flink.streaming.api.scala._
       |import dbis.flink._
@@ -50,7 +53,7 @@ class FlinkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
-    val expectedCode = cleanString(s"""val a = env.readTextFile("${file}").map(s => List(s))""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", '\\t')""")
     assert(generatedCode == expectedCode)
   }
 
@@ -116,13 +119,13 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for a FOREACH statement with function expressions" in {
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
-    val op = Foreach("a", "b", List(
+    val op = Foreach("a", "b", GeneratorList(List(
       GeneratorExpr(Func("TOMAP", List(
         RefExpr(Value("\"field1\"")),
         RefExpr(PositionalField(0)),
         RefExpr(Value("\"field2\"")),
         RefExpr(PositionalField(1)))))
-      ))
+      )))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(PigFuncs.toMap(\"field1\",t(0),\"field2\",t(1))))")
@@ -131,10 +134,10 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for a FOREACH statement with another function expression" in {
     // a = FOREACH b GENERATE $0, COUNT($1) AS CNT;
-    val op = Foreach("a", "b", List(
+    val op = Foreach("a", "b", GeneratorList(List(
       GeneratorExpr(RefExpr(PositionalField(0))),
       GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType)))
-      ))
+      )))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(t(0),PigFuncs.count(t(1).asInstanceOf[Seq[Any]])))")
@@ -143,8 +146,8 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for deref operator on maps in FOREACH statement" in {
     // a = FOREACH b GENERATE $0#"k1", $1#"k2";
-    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
-      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\"")))))
+    val op = Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
+      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\""))))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -154,8 +157,8 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for deref operator on tuple in FOREACH statement" in {
     // a = FOREACH b GENERATE $0.$1, $2.$0;
-    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
-      GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0))))))
+    val op = Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
+      GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0)))))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""

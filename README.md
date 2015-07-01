@@ -52,11 +52,12 @@ installation. A corresponding script called `pigf` exists for Flink.
 In addition, there is an interactive Pig shell similar to Grunt:
 
 ```
-pigsh
+pigsh -b spark
 ```
 
 where Pig statements can be entered at the prompt and are executed as soon as
 a `DUMP` or `STORE` statement is entered. Furthermore, the schema can be printed using `DESCRIBE`.
+With the `-b` option you can specify which backend (spark, flink) will be used.
 
 
 ### Mapping of Pig statements to Spark ###

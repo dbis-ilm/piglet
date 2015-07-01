@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package dbis.pig.tools
 
 import java.io.{File, FileOutputStream, FileWriter, InputStream, OutputStream}

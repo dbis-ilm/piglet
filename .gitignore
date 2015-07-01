@@ -9,11 +9,11 @@ dist
 /.idea
 /*.iml
 /out
-/.idea_modules
-/.classpath
-/.project
+.idea_modules
+.classpath
+.project
 /RUNNING_PID
-/.settings
+.settings
 .target
 /bin
 *.jpage
@@ -24,3 +24,21 @@ lodhub_data
 .sbt_completion_cache
 .tags
 *.bak
+*.class
+*.log
+
+# sbt specific
+.cache
+.cache-*
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet

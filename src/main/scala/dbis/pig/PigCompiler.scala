@@ -19,14 +19,16 @@ package dbis.pig
 
 
 import java.io.File
+
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.FileTools
 import scopt.OptionParser
+
 import scala.io.Source
-import sys.process._
 
 object PigCompiler extends PigParser {
   case class CompilerConfig(master: String = "local", input: String = "", compile: Boolean = false, outDir: String = ".", backend: String = BuildSettings.backends.get("default").get("name"))
@@ -78,7 +80,7 @@ object PigCompiler extends PigParser {
     val fileName = new File(inputFile).getName
 
     // 2. then we parse it and construct a dataflow plan
-    val plan = new DataflowPlan(parseScriptFromSource(source))
+    var plan = new DataflowPlan(parseScriptFromSource(source))
     
     try {
       // if this does _not_ throw an exception, the schema is ok
@@ -93,14 +95,16 @@ object PigCompiler extends PigParser {
     val scriptName = fileName.replace(".pig", "")
 
     // 3. now, we should apply optimizations
-
+    plan = processPlan(plan)
 
     if (FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend)) {
       val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
 
-      // 4. and finally deploy/submit
-      val runner = FileTools.getRunner(backend)
-      runner.execute(master, scriptName, jarFile)
+      if (!compileOnly) {
+        // 4. and finally deploy/submit
+        val runner = FileTools.getRunner(backend)
+        runner.execute(master, scriptName, jarFile)
+      }
     }
   }
 

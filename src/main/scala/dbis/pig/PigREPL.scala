@@ -21,6 +21,8 @@ import java.io.File
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.rewriting.Rewriter._
+import dbis.pig.plan.PrettyPrinter._
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.FileTools
 import jline.console.ConsoleReader
@@ -62,6 +64,8 @@ object PigREPL extends PigParser {
         |Diagnostic commands:
         |    describe <alias> - Show the schema for the alias.
         |    dump <alias> - Compute the alias and writes the results to stdout.
+        |    prettyprint - Prints the dataflowplans operator list
+        |    rewrite - Rewrites the current DataflowPlan
         |Utility Commands:
         |    help - Display this message.
         |    quit - Quit the Pig shell.
@@ -81,6 +85,22 @@ object PigREPL extends PigParser {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
       case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
+      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => {
+        val plan = new DataflowPlan(buf.toList)
+        for(sink <- plan.sinkNodes) {
+          println(pretty(sink))
+        }
+        false
+      }
+      case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => {
+        val plan = new DataflowPlan(buf.toList)
+        for (sink <- plan.sinkNodes) {
+          println(pretty(sink))
+          val newSink = processSink(sink)
+          println(pretty(newSink))
+        }
+        false
+      }
       case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
         val plan = new DataflowPlan(buf.toList)
         
