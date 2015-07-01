@@ -51,7 +51,7 @@ Option[Schema]) extends Rewritable{
         case Some(name) => {
           list.foreach(op => {
             if (!op.initialInPipeNames.contains(name)) {
-              throw new IllegalArgumentException(op + " does not read from " + newOutput)
+              throw new IllegalArgumentException(op + " does not read from " + name)
             }
           })
           _output = newOutput
