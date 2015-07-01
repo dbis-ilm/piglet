@@ -56,10 +56,11 @@ class DataflowPlan(var operators: List[PigOperator]) {
      * 1. We create the mapping from names to the operators that *write* them.
      */
     planOps.foreach(op => {
-      if (op.initialOutPipeName != "") {
-        if (pipes.contains(op.initialOutPipeName))
-          throw new InvalidPlanException("duplicate pipe: " + op.initialOutPipeName)
-        pipes(op.initialOutPipeName) = (op, List())
+      if (op.output.isDefined) {
+        val output = op.output.get
+        if (pipes.contains(output))
+          throw new InvalidPlanException("duplicate pipe: " + output)
+        pipes(output) = (op, List())
       }
     })
 
@@ -81,8 +82,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
     try {
       planOps.foreach(op => {
         op.inputs = op.initialInPipeNames.map(p => Pipe(p, pipes(p)._1))
-        op.output = if (op.initialOutPipeName != "") Some(op.initialOutPipeName) else None
-        op.outputs = if (op.initialOutPipeName != "") pipes(op.initialOutPipeName)._2 else op.outputs
+        op.output = if (op.output.isDefined) Some(op.output.get) else None
+        op.outputs = if (op.output.isDefined) pipes(op.output.get)._2 else op.outputs
         // println("op: " + op)
         op.preparePlan
         op.constructSchema
