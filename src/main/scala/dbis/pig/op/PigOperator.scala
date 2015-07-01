@@ -85,6 +85,8 @@ Option[Schema]) extends Rewritable{
     }
   }
 
+  output = if (initialOutPipeName != null && initialOutPipeName != "") { Some(initialOutPipeName)} else { None }
+
   def this(out: String, in: List[String]) = this(out, in, None)
 
   def this(out: String) = this(out, List(), None)
