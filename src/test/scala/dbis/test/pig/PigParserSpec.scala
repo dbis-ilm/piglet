@@ -89,6 +89,15 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("dump b; -- A comment") == List(Dump("b")))
   }
 
+
+  it should "should handle comments only to EOL" in {
+    assert(parseScript("""
+      |-- A comment
+      |-- Another comment
+      |dump b; -- A comment
+      |dump c;""".stripMargin) == List(Dump("b"), Dump("c")))
+  }
+
   it should "parse the dump statement" in {
     assert(parseScript("dump b;") == List(Dump("b")))
   }

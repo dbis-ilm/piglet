@@ -152,7 +152,12 @@ case class Field(name: String, fType: PigType = Types.ByteArrayType) {
   def isBagType = fType.isInstanceOf[BagType]
 }
 
-case class TupleType(var fields: Array[Field], s: String = "") extends PigType(s) {
+abstract class ComplexType(s: String) extends PigType(s) {
+  def typeOfComponent(name: String): PigType
+  def typeOfComponent(pos: Int): PigType
+}
+
+case class TupleType(var fields: Array[Field], s: String = "") extends ComplexType(s) {
   override def equals(that: Any): Boolean = that match {
     case TupleType(fields, name) => this.name == name && this.fields.deep == fields.deep
     case _ => false
@@ -163,12 +168,19 @@ case class TupleType(var fields: Array[Field], s: String = "") extends PigType(s
   override def descriptionString = "(" + fields.mkString(", ") + ")"
 
   def plainDescriptionString = fields.mkString(", ")
+
+  override def typeOfComponent(name: String): PigType = fields.find(f => f.name == name).head.fType
+  override def typeOfComponent(pos: Int): PigType = fields(pos).fType
 }
 
-case class BagType(var valueType: TupleType, s: String = "") extends PigType(s) {
+case class BagType(var valueType: TupleType, s: String = "") extends ComplexType(s) {
   override def descriptionString = "{" + valueType.plainDescriptionString + "}"
+  override def typeOfComponent(name: String): PigType = valueType.typeOfComponent(name)
+  override def typeOfComponent(pos: Int): PigType = valueType.typeOfComponent(pos)
 }
 
-case class MapType(var valueType: PigType, s: String = "") extends PigType(s) {
+case class MapType(var valueType: PigType, s: String = "") extends ComplexType(s) {
   override def descriptionString = "[" + valueType.descriptionString + "]"
+  override def typeOfComponent(name: String): PigType = valueType
+  override def typeOfComponent(pos: Int): PigType = valueType
 }

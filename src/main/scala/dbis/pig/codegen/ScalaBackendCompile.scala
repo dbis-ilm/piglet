@@ -24,21 +24,9 @@ import org.clapper.scalasti._
 
 class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
 
-  // case class UDF(name: String, numParams: Int, isAggregate: Boolean)
   case class TemplateException(msg: String) extends Exception(msg)
   
 
-/*//  val templateFile = "src/main/resources/flink-template.stg"
-
-  val funcTable = Map("COUNT" -> UDF("PigFuncs.count", 1, true),
-                      "AVG" -> UDF("PigFuncs.average", 1, true),
-                      "SUM" -> UDF("PigFuncs.sum", 1, true),
-                      "MIN" -> UDF("PigFuncs.min", 1, true),
-                      "MAX" -> UDF("PigFuncs.max", 1, true),
-                      "TOKENIZE" -> UDF("PigFuncs.tokenize", 1, false),
-                      "TOMAP" -> UDF("PigFuncs.toMap", Int.MaxValue, false)
-  )
-  */
 
   // TODO: complex types
   val scalaTypeMappingTable = Map[PigType, String](Types.IntType -> "Int",
@@ -142,9 +130,9 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
     case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast)}"
     case Func(f, params) => {
-      val pTypes = params.map(p => p.resultType(schema)._2)
+      val pTypes = params.map(p => {p.resultType(schema)._2})
       UDFTable.findUDF(f, pTypes) match {
-        case Some(udf) => { if (udf.isAggregate) s"${udf.scalaName}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
+        case Some(udf) => { if (udf.isAggregate) s"${udf.scalaName}(${emitExpr(schema, params.head, false)}.asInstanceOf[Seq[Any]])"
                             else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
         }
         case None => {
@@ -152,21 +140,6 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
           s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
         }
       }
-      /*
-      if (funcTable.contains(f)) {
-        val udf = funcTable(f)
-        // TODO: check size of params
-        if (udf.isAggregate) {
-          s"${udf.name}(${emitExpr(schema, params.head)}.asInstanceOf[Seq[Any]])"
-        }
-        else
-          s"${udf.name}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
-      }
-      else {
-        // TODO: we don't know the function yet, let's assume there is a corresponding Scala function
-        s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
-      }
-      */
     }
     case FlattenExpr(e) => emitExpr(schema, e)
     case _ => println("unsupported expression: " + expr); ""
@@ -193,7 +166,10 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     val otherExprs = genExprs.diff(flattenExprs)
     if (flattenExprs.size == 1) {
       val ex = flattenExprs.head.expr
-      s"List(${emitExpr(schema, ex, false)}.asInstanceOf[Seq[Any]].map(s => (${otherExprs.map(e => emitExpr(schema, e.expr, false))}, s))"
+      if (otherExprs.nonEmpty)
+        s"List(${emitExpr(schema, ex, false)}.asInstanceOf[Seq[Any]].map(s => (${otherExprs.map(e => emitExpr(schema, e.expr, false))}, s))"
+      else
+        s"${emitExpr(schema, ex, false)}"
     }
     else
       s"" // i.flatMap(t => t(1).asInstanceOf[Seq[Any]].map(s => List(t(0),s)))
@@ -336,7 +312,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(node.schema, pred)))
       case Foreach(out, in, gen) => {
-        // we need to know if the generator contains flatten on tuples or even on bags (which require flatMap)
+        // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
         val requiresPlainFlatten = node.asInstanceOf[Foreach].containsFlatten(onBag = false)
         val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
         gen match {

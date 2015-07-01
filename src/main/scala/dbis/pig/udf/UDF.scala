@@ -33,12 +33,36 @@ object UDFTable {
   )
 
   def typeMatch(funcType: PigType, paramType: PigType): Boolean = if (funcType == Types.AnyType) true else funcType == paramType
+
+  // TODO
   def typeListMatch(funcTypes: List[PigType], paramTypes: List[PigType]): Boolean = true
 
-  def findUDF(name: String, paramType: PigType): Option[UDF] =
-    funcTable.filter(udf => udf.name == name && udf.numParams == 1 && typeMatch(udf.paramTypes.head, paramType)).headOption
+  // TODO
+  def typeListCompatibility(funcTypes: List[PigType], paramTypes: List[PigType]): Boolean = true
 
-  def findUDF(name: String, paramTypes: List[PigType]): Option[UDF] =
-    funcTable.filter(udf => udf.name == name && typeListMatch(udf.paramTypes, paramTypes)).headOption
+  def findUDF(name: String, paramType: PigType): Option[UDF] = {
+    // 1st, we check candidates with the same name
+    val candidates = funcTable.filter(udf => udf.name == name.toUpperCase && udf.numParams == 1)
+    // if we find a udf among these candidates with the same number and type of parameter, then we return it directly
+    val res = candidates.filter{udf: UDF => typeMatch(udf.paramTypes.head, paramType)}
+    if (res.nonEmpty)
+      res.headOption
+    else {
+      // otherwise we check for a udf with type compatible parameter
+      candidates.find { udf: UDF => Types.typeCompatibility(udf.paramTypes.head, paramType) }
+    }
+  }
 
+  def findUDF(name: String, paramTypes: List[PigType]): Option[UDF] = {
+    // 1st, we check candidates with the same name (not the same number of parameters in order to allow AnyType)
+    val candidates = funcTable.filter(udf => udf.name == name.toUpperCase /* && udf.numParams == paramTypes.size*/)
+    // if we find a udf among these candidates with the same number and type of parameters, then we return it directly
+    val res = candidates.filter { udf: UDF => typeListMatch(udf.paramTypes, paramTypes) }
+    if (res.nonEmpty)
+      res.headOption
+    else {
+      // otherwise we check for a udf with type compatible parameter
+      candidates.find { udf: UDF => typeListCompatibility(udf.paramTypes, paramTypes) }
+    }
+  }
 }

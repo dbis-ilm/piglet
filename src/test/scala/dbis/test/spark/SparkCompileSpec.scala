@@ -406,6 +406,18 @@ class SparkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for flattening a bag function in FOREACH" in {
+    val ops = parseScript("b = load 'file'; a = foreach b generate flatten(tokenize($0));")
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType)))))
+    ops.head.schema = Some(schema)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
+    val expectedCode = cleanString("""
+        |val a = b.flatMap(t => PigFuncs.tokenize(t(0))).map(t => List(t))""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
   it should "contain code for flattening a bag in FOREACH" in {
     val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
@@ -416,7 +428,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.flatMap(t => List(t(1).asInstanceOf[Seq[Any]].map(s => (List(t(0)), s)))""".stripMargin)
+        |val a = b.flatMap(t => List(t(1).asInstanceOf[Seq[Any]].map(s => (List(t(0)), s))).map(t => List(t))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 }

@@ -329,7 +329,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     val op = ops.head
     op.outPipeName should be ("a")
     plan.insertAfter(op, Distinct("c", "a"))
-    println(op)
   }
 
   it should "be consistent after exchanging two operators" in {

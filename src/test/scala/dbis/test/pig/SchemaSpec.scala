@@ -31,4 +31,11 @@ class SchemaSpec extends FlatSpec {
     assert(schema.field(0) == Field("f1", Types.DoubleType))
     assert(schema.field(1) == Field("f2", Types.CharArrayType))
   }
+
+  it should "allow to change the bag name" in {
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.DoubleType),
+      Field("f2", Types.CharArrayType)), "t"), "s"))
+    schema.setBagName("bag")
+    assert(schema.element.name == "bag")
+  }
 }

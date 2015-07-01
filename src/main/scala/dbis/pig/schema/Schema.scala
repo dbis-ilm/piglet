@@ -29,7 +29,9 @@ case class SchemaException(private val msg: String) extends Exception(msg)
  * @param element the type definition - in most cases a bag of tuples
  *
  */
-case class Schema(val element: BagType) {
+case class Schema(var element: BagType) {
+  def setBagName(s: String) =  element.name = s
+
   /**
    * Returns the index of the field in the schema.
    *
@@ -51,7 +53,7 @@ case class Schema(val element: BagType) {
    */
   def field(pos: Int): Field = {
     if (! element.valueType.isInstanceOf[TupleType])
-      throw new SchemaException("schema type isn't a bag of tuples")
+      throw SchemaException("schema type isn't a bag of tuples")
     val tupleType = element.valueType.asInstanceOf[TupleType]
     tupleType.fields(pos)
   }
@@ -62,7 +64,11 @@ case class Schema(val element: BagType) {
    * @param name the name of the field
    * @return the field definition
    */
-  def field(name: String): Field = field(indexOfField(name))
+  def field(name: String): Field = {
+    val idx = indexOfField(name)
+    if (idx == -1) throw SchemaException("unkown field '" + name + "' in "+ this)
+    field(idx)
+  }
 
   def fields: Array[Field] = {
     if (! element.valueType.isInstanceOf[TupleType])
@@ -70,4 +76,6 @@ case class Schema(val element: BagType) {
     val tupleType = element.valueType.asInstanceOf[TupleType]
     tupleType.fields
   }
+
+  override def toString = "Schema(" + element.toString + "," + element.name + ")"
 }

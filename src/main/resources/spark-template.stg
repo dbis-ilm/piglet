@@ -53,7 +53,7 @@ foreach(out,in,expr) ::=<<
 
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
 foreachFlatMap(out,in,expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>)
+        val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
