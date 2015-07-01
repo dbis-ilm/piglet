@@ -158,9 +158,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @param n the operator to be removed from the plan
    * @return the resulting dataflow plan
    */
-  def remove(n: PigOperator) : DataflowPlan = {
-    this
-  }
+  def remove(n: PigOperator) : DataflowPlan = Rewriter.remove(this, n)
 
   /**
    * Replace the operator old by the new operator repl in the current dataflow plan.

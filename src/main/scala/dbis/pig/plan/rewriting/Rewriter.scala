@@ -186,6 +186,38 @@ object Rewriter {
     processPlan(plan, strategyf(t => strategy(t)))
   }
 
+  /** Remove `rem` from `plan`
+    *
+    * @param plan
+    * @param rem
+    * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
+    */
+  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
+    if (rem.inputs.length != 1) {
+      throw new IllegalArgumentException("Can't remove an operator with more than one input")
+    }
+
+    val strategy = (op: Any) => {
+      if (op == rem) {
+        val pigop = op.asInstanceOf[PigOperator]
+        val input = pigop.inputs.head
+        val newOp = input.producer
+
+        // Modify rems input operator so its data can flow to rems output
+        newOp.outputs = newOp.outputs.filter(_ != pigop)
+        newOp.output = rem.output
+        newOp.outputs = pigop.outputs
+
+        Some(newOp)
+      }
+      else {
+        None
+      }
+    }
+
+    processPlan(plan, strategyf(t => strategy(t)))
+  }
+
   /** Add a strategy that applies a function to two operators.
     *
     * @param f The function to apply.

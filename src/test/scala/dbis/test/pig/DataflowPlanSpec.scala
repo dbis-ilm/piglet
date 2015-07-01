@@ -337,7 +337,16 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   }
   it should "be consistent after removing an operator" in {
+    val op1 = Load("a", "file.csv")
+    val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = Filter("b", "a", predicate)
+    val op3 = Dump("b")
 
+    val plan = new DataflowPlan(List(op1, op2, op3))
+    val newPlan = plan.remove(op2)
+
+    newPlan.sinkNodes.headOption.value.inputs should contain only(Pipe("b", op1))
+    newPlan.sourceNodes.headOption.value.outputs should not contain op2
   }
 
   it should "correctly assign inputs and outputs" in {
