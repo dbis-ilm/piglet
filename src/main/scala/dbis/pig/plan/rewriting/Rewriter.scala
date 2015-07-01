@@ -114,8 +114,7 @@ object Rewriter {
     *         Filters, None otherwise.
     */
   private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
-    val newFilter = Filter(parent.output.get, child.initialInPipeName, And(parent.pred, child.pred))
-    Some(newFilter)
+    Some(Filter(parent.output.get, child.initialInPipeName, And(parent.pred, child.pred)))
   }
 
   /** Puts [[dbis.pig.op.Filter]] operators before [[dbis.pig.op.OrderBy]] ones.
@@ -134,6 +133,18 @@ object Rewriter {
 
   /** Add a new strategy for merging operators of two types.
     *
+    * An example method to merge Filter operators is
+    * {{{
+    *  def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
+    *    Some(Filter(parent.output.get, child.initialInPipeName, And(parent.pred, child.pred)))
+    *  }
+    * }}}
+    *
+    * It can be added to the rewriter via
+    * {{{
+    *  merge[Filter, Filter](mergeFilters)
+    * }}}
+    *
     * @param f The function to perform the merge. It does not have to modify inputs and outputs, this will be done
     *          automatically.
     * @tparam T The type of the first operator.
@@ -149,6 +160,20 @@ object Rewriter {
   }
 
   /** Add a new strategy for reordering two operators.
+    *
+    * An example method to reorder Filter operators before OrderBy ones is
+    * {{{
+    *   def filterBeforeOrder(parent: Filter, child: OrderBy): Option[(OrderBy, Filter)] = {
+    *     val newOrder = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.orderSpec)
+    *     val newFilter = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.pred)
+    *     Some((newOrder, newFilter))
+    *   }
+    * }}}
+    *
+    * It can be added to the rewriter via
+    * {{{
+    *  reorder[Filter, OrderBy](filterBeforeOrder)
+    * }}}
     *
     * @param f The function to perform the reordering. It does not have to modify inputs and outputs, this will be
     *          done automatically.
