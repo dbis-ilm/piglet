@@ -85,12 +85,11 @@ class PigParserSpec extends FlatSpec {
       List(Load("a", "file.csv", Some(Schema(schema)))))
   }
 
-  it should "should ignore comments" in {
+  it should "ignore comments" in {
     assert(parseScript("dump b; -- A comment") == List(Dump("b")))
   }
 
-
-  it should "should handle comments only to EOL" in {
+  it should "handle comments only to EOL" in {
     assert(parseScript("""
       |-- A comment
       |-- Another comment
