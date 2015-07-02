@@ -54,7 +54,7 @@ trait GenCodeBase {
   def emitHeader2(scriptName: String): String
 
   /**
-   * Generate code needed for finish the script.
+   * Generate code needed for finishing the script.
    *
    * @return a string representing the end of the code.
    */

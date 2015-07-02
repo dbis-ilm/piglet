@@ -22,20 +22,36 @@ import dbis.pig.schema._
 import dbis.pig.udf._
 import org.clapper.scalasti._
 
+/**
+ * Implements a code generator for Scala-based backends such as Spark or Flink which use
+ * a template file for the backend-specific code.
+ *
+ * The main idea of the generated code is the following: a record of the backend-specific data
+ * structure (e.g. RDD in Spark) is represented by List[Any] to allow variable-sized tuples as
+ * supported in Pig. This requires to always map the output of any backend transformation back
+ * to such a list.
+ *
+ * @param templateFile the name of the backend-specific template fle
+ */
 class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
 
+  /**
+   * An exception representing an error in handling the templates for code generation.
+   *
+   * @param msg the error message
+   */
   case class TemplateException(msg: String) extends Exception(msg)
-  
 
+  /*------------------------------------------------------------------------------------------------- */
+  /*                                           helper functions                                       */
+  /*------------------------------------------------------------------------------------------------- */
 
-  // TODO: complex types
-  val scalaTypeMappingTable = Map[PigType, String](Types.IntType -> "Int",
-    Types.LongType -> "Long",
-    Types.FloatType -> "Float",
-    Types.DoubleType -> "Double",
-    Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "String")
-
+  /**
+   *
+   * @param schema
+   * @param ref
+   * @return
+   */
   def tupleSchema(schema: Option[Schema], ref: Ref): Option[Schema] = {
     val tp = ref match {
       case NamedField(f) => schema match {
@@ -53,6 +69,96 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       Some(new Schema( if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType(tp.asInstanceOf[TupleType])))
   }
 
+  /**
+   * Replaces Pig-style quotes (') by double quotes in a string.
+   *
+   * @param s a quoted string in Pig-style (')
+   * @return a string with double quotes
+   */
+  def quote(s: String): String = s.replace('\'', '"')
+
+  /**
+   * Returns true if the sort order of the OrderBySpec is ascending
+   *
+   * @param spec the OrderBySpec value
+   * @return true if sorting in ascending order
+   */
+  def ascendingSortOrder(spec: OrderBySpec): Boolean = spec.dir == OrderByDirection.AscendingOrder
+
+
+  // TODO: complex types
+  val scalaTypeMappingTable = Map[PigType, String](
+    Types.IntType -> "Int",
+    Types.LongType -> "Long",
+    Types.FloatType -> "Float",
+    Types.DoubleType -> "Double",
+    Types.CharArrayType -> "String",
+    Types.ByteArrayType -> "String")
+
+  /**
+   * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
+   * bytearray which is mapped to String.
+   *
+   * @param field a Ref representing the field (positional or named=
+   * @param schema the schema of the field
+   * @return the name of the Scala type
+   */
+  def scalaTypeOfField(field: Ref, schema: Option[Schema]) : String = {
+    schema match {
+      case Some(s) => {
+        field match {
+          case PositionalField(f) => scalaTypeMappingTable(s.field(f).fType)
+          case NamedField(n) => scalaTypeMappingTable(s.field(n).fType)
+          case _ => "String"
+        }
+      }
+      case None => "String"
+    }
+  }
+
+  /**
+   *
+   * @param schema
+   * @return
+   */
+  def listToTuple(schema: Option[Schema]): String = schema match {
+    case Some(s) => '"' + (0 to s.fields.length-1).toList.map(i => if (s.field(i).isBagType) s"{%s}" else s"%s").mkString(",") + '"' +
+      ".format(" + (0 to s.fields.length-1).toList.map(i =>
+      if (s.field(i).isBagType)
+        s"""t($i).asInstanceOf[Seq[Any]].mkString(",")"""
+      else
+        s"t($i)").mkString(",") + ")"
+    case None => s"t(0)"
+  }
+
+  /**
+   *
+   * @param schema
+   * @param field
+   * @return
+   */
+  def findFieldPosition(schema: Option[Schema], field: Ref): Int = field match {
+    case NamedField(f) => schema match {
+      case Some(s) => s.indexOfField(f)
+      case None => -1
+    }
+    case PositionalField(p) => p
+    case _ => -1
+  }
+
+
+  /*------------------------------------------------------------------------------------------------- */
+  /*                                  Scala-specific code generators                                  */
+  /*------------------------------------------------------------------------------------------------- */
+
+   /**
+   *
+   * @param schema
+   * @param ref
+   * @param tuplePrefix
+   * @param requiresTypeCast
+   * @return
+   */
   def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true): String = ref match {
     case NamedField(f) => schema match {
       case Some(s) => {
@@ -82,6 +188,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     case _ => { "" }
   }
 
+  /**
+   *
+   * @param schema
+   * @param predicate
+   * @return
+   */
   def emitPredicate(schema: Option[Schema], predicate: Predicate): String = predicate match {
     case Eq(left, right) => { s"${emitExpr(schema, left)} == ${emitExpr(schema, right)}"}
     case Neq(left, right) => { s"${emitExpr(schema, left)} != ${emitExpr(schema, right)}"}
@@ -92,6 +204,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     case _ => { "" }
   }
 
+  /**
+   *
+   * @param schema
+   * @param groupingExpr
+   * @return
+   */
   def emitGrouping(schema: Option[Schema], groupingExpr: GroupingExpression): String = {
     if (groupingExpr.keyList.size == 1)
       groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString
@@ -99,6 +217,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       "(" + groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",") + ")"
   }
 
+  /**
+   *
+   * @param schema
+   * @param joinExpr
+   * @return
+   */
   def emitJoinKey(schema: Option[Schema], joinExpr: List[Ref]): String = {
     if (joinExpr.size == 1)
       emitRef(schema, joinExpr.head)
@@ -106,8 +230,15 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       s"Array(${joinExpr.map(e => emitRef(schema, e)).mkString(",")}).mkString"
   }
 
-  def quote(s: String): String = s.replace('\'', '"')
-
+  /**
+   * Generates code for the LOAD operator.
+   *
+   * @param out name of the output bag
+   * @param file the name of the file to be loaded
+   * @param loaderFunc an optional loader function (we assume a corresponding Scala function is available)
+   * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
+   * @return the Scala code implementing the LOAD operator
+   */
   def emitLoader(out: String, file: String, loaderFunc: String, loaderParams: List[String]): String = {
     if (loaderFunc == "")
       callST("loader", Map("out"->out,"file"->file))
@@ -117,6 +248,13 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     }
   }
 
+  /**
+   *
+   * @param schema
+   * @param expr
+   * @param requiresTypeCast
+   * @return
+   */
   def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
@@ -145,6 +283,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     case _ => println("unsupported expression: " + expr); ""
   }
 
+  /**
+   *
+   * @param schema
+   * @param genExprs
+   * @return
+   */
   def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
     s"List(${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(",")})"
   }
@@ -161,6 +305,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     s"PigFuncs.flatTuple(${emitGenerator(schema, genExprs)})"
   }
 
+  /**
+   *
+   * @param schema
+   * @param genExprs
+   * @return
+   */
   def emitBagFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
     val flattenExprs = genExprs.filter(e => e.expr.traverseOr(schema.getOrElse(null), Expr.containsFlattenOnBag))
     val otherExprs = genExprs.diff(flattenExprs)
@@ -175,19 +325,25 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       s"" // i.flatMap(t => t(1).asInstanceOf[Seq[Any]].map(s => List(t(0),s)))
   }
 
+  /**
+   *
+   * @param schema the input schema of the operator
+   * @param params the list of parameters (as Refs)
+   * @return the generated code
+   */
   def emitParamList(schema: Option[Schema], params: Option[List[Ref]]): String = params match {
     case Some(refList) => s",${refList.map(r => emitRef(schema, r)).mkString(",")}"
     case None => ""
   }
 
   /**
-    * Returns true if the sort order of the OrderBySpec is ascending
-    *
-    * @param spec
-    * @return
-    */
-  def ascendingSortOrder(spec: OrderBySpec): Boolean = spec.dir == OrderByDirection.AscendingOrder
-
+   *
+   * @param schema
+   * @param orderSpec
+   * @param out
+   * @param in
+   * @return
+   */
   def emitSortKey(schema: Option[Schema], orderSpec: List[OrderBySpec], out: String, in: String) : String = {
     if (orderSpec.size == 1)
       emitRef(schema, orderSpec.head.field)
@@ -196,26 +352,11 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   }
 
   /**
-   * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
-   * bytearray which is mapped to String.
+   * Generate code for any helper class/function if needed by the given operator.
    *
-   * @param field a Ref representing the field (positional or named=
-   * @param schema the schema of the field
-   * @return the name of the Scala type
+   * @param node the Pig operator requiring helper code
+   * @return a string representing the helper code
    */
-  def scalaTypeOfField(field: Ref, schema: Option[Schema]) : String = {
-    schema match {
-      case Some(s) => {
-        field match {
-          case PositionalField(f) => scalaTypeMappingTable(s.field(f).fType)
-          case NamedField(n) => scalaTypeMappingTable(s.field(n).fType)
-          case _ => "String"
-        }
-      }
-      case None => "String"
-    }
-  }
-
   def emitHelperClass(node: PigOperator): String = {
     def genCmpExpr(col: Int, num: Int) : String =
       if (col == num) s"{ this.c$col compare that.c$col }"
@@ -264,25 +405,13 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     }
   }
 
-  def listToTuple(schema: Option[Schema]): String = schema match {
-    case Some(s) => '"' + (0 to s.fields.length-1).toList.map(i => if (s.field(i).isBagType) s"{%s}" else s"%s").mkString(",") + '"' +
-    ".format(" + (0 to s.fields.length-1).toList.map(i =>
-      if (s.field(i).isBagType)
-        s"""t($i).asInstanceOf[Seq[Any]].mkString(",")"""
-      else
-        s"t($i)").mkString(",") + ")"
-    case None => s"t(0)"
-  }
-
-  def findFieldPosition(schema: Option[Schema], field: Ref): Int = field match {
-   case NamedField(f) => schema match {
-     case Some(s) => s.indexOfField(f)
-     case None => -1
-    }
-    case PositionalField(p) => p
-    case _ => -1
-  }
-
+  /**
+   * Generates Scala code for a nested plan, i.e. statements within nested FOREACH.
+   *
+   * @param schema the input schema of the FOREACH statement
+   * @param plan the dataflow plan representing the nested statements
+   * @return the generated code
+   */
   def emitNestedPlan(schema: Option[Schema], plan: DataflowPlan): String = {
     "{\n" + plan.operators.map {
       case Generate(expr) => s"""( ${emitGenerator(schema, expr)} )"""
@@ -303,6 +432,48 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     }.mkString("\n") + "}"
   }
 
+  /**
+   *
+   * @param node
+   * @param out
+   * @param in
+   * @param gen
+   * @return
+   */
+  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator): String = {
+    // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
+    val requiresPlainFlatten = node.asInstanceOf[Foreach].containsFlatten(onBag = false)
+    val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
+    gen match {
+      case GeneratorList(expr) => {
+        if (requiresFlatMap)
+          callST("foreachFlatMap", Map("out" -> out, "in" -> in, "expr" -> emitBagFlattenGenerator(node.inputSchema, expr)))
+        else
+          callST("foreach", Map("out" -> out, "in" -> in,
+            "expr" -> {
+              if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
+              else emitGenerator(node.inputSchema, expr)
+            }))
+      }
+      case GeneratorPlan(plan) => {
+        val subPlan = node.asInstanceOf[Foreach].subPlan.get
+        callST("foreach", Map("out" -> out, "in" -> in,
+          "expr" -> emitNestedPlan(node.inputSchema, subPlan)))
+      }
+    }
+  }
+
+
+  /*------------------------------------------------------------------------------------------------- */
+  /*                           implementation of the GenCodeBase interface                            */
+  /*------------------------------------------------------------------------------------------------- */
+
+  /**
+   * Generate code for the given Pig operator.
+   *
+   * @param node the operator (an instance of PigOperator)
+   * @return a string representing the code
+   */
   def emitNode(node: PigOperator): String = {
     val group = STGroupFile(templateFile)
     node match {
@@ -311,26 +482,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       case Store(in, file) => callST("store", Map("in"->in,"file"->file,"schema"->s"tuple${in}ToString(t)"/*listToTuple(node.schema)*/))
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(node.schema, pred)))
-      case Foreach(out, in, gen) => {
-        // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
-        val requiresPlainFlatten = node.asInstanceOf[Foreach].containsFlatten(onBag = false)
-        val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
-        gen match {
-          case GeneratorList(expr) => {
-            if (requiresFlatMap)
-              callST("foreachFlatMap", Map("out" -> out, "in" -> in, "expr" -> emitBagFlattenGenerator(node.inputSchema, expr)))
-            else
-              callST("foreach", Map("out" -> out, "in" -> in,
-                "expr" -> { if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
-                            else emitGenerator(node.inputSchema, expr) }))
-          }
-          case GeneratorPlan(plan) => {
-            val subPlan = node.asInstanceOf[Foreach].subPlan.get
-            callST("foreach", Map("out" -> out, "in" -> in,
-              "expr" -> emitNestedPlan(node.inputSchema, subPlan)))
-          }
-        }
-      }
+      case Foreach(out, in, gen) => emitForeach(node, out, in, gen)
       case Grouping(out, in, groupExpr) => {
         if (groupExpr.keyList.isEmpty) callST("groupBy", Map("out"->out,"in"->in))
         else callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGrouping(node.inputSchema, groupExpr)))
@@ -365,14 +517,56 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     }
   }
 
+   /**
+   * Generate code needed for importing required Scala packages.
+   *
+   * @return a string representing the import code
+   */
   def emitImport: String = callST("init_code")
 
+  /**
+   * Generate code for the header of the script outside the main class/object,
+   * i.e. defining the main object.
+   *
+   * @param scriptName the name of the script (e.g. used for the object)
+   * @return a string representing the header code
+   */
   def emitHeader1(scriptName: String): String = callST("query_object", Map("name" -> scriptName))
+
+  /**
+   *
+   * Generate code for the header of the script which should be defined inside
+   * the main class/object.
+   *
+   * @param scriptName the name of the script (e.g. used for the object)
+   * @return a string representing the header code
+   */
   def emitHeader2(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
 
+  /**
+   * Generate code needed for finishing the script and starting the execution.
+   *
+   * @return a string representing the end of the code.
+   */
   def emitFooter: String = callST("end_query", Map("name" -> "Starting Query"))
 
+  /*------------------------------------------------------------------------------------------------- */
+  /*                               template handling code                                             */
+  /*------------------------------------------------------------------------------------------------- */
+
+  /**
+   *
+   * @param template
+   * @return
+   */
   def callST(template: String): String = callST(template, Map[String,Any]())
+
+  /**
+   *
+   * @param template
+   * @param attributes
+   * @return
+   */
   def callST(template:String, attributes: Map[String, Any]): String = {
     val group = STGroupFile(templateFile)
     val tryST = group.instanceOf(template)
