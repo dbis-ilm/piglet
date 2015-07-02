@@ -19,20 +19,54 @@ package dbis.pig.codegen
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.DataflowPlan
 
-/**
- * Created by kai on 08.04.15.
- */
 trait GenCodeBase {
+  /**
+   * Generate code for the given Pig operator.
+   *
+   * @param node the operator (an instance of PigOperator)
+   * @return a string representing the code
+   */
   def emitNode(node: PigOperator): String
-  def emitImport: String
-  def emitHeader1(scriptName: String): String
-  def emitHeader2(scriptName: String): String
-  def emitFooter: String
-  def emitHelperClass(node: PigOperator): String
 
-  // def emitPredicate(schema: Option[Schema], predicate: Predicate): String
-  // def emitRef(schema: Option[Schema], ref: Ref): String
-  // def emitGrouping(schema: Option[Schema], groupingExpr: GroupingExpression): String
+  /**
+   * Generate code needed for importing packages, classes, etc.
+   *
+   * @return a string representing the import code
+   */
+  def emitImport: String
+
+  /**
+   * Generate code for the header of the script outside the main class/object,
+   * e.g. defining the main object.
+   *
+   * @param scriptName the name of the script (e.g. used for the object)
+   * @return a string representing the header code
+   */
+  def emitHeader1(scriptName: String): String
+
+  /**
+   * Generate code for the header of the script which should be defined inside
+   * the main class/object.
+   *
+   * @param scriptName the name of the script (e.g. used for the object)
+   * @return a string representing the header code
+   */
+  def emitHeader2(scriptName: String): String
+
+  /**
+   * Generate code needed for finish the script.
+   *
+   * @return a string representing the end of the code.
+   */
+  def emitFooter: String
+
+  /**
+   * Generate code for any helper class/function if needed by the given operator.
+   *
+   * @param node the Pig operator requiring helper code
+   * @return a string representing the helper code
+   */
+  def emitHelperClass(node: PigOperator): String
 }
 
 /**

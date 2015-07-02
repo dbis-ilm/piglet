@@ -25,6 +25,7 @@ case class SchemaException(private val msg: String) extends Exception(msg)
 
 /**
  * A schema describes the structure of the output relation of an operator.
+ * We assume that the element type is a bag of tuple types.
  *
  * @param element the type definition - in most cases a bag of tuples
  *
@@ -38,6 +39,7 @@ case class Schema(var element: BagType) {
    * @param name the name of the field
    * @return the position in the field list
    */
+  @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
   def indexOfField(name: String) : Int = {
     if (! element.valueType.isInstanceOf[TupleType])
       throw new SchemaException("schema type isn't a bag of tuples")
@@ -51,6 +53,7 @@ case class Schema(var element: BagType) {
    * @param pos the position of the field in the schemas field list
    * @return the field definition
    */
+  @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
   def field(pos: Int): Field = {
     if (! element.valueType.isInstanceOf[TupleType])
       throw SchemaException("schema type isn't a bag of tuples")
@@ -64,18 +67,31 @@ case class Schema(var element: BagType) {
    * @param name the name of the field
    * @return the field definition
    */
+  @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
+  @throws[SchemaException]("if the schema doesn't contain a field with the given name")
   def field(name: String): Field = {
     val idx = indexOfField(name)
     if (idx == -1) throw SchemaException("unkown field '" + name + "' in "+ this)
     field(idx)
   }
 
+  /**
+   * Returns an array of all fields assuming that the schema type is a bag of tuples.
+   *
+   * @return the array of fields of the underlying tuple type.
+   */
+  @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
   def fields: Array[Field] = {
     if (! element.valueType.isInstanceOf[TupleType])
-      throw new SchemaException("schema type isn't a bag of tuples")
+      throw SchemaException("schema type isn't a bag of tuples")
     val tupleType = element.valueType.asInstanceOf[TupleType]
     tupleType.fields
   }
 
+  /**
+   * Returns a string representation of the schema.
+   *
+   * @return the string representation
+   */
   override def toString = "Schema(" + element.toString + "," + element.name + ")"
 }
