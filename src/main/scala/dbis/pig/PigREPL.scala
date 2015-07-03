@@ -37,12 +37,20 @@ case object EOF extends JLineEvent
 object PigREPL extends PigParser {
   val consoleReader = new ConsoleReader()
 
+  def unbalancedBrackets(s: String): Boolean = {
+    val leftBrackets = s.count(_ == '{')
+    val rightBrackets = s.count(_ == '}')
+    leftBrackets != rightBrackets
+  }
+
   def console(handler: JLineEvent => Boolean) {
     var finished = false
     val planBuffer = ListBuffer[PigOperator]()
+    var lineBuffer = ""
+    var prompt = "pigsh> "
 
     while (!finished) {
-      val line = consoleReader.readLine("pigsh> ")
+      val line = consoleReader.readLine(prompt)
       if (line == null) {
         consoleReader.getTerminal().restore()
         consoleReader.shutdown
@@ -52,7 +60,18 @@ object PigREPL extends PigParser {
         finished = handler(EmptyLine)
       }
       else if (line.size > 0) {
-        finished = handler(Line(line, planBuffer))
+        lineBuffer += line
+        // if the line doesn't end with a semicolon or the current
+        // buffer contains a unbalanced number of brackets
+        // then we change the prompt and do not execute the command.
+        if (! line.trim.endsWith(";") || unbalancedBrackets(lineBuffer)) {
+          prompt = "    | "
+        }
+        else {
+          finished = handler(Line(lineBuffer, planBuffer))
+          prompt = "pigsh> "
+          lineBuffer = ""
+        }
       }
     }
   }
@@ -137,7 +156,7 @@ object PigREPL extends PigParser {
         false
       }
       case Line(s, buf) => try {
-        buf ++= parseScript(s); 
+        buf ++= parseScript(s);
         false 
       } catch {
         case iae: IllegalArgumentException => println(iae.getMessage); false
