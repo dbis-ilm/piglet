@@ -45,14 +45,47 @@ object UDFTable {
     UDF("TOMAP", "PigFuncs.toMap", List(Types.AnyType), MapType(Types.ByteArrayType), false)
   )
 
+  /**
+   * Checks whether two parameter types are the same.
+   *
+   * @param funcType the parameter type of the function
+   * @param paramType the current parameter type
+   * @return true if the same type, otherwise false
+   */
   def typeMatch(funcType: PigType, paramType: PigType): Boolean = if (funcType == Types.AnyType) true else funcType == paramType
 
-  // TODO
-  def typeListMatch(funcTypes: List[PigType], paramTypes: List[PigType]): Boolean = true
 
-  // TODO
-  def typeListCompatibility(funcTypes: List[PigType], paramTypes: List[PigType]): Boolean = true
+  /**
+   * Checks whether two lists of parameter types are equal.
+   *
+   * @param funcTypes the list of parameter type of the function
+   * @param paramTypes the current list of parameter type
+   * @return true if the parameters are of the same types, otherwise false
+   */
+  def typeListMatch(funcTypes: List[PigType], paramTypes: List[PigType]): Boolean = {
+    val matches = funcTypes.zip(paramTypes).map{case (t1, t2) => typeMatch(t1, t2)}
+    matches.size == funcTypes.size && ! matches.exists(_ == false)
+  }
 
+  /**
+   * Checks whether two lists of parameter types contain compatible types.
+   *
+   * @param funcTypes the list of parameter type of the function
+   * @param paramTypes the current list of parameter type
+   * @return true if the parameters types are compatible, otherwise false
+   */
+  def typeListCompatibility(funcTypes: List[PigType], paramTypes: List[PigType]): Boolean = {
+    val matches = funcTypes.zip(paramTypes).map{case (t1, t2) => Types.typeCompatibility(t1, t2)}
+    matches.size == funcTypes.size && ! matches.exists(_ == false)
+  }
+
+  /**
+   * Try to find a UDF with the given name and a matching parameter type.
+   *
+   * @param name the name of the UDF
+   * @param paramType the parameter type
+   * @return the UDF object
+   */
   def findUDF(name: String, paramType: PigType): Option[UDF] = {
     // 1st, we check candidates with the same name
     val candidates = funcTable.filter(udf => udf.name == name.toUpperCase && udf.numParams == 1)
@@ -66,6 +99,13 @@ object UDFTable {
     }
   }
 
+  /**
+   * Try to find a UDF with the given name and a matching parameter type.
+   *
+   * @param name the name of the UDF
+   * @param paramTypes the list of parameter types
+   * @return the UDF object
+   */
   def findUDF(name: String, paramTypes: List[PigType]): Option[UDF] = {
     // 1st, we check candidates with the same name (not the same number of parameters in order to allow AnyType)
     val candidates = funcTable.filter(udf => udf.name == name.toUpperCase /* && udf.numParams == paramTypes.size*/)

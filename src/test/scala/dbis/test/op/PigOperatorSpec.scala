@@ -16,7 +16,10 @@
  */
 package dbis.test.op
 
-import dbis.pig.op.{Limit, Store}
+import dbis.pig.op.{PigOperator, Foreach, Limit, Store}
+import dbis.pig.schema._
+import dbis.pig.PigCompiler._
+import dbis.pig.plan._
 import org.scalatest.{FlatSpec, Matchers}
 
 class PigOperatorSpec extends FlatSpec with Matchers {
@@ -78,4 +81,27 @@ class PigOperatorSpec extends FlatSpec with Matchers {
     op.outputs = List()
   }
 
+  "The FOREACH operator" should "allow to check for FLATTEN expression" in {
+    val plan = new DataflowPlan(parseScript("b = load 'data'; a = foreach b generate $0, flatten($1);"))
+    val ops = plan.operators
+    val foreachOp: Foreach = ops(1).asInstanceOf[Foreach]
+    val schema1 = BagType(TupleType(Array(Field("a", Types.IntType),
+                                          Field("t", TupleType(Array(
+                                              Field("f1", Types.IntType),
+                                              Field("f2", Types.IntType)))))))
+    ops.head.schema = Some(Schema(schema1))
+
+    foreachOp.containsFlatten(false) should be (true)
+    foreachOp.containsFlatten(true) should be (false)
+
+
+    val schema2 = BagType(TupleType(Array(Field("a", Types.IntType),
+                                          Field("b", BagType(TupleType(Array(
+                                                                  Field("f1", Types.IntType))))))))
+    ops.head.schema = Some(Schema(schema2))
+    foreachOp.containsFlatten(false) should be (true)
+    foreachOp.containsFlatten(true) should be (true)
+
+
+  }
 }

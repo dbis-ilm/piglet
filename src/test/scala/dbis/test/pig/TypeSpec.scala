@@ -112,4 +112,16 @@ class TypeSpec extends FlatSpec with Matchers {
     )))
     t.descriptionString should be ("{f1: int, f2: (t1: bytearray, t2: bytearray)}")
   }
+
+  it should "return components of complex types" in {
+    val tup0 = TupleType(Array(Field("t1", Types.ByteArrayType),
+                               Field("t2", Types.ByteArrayType)))
+    val tup = TupleType(Array(Field("f1", Types.IntType),
+                              Field("f2", tup0)))
+    val t = BagType(tup)
+    t.typeOfComponent(0) should be (Types.IntType)
+    tup.typeOfComponent("f1") should be (Types.IntType)
+    tup.typeOfComponent(0) should be (Types.IntType)
+    tup.typeOfComponent("f2") should be (tup0)
+  }
 }

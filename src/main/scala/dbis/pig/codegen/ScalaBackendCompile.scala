@@ -83,7 +83,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
    * @param spec the OrderBySpec value
    * @return true if sorting in ascending order
    */
-  def ascendingSortOrder(spec: OrderBySpec): Boolean = spec.dir == OrderByDirection.AscendingOrder
+  def ascendingSortOrder(spec: OrderBySpec): String = if (spec.dir == OrderByDirection.AscendingOrder) "true" else "false"
 
 
   // TODO: complex types
@@ -132,10 +132,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   }
 
   /**
+   * Find the index of the field represented by the reference in the given schema.
+   * The reference could be a named field or a positional field. If not found -1 is returned.
    *
-   * @param schema
-   * @param field
-   * @return
+   * @param schema the schema containing the field
+   * @param field the field denoted by a Ref object
+   * @return the index of the field
    */
   def findFieldPosition(schema: Option[Schema], field: Ref): Int = field match {
     case NamedField(f) => schema match {
@@ -555,31 +557,34 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   /*------------------------------------------------------------------------------------------------- */
 
   /**
+   * Invoke a given string template without parameters.
    *
-   * @param template
-   * @return
+   * @param template the name of the string template
+   * @return the text from the template
    */
   def callST(template: String): String = callST(template, Map[String,Any]())
 
   /**
+   * Invoke a given string template with a map of key-value pairs used for replacing
+   * the keys in the template by the string values.
    *
-   * @param template
-   * @param attributes
-   * @return
+   * @param template the name of the string template
+   * @param attributes the map of key-value pairs
+   * @return the text from the template
    */
   def callST(template:String, attributes: Map[String, Any]): String = {
     val group = STGroupFile(templateFile)
     val tryST = group.instanceOf(template)
     if (tryST.isSuccess) {
       val st = tryST.get
-      if (!attributes.isEmpty){
+      if (attributes.nonEmpty) {
         attributes.foreach {
           attr => st.add(attr._1, attr._2)
         }
       }
       st.render()
     }
-    else throw new TemplateException(s"Template '$template' not implemented or not found") 
+    else throw TemplateException(s"Template '$template' not implemented or not found")
   }
   
 }
