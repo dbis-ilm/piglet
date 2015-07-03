@@ -102,9 +102,10 @@ class DataflowPlan(var operators: List[PigOperator]) {
     // we simply construct a graph and check its connectivity
     var graph = Graph[PigOperator,DiEdge]()
     operators.foreach(op => op.inputs.foreach(p => graph += p.producer ~> op))
+    
     graph.isConnected
   }
-
+  
   def checkSchemaConformance: Unit = {
     val errors = operators.view.map{ op => (op, op.checkSchemaConformance) }
                     .filter{ t => t._2 == false }
@@ -222,7 +223,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
     old.outputs = List.empty
     old.output = None
     
-    // 5. finally, remove old from the operator list
+    // 5. finally, remove old from the operator list and add the new one
     operators = operators.filter(_ != old) :+ repl
     
     this

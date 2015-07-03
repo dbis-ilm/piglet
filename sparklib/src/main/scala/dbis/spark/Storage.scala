@@ -24,11 +24,16 @@ import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import java.io.FileOutputStream
 
+
 class PigStorage extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, delim: Char = ' '): RDD[List[String]] = {
+  def load(sc: SparkContext, path: String, delim: Char = '\t'): RDD[List[String]] = {
     sc.textFile(path).map(line => line.split(delim).toList)
   }
 
+  def write(path: String, rdd: RDD[String]) {
+    rdd.saveAsTextFile(path)
+  }
+  
   /*
   def load(sc: SparkContext, path: String, schema: Schema, delim: String = " "): RDD[List[Any]] = {
     val pattern = "[^,(){}]+".r
@@ -72,6 +77,8 @@ class BinStorage extends java.io.Serializable {
   
   def load(sc: SparkContext, path: String): RDD[Any] = {
     
+//    val d = sc.objectFile[Any](path)
+    
     var ois: Option[ObjectInputStream] = None
     
     try {
@@ -86,8 +93,10 @@ class BinStorage extends java.io.Serializable {
   }
   
   def write(sc: SparkContext, path: String, rdd: RDD[Any]) = {
-    var oos: Option[ObjectOutputStream] = None
     
+//    rdd.saveAsObjectFile(path);
+    
+    var oos: Option[ObjectOutputStream] = None
     try {
       oos = Some(new ObjectOutputStream(new FileOutputStream(path)))
       oos.get.writeObject(rdd)

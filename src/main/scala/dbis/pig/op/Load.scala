@@ -33,7 +33,7 @@ import dbis.pig.schema.Schema
  */
 case class Load(override val initialOutPipeName: String, file: String,
                 var loadSchema: Option[Schema] = None,
-                loaderFunc: String = "", loaderParams: List[String] = null) extends PigOperator(initialOutPipeName, List(), loadSchema) {
+                loaderFunc: String = "PigStorage", loaderParams: List[String] = null) extends PigOperator(initialOutPipeName, List(), loadSchema) {
   override def constructSchema: Option[Schema] = {
     /*
      * Either the schema was defined or it is None.

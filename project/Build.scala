@@ -104,8 +104,8 @@ object Dependencies {
     scopt,
     scalaIoFile,
     scalasti,
-    kiama,
-    config
+    kiama
+//    config
   )
   val sparkDeps = Seq(
     scalaTest % "test" withSources(),
