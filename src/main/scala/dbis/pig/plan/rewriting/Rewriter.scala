@@ -44,8 +44,8 @@ object Rewriter {
    * @param sink The sink node to rewrite.
    * @return The rewritten sink node.
    */
-  def processSink(sink: PigOperator): PigOperator = {
-    processSink(sink, ourStrategy)
+  def processPigOperator(sink: PigOperator): PigOperator = {
+    processPigOperator(sink, ourStrategy)
   }
 
   /** Process a sink with a specified strategy
@@ -54,7 +54,7 @@ object Rewriter {
     * @param strategy
     * @return
     */
-  def processSink(sink: PigOperator, strategy: Strategy): PigOperator = {
+  def processPigOperator(sink: PigOperator, strategy: Strategy): PigOperator = {
     val rewriter = bottomup( attempt (strategy))
     rewrite(rewriter)(sink)
   }
@@ -68,40 +68,39 @@ object Rewriter {
 
   def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
     // This looks innocent, but this is where the rewriting happens.
-    val newSinks = plan.sinkNodes.map(processSink(_, strategy))
+    val newSources = plan.sourceNodes.map(processPigOperator(_, strategy))
 
-    var newPlanNodes = LinkedHashSet[PigOperator]() ++= newSinks
-    var nodesToProcess = newSinks.toList
+    var newPlanNodes = LinkedHashSet[PigOperator]() ++= newSources
+    var nodesToProcess = newSources.toList
 
     // We can't modify nodesToProcess while iterating over it. Therefore we'll iterate over a copy of it as long as
     // it contains elements.
     while (nodesToProcess.length > 0) {
       val iter = nodesToProcess.iterator
       nodesToProcess = List[PigOperator]()
-      for (sink <- iter) {
+      for (source <- iter) {
         // newPlanNodes might already contain this PigOperator, but we encountered it again. Remove it to later add it
         // again, thereby "pushing" it to an earlier position in the new plans list of operators because a
-        // LinkedHashSet iterates over the elements in the order of insertion and we later *reverse* the the whole
-        // thing, so PigOperators inserted later get emitted first.
-        // This is to make sure that that sink is emitted before all other operators that need its data.
-        newPlanNodes -= sink
-        // And remove its inputs as well to revisit them later on.
-        newPlanNodes --= sink.inputs.map(_.producer)
+        // LinkedHashSet iterates over the elements in the order of insertion, so PigOperators inserted later get
+        // emitted first.
+        // This is to make sure that that source is emitted before all other operators that need its data.
+        newPlanNodes -= source
+        // And remove its outputs as well to revisit them later on.
+        newPlanNodes --= source.outputs
 
-        newPlanNodes += sink
-        for (input <- sink.inputs) {
-          val producer = input.producer
+        newPlanNodes += source
+        for (output <- source.outputs) {
           // We've found a new node - it needs to be included in the new plan, so add it to the new plans nodes.
-          newPlanNodes += producer
-          // And we need to process its input nodes in the future.
-          // If we already processed a nodes input, they'll be removed again and put at the head of the new plans list
+          newPlanNodes += output
+          // And we need to process its output nodes in the future.
+          // If we already processed a nodes outputs, they'll be removed again and put at the head of the new plans list
           // of operators.
-          nodesToProcess ++= producer.inputs.map(_.producer)
+          nodesToProcess ++= output.outputs
         }
       }
     }
 
-    var newPlan = new DataflowPlan(newPlanNodes.toList.reverse)
+    var newPlan = new DataflowPlan(newPlanNodes.toList)
     newPlan.additionalJars ++= plan.additionalJars
     newPlan
   }
@@ -114,7 +113,7 @@ object Rewriter {
     *         Filters, None otherwise.
     */
   private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
-    Some(Filter(parent.output.get, child.initialInPipeName, And(parent.pred, child.pred)))
+    Some(Filter(child.output.get, parent.initialInPipeName, And(parent.pred, child.pred)))
   }
 
   /** Puts [[dbis.pig.op.Filter]] operators before [[dbis.pig.op.OrderBy]] ones.
@@ -124,10 +123,10 @@ object Rewriter {
     * @return On success, an Option containing a new [[dbis.pig.op.OrderBy]] operators whose input is the
     *         [[dbis.pig.op.Filter]] passed into this method, None otherwise.
     */
-  private def filterBeforeOrder(parent: Filter, child: OrderBy): Option[(OrderBy, Filter)] = {
-    val newOrder = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.orderSpec)
-    val newFilter = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.pred)
-    Some((newOrder, newFilter))
+  private def filterBeforeOrder(parent: OrderBy, child: Filter): Option[(Filter, OrderBy)] = {
+    val newOrder = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.orderSpec)
+    val newFilter = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.pred)
+    Some((newFilter, newOrder))
   }
 
 
@@ -136,7 +135,7 @@ object Rewriter {
     * An example method to merge Filter operators is
     * {{{
     *  def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
-    *    Some(Filter(parent.output.get, child.initialInPipeName, And(parent.pred, child.pred)))
+    *    Some(Filter(child.output.get, parent.initialInPipeName, And(parent.pred, child.pred)))
     *  }
     * }}}
     *
@@ -163,22 +162,22 @@ object Rewriter {
     *
     * An example method to reorder Filter operators before OrderBy ones is
     * {{{
-    *   def filterBeforeOrder(parent: Filter, child: OrderBy): Option[(OrderBy, Filter)] = {
-    *     val newOrder = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.orderSpec)
-    *     val newFilter = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.pred)
-    *     Some((newOrder, newFilter))
-    *   }
+    * def filterBeforeOrder(parent: OrderBy, child: Filter): Option[(Filter, OrderBy)] = {
+    *   val newOrder = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.orderSpec)
+    *   val newFilter = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.pred)
+    *   Some((newFilter, newOrder))
+    * }
     * }}}
     *
     * It can be added to the rewriter via
     * {{{
-    *  reorder[Filter, OrderBy](filterBeforeOrder)
+    *  reorder[OrderBy, Filter](filterBeforeOrder)
     * }}}
     *
     * @param f The function to perform the reordering. It does not have to modify inputs and outputs, this will be
     *          done automatically.
-    * @tparam T The type of the first operator.
-    * @tparam T2 The type of the second operator.
+    * @tparam T The type of the parent operator.
+    * @tparam T2 The type of the child operator.
     */
   def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: Function2[T, T2, Option[(T2, T)]]):
   Unit = {
@@ -219,9 +218,9 @@ object Rewriter {
     */
   def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
     val strategy = (parent: PigOperator, child: PigOperator) => {
-      if (parent == rem) {
-        child.outputs = child.outputs.filter(_ != parent)
-        Some(fixInputsAndOutputs(parent, child, child))
+      if (child == rem) {
+        parent.outputs = parent.outputs.filter(_ != child)
+        Some(fixInputsAndOutputs(parent, child, parent))
       }
       else {
         None
@@ -248,10 +247,10 @@ object Rewriter {
       op match {
         case op if classTag[T].runtimeClass.isInstance(op) => {
           val parent = op.asInstanceOf[T]
-          if (parent.inputs.length == 1) {
-            val op2 = parent.inputs.head.producer
+          if (parent.outputs.length == 1) {
+            val op2 = parent.outputs.head
             op2 match {
-              case op2 if classTag[T2].runtimeClass.isInstance(op2) && op2.outputs.length == 1 => {
+              case op2 if classTag[T2].runtimeClass.isInstance(op2) && op2.inputs.length == 1 => {
                 val child = op2.asInstanceOf[T2]
                 f(parent, child)
               }
@@ -279,17 +278,17 @@ object Rewriter {
     */
   private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                           newParent: T3): T3 = {
-    newParent.inputs = oldChild.inputs
-    newParent.output = oldParent.output
-    newParent.outputs = oldParent.outputs
+    newParent.inputs = oldParent.inputs
+    newParent.output = oldChild.output
+    newParent.outputs = oldChild.outputs
 
-    // Fix replace oldChild in its inputs outputs attribute with newParent
-    for(out <- oldChild.inputs) {
-      val op = out.producer
-      op.outputs = op.outputs.filter(_ != oldChild) :+ newParent
+    // Replace oldChild in its outputs inputs attribute with newParent
+    for(out <- oldChild.outputs) {
+      out.inputs = out.inputs.filter(_.producer != oldChild) :+ Pipe(newParent.output.get, newParent)
     }
 
-    // Replacing oldParent with newParent in oldParents input list is done via kiamas Rewritable trait
+    // Replacing oldParent with newParent in the outputs attribute of oldParents inputs producers is done by kiamas
+    // Rewritable trait
     newParent
   }
 
@@ -305,24 +304,24 @@ object Rewriter {
     */
   private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                        newChild: T): T2 = {
-    newChild.inputs = oldChild.inputs
+    newChild.inputs = List(Pipe(newParent.output.get, newParent))
     newChild.output = oldChild.output
     newChild.outputs = oldChild.outputs
 
-    newParent.inputs = List(Pipe(newChild.output.get, newChild))
+    newParent.inputs = oldParent.inputs
     newParent.output = oldParent.output
-    newParent.outputs = oldParent.outputs
+    newParent.outputs = List(newChild)
 
-    // Fix replace oldChild in its inputs outputs attribute with newChild
-    for(out <- oldChild.inputs) {
-      val op = out.producer
-      op.outputs = op.outputs.filter(_ != oldChild) :+ newChild
+    // Replace oldChild in its outputs inputs attribute with newChild
+    for(out <- oldChild.outputs) {
+      out.inputs = out.inputs.filter(_.producer != oldChild)
+      out.inputs = out.inputs :+ Pipe(newChild.output.get, newChild)
     }
 
-    // Replacing oldParent with newParent in oldParents input list is done via kiamas Rewritable trait
+    // Replacing oldParent with newParent in oldParents inputs outputs list is done by kiamas Rewritable trait
     newParent
   }
 
   merge[Filter, Filter](mergeFilters)
-  reorder[Filter, OrderBy](filterBeforeOrder)
+  reorder[OrderBy, Filter](filterBeforeOrder)
 }

@@ -35,11 +35,11 @@ class RewriterSpec extends FlatSpec with Matchers{
 
     val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
     val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
-    val sink = planUnmerged.sinkNodes.head
-    val sinkMerged = planMerged.sinkNodes.head
+    val source = planUnmerged.sourceNodes.head
+    val sourceMerged = planMerged.sourceNodes.head
 
-    val rewrittenSink = processSink(sink)
-    rewrittenSink.inputs should equal (sinkMerged.inputs)
+    val rewrittenSink = processPigOperator(source)
+    rewrittenSink.outputs should equal (sourceMerged.outputs)
 
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be (opMerged)
@@ -62,11 +62,11 @@ class RewriterSpec extends FlatSpec with Matchers{
 
     val plan = new DataflowPlan(List(op1, op2, op3, op4))
     val planReordered = new DataflowPlan(List(op1, op2_2, op3_2, op4_2))
-    val sink = plan.sinkNodes.head
-    val sinkReordered = planReordered.sinkNodes.head
+    val source = plan.sourceNodes.head
+    val sourceReordered = planReordered.sourceNodes.head
 
-    val rewrittenSink = processSink(sink)
-    rewrittenSink.inputs.head should equal (sinkReordered.inputs.head)
+    val rewrittenSource = processPigOperator(source)
+    rewrittenSource.outputs.head should equal (sourceReordered.outputs.head)
 
     val pPlan = processPlan(plan)
     pPlan.findOperatorForAlias("b").value should be (op2_2)
@@ -87,7 +87,9 @@ class RewriterSpec extends FlatSpec with Matchers{
       val currentIndex = newPlan.operators.indexOf(op)
       for (input <- op.inputs.map(_.producer)) {
         val inputIndex = newPlan.operators.indexOf(input)
-        assert(currentIndex > inputIndex)
+        withClue(op.toString ++ input.toString) {
+         assert(currentIndex > inputIndex)
+        }
       }
     }
   }
@@ -103,10 +105,9 @@ class RewriterSpec extends FlatSpec with Matchers{
     val op5 = Dump("b")
 
     val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
-    val sink = plan.sinkNodes.head
+    val source = plan.sourceNodes.head
 
-    val rewrittenSink = processSink(sink)
-    rewrittenSink.inputs.head.name shouldBe "c"
-    rewrittenSink.inputs.head.producer should equal (op3)
+    val rewrittenSource = processPigOperator(source)
+    rewrittenSource.outputs should contain only(op2)
   }
 }

@@ -161,20 +161,20 @@ Option[Schema]) extends Rewritable{
   def lineageString: String = {
     inputs.map(p => p.producer.lineageString).mkString("%")
   }
-  def arity = this.inputs.length
+  def arity = this.outputs.length
 
-  def deconstruct = this.inputs.map(_.producer)
+  def deconstruct = this.outputs
 
-  def reconstruct(output: Seq[Any]): PigOperator = output match {
-    case inputs: Seq[_] => {
+  def reconstruct(outputs: Seq[Any]): PigOperator = output match {
+    case outputs: Seq[_] => {
       this match {
         case obj: PigOperator => {
-          obj.inputs = inputs.toList.asInstanceOf[List[PigOperator]].map(op => Pipe(op.output.get, op))
+          obj.outputs = outputs.asInstanceOf[List[PigOperator]]
           obj
         }
-        case _ => illegalArgs("PigOperator", "PigOperator", output)
+        case _ => illegalArgs("PigOperator", "PigOperator", outputs)
       }
     }
-    case _ => illegalArgs("PigOperator", "PigOperator", output)
+    case _ => illegalArgs("PigOperator", "PigOperator", outputs)
   }
 }

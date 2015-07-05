@@ -96,7 +96,7 @@ object PigREPL extends PigParser {
         val plan = new DataflowPlan(buf.toList)
         for (sink <- plan.sinkNodes) {
           println(pretty(sink))
-          val newSink = processSink(sink)
+          val newSink = processPigOperator(sink)
           println(pretty(newSink))
         }
         false
