@@ -21,7 +21,7 @@ import dbis.pig.plan.{DataflowPlan, Pipe}
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
-import scala.collection.mutable.LinkedHashSet
+import scala.collection.mutable
 import scala.reflect.{ClassTag, classTag}
 
 object Rewriter {
@@ -50,8 +50,8 @@ object Rewriter {
 
   /** Process a sink with a specified strategy
     *
-    * @param sink
-    * @param strategy
+    * @param sink The sink to process.
+    * @param strategy The strategy to apply.
     * @return
     */
   def processPigOperator(sink: PigOperator, strategy: Strategy): PigOperator = {
@@ -61,7 +61,7 @@ object Rewriter {
 
   /** Apply all rewriting rules of this Rewriter to a [[dbis.pig.plan.DataflowPlan]].
     *
-    * @param plan
+    * @param plan The plan to process.
     * @return A rewritten [[dbis.pig.plan.DataflowPlan]]
     */
   def processPlan(plan: DataflowPlan): DataflowPlan = processPlan(plan, ourStrategy)
@@ -70,12 +70,12 @@ object Rewriter {
     // This looks innocent, but this is where the rewriting happens.
     val newSources = plan.sourceNodes.map(processPigOperator(_, strategy))
 
-    var newPlanNodes = LinkedHashSet[PigOperator]() ++= newSources
+    var newPlanNodes = mutable.LinkedHashSet[PigOperator]() ++= newSources
     var nodesToProcess = newSources.toList
 
     // We can't modify nodesToProcess while iterating over it. Therefore we'll iterate over a copy of it as long as
     // it contains elements.
-    while (nodesToProcess.length > 0) {
+    while (nodesToProcess.nonEmpty) {
       val iter = nodesToProcess.iterator
       nodesToProcess = List[PigOperator]()
       for (source <- iter) {
@@ -100,7 +100,7 @@ object Rewriter {
       }
     }
 
-    var newPlan = new DataflowPlan(newPlanNodes.toList)
+    val newPlan = new DataflowPlan(newPlanNodes.toList)
     newPlan.additionalJars ++= plan.additionalJars
     newPlan
   }
@@ -149,7 +149,7 @@ object Rewriter {
     * @tparam T The type of the first operator.
     * @tparam T2 The type of the second operator.
     */
-  def merge[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: Function2[T, T2, Option[PigOperator]]):
+  def merge[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[PigOperator]):
   Unit = {
     val strategy = (parent: T, child: T2) => {
       val result = f(parent, child)
@@ -179,7 +179,7 @@ object Rewriter {
     * @tparam T The type of the parent operator.
     * @tparam T2 The type of the child operator.
     */
-  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: Function2[T, T2, Option[(T2, T)]]):
+  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[(T2, T)]):
   Unit = {
     val strategy = (parent: T, child: T2) => {
       val result = f(parent, child)
@@ -195,6 +195,7 @@ object Rewriter {
     * @param repl
     * @return A new [[dbis.pig.plan.DataflowPlan]] in which `old` has been replaced with `repl`.
     */
+  //noinspection ScalaDocMissingParameterDescription
   def replace(plan: DataflowPlan, old: PigOperator, repl: PigOperator): DataflowPlan = {
     val strategy = (op: Any) => {
       if (op == old) {
@@ -216,6 +217,7 @@ object Rewriter {
     * @param rem
     * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
     */
+  //noinspection ScalaDocMissingParameterDescription
   def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
     val strategy = (parent: PigOperator, child: PigOperator) => {
       if (child == rem) {
@@ -243,24 +245,22 @@ object Rewriter {
 
   private def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
     (f: (T, T2) => Option[PigOperator]): Strategy = {
-    return strategyf(op => {
+    strategyf(op => {
       op match {
-        case op if classTag[T].runtimeClass.isInstance(op) => {
+        case `op` if classTag[T].runtimeClass.isInstance(op) =>
           val parent = op.asInstanceOf[T]
           if (parent.outputs.length == 1) {
             val op2 = parent.outputs.head
             op2 match {
-              case op2 if classTag[T2].runtimeClass.isInstance(op2) && op2.inputs.length == 1 => {
+              case `op2` if classTag[T2].runtimeClass.isInstance(op2) && op2.inputs.length == 1 =>
                 val child = op2.asInstanceOf[T2]
                 f(parent, child)
-              }
               case _ => None
             }
           }
           else {
             None
           }
-        }
         case _ => None
       }
     })
