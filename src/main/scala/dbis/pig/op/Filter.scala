@@ -40,11 +40,11 @@ case class Filter(override val initialOutPipeName: String, initialInPipeName: St
     schema match {
       case Some(s) => {
         // if we know the schema we check all named fields
-        pred.traverse(s, Expr.checkExpressionConformance)
+        pred.traverseAnd(s, Expr.checkExpressionConformance)
       }
       case None => {
         // if we don't have a schema all expressions should contain only positional fields
-        pred.traverse(null, Expr.containsNoNamedFields)
+        pred.traverseAnd(null, Expr.containsNoNamedFields)
       }
     }
   }

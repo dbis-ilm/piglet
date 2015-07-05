@@ -24,11 +24,18 @@ import dbis.pig._
 class SchemaSpec extends FlatSpec {
 
   "The schema" should "contain f1, f2" in {
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.DoubleType),
-                                                              Field("f2", Types.CharArrayType)))))
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.DoubleType),
+                                                              Field("f2", Types.CharArrayType)), "t"), "s"))
     assert(schema.indexOfField("f1") == 0)
     assert(schema.indexOfField("f2") == 1)
     assert(schema.field(0) == Field("f1", Types.DoubleType))
     assert(schema.field(1) == Field("f2", Types.CharArrayType))
+  }
+
+  it should "allow to change the bag name" in {
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.DoubleType),
+      Field("f2", Types.CharArrayType)), "t"), "s"))
+    schema.setBagName("bag")
+    assert(schema.element.name == "bag")
   }
 }

@@ -31,11 +31,11 @@ case class Sample(override val initialOutPipeName: String, initialInPipeName: St
     schema match {
       case Some(s) => {
         // if we know the schema we check all named fields
-        expr.traverse(s, Expr.checkExpressionConformance)
+        expr.traverseAnd(s, Expr.checkExpressionConformance)
       }
       case None => {
         // if we don't have a schema all expressions should contain only positional fields
-        expr.traverse(null, Expr.containsNoNamedFields)
+        expr.traverseAnd(null, Expr.containsNoNamedFields)
       }
     }
   }

@@ -45,7 +45,7 @@ settings(
   libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv)
 ).
 settings(excludes(backendEnv): _*).
-//aggregate(backendlib(backendEnv).map(a => a.project): _*).
+// aggregate(backendlib(backendEnv).map(a => a.project): _*).
 dependsOn(backendlib(backendEnv): _*)
 
 /*

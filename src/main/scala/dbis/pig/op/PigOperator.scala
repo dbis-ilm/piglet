@@ -34,7 +34,7 @@ import scala.collection.immutable.Seq
  * @param schema
  */
 abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNames: List[String], var schema:
-Option[Schema]) extends Rewritable{
+Option[Schema]) extends Rewritable {
   // A list of all pipes that this operator reads from.
   var inputs: List[Pipe] = List[Pipe]()
 
@@ -98,7 +98,7 @@ Option[Schema]) extends Rewritable{
     case None => ""
   }
 
-  def inPipeName: String = inPipeNames.head
+  def inPipeName: String = if (inPipeNames.isEmpty) "" else inPipeNames.head
   def inPipeNames: List[String] = if (inputs.isEmpty) initialInPipeNames else inputs.map(p => p.name)
 
   def inputSchema =   if (inputs.nonEmpty) inputs.head.producer.schema else None
@@ -112,8 +112,14 @@ Option[Schema]) extends Rewritable{
    * @return the output schema
    */
   def constructSchema: Option[Schema] = {
-    if (inputs.nonEmpty)
+    if (inputs.nonEmpty) {
       schema = inputs.head.producer.schema
+      // the bag should be named with the output pipe
+      schema match {
+        case Some(s) => s.setBagName(outPipeName)
+        case None => {}
+      }
+    }
     schema
   }
 

@@ -50,18 +50,18 @@ class TypeSpec extends FlatSpec with Matchers {
   }
 
   it should "allow to define complex types" in {
-    val t1 = MapType("m", Types.DoubleType)
+    val t1 = MapType(Types.DoubleType, "m")
     assert(t1.name == "m")
     assert(t1.valueType == Types.typeForName("double"))
 
-    val tt = TupleType("", Array(Field("c", Types.IntType)))
-    val t2 = BagType("b", tt)
+    val tt = TupleType(Array(Field("c", Types.IntType)))
+    val t2 = BagType(tt, "b")
     assert(t2.name == "b")
     assert(t2.valueType == tt)
 
-    val t3 = TupleType("t", Array(Field("f1", Types.IntType),
-                                  Field("f2", Types.DoubleType),
-                                  Field("f3", MapType("m", Types.CharArrayType))))
+    val t3 = TupleType(Array(Field("f1", Types.IntType),
+                             Field("f2", Types.DoubleType),
+                             Field("f3", MapType(Types.CharArrayType, "m"))), "t")
     assert(t3.name == "t")
     assert(t3.fields(0).name == "f1")
     assert(t3.fields(1).name == "f2")
@@ -75,41 +75,53 @@ class TypeSpec extends FlatSpec with Matchers {
     assert(Types.typeCompatibility(Types.IntType, Types.DoubleType))
     assert(Types.typeCompatibility(Types.FloatType, Types.DoubleType))
     assert(! Types.typeCompatibility(Types.IntType, Types.CharArrayType))
-    assert(! Types.typeCompatibility(Types.IntType, MapType("m", Types.CharArrayType)))
+    assert(! Types.typeCompatibility(Types.IntType, MapType(Types.CharArrayType, "m")))
   }
 
   it should "check type compatibility for bags" in {
-    val t1 = BagType("b", TupleType("", Array(Field("f1", Types.IntType),
+    val t1 = BagType(TupleType(Array(Field("f1", Types.IntType),
                                               Field("f2", Types.DoubleType),
-                                              Field("f3", Types.CharArrayType))))
-    val t2 = BagType("b", TupleType("", Array(Field("f1", Types.IntType),
+                                              Field("f3", Types.CharArrayType))), "b")
+    val t2 = BagType(TupleType(Array(Field("f1", Types.IntType),
                                               Field("f2", Types.DoubleType),
-                                              Field("f3", Types.CharArrayType))))
-    val t3 = BagType("b", TupleType("", Array(Field("f11", Types.IntType),
+                                              Field("f3", Types.CharArrayType))), "b")
+    val t3 = BagType(TupleType(Array(Field("f11", Types.IntType),
                                               Field("f21", Types.IntType),
-                                              Field("f31", Types.CharArrayType))))
-    val t4 = BagType("b", TupleType("", Array(Field("f11", Types.IntType),
+                                              Field("f31", Types.CharArrayType))), "b")
+    val t4 = BagType(TupleType(Array(Field("f11", Types.IntType),
                                               Field("f12", Types.DoubleType),
                                               Field("f13", Types.DoubleType),
-                                              Field("f14", Types.CharArrayType))))
+                                              Field("f14", Types.CharArrayType))), "b")
     assert(Types.typeCompatibility(t1, t2))
     assert(Types.typeCompatibility(t1, t3))
     assert(! Types.typeCompatibility(t1, t4))
   }
 
   it should "return the type description for a bag" in {
-    val t = BagType("", TupleType("", Array(Field("f1", Types.IntType),
+    val t = BagType(TupleType(Array(Field("f1", Types.IntType),
                                             Field("f2", Types.CharArrayType)
     )))
     t.descriptionString should be ("{f1: int, f2: chararray}")
   }
 
   it should "return the type description for a nested bag" in {
-    val t = BagType("", TupleType("", Array(Field("f1", Types.IntType),
-                                            Field("f2", TupleType("", Array(Field("t1", Types.ByteArrayType),
+    val t = BagType(TupleType(Array(Field("f1", Types.IntType),
+                                            Field("f2", TupleType(Array(Field("t1", Types.ByteArrayType),
                                                                 Field("t2", Types.ByteArrayType)
                                               )))
     )))
     t.descriptionString should be ("{f1: int, f2: (t1: bytearray, t2: bytearray)}")
+  }
+
+  it should "return components of complex types" in {
+    val tup0 = TupleType(Array(Field("t1", Types.ByteArrayType),
+                               Field("t2", Types.ByteArrayType)))
+    val tup = TupleType(Array(Field("f1", Types.IntType),
+                              Field("f2", tup0)))
+    val t = BagType(tup)
+    t.typeOfComponent(0) should be (Types.IntType)
+    tup.typeOfComponent("f1") should be (Types.IntType)
+    tup.typeOfComponent(0) should be (Types.IntType)
+    tup.typeOfComponent("f2") should be (tup0)
   }
 }
