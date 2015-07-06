@@ -18,15 +18,50 @@ package dbis.pig.op
 
 import dbis.pig.schema._
 
+/**
+ * A trait for all types of expressions.
+ */
 trait Expr {
-  def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean
+  /**
+   * Traverses the expression tree and applies the traverser function to each node.
+   * The final boolean result is constructed by ANDing the result of the traverser
+   * and the results from applying the traverser to all sub-nodes in the tree.
+   * 
+   * @param schema
+   * @param traverser
+   * @return
+   */
+  def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean
+
+  /**
+   * Traverses the expression tree and applies the traverser function to each node.
+   * The final boolean result is constructed by ORing the result of the traverser
+   * and the results from applying the traverser to all sub-nodes in the tree.
+   *
+   * @param schema
+   * @param traverser
+   * @return
+   */
+  def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean
+
+  /**
+   * Determines the result type of the expression.
+   * 
+   * @param schema The input schema for the operator providing the context of this expression (if defined).
+   *               
+   * @return
+   */
   def resultType(schema: Option[Schema]): (String, PigType)
 }
 
 abstract class BinaryExpr(left: Expr, right: Expr) extends Expr {
-  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
-    traverser(schema, this) && left.traverse(schema, traverser) && right.traverse(schema, traverser)
-  }
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && left.traverseAnd(schema, traverser) && right.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || left.traverseOr(schema, traverser) || right.traverseOr(schema, traverser)
+
 }
 
 object Expr {
@@ -63,5 +98,32 @@ object Expr {
     case _ => true
   }
 
+  /**
+   * This function is a traverser function to check whether the expression contains
+   * a flatten operator.
+   *
+   * @param schema the schema of the operator
+   * @param ex the expression
+   * @return true if the expression contains flatten.
+   */
+  def containsFlatten(schema: Schema, ex: Expr): Boolean = ex match {
+    case FlattenExpr(e) => true
+    case _ => false
+  }
 
+
+  /**
+   * This function is a traverser function to check whether the expression contains
+   * a flatten operator for a bag.
+   *
+   * @param schema the schema of the operator
+   * @param ex the expression
+   * @return true if the expression contains flatten({}).
+   */
+  def containsFlattenOnBag(schema: Schema, ex: Expr): Boolean = {
+    ex match {
+      case FlattenExpr(e) => e.resultType(Some(schema))._2.isInstanceOf[BagType]
+      case _ => false
+    }
+  }
 }

@@ -17,19 +17,25 @@
 
 package dbis.pig.op
 
-import dbis.pig.schema.{Types, PigType, Schema}
+import dbis.pig.schema._
+import dbis.pig.udf.{UDFTable, UDF}
 
 trait ArithmeticExpr extends Expr
 
 case class RefExpr(r: Ref) extends ArithmeticExpr {
-  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
-    traverser(schema, this)
-  }
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
 
   override def resultType(schema: Option[Schema]): (String, PigType) = schema match {
     case Some(s) => r match {
-      case NamedField(n) => val f = s.field(n); (n, f.fType)
-      case PositionalField(p) => val f = s.field(p); ("", Types.ByteArrayType)
+      case NamedField(n) => try {
+        val f = s.field(n)
+        (n, f.fType)
+      }
+      catch {
+        case e: SchemaException => (n, Types.AnyType)
+      }
+      case PositionalField(p) => val f = s.field(p); ("", f.fType)
       case Value(v) => if (v.isInstanceOf[String]) ("", Types.CharArrayType) else ("", Types.ByteArrayType)
       // TODO: handle deref of tuple, bag
       //case DerefTuple(t, c) =>
@@ -40,25 +46,44 @@ case class RefExpr(r: Ref) extends ArithmeticExpr {
 }
 
 case class FlattenExpr(a: ArithmeticExpr) extends ArithmeticExpr {
-  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
-    a.traverse(schema, traverser)
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    traverser(schema, this) && a.traverseAnd(schema, traverser)
   }
 
-  // TODO: implement resultType
-  override def resultType(schema: Option[Schema]): (String, PigType) = a.resultType(schema)
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    traverser(schema, this) || a.traverseOr(schema, traverser)
+  }
+
+  override def resultType(schema: Option[Schema]): (String, PigType) = {
+    val bType = a.resultType(schema) // that's a BagType, extract the component type
+    if (bType._2.isInstanceOf[ComplexType]) {
+      val cType = bType._2.asInstanceOf[ComplexType]
+      ("", cType.typeOfComponent(0))
+    }
+    else {
+      a.resultType(schema)
+    }
+  }
 }
 
 case class CastExpr(t: PigType, a: ArithmeticExpr) extends ArithmeticExpr {
-  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
-    traverser(schema, this) && a.traverse(schema, traverser)
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    traverser(schema, this) && a.traverseAnd(schema, traverser)
+  }
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    traverser(schema, this) || a.traverseOr(schema, traverser)
   }
 
   override def resultType(schema: Option[Schema]): (String, PigType) = (a.resultType(schema)._1, t)
 }
 
 case class MSign(a: ArithmeticExpr) extends ArithmeticExpr {
-  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
-    traverser(schema, this) && a.traverse(schema, traverser)
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    traverser(schema, this) && a.traverseAnd(schema, traverser)
+  }
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    traverser(schema, this) || a.traverseOr(schema, traverser)
   }
   override def resultType(schema: Option[Schema]): (String, PigType) = a.resultType(schema)
 }
@@ -80,12 +105,24 @@ case class Div(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(l
 }
 
 case class Func(f: String, params: List[ArithmeticExpr]) extends ArithmeticExpr {
-  override def traverse(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
     traverser(schema, this) &&
-      params.map(_.traverse(schema, traverser)).foldLeft(true){ (b1: Boolean, b2: Boolean) => b1 && b2 }
+      params.map(_.traverseAnd(schema, traverser)).forall(b => b)
   }
 
-  // TODO: we should know the function signature
-  override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.ByteArrayType)
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    traverser(schema, this) ||
+    params.map(_.traverseOr(schema, traverser)).exists(b => b)
+  }
+
+
+  override def resultType(schema: Option[Schema]): (String, PigType) = {
+    val pTypes = params.map(e => e.resultType(schema)._2)
+    val func = UDFTable.findUDF(f, pTypes)
+    func match {
+      case Some(udf) => ("", udf.resultType)
+      case None => ("", Types.ByteArrayType)
+    }
+  }
 }
 

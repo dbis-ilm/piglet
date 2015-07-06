@@ -109,6 +109,6 @@ object PigCompiler extends PigParser {
   }
 
   private def parseScriptFromSource(source: Source): List[PigOperator] = {
-    parseScript(source.getLines().mkString)
+    parseScript(source.getLines().mkString("\n"))
   }
 }

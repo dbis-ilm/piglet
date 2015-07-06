@@ -105,10 +105,10 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for the STORE helper function" in {
     val op = Store("A", "file.csv")
-    op.schema = Some(new Schema(BagType("s", TupleType("t", Array(
+    op.schema = Some(new Schema(BagType(TupleType(Array(
       Field("f1", Types.IntType),
-      Field("f2", BagType("b", TupleType("", Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType)))))
-    )))))
+      Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
+    ), "t"), "s")))
 
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitHelperClass(op))
@@ -166,12 +166,12 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for a binary join statement with simple expression" in {
     val op = Join("aa", List("bb", "cc"), List(List(PositionalField(0)), List(PositionalField(0))))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
-                                                              Field("f3", Types.IntType)))))
+                                                              Field("f3", Types.IntType)), "t"), "s"))
     val input1 = Pipe("bb",Load("bb", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("cc",Load("cc", "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    op.inputs=List(input1,input2)
+    op.inputs = List(input1,input2)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -184,9 +184,9 @@ class SparkCompileSpec extends FlatSpec {
   it should "contain code for a binary join statement with expression lists" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0), PositionalField(1)),
       List(PositionalField(1), PositionalField(2))))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
-                                                              Field("f3", Types.IntType)))))
+                                                              Field("f3", Types.IntType)), "t"), "s"))
     val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("c",Load("c", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
@@ -202,9 +202,9 @@ class SparkCompileSpec extends FlatSpec {
   it should "contain code for a multiway join statement" in {
     val op = Join("a", List("b", "c", "d"), List(List(PositionalField(0)),
       List(PositionalField(0)), List(PositionalField(0))))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
-                                                              Field("f3", Types.IntType)))))
+                                                              Field("f3", Types.IntType)), "t"), "s"))
     val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("c",Load("c", "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input3 = Pipe("d",Load("d", "file.csv", Some(schema), "PigStorage", List("\",\"")))
@@ -372,10 +372,10 @@ class SparkCompileSpec extends FlatSpec {
     // a = ORDER b BY f1, f3
     val op = OrderBy("a", "b", List(OrderBySpec(NamedField("f1"), OrderByDirection.AscendingOrder),
                                     OrderBySpec(NamedField("f3"), OrderByDirection.AscendingOrder)))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)
-    ))))
+    ), "t"), "s"))
 
     op.schema = Some(schema)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -394,5 +394,45 @@ class SparkCompileSpec extends FlatSpec {
         |                                   this.c1 compare that.c1 }
         |}""".stripMargin)
     assert(generatedHelperCode == expectedHelperCode)
+  }
+
+  it should "contain code for flattening a tuple in FOREACH" in {
+    val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+                                                              Field("f2", TupleType(Array(Field("f3", Types.IntType)), "t2"))
+    ), "t"), "s"))
+    ops.head.schema = Some(schema)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
+    val expectedCode = cleanString("""
+        |val a = b.map(t => PigFuncs.flatTuple(List(t(0),t(1))))""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for flattening a bag function in FOREACH" in {
+    val ops = parseScript("b = load 'file'; a = foreach b generate flatten(tokenize($0));")
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType)))))
+    ops.head.schema = Some(schema)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
+    val expectedCode = cleanString("""
+        |val a = b.flatMap(t => PigFuncs.tokenize(t(0))).map(t => List(t))""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for flattening a bag in FOREACH" in {
+    val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+                                                              Field("f2", BagType(TupleType(
+                                                                Array(Field("ff1", Types.IntType)), "s"), "b"))), "t"), "s"))
+    ops.head.schema = Some(schema)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
+    val expectedCode = cleanString("""
+        |val a = b.flatMap(t => List(t(1).asInstanceOf[Seq[Any]].map(s => (List(t(0)), s))).map(t => List(t))""".stripMargin)
+    assert(generatedCode == expectedCode)
   }
 }

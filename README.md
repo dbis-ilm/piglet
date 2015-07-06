@@ -59,28 +59,6 @@ where Pig statements can be entered at the prompt and are executed as soon as
 a `DUMP` or `STORE` statement is entered. Furthermore, the schema can be printed using `DESCRIBE`.
 With the `-b` option you can specify which backend (spark, flink) will be used.
 
-
-### Mapping of Pig statements to Spark ###
-
-Currently, we have implemented to following mappings in the code generator.
-
-| Pig statement  | Spark code |
-| ------------- | ------------- |
-| `LOAD "file" USING storage-func() AS schema-def` | `sc.textFile(file)` or `storage-func.load(sc, file)`  |
-| `DUMP alias` |  `alias.collect.map(t => println(t.mkString(","))` |
-| `STORE alias INTO "file"` |  `alias.coalesce(1, true).saveAsTextFile(file)` |
-| `FILTER alias BY predicate`  | `alias.filter(t => predicate(t))`   |
-| `FOREACH alias GENERATE`  |    |
-| `DISTINCT alias` |  `alias.distinct` |
-| `LIMIT alias num` |  `sc.parallelize(alias.take(num))` |
-| `UNION alias1, alias2, ...` | `alias1.union(alias2.union(...))` |
-| `SAMPLE alias size` |  `alias.sample(size)` |
-| `ORDER alias1 BY field1 ASC, field2 ASC ...` |  |
-| `JOIN alias1 BY expr1, alias2 BY expr2, ...` |  |
-| `GROUP alias ALL`| `alias.glom`  |
-| `GROUPB alias BY expr` | `alias.groupBy(t => {expr}).map{case (k,v) => List(k,v)}`|
-| `STREAM alias THROUGH op(params)` |  `op(alias, params)` |
-
 ### Testing ###
 
 We use the Scala testing framework as well as the scoverage tool for test coverage. You can produce
@@ -89,6 +67,5 @@ a coverage report by running `sbt clean coverage test`. The results can be found
 
 ### ToDo ###
 
- * nested blocks in `FOREACH`
  * `COGROUP` and `GROUP BY` with multiple relations
  * `EXPLAIN` not implemented yet

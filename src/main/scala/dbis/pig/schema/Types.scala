@@ -28,7 +28,7 @@ case class TypeException(msg: String) extends Exception(msg)
  */
 object TypeCode extends Enumeration {
   type TypeCode = Value
-  val IntType, LongType, FloatType, BooleanType, DoubleType, ByteArrayType, CharArrayType = Value
+  val AnyType, IntType, LongType, FloatType, BooleanType, DoubleType, ByteArrayType, CharArrayType = Value
 }
 
 import dbis.pig.schema.TypeCode._
@@ -36,7 +36,7 @@ import dbis.pig.schema.TypeCode._
 /**
  * The base class for all Pig types.
  */
-sealed abstract class PigType {
+abstract class PigType {
   var name: String = ""
 
   def this(s: String) = { this(); name = s }
@@ -52,7 +52,17 @@ sealed abstract class PigType {
  */
 case class SimpleType(s: String, tc: TypeCode) extends PigType(s)
 
+/**
+ * An object with some helper functions for type handling.
+ */
 object Types {
+  /**
+   * Returns the priority of the given type which is used for determining
+   * compatibility between two types.
+   *
+   * @param t the Pig type
+   * @return the priority value (between 0=lowest ... 10=highest)
+   */
   def typePriority(t: PigType): Int = t match {
     // double > float > long > int > bytearray
     case ByteArrayType => 0
@@ -124,8 +134,18 @@ object Types {
       false
   }
 
+  /**
+   * Returns true if the given type is a numeric type.
+   *
+   * @param t the type to be checked
+   * @return true if int, long, float or double
+   */
   def isNumericType(t: PigType): Boolean = t == IntType || t == LongType || t == FloatType || t == DoubleType
 
+  /**
+   * Predefined type instances for simple types.
+   */
+  val AnyType = SimpleType("nothing", TypeCode.AnyType)
   val IntType = SimpleType("int", TypeCode.IntType)
   val LongType = SimpleType("long", TypeCode.LongType)
   val BooleanType = SimpleType("boolean", TypeCode.BooleanType)
@@ -134,6 +154,13 @@ object Types {
   val ByteArrayType = SimpleType("bytearray", TypeCode.ByteArrayType)
   val CharArrayType = SimpleType("chararray", TypeCode.CharArrayType)
 
+  /**
+   * Returns the type object representing the type of the given name.
+   *
+   * @param s the name of the type
+   * @return the type instance
+   */
+  @throws[TypeException]("if the type name is unknown")
   def typeForName(s: String) = s match {
     case "int" => IntType
     case "long" => LongType
@@ -142,32 +169,6 @@ object Types {
     case "double" => DoubleType
     case "bytearray" => ByteArrayType
     case "chararray" => CharArrayType
-    case _ => throw new TypeException("invalid type: " + s)
+    case _ => throw TypeException("invalid type: " + s)
   }
-}
-
-case class Field(name: String, fType: PigType = Types.ByteArrayType) {
-  override def toString = s"${name}: ${fType.descriptionString}"
-  def isBagType = fType.isInstanceOf[BagType]
-}
-
-case class TupleType(s: String, var fields: Array[Field]) extends PigType(s) {
-  override def equals(that: Any): Boolean = that match {
-    case TupleType(name, fields) => this.name == name && this.fields.deep == fields.deep
-    case _ => false
-  }
-
-  override def toString = "TupleType(" + name + "," + fields.mkString(",") + ")"
-
-  override def descriptionString = "(" + fields.mkString(", ") + ")"
-
-  def plainDescriptionString = fields.mkString(", ")
-}
-
-case class BagType(s: String, var valueType: TupleType) extends PigType(s) {
-  override def descriptionString = "{" + valueType.plainDescriptionString + "}"
-}
-
-case class MapType(s: String, var valueType: PigType) extends PigType(s) {
-  override def descriptionString = "[" + valueType.descriptionString + "]"
 }
