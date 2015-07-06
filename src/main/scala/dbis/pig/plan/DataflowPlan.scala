@@ -55,10 +55,20 @@ class DataflowPlan(var operators: List[PigOperator]) {
      * 1. We create the mapping from names to the operators that *write* them.
      */
     planOps.foreach(op => {
+      // TODO: we can have multiple OutPipeName's (e.g. in SplitInto)
+      /*
       if (op.initialOutPipeName != "") {
         if (pipes.contains(op.initialOutPipeName))
           throw new InvalidPlanException("duplicate pipe: " + op.initialOutPipeName)
         pipes(op.initialOutPipeName) = (op, List())
+      }
+      */
+      op.initialOutPipeNames.foreach { name: String =>
+        if (name != "") {
+          if (pipes.contains(name))
+            throw new InvalidPlanException("duplicate pipe: " + name)
+          pipes(name) = (op, List())
+        }
       }
     })
 
