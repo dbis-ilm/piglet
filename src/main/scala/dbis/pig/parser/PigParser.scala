@@ -121,7 +121,7 @@ class PigParser extends JavaTokenParsers {
 
   def factor: Parser[ArithmeticExpr] =  (
      "(" ~ castTypeSpec ~ ")" ~ refExpr ^^ { case _ ~ t ~ _ ~ e => CastExpr(t, e) }
-      | "(" ~ arithmExpr ~ ")" ^^ { case _ ~ e ~ _ => e }
+      | "(" ~ arithmExpr ~ ")" ^^ { case _ ~ e ~ _ => PExpr(e) }
        | "flatten" ~ "(" ~ arithmExpr ~ ")" ^^ { case _ ~ _ ~ e ~ _  => FlattenExpr(e) }
       | func
       | refExpr
@@ -143,7 +143,7 @@ class PigParser extends JavaTokenParsers {
 
   def logicalTerm: Parser[Predicate] = (
     comparisonExpr ^^ { e => e }
-     | "(" ~ logicalExpr ~ ")" ^^ { case _ ~ e ~ _ => e }
+     | "(" ~ logicalExpr ~ ")" ^^ { case _ ~ e ~ _ => PPredicate(e) }
     )
 
   def logicalExpr: Parser[Predicate] = (
