@@ -371,4 +371,13 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     op5.output shouldBe None
     op5.outputs shouldBe empty
   }
+
+  it should "construct pipes for SPLIT INTO" in {
+    val plan = new DataflowPlan(parseScript(s"""
+      |a = LOAD 'file' AS (x, y);
+      |SPLIT a INTO b IF x < 100, c IF x >= 100;
+      |STORE b INTO 'res1.data';
+      |STORE c INTO 'res2.data';""".stripMargin))
+    assert(plan.checkConnectivity)
+  }
 }
