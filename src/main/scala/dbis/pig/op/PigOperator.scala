@@ -169,7 +169,7 @@ Option[Schema]) extends Rewritable {
 
   def deconstruct = this.outputs
 
-  def reconstruct(outputs: Seq[Any]): PigOperator = output match {
+  def reconstruct(outputs: Seq[Any]): PigOperator = outputs match {
     case outputs: Seq[_] =>
       this match {
         case obj: PigOperator =>
