@@ -14,34 +14,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package dbis.pig.op
 
 import dbis.pig.schema.Schema
 
 /**
-  * ZmqSubscriber represents the ZMQ_SUBSCRIBER operator of Pig.
-  *
-  * @param initialOutPipeName the name of the initial output pipe (relation).
-  * @param addr the zmq address to subscribe to
-  * @param loadSchema
-  */
-case class ZmqSubscriber(override val initialOutPipeName: String, addr: String,
-  var loadSchema: Option[Schema] = None) extends PigOperator(initialOutPipeName, List(), loadSchema) {
-  override def constructSchema: Option[Schema] = { 
-    /*  
+ * Load represents the LOAD operator of Pig.
+ *
+ * @param initialOutPipeName the name of the initial output pipe (relation).
+ * @param addr the address of the socket to read from
+ * @param mode empty for standard socket or currently also possible "zmq"
+ * @param loadSchema
+ */
+case class SocketRead(override val initialOutPipeName: String, addr: String, 
+                mode: String, var loadSchema: Option[Schema] = None) extends PigOperator(initialOutPipeName, List(), loadSchema) {
+  override def constructSchema: Option[Schema] = {
+    /*
      * Either the schema was defined or it is None.
      */
     schema
   }
 
-  /** 
-    * Returns the lineage string describing the sub-plan producing the input for this operator.
-    *
-    * @return a string representation of the sub-plan.
-    */
-  override def lineageString: String = { 
-    s"""ZMQ_SUBSCRIBER%${addr}%""" + super.lineageString
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
+  override def lineageString: String = {
+    s"""SOCKET_READ%${addr}%${mode}""" + super.lineageString
   }
 }
-

@@ -373,12 +373,20 @@ class PigParserSpec extends FlatSpec {
         OrderBySpec(PositionalField(2), OrderByDirection.AscendingOrder)))))
   }
 
-  it should "parse a zmq subscriber statement using tcp without schema" in {
-    assert(parseScript("a = zmq_subscriber 'tcp://127.0.0.1:5555';") == List(ZmqSubscriber("a", "tcp://127.0.0.1:5555")))
+  it should "parse a socket read statement in standard mode" in {
+    assert(parseScript("a = socket_read '127.0.0.1:5555';") == List(SocketRead("a", "127.0.0.1:5555", "")))
   }
- 
-  it should "parse a zmq publisher statement using tcp" in {
-    assert(parseScript("zmq_publisher a to 'tcp://127.0.0.1:5555';") == List(ZmqPublisher("a", "tcp://127.0.0.1:5555")))
+
+  it should "parse a socket read statement in zmq mode" in {
+    assert(parseScript("a = socket_read 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketRead("a", "tcp://127.0.0.1:5555", "zmq")))
+  }
+
+  it should "parse a socket write statement in standard mode" in {
+    assert(parseScript("socket_write a to '127.0.0.1:5555';") == List(SocketWrite("a", "127.0.0.1:5555", "")))
+  }
+
+  it should "parse a socket write statement in zmq mode" in {
+    assert(parseScript("socket_write a to 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketWrite("a", "tcp://127.0.0.1:5555", "zmq")))
   }
 
   it should "parse a window statement using Rows for window and slider" in {

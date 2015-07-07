@@ -28,7 +28,7 @@ class ZmqSubscriber(addr: String) extends RichSourceFunction[List[java.io.Serial
 
   private var subscriber: Socket = _
   @volatile private var isRunning: Boolean = _
-  private val schema = new StringListSchema()
+  private val schema = new UTF8StringSchema()
 
   @throws(classOf[Exception])
   override def open(parameters: Configuration) = {

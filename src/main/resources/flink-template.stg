@@ -103,15 +103,24 @@ union(out,in,others) ::=<<
         val <out> = <in><others:{ e | .merge(<e>)}>
 >>
 
-// ------------------ Subscribes to a socket with ZMQ -------------------------
-zmqSubscriber(out,addr,schema) ::=<<
+// ------------------ Reads from a SOCKET -------------------------------------
+socketRead(out,addr,mode,schema) ::=<<
+<if (mode)>
         val <out> = env.addSource(new ZmqSubscriber("<addr>"))
+<else>
+        val <out> = env.socketTextStream("<addr>".split(':')(0),"<addr>".split(':')(1).toInt).map(line => line.split(',').toList)
+<endif>
 >>
 
-// ------------------ Publish to a socket with ZMQ ----------------------------
-zmqPublisher(in,addr) ::=<<
+// ------------------ Writes to a SOCKET -------------------------------------
+socketWrite(in,addr,mode) ::=<<
+<if (mode)>
         <in>.addSink(new ZmqPublisher("<addr>")).setParallelism(1)
+<else>
+        <in>.writeToSocket("<addr>".split(':')(0),"<addr>".split(':')(1).toInt,new UTF8StringSchema())
+<endif>
 >>
+
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<

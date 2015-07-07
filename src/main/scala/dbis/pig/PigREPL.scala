@@ -143,7 +143,7 @@ object PigREPL extends PigParser {
         
         false
       }
-      case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") || s.toLowerCase.startsWith(s"zmq_publisher "))=> {
+      case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") || s.toLowerCase.startsWith(s"socket_write "))=> {
         buf ++= parseScript(s)
         val plan = new DataflowPlan(buf.toList)
         if (FileTools.compileToJar(plan, "script", ".", false, backend)) {

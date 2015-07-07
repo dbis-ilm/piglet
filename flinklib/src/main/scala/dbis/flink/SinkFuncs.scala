@@ -24,7 +24,7 @@ import org.zeromq.ZMQ._
 
 class ZmqPublisher(addr: String) extends RichSinkFunction[List[String]]{ 
   private var publisher: Socket = _
-  private val schema = new StringListSchema()
+  private val schema = new UTF8StringSchema()
 
   def initializeConnection = {
     try {

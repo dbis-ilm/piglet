@@ -188,8 +188,10 @@ class PigParser extends JavaTokenParsers {
   lazy val orKeyword = "or".ignoreCase
   lazy val notKeyword = "not".ignoreCase
   lazy val toKeyword = "to".ignoreCase
-  lazy val zmqSubscriberKeyword = "zmq_subscriber".ignoreCase
-  lazy val zmqPublisherKeyword = "zmq_publisher".ignoreCase
+  lazy val socketReadKeyword = "socket_read".ignoreCase
+  lazy val socketWriteKeyword = "socket_write".ignoreCase
+  lazy val modeKeyword = "mode".ignoreCase
+  lazy val zmqKeyword = "zmq".ignoreCase
   lazy val windowKeyword = "window".ignoreCase
   lazy val rowsKeyword = "rows".ignoreCase
   lazy val rangeKeyword = "range".ignoreCase
@@ -415,13 +417,14 @@ class PigParser extends JavaTokenParsers {
   }
 
   /*
-   * <A> = ZMQ_SUBSCRIBER '<address>' [ AS <Schema> ]
+   * Socket Definitions
    */
   def ipMember: Parser[String] = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)".r 
   def ipv4: Parser[String] = ipMember ~ "." ~ ipMember ~ "." ~ ipMember ~ "." ~ ipMember ^^{
     case i1 ~ _ ~ i2 ~ _ ~ i3 ~ _ ~i4 => i1 + "." + i2 + "." + i3 + "." + i4
   }
   def port: Parser[String] = ":([0-9]{1,5})".r
+  def inetAddress: Parser[String] = "'" ~ (ipv4 | ident) ~ port ~ "'" ^^ { case _ ~ ip ~ p ~ _ => ip + p }
   def bindAddress: Parser[String] = (ipv4 | "*" | ident) ~ (port | "*") ^^ { case ip ~ p => ip + p }
   def tcpSocket: Parser[String] = "tcp://" ~ bindAddress ^^ { case trans ~ addr => trans + addr}
   def ipcSocket: Parser[String] = "ipc://" ~ (fileName | "*") ^^ { case trans ~  path => trans + path}
@@ -431,15 +434,29 @@ class PigParser extends JavaTokenParsers {
     }
   //def transports: Parser[String] = "(inproc|ipc|tcp|pgm|epgm)".r
   def zmqAddress: Parser[String] = "'" ~ (tcpSocket | ipcSocket | inprocSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
-  def zmqSubscriberStmt: Parser[PigOperator] = bag ~ "=" ~ zmqSubscriberKeyword ~ zmqAddress ~ (loadSchemaClause?) ^^ {
-    case out ~ _ ~ _ ~ addr ~ schema => ZmqSubscriber(out, addr, schema)
+
+  /*
+   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] [ AS <schema> ]
+   * 
+   * Maybe other modes later
+   */
+  def socketReadStmt: Parser[PigOperator] =
+  bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (loadSchemaClause?) ^^ {
+    case out ~ _ ~ _ ~ addr ~ schema => SocketRead(out, addr, "", schema)
+  } | 
+  bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (loadSchemaClause?) ^^ {
+    case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ schema => SocketRead(out, addr, mode, schema)
   }
 
   /*
-   * ZMQ_PUBLISHER <A> TO <address>
+   * SOCKET_WRITE <A> TO '<address>' [ MODE ZMQ ]
    */
-  def zmqPublisherStmt: Parser[PigOperator] = zmqPublisherKeyword ~ bag ~ toKeyword ~ zmqAddress ^^ {
-    case _ ~ b ~ _ ~ addr => ZmqPublisher(b, addr)
+  def socketWriteStmt: Parser[PigOperator] =
+  socketWriteKeyword ~ bag ~ toKeyword ~ inetAddress ^^ {
+    case _ ~ b ~ _ ~ addr => SocketWrite(b, addr, "")
+  } | 
+  socketWriteKeyword ~ bag ~ toKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ^^ {
+    case _ ~ b ~ _ ~ addr ~ _ ~ mode => SocketWrite(b, addr, mode)
   }
 
   /*
@@ -454,9 +471,7 @@ class PigParser extends JavaTokenParsers {
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
-  def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    zmqSubscriberStmt | zmqPublisherStmt | windowStmt | splitStmt) ~ ";" ^^ {
+  def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt | socketReadStmt | socketWriteStmt | windowStmt | splitStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*
