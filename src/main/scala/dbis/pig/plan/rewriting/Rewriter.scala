@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{And, Filter, OrderBy, PigOperator}
+import dbis.pig.op._
 import dbis.pig.plan.{DataflowPlan, Pipe}
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
@@ -127,6 +127,25 @@ object Rewriter {
     val newOrder = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.orderSpec)
     val newFilter = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.pred)
     Some((newFilter, newOrder))
+  }
+
+  private def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
+    case node @ SplitInto(inPipeName, splits) =>
+      val filters = (for (branch <- splits) yield branch.outPipeName -> Filter(branch.outPipeName, inPipeName, branch
+        .expr)).toMap
+      println(node.outputs)
+      (node.outputs.iterator).foreach(output => {
+        (output.inputs.iterator).foreach(input => {
+          if (filters contains input.name) {
+            // Replace SplitInto with the appropriate Filter
+            output.inputs = output.inputs.filter(_.producer != node) :+ Pipe(input.name, filters(input.name))
+            // and add the operator to the correct Filters outputs
+            filters(input.name).outputs = List(output)
+          }
+        })
+      })
+      Some(filters.values.toList)
+    case _ => None
   }
 
 
@@ -324,4 +343,5 @@ object Rewriter {
 
   merge[Filter, Filter](mergeFilters)
   reorder[OrderBy, Filter](filterBeforeOrder)
+  addStrategy(strategyf(t => splitIntoToFilters(t)))
 }

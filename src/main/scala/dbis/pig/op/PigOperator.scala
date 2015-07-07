@@ -169,14 +169,13 @@ Option[Schema]) extends Rewritable {
 
   def deconstruct = this.outputs
 
-  def reconstruct(outputs: Seq[Any]): PigOperator = outputs match {
-    case outputs: Seq[_] =>
-      this match {
-        case obj: PigOperator =>
-          obj.outputs = outputs.asInstanceOf[List[PigOperator]]
-          obj
-        case _ => illegalArgs("PigOperator", "PigOperator", outputs)
-      }
-    case _ => illegalArgs("PigOperator", "PigOperator", outputs)
+  def reconstruct(outputs: Seq[Any]): PigOperator = {
+    this.outputs = List.empty
+    outputs.foreach(_ match {
+      case op : PigOperator => this.outputs = this.outputs :+ op
+      case ops : List[PigOperator] => this.outputs = this.outputs ++ ops
+      case _ => illegalArgs("PigOperator", "PigOperator", outputs)
+    })
+    this
   }
 }

@@ -401,6 +401,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
       |SPLIT a INTO b IF x < 100, c IF x >= 100;
       |STORE b INTO 'res1.data';
       |STORE c INTO 'res2.data';""".stripMargin))
+    plan.findOperatorForAlias("b") should not be empty
+    plan.sourceNodes.headOption.value.outputs.headOption.value.outputs should have length 2
     assert(plan.checkConnectivity)
   }
 }

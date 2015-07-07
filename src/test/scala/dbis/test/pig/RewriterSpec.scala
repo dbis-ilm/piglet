@@ -17,6 +17,7 @@
 package dbis.test.pig
 
 import dbis.pig.op._
+import dbis.pig.PigCompiler._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import org.scalatest.OptionValues._
@@ -70,6 +71,34 @@ class RewriterSpec extends FlatSpec with Matchers{
 
     val pPlan = processPlan(plan)
     pPlan.findOperatorForAlias("b").value should be (op2_2)
+  }
+
+  it should "rewrite SplitInto operators into multiple Filter ones" in {
+    val plan = new DataflowPlan(parseScript(s"""
+      |a = LOAD 'file' AS (x, y);
+      |SPLIT a INTO b IF x < 100, c IF x >= 100;
+      |STORE b INTO 'res1.data';
+      |STORE c INTO 'res2.data';""".stripMargin))
+
+    val filter1 = parseScript("b = filter a by x < 100;").head
+    val filter2 = parseScript("c = filter a by x >= 100;").head
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes.headOption.value.outputs should have length 2
+    newPlan.sourceNodes.headOption.value.outputs should contain allOf(filter1, filter2)
+
+    newPlan.sinkNodes should have size 2
+    newPlan.sinkNodes.foreach(node => {
+      println(node.inputs)
+      node.inputs should have length 1
+    })
+
+    val sink1 = newPlan.sinkNodes.head
+    val sink2 = newPlan.sinkNodes.last
+
+    sink1.inputs.head.producer should be (if (sink1.inPipeName == "b") filter1 else filter2)
+    sink2.inputs.head.producer should be (if (sink1.inPipeName == "b") filter2 else filter1)
+
   }
 
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
