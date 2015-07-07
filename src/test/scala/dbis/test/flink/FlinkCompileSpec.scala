@@ -58,11 +58,11 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val op = Load("a", "file.csv", Option(Schema(BagType("",TupleType("",Array(Field("a1"),Field("a2"),Field("a3")))))), "PigStorage", List("\",\""))
+    val op = Load("a", "file.csv", None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ",")""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
@@ -188,7 +188,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for a binary JOIN statement with simple expression" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0)), List(PositionalField(0))))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
     val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
@@ -206,7 +206,7 @@ class FlinkCompileSpec extends FlatSpec {
   it should "contain code for a binary JOIN statement with expression lists" in {
     val op = Join("a", List("b", "c"), List(List(PositionalField(0), PositionalField(1)),
       List(PositionalField(1), PositionalField(2))))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
     val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
@@ -224,7 +224,7 @@ class FlinkCompileSpec extends FlatSpec {
   it should "contain code for a multiway JOIN statement" in {
     val op = Join("a", List("b", "c", "d"), List(List(PositionalField(0)),
       List(PositionalField(0)), List(PositionalField(0))))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
     val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
