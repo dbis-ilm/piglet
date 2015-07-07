@@ -46,21 +46,18 @@ Option[Schema]) extends Rewritable {
   @throws[IllegalArgumentException]("if any of the existing outputs doesn't read from the new name")
   def output_=(newOutput: Option[String]) = _outputs match {
     case Nil => _output = newOutput
-    case list => {
+    case list =>
       newOutput match {
-        case Some(name) => {
+        case Some(name) =>
           list.foreach(op => {
             if (!op.initialInPipeNames.contains(name)) {
               throw new IllegalArgumentException(op + " does not read from " + name)
             }
           })
           _output = newOutput
-        }
-        case None => {
+        case None =>
           throw new IllegalStateException("Can't unset the relation name of an operator with outputs")
-        }
       }
-    }
   }
 
   // If the operator writes a relation, this is a list of all operators the read that one.
@@ -72,7 +69,7 @@ Option[Schema]) extends Rewritable {
     "operator")
   def outputs_=(newOps: List[PigOperator]) = newOps match {
     case Nil => _outputs = newOps
-    case _ => {
+    case _ =>
       if (output.isEmpty) {
         throw new IllegalStateException("Can't set the outputs of an operator that doesn't return a relation")
       }
@@ -82,7 +79,6 @@ Option[Schema]) extends Rewritable {
         }
       })
       _outputs = newOps
-    }
   }
 
   output = if (initialOutPipeName != null && initialOutPipeName != "") { Some(initialOutPipeName)} else { None }
@@ -119,7 +115,7 @@ Option[Schema]) extends Rewritable {
       // the bag should be named with the output pipe
       schema match {
         case Some(s) => s.setBagName(outPipeName)
-        case None => {}
+        case None =>
       }
     }
     schema
@@ -135,8 +131,8 @@ Option[Schema]) extends Rewritable {
      * schemaToString is mainly called from DESCRIBE. Thus, we can take outPipeName as relation name.
      */
     schema match {
-      case Some(s) => s"${outPipeName}: ${s.element.descriptionString}"
-      case None => s"Schema for ${outPipeName} unknown."
+      case Some(s) => s"$outPipeName: ${s.element.descriptionString}"
+      case None => s"Schema for $outPipeName unknown."
     }
   }
 
@@ -174,15 +170,13 @@ Option[Schema]) extends Rewritable {
   def deconstruct = this.outputs
 
   def reconstruct(outputs: Seq[Any]): PigOperator = output match {
-    case outputs: Seq[_] => {
+    case outputs: Seq[_] =>
       this match {
-        case obj: PigOperator => {
+        case obj: PigOperator =>
           obj.outputs = outputs.asInstanceOf[List[PigOperator]]
           obj
-        }
         case _ => illegalArgs("PigOperator", "PigOperator", outputs)
       }
-    }
     case _ => illegalArgs("PigOperator", "PigOperator", outputs)
   }
 }
