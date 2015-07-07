@@ -16,12 +16,7 @@
  */
 package dbis.pig.op
 
-import dbis.pig.plan._
-import dbis.pig.schema._
-
-import scala.collection.mutable.ArrayBuffer
-
-case class SplitBranch(val outPipeName: String, val expr: Expr)
+case class SplitBranch(val outPipeName: String, val expr: Predicate)
 
 /**
  * SplitInto represents the SPLIT INTO operator of Pig.
