@@ -21,7 +21,7 @@ import dbis.pig.schema._
 
 import scala.collection.mutable.ArrayBuffer
 
-case class SplitBranch(val outPipeName: String, val expr: Expr)
+case class SplitBranch(val output: Pipe, val expr: Expr)
 
 /**
  * SplitInto represents the SPLIT INTO operator of Pig.
@@ -29,10 +29,11 @@ case class SplitBranch(val outPipeName: String, val expr: Expr)
  * @param initialInPipeName the names of the input pipe.
  * @param splits a list of split branches (output pipe + condition)
  */
-case class SplitInto(val initialInPipeName: String, val splits: List[SplitBranch])
-  extends PigOperator("", initialInPipeName) {
+case class SplitInto(in: Pipe, splits: List[SplitBranch]) extends PigOperator {
+  outputs = splits.map(s => s.output)
+  inputs = List(in)
 
-  override def initialOutPipeNames: List[String] = splits.map{ case branch => branch.outPipeName }
+  // override def initialOutPipeNames: List[String] = splits.map{ branch => branch.output.name }
 
   override def lineageString: String = {
     s"""SPLIT%""" + super.lineageString

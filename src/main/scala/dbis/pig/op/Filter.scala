@@ -24,8 +24,9 @@ package dbis.pig.op
  * @param initialInPipeName the name of the input pipe
  * @param pred the predicate used for filtering tuples from the input pipe
  */
-case class Filter(override val initialOutPipeName: String, initialInPipeName: String, pred: Predicate)
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Filter(out: Pipe, in: Pipe, pred: Predicate) extends PigOperator {
+  outputs = List(out)
+  inputs = List(in)
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

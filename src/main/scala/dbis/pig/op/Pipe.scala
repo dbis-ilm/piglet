@@ -16,22 +16,16 @@
  */
 package dbis.pig.op
 
-/**
- * Store represents the STORE operator of Pig.
- *
- * @param initialInPipeName the name of the input pipe
- * @param file the name of the output file
- */
-case class Store(in: Pipe, file: String) extends PigOperator {
-  outputs = List()
-  inputs = List(in)
 
-  /**
-   * Returns the lineage string describing the sub-plan producing the input for this operator.
-   *
-   * @return a string representation of the sub-plan.
-   */
-  override def lineageString: String = {
-    s"""STORE%${file}%""" + super.lineageString
-  }
+/**
+ * A pipe connects some Pig operator and associates a name to this channel.
+ *
+ * @param name the name of the pipe
+ * @param producer the operator producing the data
+ * @param consumer the list of operators reading this data
+ */
+case class Pipe (var name: String, var producer: PigOperator = null, var consumer: List[PigOperator] = List()) {
+  override def toString = s"Pipe($name)"
+
+  def inputSchema = if (producer != null) producer.schema else None
 }

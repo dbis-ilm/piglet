@@ -26,8 +26,10 @@ package dbis.pig.op
  * @param initialOutPipeName the name of the output pipe (relation).
  * @param initialInPipeName the name of the input pipe.
  */
-case class Distinct(override val initialOutPipeName: String, initialInPipeName: String)
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Distinct(out: Pipe, in: Pipe) extends PigOperator {
+  outputs = List(out)
+  inputs = List(in)
+
   override def lineageString: String = {
     s"""DISTINCT%""" + super.lineageString
   }

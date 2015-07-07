@@ -23,8 +23,11 @@ package dbis.pig.op
  * @param initialInPipeName
  * @param expr
  */
-case class Sample(override val initialOutPipeName: String, initialInPipeName: String, expr: ArithmeticExpr)
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Sample(out: Pipe, in: Pipe, expr: ArithmeticExpr) extends PigOperator {
+
+  outputs = List(out)
+  inputs = List(in)
+
   override def lineageString: String = s"""SAMPLE%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {

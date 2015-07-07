@@ -23,14 +23,14 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class RewriterSpec extends FlatSpec with Matchers{
   "The rewriter" should "merge two Filter operations" in {
-    val op1 = Load("a", "file.csv")
+    val op1 = Load(Pipe("a"), "file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val op2 = Filter("b", "a", predicate1)
-    val op3 = Filter("c", "b", predicate2)
-    val op4 = Dump("c")
+    val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
+    val op4 = Dump(Pipe("c"))
     val op4_2 = op4.copy()
-    val opMerged = Filter("c", "a", And(predicate1, predicate2))
+    val opMerged = Filter(Pipe("c"), Pipe("a"), And(predicate1, predicate2))
 
     val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
     val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
@@ -42,17 +42,17 @@ class RewriterSpec extends FlatSpec with Matchers{
   }
 
   it should "order Filter operations before Order By ones" in {
-    val op1 = Load("a", "file.csv")
+    val op1 = Load(Pipe("a"), "file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
 
     // ops before reordering
-    val op2 = OrderBy("b", "a", List())
-    val op3 = Filter("c", "b", predicate1)
-    val op4 = Dump("c")
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
 
     // ops after reordering
-    val op2_2 = Filter("b", "a", predicate1)
-    val op3_2 = OrderBy("c", "b", List())
+    val op2_2 = Filter(Pipe("b"), Pipe("a"), predicate1)
+    val op3_2 = OrderBy(Pipe("c"), Pipe("b"), List())
     val op4_2 = op4.copy()
 
     val plan = new DataflowPlan(List(op1, op2, op3, op4))
@@ -65,12 +65,12 @@ class RewriterSpec extends FlatSpec with Matchers{
   }
 
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
-    val op1 = Load("a", "file.csv")
+    val op1 = Load(Pipe("a"), "file.csv")
     val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val op2 = Filter("b", "a", predicate)
-    val op3 = Dump("b")
-    val op4 = OrderBy("c", "b", List())
-    val op5 = Dump("c")
+    val op2 = Filter(Pipe("b"), Pipe("a"), predicate)
+    val op3 = Dump(Pipe("b"))
+    val op4 = OrderBy(Pipe("c"), Pipe("b"), List())
+    val op5 = Dump(Pipe("c"))
     val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
 
     val newPlan = processPlan(plan)

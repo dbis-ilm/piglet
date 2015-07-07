@@ -38,8 +38,10 @@ case class OrderBySpec(field: Ref, dir: OrderByDirection)
  * @param initialInPipeName
  * @param orderSpec
  */
-case class OrderBy(override val initialOutPipeName: String, initialInPipeName: String, orderSpec: List[OrderBySpec])
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class OrderBy(out: Pipe, in: Pipe, orderSpec: List[OrderBySpec]) extends PigOperator {
+  outputs = List(out)
+  inputs = List(in)
+
   override def lineageString: String = s"""ORDERBY%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
