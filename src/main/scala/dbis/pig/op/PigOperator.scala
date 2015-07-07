@@ -98,6 +98,8 @@ Option[Schema]) extends Rewritable {
     case None => ""
   }
 
+  def initialOutPipeNames: List[String] = List(initialOutPipeName)
+
   def inPipeName: String = if (inPipeNames.isEmpty) "" else inPipeNames.head
   def inPipeNames: List[String] = if (inputs.isEmpty) initialInPipeNames else inputs.map(p => p.name)
 

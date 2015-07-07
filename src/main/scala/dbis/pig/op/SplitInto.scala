@@ -31,6 +31,9 @@ case class SplitBranch(val outPipeName: String, val expr: Expr)
  */
 case class SplitInto(val initialInPipeName: String, val splits: List[SplitBranch])
   extends PigOperator("", initialInPipeName) {
+
+  override def initialOutPipeNames: List[String] = splits.map{ case branch => branch.outPipeName }
+
   override def lineageString: String = {
     s"""SPLIT%""" + super.lineageString
   }

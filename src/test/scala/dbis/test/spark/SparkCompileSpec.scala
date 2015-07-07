@@ -83,6 +83,16 @@ class SparkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for a complex FILTER" in {
+    val ops = parseScript("b = LOAD 'file' AS (x: double, y:double, z1:int, z2: int); c = FILTER b BY x > 0 AND (y < 0 OR (NOT z1 == z2));")
+    val plan = new DataflowPlan(ops)
+    val op = ops(1)
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val c = b.filter(t => {t(0).toDouble > 0 && (t(1).toDouble < 0 || (!(t(2).toInt == t(3).toInt)))})")
+    assert(generatedCode == expectedCode)
+  }
+
   it should "contain code for DUMP" in {
     val op = Dump("a")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
