@@ -25,18 +25,39 @@ import scalax.collection.mutable.Graph
 import scalax.collection.GraphPredef._
 
 /**
- * Created by kai on 01.04.15.
+ * A pipe connects two Pig operator and associates a name to this channel.
+ * Pipes are stored as members of the "receiver" operator and, therefore,
+ * contain only the producer.
+ *
+ * @param name the name of the pipe
+ * @param producer the operator producing the data
  */
 case class Pipe (name: String, producer: PigOperator)
 
+/**
+ * An exception indicating that the dataflow plan is invalid.
+ *
+ * @param msg a text describing the reason
+ */
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
 class DataflowPlan(var operators: List[PigOperator]) {
   // private var graph = Graph[PigOperator,DiEdge]()
+
+  /**
+   * A list of JAR files specified by the REGISTER statement
+   */
   val additionalJars = ListBuffer[String]()
 
   constructPlan(operators)
 
+  /**
+   * Constructs a plan from a list of Pig operators. This means, that based on
+   * the initial input and output bag names (as specified in the script) the
+   * necessary pipes are constructed and assigned to the operators.
+   *
+   * @param ops the list of pig operators produced by the parser
+   */
   def constructPlan(ops: List[PigOperator]) : Unit = {
     def unquote(s: String): String = s.substring(1, s.length - 1)
 
@@ -55,10 +76,13 @@ class DataflowPlan(var operators: List[PigOperator]) {
      * 1. We create the mapping from names to the operators that *write* them.
      */
     planOps.foreach(op => {
-      if (op.initialOutPipeName != "") {
-        if (pipes.contains(op.initialOutPipeName))
-          throw new InvalidPlanException("duplicate pipe: " + op.initialOutPipeName)
-        pipes(op.initialOutPipeName) = (op, List())
+      // we can have multiple OutPipeName's (e.g. in SplitInto)
+      op.initialOutPipeNames.foreach { name: String =>
+        if (name != "") {
+          if (pipes.contains(name))
+            throw new InvalidPlanException("duplicate pipe: " + name)
+          pipes(name) = (op, List())
+        }
       }
     })
 
@@ -93,10 +117,26 @@ class DataflowPlan(var operators: List[PigOperator]) {
     operators = planOps
   }
 
+  /**
+   * Returns a set of operators acting as sinks (without output bags) in the dataflow plan.
+   *
+   * @return the set of sink operators
+   */
   def sinkNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.outputs.isEmpty).toSet[PigOperator]
-  
+
+  /**
+   * Returns a set of operators acting as sources (without input bags) in the dataflow plan.
+   *
+   * @return the set of source operators
+   */
   def sourceNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.inputs.isEmpty).toSet[PigOperator]
 
+  /**
+   * Checks whether the dataflow plan represents a connected graph, i.e. all operators have their
+   * input.
+   *
+   * @return true if the plan is connected, false otherwise
+   */
   def checkConnectivity: Boolean = {
     // TODO: check connectivity of subplans in nested foreach
     // we simply construct a graph and check its connectivity
@@ -105,6 +145,10 @@ class DataflowPlan(var operators: List[PigOperator]) {
     graph.isConnected
   }
 
+  /**
+   * Checks whether all operators and their expressions conform to the schema
+   * of their input bags. If not, a SchemaException is raised.
+   */
   def checkSchemaConformance: Unit = {
     val errors = operators.view.map{ op => (op, op.checkSchemaConformance) }
                     .filter{ t => t._2 == false }
@@ -125,6 +169,12 @@ class DataflowPlan(var operators: List[PigOperator]) {
    */
   def findOperatorForAlias(s: String): Option[PigOperator] = operators.find(o => o.outPipeName == s)
 
+  /**
+   * Returns a list of operators satisfying a given predicate.
+   *
+   * @param pred a function implementing a predicate
+   * @return the list of operators satisfying this predicate
+   */
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
 
   /**

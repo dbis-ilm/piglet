@@ -118,3 +118,20 @@ case class Not(a: Predicate) extends Predicate {
 
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 }
+
+/**
+ * A parenthesized predicate.
+ *
+ * @param a
+ */
+case class PPredicate(a: Predicate) extends Predicate {
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) && a.traverseAnd(schema, traverser)
+
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
+    traverser(schema, this) || a.traverseAnd(schema, traverser)
+
+  override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
+
+}

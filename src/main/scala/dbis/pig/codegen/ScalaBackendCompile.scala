@@ -191,10 +191,11 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   }
 
   /**
+   * Generate Scala code for a predicate on expressions.
    *
-   * @param schema
-   * @param predicate
-   * @return
+   * @param schema the optional input schema of the operator where the expressions refer to.
+   * @param predicate the actual predicate
+   * @return a string representation of the generated Scala code
    */
   def emitPredicate(schema: Option[Schema], predicate: Predicate): String = predicate match {
     case Eq(left, right) => { s"${emitExpr(schema, left)} == ${emitExpr(schema, right)}"}
@@ -203,14 +204,20 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     case Lt(left, right) => { s"${emitExpr(schema, left)} < ${emitExpr(schema, right)}"}
     case Geq(left, right) => { s"${emitExpr(schema, left)} >= ${emitExpr(schema, right)}"}
     case Gt(left, right) => { s"${emitExpr(schema, left)} > ${emitExpr(schema, right)}"}
-    case _ => { "" }
+    case And(left, right) => s"${emitPredicate(schema, left)} && ${emitPredicate(schema, right)}"
+    case Or(left, right) => s"${emitPredicate(schema, left)} || ${emitPredicate(schema, right)}"
+    case Not(pred) => s"!(${emitPredicate(schema, pred)})"
+    case PPredicate(pred) => s"(${emitPredicate(schema, pred)})"
+    case _ => { s"UNKNOWN PREDICATE: $predicate" }
   }
 
   /**
+   * Generates Scala code for a grouping expression in GROUP BY. We construct code for map
+   * in the form "map(t => {(t(0),t(1),...)}" if t(0), t(1) are grouping attributes.
    *
-   * @param schema
-   * @param groupingExpr
-   * @return
+   * @param schema the optional input schema of the operator where the expressions refer to.
+   * @param groupingExpr the actual grouping expression object
+   * @return a string representation of the generated Scala code
    */
   def emitGrouping(schema: Option[Schema], groupingExpr: GroupingExpression): String = {
     if (groupingExpr.keyList.size == 1)
@@ -264,6 +271,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       val targetType = scalaTypeMappingTable(t)
       s"${emitExpr(schema, e)}.to$targetType"
     }
+    case PExpr(e) => s"(${emitExpr(schema, e)})"
     case MSign(e) => s"-${emitExpr(schema, e)}"
     case Add(e1, e2) => s"${emitExpr(schema, e1)} + ${emitExpr(schema, e2)}"
     case Minus(e1, e2) => s"${emitExpr(schema, e1)} - ${emitExpr(schema, e2)}"
