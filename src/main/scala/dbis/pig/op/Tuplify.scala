@@ -24,8 +24,8 @@ package dbis.pig.op
  * @param ref a reference des
  */
 case class Tuplify(out: Pipe, in: Pipe, ref: Ref) extends PigOperator {
-  outputs = List(out)
-  inputs = List(in)
+  _outputs = List(out)
+  _inputs = List(in)
 
   override def lineageString: String = s"""TUPLIFY%""" + super.lineageString
 

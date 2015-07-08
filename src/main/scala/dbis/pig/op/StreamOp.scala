@@ -30,8 +30,8 @@ import dbis.pig.schema.Schema
  */
 case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref]] = None,
                     var loadSchema: Option[Schema] = None) extends PigOperator {
-  outputs = List(out)
-  inputs = List(in)
+  _outputs = List(out)
+  _inputs = List(in)
   schema = loadSchema
 
   override def lineageString: String = s"""STREAM%""" + super.lineageString

@@ -28,13 +28,52 @@ import scala.collection.immutable.Seq
  * dataflow.
  */
 trait PigOperator extends Rewritable {
-  var outputs: List[Pipe] = _
-  var inputs: List[Pipe]  = _
+  protected var _outputs: List[Pipe] = _
+  protected var _inputs: List[Pipe]  = _
+
   var schema: Option[Schema] = None
+
+  /**
+   * Getter method for the output pipes.
+   *
+   * @return the list of output pipes
+   */
+  def outputs = _outputs
+
+  /**
+   * Setter method for the output pipes. It ensures
+   * that this is producer of all pipes.
+   *
+   * @param o the new list of output pipes
+   */
+  def outputs_=(o: List[Pipe]) = {
+    _outputs = o
+    // make sure that we are producer in all pipes
+    _outputs.foreach(p => p.producer = this)
+  }
+
+  /**
+   * Getter method for the input pipes.
+   *
+   * @return the list of input pipes
+   */
+  def inputs = _inputs
+
+  /**
+   * Setter method for the input pipes. It ensures
+   * that this is a consumer in all pipes.
+   *
+   * @param i the new list of input pipes
+   */
+  def inputs_=(i: List[Pipe]) = {
+    _inputs = i
+    // make sure that we are consumer in all pipes
+    _inputs.foreach(p => if (!p.consumer.contains(this)) p.consumer = p.consumer :+ this)
+  }
 
   def outPipeName: String = if (outputs.nonEmpty) outputs.head.name else ""
 
-  def inputSchema = if (inputs.nonEmpty ) inputs.head.inputSchema else None
+  def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 
   def preparePlan: Unit = {}
 
@@ -100,7 +139,19 @@ trait PigOperator extends Rewritable {
   def lineageString: String = {
     inputs.map(p => p.producer.lineageString).mkString("%")
   }
+
   def arity = this.inputs.length
+
+  /**
+   * Check whether the input and output pipes are still consistent, i.e.
+   * for all output pipes the producer is the current operator and the current
+   * operator is also a consumer in each input pipe.
+   *
+   * @return true if the operator pipes are consistent
+   */
+  def checkConsistency: Boolean = {
+    outputs.forall(p => p.producer == this) && inputs.forall(p => p.consumer.contains(this))
+  }
 
   def deconstruct = this.inputs
 
@@ -108,7 +159,7 @@ trait PigOperator extends Rewritable {
     case inputs: Seq[_] => {
       this match {
         case obj: PigOperator => {
-          obj.inputs = inputs.toList.asInstanceOf[List[Pipe]]
+          obj._inputs = inputs.toList.asInstanceOf[List[Pipe]]
           obj
         }
       }

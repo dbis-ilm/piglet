@@ -25,8 +25,8 @@ package dbis.pig.op
  */
 case class Sample(out: Pipe, in: Pipe, expr: ArithmeticExpr) extends PigOperator {
 
-  outputs = List(out)
-  inputs = List(in)
+  _outputs = List(out)
+  _inputs = List(in)
 
   override def lineageString: String = s"""SAMPLE%""" + super.lineageString
 

@@ -23,8 +23,8 @@ package dbis.pig.op
  * @param file the name of the output file
  */
 case class Store(in: Pipe, file: String) extends PigOperator {
-  outputs = List()
-  inputs = List(in)
+  _outputs = List()
+  _inputs = List(in)
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

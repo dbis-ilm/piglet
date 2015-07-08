@@ -61,8 +61,8 @@ case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
  * @param generator the generator (a list of expressions or a subplan)
  */
 case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator) extends PigOperator {
-  outputs = List(out)
-  inputs = List(in)
+  _outputs = List(out)
+  _inputs = List(in)
 
   var subPlan: Option[DataflowPlan] = None
 
@@ -174,8 +174,8 @@ case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator) extends Pig
  * @param exprs list of generator expressions
  */
 case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
-  outputs = List()
-  inputs = List()
+  _outputs = List()
+  _inputs = List()
 
   // TODO: what do we need here?
   override def constructSchema: Option[Schema] = {
@@ -214,8 +214,8 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
  * @param refExpr a reference referring to an expression constructing a relation (bag).
  */
 case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
-  outputs = List(out)
-  inputs = List()
+  _outputs = List(out)
+  _inputs = List()
 
   // TODO: what do we need here?
   var parentSchema: Option[Schema] = None

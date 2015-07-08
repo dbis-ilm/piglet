@@ -24,8 +24,8 @@ package dbis.pig.op
  * @param num
  */
 case class Limit(out: Pipe, in: Pipe, num: Int) extends PigOperator {
-  outputs = List(out)
-  inputs = List(in)
+  _outputs = List(out)
+  _inputs = List(in)
 
   override def lineageString: String = {
     s"""LIMIT%${num}%""" + super.lineageString

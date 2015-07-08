@@ -62,7 +62,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
     ops.filter(_.isInstanceOf[Register]).foreach(op => additionalJars += unquote(op.asInstanceOf[Register].jarFile))
     val planOps = ops.filterNot(_.isInstanceOf[Register])
 
-    println("constructPlan #1")
     /*
      * 1. We create a Map from names to the pipes that *write* them.
      */
@@ -79,7 +78,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
       }
     })
 
-    println("constructPlan #2")
     /*
      * 2. We add operators that *read* from a pipe to this pipe
      */
@@ -94,7 +92,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
      * 3. Because we have completed only the pipes from the operator outputs
      *    we have to replace the inputs list of each operator
      */
-    println("constructPlan #3")
     try {
       planOps.foreach(op => {
         val newPipes = op.inputs.map(p => pipes(p.name))
@@ -105,7 +102,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
         op.output = if (op.initialOutPipeName != "") Some(op.initialOutPipeName) else None
         op.outputs = if (op.initialOutPipeName != "") pipes(op.initialOutPipeName)._2 else op.outputs
         */
-        println("op: " + op)
+        // println("op: " + op)
         op.preparePlan
         op.constructSchema
       })
@@ -152,6 +149,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
     operators.forall(op =>
       op.inputs.forall(p => p.producer != null) && op.outputs.forall(p => p.consumer.nonEmpty))
   }
+
+  def checkConsistency: Boolean = operators.forall(_.checkConsistency)
 
   /**
    * Checks whether all operators and their expressions conform to the schema

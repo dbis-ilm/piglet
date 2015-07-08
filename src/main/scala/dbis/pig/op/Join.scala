@@ -28,8 +28,8 @@ import scala.collection.mutable.ArrayBuffer
  * @param fieldExprs  list of key expressions (list of keys) used as join expressions.
  */
 case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]]) extends PigOperator {
-  outputs = List(out)
-  inputs = in
+  _outputs = List(out)
+  _inputs = in
 
   override def lineageString: String = {
     s"""JOIN%""" + super.lineageString

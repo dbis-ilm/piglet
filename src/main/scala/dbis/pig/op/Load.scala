@@ -34,8 +34,8 @@ import dbis.pig.schema.Schema
 case class Load(out: Pipe, file: String,
                 var loadSchema: Option[Schema] = None,
                 loaderFunc: String = "", loaderParams: List[String] = null) extends PigOperator {
-  outputs = List(out)
-  inputs = List()
+  _outputs = List(out)
+  _inputs = List()
   schema = loadSchema
 
   override def constructSchema: Option[Schema] = {

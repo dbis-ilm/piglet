@@ -27,8 +27,8 @@ package dbis.pig.op
  * @param initialInPipeName the name of the input pipe.
  */
 case class Distinct(out: Pipe, in: Pipe) extends PigOperator {
-  outputs = List(out)
-  inputs = List(in)
+  _outputs = List(out)
+  _inputs = List(in)
 
   override def lineageString: String = {
     s"""DISTINCT%""" + super.lineageString

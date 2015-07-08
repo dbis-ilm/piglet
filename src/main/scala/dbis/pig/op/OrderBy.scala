@@ -39,8 +39,8 @@ case class OrderBySpec(field: Ref, dir: OrderByDirection)
  * @param orderSpec
  */
 case class OrderBy(out: Pipe, in: Pipe, orderSpec: List[OrderBySpec]) extends PigOperator {
-  outputs = List(out)
-  inputs = List(in)
+  _outputs = List(out)
+  _inputs = List(in)
 
   override def lineageString: String = s"""ORDERBY%""" + super.lineageString
 
