@@ -106,18 +106,18 @@ union(out,in,others) ::=<<
 // ------------------ Reads from a SOCKET -------------------------------------
 socketRead(out,addr,mode,schema) ::=<<
 <if (mode)>
-        val <out> = env.addSource(new ZmqSubscriber("<addr>"))
+        val <out> = env.addSource(new ZmqSubscriber("<addr.protocol><addr.hostname>:<addr.port>"))
 <else>
-        val <out> = env.socketTextStream("<addr>".split(':')(0),"<addr>".split(':')(1).toInt).map(line => line.split(',').toList)
+        val <out> = env.socketTextStream("<addr.hostname>",<addr.port>).map(line => line.split(',').toList)
 <endif>
 >>
 
 // ------------------ Writes to a SOCKET -------------------------------------
 socketWrite(in,addr,mode) ::=<<
 <if (mode)>
-        <in>.addSink(new ZmqPublisher("<addr>")).setParallelism(1)
+        <in>.addSink(new ZmqPublisher("<addr.protocol><addr.hostname>:<addr.port>")).setParallelism(1)
 <else>
-        <in>.writeToSocket("<addr>".split(':')(0),"<addr>".split(':')(1).toInt,new UTF8StringSchema())
+        <in>.writeToSocket("<addr.hostname>",<addr.port>,new UTF8StringSchema())
 <endif>
 >>
 

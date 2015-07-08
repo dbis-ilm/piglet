@@ -374,19 +374,19 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a socket read statement in standard mode" in {
-    assert(parseScript("a = socket_read '127.0.0.1:5555';") == List(SocketRead("a", "127.0.0.1:5555", "")))
+    assert(parseScript("a = socket_read '127.0.0.1:5555';") == List(SocketRead("a", SocketAddress("","127.0.0.1","5555"), "")))
   }
 
   it should "parse a socket read statement in zmq mode" in {
-    assert(parseScript("a = socket_read 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketRead("a", "tcp://127.0.0.1:5555", "zmq")))
+    assert(parseScript("a = socket_read 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketRead("a", SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
   }
 
   it should "parse a socket write statement in standard mode" in {
-    assert(parseScript("socket_write a to '127.0.0.1:5555';") == List(SocketWrite("a", "127.0.0.1:5555", "")))
+    assert(parseScript("socket_write a to '127.0.0.1:5555';") == List(SocketWrite("a", SocketAddress("","127.0.0.1","5555"), "")))
   }
 
   it should "parse a socket write statement in zmq mode" in {
-    assert(parseScript("socket_write a to 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketWrite("a", "tcp://127.0.0.1:5555", "zmq")))
+    assert(parseScript("socket_write a to 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketWrite("a", SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
   }
 
   it should "parse a window statement using Rows for window and slider" in {

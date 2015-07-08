@@ -23,7 +23,7 @@ package dbis.pig.op
  * @param addr the socket address to write to
  * @param mode empty for standard socket or currently also possible "zmq"
  */
-case class SocketWrite(initialInPipeName: String, addr: String, mode: String) extends PigOperator("", initialInPipeName) {
+case class SocketWrite(initialInPipeName: String, addr: SocketAddress, mode: String) extends PigOperator("", initialInPipeName) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

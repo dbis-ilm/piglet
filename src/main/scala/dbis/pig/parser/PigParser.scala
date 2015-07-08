@@ -423,17 +423,18 @@ class PigParser extends JavaTokenParsers {
   def ipv4: Parser[String] = ipMember ~ "." ~ ipMember ~ "." ~ ipMember ~ "." ~ ipMember ^^{
     case i1 ~ _ ~ i2 ~ _ ~ i3 ~ _ ~i4 => i1 + "." + i2 + "." + i3 + "." + i4
   }
-  def port: Parser[String] = ":([0-9]{1,5})".r
-  def inetAddress: Parser[String] = "'" ~ (ipv4 | ident) ~ port ~ "'" ^^ { case _ ~ ip ~ p ~ _ => ip + p }
-  def bindAddress: Parser[String] = (ipv4 | "*" | ident) ~ (port | "*") ^^ { case ip ~ p => ip + p }
-  def tcpSocket: Parser[String] = "tcp://" ~ bindAddress ^^ { case trans ~ addr => trans + addr}
-  def ipcSocket: Parser[String] = "ipc://" ~ (fileName | "*") ^^ { case trans ~  path => trans + path}
-  def inprocSocket: Parser[String] = "inproc://" ~ ident ^^ { case trans ~ name => trans + name}
-  def pgmSocket: Parser[String] = ("pgm://" | "epgm://") ~ (ipv4 | ident) ~ ";" ~ ipv4 ~ port ^^ { 
-      case trans ~ interface ~ _ ~ ip ~ p => trans + interface + ";" + ip + p
+  def portNum: Parser[String] = "([0-9]{1,5})".r
+  def port: Parser[String] = (portNum | "*") 
+  def bindAddress: Parser[String] = (ipv4 | "*" | ident)
+  
+  def inetAddress: Parser[SocketAddress] = "'" ~ (ipv4 | ident) ~ ":" ~ portNum ~ "'" ^^ { case _ ~ ip ~ _ ~ p ~ _ => SocketAddress("",ip,p)}
+  def tcpSocket: Parser[SocketAddress] = "tcp://" ~ bindAddress ~ ":" ~ port ^^ { case trans ~ addr ~ _ ~ p => SocketAddress(trans, addr, p)}
+  def ipcSocket: Parser[SocketAddress] = "ipc://" ~ (fileName | "*") ^^ { case trans ~  path => SocketAddress(trans,path,"")}
+  def inprocSocket: Parser[SocketAddress] = "inproc://" ~ ident ^^ { case trans ~ name => SocketAddress(trans,name,"")}
+  def pgmSocket: Parser[SocketAddress] = ("pgm://" | "epgm://") ~ (ipv4 | ident) ~ ";" ~ ipv4 ~ ":" ~ portNum ^^ { 
+      case trans ~ interface ~ _ ~ ip ~ _ ~ p => SocketAddress(trans, interface + ";" + ip, p)
     }
-  //def transports: Parser[String] = "(inproc|ipc|tcp|pgm|epgm)".r
-  def zmqAddress: Parser[String] = "'" ~ (tcpSocket | ipcSocket | inprocSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
+  def zmqAddress: Parser[SocketAddress] = "'" ~ (tcpSocket | ipcSocket | inprocSocket | pgmSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
 
   /*
    * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] [ AS <schema> ]

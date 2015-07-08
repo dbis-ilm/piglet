@@ -18,6 +18,7 @@ package dbis.pig.op
 
 import dbis.pig.schema.Schema
 
+case class SocketAddress(protocol: String, hostname: String, port: String)
 /**
  * Load represents the LOAD operator of Pig.
  *
@@ -26,7 +27,7 @@ import dbis.pig.schema.Schema
  * @param mode empty for standard socket or currently also possible "zmq"
  * @param loadSchema
  */
-case class SocketRead(override val initialOutPipeName: String, addr: String, 
+case class SocketRead(override val initialOutPipeName: String, addr: SocketAddress, 
                 mode: String, var loadSchema: Option[Schema] = None) extends PigOperator(initialOutPipeName, List(), loadSchema) {
   override def constructSchema: Option[Schema] = {
     /*
