@@ -25,7 +25,9 @@ package dbis.pig.op
 *
 * @param initialInPipeName the name of the input pipe
 */
-case class Describe(initialInPipeName: String) extends PigOperator("", initialInPipeName) {
+case class Describe(in: Pipe) extends PigOperator {
+  _inputs = List(in)
+  _outputs = List()
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

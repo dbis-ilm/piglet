@@ -27,8 +27,10 @@ import scala.collection.mutable.ArrayBuffer
  * @param inPipeNames the list of names of input pipes.
  * @param fieldExprs  list of key expressions (list of keys) used as join expressions.
  */
-case class Join(override val outPipeName: String, override val inPipeNames: List[String], val fieldExprs: List[List[Ref]])
-  extends PigOperator(outPipeName, inPipeNames) {
+case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]]) extends PigOperator {
+  _outputs = List(out)
+  _inputs = in
+
   override def lineageString: String = {
     s"""JOIN%""" + super.lineageString
   }

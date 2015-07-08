@@ -60,8 +60,9 @@ case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
  * @param initialInPipeName the name of the input pipe
  * @param generator the generator (a list of expressions or a subplan)
  */
-case class Foreach(override val initialOutPipeName: String, initialInPipeName: String, generator: ForeachGenerator)
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
 
   var subPlan: Option[DataflowPlan] = None
 
@@ -172,7 +173,10 @@ case class Foreach(override val initialOutPipeName: String, initialInPipeName: S
  *
  * @param exprs list of generator expressions
  */
-case class Generate(exprs: List[GeneratorExpr]) extends PigOperator("") {
+case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
+  _outputs = List()
+  _inputs = List()
+
   // TODO: what do we need here?
   override def constructSchema: Option[Schema] = {
     val fields = constructFieldList(exprs)
@@ -209,7 +213,10 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator("") {
  *                           can be changed later.
  * @param refExpr a reference referring to an expression constructing a relation (bag).
  */
-case class ConstructBag(override val initialOutPipeName: String, refExpr: Ref) extends PigOperator (initialOutPipeName) {
+case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List()
+
   // TODO: what do we need here?
   var parentSchema: Option[Schema] = None
 

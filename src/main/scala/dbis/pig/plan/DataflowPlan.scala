@@ -26,24 +26,35 @@ import scalax.collection.mutable.Graph
 import scalax.collection.GraphPredef._
 
 /**
- * Created by kai on 01.04.15.
+ * An exception indicating that the dataflow plan is invalid.
+ *
+ * @param msg a text describing the reason
  */
-case class Pipe (name: String, producer: PigOperator)
-
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
 class DataflowPlan(var operators: List[PigOperator]) {
   // private var graph = Graph[PigOperator,DiEdge]()
+
+  /**
+   * A list of JAR files specified by the REGISTER statement
+   */
   val additionalJars = ListBuffer[String]()
 
   constructPlan(operators)
 
+  /**
+   * Constructs a plan from a list of Pig operators. This means, that based on
+   * the initial input and output bag names (as specified in the script) the
+   * necessary pipes are constructed and assigned to the operators.
+   *
+   * @param ops the list of pig operators produced by the parser
+   */
   def constructPlan(ops: List[PigOperator]) : Unit = {
     def unquote(s: String): String = s.substring(1, s.length - 1)
 
-    // This maps a String (the relations name, a string) to the single operator that writes it and the list of
+    // This maps a String (the relation name, a string) to the pipe that writes it and the list of
     // operators that read it.
-    val pipes: Map[String, (PigOperator, List[PigOperator])] = Map[String, (PigOperator, List[PigOperator])]()
+    val pipes: Map[String, Pipe] = Map[String, Pipe]()
 
     /*
      * 0. We remove all Register operators: they are just pseudo-operators.
@@ -53,46 +64,45 @@ class DataflowPlan(var operators: List[PigOperator]) {
     val planOps = ops.filterNot(_.isInstanceOf[Register])
 
     /*
-     * 1. We create the mapping from names to the operators that *write* them.
+     * 1. We create a Map from names to the pipes that *write* them.
      */
     planOps.foreach(op => {
-      // TODO: we can have multiple OutPipeName's (e.g. in SplitInto)
-      /*
-      if (op.initialOutPipeName != "") {
-        if (pipes.contains(op.initialOutPipeName))
-          throw new InvalidPlanException("duplicate pipe: " + op.initialOutPipeName)
-        pipes(op.initialOutPipeName) = (op, List())
-      }
-      */
-      op.initialOutPipeNames.foreach { name: String =>
-        if (name != "") {
-          if (pipes.contains(name))
-            throw new InvalidPlanException("duplicate pipe: " + name)
-          pipes(name) = (op, List())
+      // we can have multiple outputs (e.g. in SplitInto)
+      op.outputs.foreach { p: Pipe =>
+        if (p.name != "") {
+          if (pipes.contains(p.name))
+            throw new InvalidPlanException("duplicate pipe: " + p.name)
+          // we initialize the producer of the pipe
+          p.producer = op
+          pipes(p.name) = p
         }
       }
     })
 
     /*
-     * 2. We add operators that *read* a name to the mapping
+     * 2. We add operators that *read* from a pipe to this pipe
      */
     planOps.foreach(op => {
-      if (op.initialInPipeNames.nonEmpty) {
-        for (inPipeName <- op.initialInPipeNames) {
-          val element = pipes(inPipeName)
-          pipes(inPipeName) = element.copy(_2 = element._2 :+ op)
+        for (p <- op.inputs) {
+          val element = pipes(p.name)
+          element.consumer = element.consumer :+ op
         }
-      }
     })
+
     /*
-     * 3. We assign the pipe objects to the input and output pipes of all operators
-     *    based on their names
+     * 3. Because we have completed only the pipes from the operator outputs
+     *    we have to replace the inputs list of each operator
      */
     try {
       planOps.foreach(op => {
+        val newPipes = op.inputs.map(p => pipes(p.name))
+        op.inputs = newPipes
+        // TODO!!!!!
+        /*
         op.inputs = op.initialInPipeNames.map(p => Pipe(p, pipes(p)._1))
-        op.output = if (op.output.isDefined) Some(op.output.get) else None
-        op.outputs = if (op.output.isDefined) pipes(op.output.get)._2 else op.outputs
+        op.output = if (op.initialOutPipeName != "") Some(op.initialOutPipeName) else None
+        op.outputs = if (op.initialOutPipeName != "") pipes(op.initialOutPipeName)._2 else op.outputs
+        */
         // println("op: " + op)
         op.preparePlan
         op.constructSchema
@@ -104,18 +114,49 @@ class DataflowPlan(var operators: List[PigOperator]) {
     operators = planOps
   }
 
+  /**
+   * Returns a set of operators acting as sinks (without output bags) in the dataflow plan.
+   *
+   * @return the set of sink operators
+   */
   def sinkNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.outputs.isEmpty).toSet[PigOperator]
-  
+
+  /**
+   * Returns a set of operators acting as sources (without input bags) in the dataflow plan.
+   *
+   * @return the set of source operators
+   */
   def sourceNodes: Set[PigOperator] = operators.filter((n: PigOperator) => n.inputs.isEmpty).toSet[PigOperator]
 
+  /**
+   * Checks whether the dataflow plan represents a connected graph, i.e. all operators have their
+   * input.
+   *
+   * @return true if the plan is connected, false otherwise
+   */
   def checkConnectivity: Boolean = {
     // TODO: check connectivity of subplans in nested foreach
     // we simply construct a graph and check its connectivity
+    /*
     var graph = Graph[PigOperator,DiEdge]()
     operators.foreach(op => op.inputs.foreach(p => graph += p.producer ~> op))
     graph.isConnected
+    */
+    /*
+     * make sure that for all operators the following holds:
+     * (1) all input pipes have a producer
+     * (2) all output pipes have a non-empty consumer list
+     */
+    operators.forall(op =>
+      op.inputs.forall(p => p.producer != null) && op.outputs.forall(p => p.consumer.nonEmpty))
   }
 
+  def checkConsistency: Boolean = operators.forall(_.checkConsistency)
+
+  /**
+   * Checks whether all operators and their expressions conform to the schema
+   * of their input bags. If not, a SchemaException is raised.
+   */
   def checkSchemaConformance: Unit = {
     val errors = operators.view.map{ op => (op, op.checkSchemaConformance) }
                     .filter{ t => t._2 == false }
@@ -136,6 +177,12 @@ class DataflowPlan(var operators: List[PigOperator]) {
    */
   def findOperatorForAlias(s: String): Option[PigOperator] = operators.find(o => o.outPipeName == s)
 
+  /**
+   * Returns a list of operators satisfying a given predicate.
+   *
+   * @param pred a function implementing a predicate
+   * @return the list of operators satisfying this predicate
+   */
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
 
   /**

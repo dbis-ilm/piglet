@@ -392,7 +392,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
 
     node match {
       case OrderBy(out, in, orderSpec) => {
-        val cname = s"custKey_${out}_${in}"
+        val cname = s"custKey_${out.name}_${in.name}"
         var col = 0
         val fields = orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
         val cmpExpr = genCmpExpr(1, orderSpec.size)
@@ -402,7 +402,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
           |}""".stripMargin
       }
       case Store(in, file) => { s"""
-        |def tuple${in}ToString(t: List[Any]): String = {
+        |def tuple${in.name}ToString(t: List[Any]): String = {
         |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
         |
         |  val sb = new StringBuilder
@@ -430,14 +430,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
           val p1 = findFieldPosition(schema, r1)
           val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
           require(p1 >= 0 && p2 >= 0)
-          s"""val $out = t($p1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]]($p2))"""
+          s"""val ${out.name} = t($p1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]]($p2))"""
         }
         case _ => "" // should not happen
       }
-      case Distinct(out, in) => callST("distinct", Map("out" -> out, "in" -> in))
-      case n@Filter(out, in, pred) => callST("filter", Map("out" -> out, "in" -> in, "pred" -> emitPredicate(n.schema, pred)))
-      case Limit(out, in, num) => callST("limit", Map("out" -> out, "in" -> in, "num" -> num))
-      case OrderBy(out, in, orderSpec) => ""
+      case Distinct(out, in) => callST("distinct", Map("out" -> out.name, "in" -> in.name))
+      case n@Filter(out, in, pred) => callST("filter", Map("out" -> out.name, "in" -> in.name, "pred" -> emitPredicate(n.schema, pred)))
+      case Limit(out, in, num) => callST("limit", Map("out" -> out.name, "in" -> in.name, "num" -> num))
+      case OrderBy(out, in, orderSpec) => "" // TODO!!!!
       case _ => ""
     }.mkString("\n") + "}"
   }
@@ -487,28 +487,28 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   def emitNode(node: PigOperator): String = {
     val group = STGroupFile(templateFile)
     node match {
-      case Load(out, file, schema, func, params) => emitLoader(out, file, func, params)
-      case Dump(in) => callST("dump", Map("in"->in))
-      case Store(in, file) => callST("store", Map("in"->in,"file"->file,"schema"->s"tuple${in}ToString(t)"/*listToTuple(node.schema)*/))
+      case Load(out, file, schema, func, params) => emitLoader(out.name, file, func, params)
+      case Dump(in) => callST("dump", Map("in"->in.name))
+      case Store(in, file) => callST("store", Map("in"->in.name,"file"->file,"schema"->s"tuple${in.name}ToString(t)"/*listToTuple(node.schema)*/))
       case Describe(in) => s"""println("${node.schemaToString}")"""
-      case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(node.schema, pred)))
-      case Foreach(out, in, gen) => emitForeach(node, out, in, gen)
+      case Filter(out, in, pred) => callST("filter", Map("out"->out.name,"in"->in.name,"pred"->emitPredicate(node.schema, pred)))
+      case Foreach(out, in, gen) => emitForeach(node, out.name, in.name, gen)
       case Grouping(out, in, groupExpr) => {
-        if (groupExpr.keyList.isEmpty) callST("groupBy", Map("out"->out,"in"->in))
-        else callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGrouping(node.inputSchema, groupExpr)))
+        if (groupExpr.keyList.isEmpty) callST("groupBy", Map("out"->out.name,"in"->in.name))
+        else callST("groupBy", Map("out"->out.name,"in"->in.name,"expr"->emitGrouping(node.inputSchema, groupExpr)))
       }
-      case Distinct(out, in) => callST("distinct", Map("out"->out,"in"->in))
-      case Limit(out, in, num) => callST("limit", Map("out"->out,"in"->in,"num"->num))
+      case Distinct(out, in) => callST("distinct", Map("out"->out.name,"in"->in.name))
+      case Limit(out, in, num) => callST("limit", Map("out"->out.name,"in"->in.name,"num"->num))
       case Join(out, rels, exprs) => { //TODO: Window Parameters
         val res = node.inputs.zip(exprs)
         val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
-        callST("join", Map("out"->out,"rel1"->rels.head,"key1"->keys.head,"rel2"->rels.tail,"key2"->keys.tail)) 
+        callST("join", Map("out"->out.name,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
       }
-      case Union(out, rels) => callST("union", Map("out"->out,"in"->rels.head,"others"->rels.tail)) 
-      case Sample(out, in, expr) => callST("sample", Map("out"->out,"in"->in,"expr"->emitExpr(node.schema, expr)))
-      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out,"in"->in,
-        "key"->emitSortKey(node.schema, orderSpec, out, in),"asc"->ascendingSortOrder(orderSpec.head)))
-      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out,"op"->op,"in"->in,
+      case Union(out, rels) => callST("union", Map("out"->out.name,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
+      case Sample(out, in, expr) => callST("sample", Map("out"->out.name,"in"->in.name,"expr"->emitExpr(node.schema, expr)))
+      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out.name,"in"->in.name,
+        "key"->emitSortKey(node.schema, orderSpec, out.name, in.name),"asc"->ascendingSortOrder(orderSpec.head)))
+      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out.name,"op"->op,"in"->in.name,
         "params"->emitParamList(node.schema, params)))
       /*     
        case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }

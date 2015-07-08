@@ -28,9 +28,12 @@ import dbis.pig.schema.Schema
  * @param params
  * @param loadSchema
  */
-case class StreamOp(override val initialOutPipeName: String, initialInPipeName: String, opName: String, params: Option[List[Ref]] = None,
-                    var loadSchema: Option[Schema] = None)
-  extends PigOperator(initialOutPipeName, List(initialInPipeName), loadSchema) {
+case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref]] = None,
+                    var loadSchema: Option[Schema] = None) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
+  schema = loadSchema
+
   override def lineageString: String = s"""STREAM%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {

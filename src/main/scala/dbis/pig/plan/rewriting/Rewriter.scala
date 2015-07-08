@@ -17,7 +17,8 @@
 package dbis.pig.plan.rewriting
 
 import dbis.pig.op._
-import dbis.pig.plan.{DataflowPlan, Pipe}
+import dbis.pig.op.{And, Filter, OrderBy, PigOperator, Pipe}
+import dbis.pig.plan.DataflowPlan
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 

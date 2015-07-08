@@ -16,19 +16,16 @@
  */
 package dbis.pig.op
 
+
 /**
+ * A pipe connects some Pig operator and associates a name to this channel.
  *
- * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
- *                           can be changed later.
- * @param initialInPipeName
- * @param ref a reference des
+ * @param name the name of the pipe
+ * @param producer the operator producing the data
+ * @param consumer the list of operators reading this data
  */
-case class Tuplify(out: Pipe, in: Pipe, ref: Ref) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class Pipe (var name: String, var producer: PigOperator = null, var consumer: List[PigOperator] = List()) {
+  override def toString = s"Pipe($name)"
 
-  override def lineageString: String = s"""TUPLIFY%""" + super.lineageString
-
-  // TODO
-  override def checkSchemaConformance: Boolean = true
+  def inputSchema = if (producer != null) producer.schema else None
 }

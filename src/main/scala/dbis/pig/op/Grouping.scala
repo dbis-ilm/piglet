@@ -34,8 +34,9 @@ case class GroupingExpression(val keyList: List[Ref])
  * @param initialInPipeName the name of the input pipe
  * @param groupExpr the expression (a key or a list of keys) used for grouping
  */
-case class Grouping(override val initialOutPipeName: String, initialInPipeName: String, groupExpr: GroupingExpression)
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

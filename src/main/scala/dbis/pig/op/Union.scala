@@ -16,7 +16,6 @@
  */
 package dbis.pig.op
 
-import dbis.pig.plan.Pipe
 import dbis.pig.schema._
 
 import scala.collection.mutable.ArrayBuffer
@@ -27,8 +26,10 @@ import scala.collection.mutable.ArrayBuffer
  * @param initialOutPipeName the name of the output pipe (relation).
  * @param initialInPipeNames the list of names of input pipes.
  */
-case class Union(override val initialOutPipeName: String, override val initialInPipeNames: List[String])
-  extends PigOperator(initialOutPipeName, initialInPipeNames) {
+case class Union(out: Pipe, in: List[Pipe]) extends PigOperator {
+  _outputs = List(out)
+  _inputs = in
+
   override def lineageString: String = {
     s"""UNION%""" + super.lineageString
   }
