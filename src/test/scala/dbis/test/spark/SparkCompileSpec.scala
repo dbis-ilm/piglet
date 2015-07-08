@@ -55,7 +55,8 @@ class SparkCompileSpec extends FlatSpec {
     val op = Load(Pipe("a"), "file.csv")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStorage().load(sc, "file.csv", '\t')""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}", '\\t')""")
     assert(generatedCode == expectedCode)
   }
 
@@ -63,7 +64,8 @@ class SparkCompileSpec extends FlatSpec {
     val op = Load(Pipe("a"), "file.csv", None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStorage().load(sc, "file.csv", ',')""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
@@ -71,7 +73,8 @@ class SparkCompileSpec extends FlatSpec {
     val op = Load(Pipe("a"), "file.n3", None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = RDFFileStorage().load(sc, "file.n3")""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -105,7 +108,8 @@ class SparkCompileSpec extends FlatSpec {
     val op = Store(Pipe("A"), "file.csv")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("file.csv")""")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
     assert(generatedCode == expectedCode)
   }
 

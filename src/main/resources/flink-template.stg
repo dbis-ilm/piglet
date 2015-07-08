@@ -23,7 +23,7 @@ loader(out,file,func,params) ::=<<
 <if (func)>
         val <out> = <func>().load(env, "<file>"<params>)
 <else>
-        val <out> = env.readTextFile("<file>").map(s => List(s))
+        val <out> = PigStorage().load(env, "<file>", '\t')
 <endif>
 >>
 
