@@ -142,9 +142,6 @@ trait PigOperator extends Rewritable {
     inputs.map(p => p.producer.lineageString).mkString("%")
   }
 
-  def arity = this.outputs.length
-
-  def deconstruct = this.outputs
   /**
    * Check whether the input and output pipes are still consistent, i.e.
    * for all output pipes the producer is the current operator and the current
@@ -156,18 +153,18 @@ trait PigOperator extends Rewritable {
     outputs.forall(p => p.producer == this) && inputs.forall(p => p.consumer.contains(this))
   }
 
-  def deconstruct = this.inputs
+  def arity = this.outputs.length
 
-  def reconstruct(outputs: Seq[Any]): PigOperator = outputs match {
-    case outputs: Seq[_] =>
-      this match {
-        case obj: PigOperator =>
-          obj.outputs = outputs.asInstanceOf[List[PigOperator]]
-        case obj: PigOperator =>
-          obj._outputs = outputs.asInstanceOf[List[PigOperator]]
-          obj
-        case _ => illegalArgs("PigOperator", "PigOperator", outputs)
-      }
-    case _ => illegalArgs("PigOperator", "PigOperator", outputs)
+  def deconstruct = this.outputs.map(_.consumer)
+
+  def reconstruct(outputs: Seq[Any]): PigOperator = {
+    this.outputs = List.empty
+    outputs.foreach(_ match {
+      // TODO find the correct output relation name
+      case op : PigOperator => this.outputs = this.outputs :+ Pipe(this.outPipeName, this, List(op))
+      case ops: List[PigOperator] => this.outputs = this.outputs ++ ops.map(op => Pipe(this.outPipeName, this, List (op)))
+      case _ => illegalArgs("PigOperator", "PigOperator", outputs)
+    })
+    this
   }
 }

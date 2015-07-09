@@ -44,7 +44,7 @@ class RewriterSpec extends FlatSpec with Matchers{
 
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be (opMerged)
-    pPlan.findOperatorForAlias("a").value.outputs should contain only(opMerged)
+    pPlan.findOperatorForAlias("a").value.outputs should contain only opMerged
   }
 
   it should "order Filter operations before Order By ones" in {
@@ -96,8 +96,8 @@ class RewriterSpec extends FlatSpec with Matchers{
     val sink1 = newPlan.sinkNodes.head
     val sink2 = newPlan.sinkNodes.last
 
-    sink1.inputs.head.producer should be (if (sink1.inPipeName == "b") filter1 else filter2)
-    sink2.inputs.head.producer should be (if (sink1.inPipeName == "b") filter2 else filter1)
+    sink1.inputs.head.producer should be (if (sink1.inputs.head.name == "b") filter1 else filter2)
+    sink2.inputs.head.producer should be (if (sink2.inputs.head.name == "b") filter2 else filter1)
 
   }
 
@@ -124,19 +124,19 @@ class RewriterSpec extends FlatSpec with Matchers{
   }
 
   it should "not reorder operators if the first one has more than one output" in {
-    val op1 = Load("a", "file.csv")
+    val op1 = Load(Pipe("a"), "file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
 
     // ops before reordering
-    val op2 = OrderBy("b", "a", List())
-    val op3 = Filter("c", "b", predicate1)
-    val op4 = Dump("c")
-    val op5 = Dump("b")
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+    val op5 = Dump(Pipe("b"))
 
     val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
     val source = plan.sourceNodes.head
 
     val rewrittenSource = processPigOperator(source)
-    rewrittenSource.outputs should contain only(op2)
+    rewrittenSource.outputs should contain only op2
   }
 }

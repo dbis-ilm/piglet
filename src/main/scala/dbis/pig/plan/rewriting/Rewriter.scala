@@ -29,10 +29,10 @@ object Rewriter {
   private var ourStrategy = fail
 
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
-   *
-   * It will be added by [[org.kiama.rewriting.Rewriter.ior]]ing it with the already existing ones.
-   * @param s The new strategy.
-   */
+    *
+    * It will be added by [[org.kiama.rewriting.Rewriter.ior]]ing it with the already existing ones.
+    * @param s The new strategy.
+    */
   def addStrategy(s: Strategy): Unit = {
     ourStrategy = ior(ourStrategy, s)
   }
@@ -40,11 +40,11 @@ object Rewriter {
   def addStrategy(f: Any => Option[PigOperator]): Unit = addStrategy(strategyf(t => f(t)))
 
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
-   * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
-   *
-   * @param sink The sink node to rewrite.
-   * @return The rewritten sink node.
-   */
+    * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
+    *
+    * @param sink The sink node to rewrite.
+    * @return The rewritten sink node.
+    */
   def processPigOperator(sink: PigOperator): PigOperator = {
     processPigOperator(sink, ourStrategy)
   }
@@ -56,7 +56,7 @@ object Rewriter {
     * @return
     */
   def processPigOperator(sink: PigOperator, strategy: Strategy): PigOperator = {
-    val rewriter = bottomup( attempt (strategy))
+    val rewriter = bottomup(attempt(strategy))
     rewrite(rewriter)(sink)
   }
 
@@ -87,16 +87,16 @@ object Rewriter {
         // This is to make sure that that source is emitted before all other operators that need its data.
         newPlanNodes -= source
         // And remove its outputs as well to revisit them later on.
-        newPlanNodes --= source.outputs
+        newPlanNodes --= source.outputs.flatMap(_.consumer)
 
         newPlanNodes += source
-        for (output <- source.outputs) {
+        for (output <- source.outputs.flatMap(_.consumer)) {
           // We've found a new node - it needs to be included in the new plan, so add it to the new plans nodes.
           newPlanNodes += output
           // And we need to process its output nodes in the future.
           // If we already processed a nodes outputs, they'll be removed again and put at the head of the new plans list
           // of operators.
-          nodesToProcess ++= output.outputs
+          nodesToProcess ++= output.outputs.flatMap(_.consumer)
         }
       }
     }
@@ -114,7 +114,7 @@ object Rewriter {
     *         Filters, None otherwise.
     */
   private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
-    Some(Filter(child.output.get, parent.initialInPipeName, And(parent.pred, child.pred)))
+    Some(Filter(child.out, parent.in, And(parent.pred, child.pred)))
   }
 
   /** Puts [[dbis.pig.op.Filter]] operators before [[dbis.pig.op.OrderBy]] ones.
@@ -125,26 +125,30 @@ object Rewriter {
     *         [[dbis.pig.op.Filter]] passed into this method, None otherwise.
     */
   private def filterBeforeOrder(parent: OrderBy, child: Filter): Option[(Filter, OrderBy)] = {
-    val newOrder = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.orderSpec)
-    val newFilter = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.pred)
+    val newOrder = parent.copy(child.out, child.in, parent.orderSpec)
+    val newFilter = child.copy(parent.out, parent.in, child.pred)
     Some((newFilter, newOrder))
   }
 
   private def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
-    case node @ SplitInto(inPipeName, splits) =>
-      val filters = (for (branch <- splits) yield branch.outPipeName -> Filter(branch.outPipeName, inPipeName, branch
+    case node@SplitInto(inPipeName, splits) =>
+      val filters = (for (branch <- splits) yield branch.output.name -> Filter(branch.output, inPipeName, branch
         .expr)).toMap
-      println(node.outputs)
-      (node.outputs.iterator).foreach(output => {
-        (output.inputs.iterator).foreach(input => {
+      // For all outputs
+      node.outputs.iterator foreach (_.consumer.foreach(output => {
+        // Iterate over their inputs
+        output.inputs foreach (input => {
+          // Check if the relation name is one of the names our SplitBranches writes
           if (filters contains input.name) {
             // Replace SplitInto with the appropriate Filter
             output.inputs = output.inputs.filter(_.producer != node) :+ Pipe(input.name, filters(input.name))
-            // and add the operator to the correct Filters outputs
-            filters(input.name).outputs = List(output)
+            // and add the consumer to the correct Filters outputs
+            filters(input.name).outputs = filters(input.name).outputs :+ Pipe(input.name, filters(input.name), List
+              (output))
           }
         })
-      })
+      }
+      ))
       Some(filters.values.toList)
     case _ => None
   }
@@ -220,7 +224,7 @@ object Rewriter {
     val strategy = (op: Any) => {
       if (op == old) {
         repl.inputs = old.inputs
-        repl.output = old.output
+        repl.outputs = old.outputs
         repl.outputs = old.outputs
         Some(repl)
       }
@@ -241,7 +245,7 @@ object Rewriter {
   def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
     val strategy = (parent: PigOperator, child: PigOperator) => {
       if (child == rem) {
-        parent.outputs = parent.outputs.filter(_ != child)
+        parent.outputs = parent.outputs.filter(_.consumer != child)
         Some(fixInputsAndOutputs(parent, child, parent))
       }
       else {
@@ -264,13 +268,13 @@ object Rewriter {
   }
 
   private def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
-    (f: (T, T2) => Option[PigOperator]): Strategy = {
+  (f: (T, T2) => Option[PigOperator]): Strategy = {
     strategyf(op => {
       op match {
         case `op` if classTag[T].runtimeClass.isInstance(op) =>
           val parent = op.asInstanceOf[T]
-          if (parent.outputs.length == 1) {
-            val op2 = parent.outputs.head
+          if (parent.outputs.length == 1 && parent.outputs.head.consumer.length == 1) {
+            val op2 = parent.outputs.head.consumer.head
             op2 match {
               case `op2` if classTag[T2].runtimeClass.isInstance(op2) && op2.inputs.length == 1 =>
                 val child = op2.asInstanceOf[T2]
@@ -299,12 +303,13 @@ object Rewriter {
   private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                           newParent: T3): T3 = {
     newParent.inputs = oldParent.inputs
-    newParent.output = oldChild.output
     newParent.outputs = oldChild.outputs
 
-    // Replace oldChild in its outputs inputs attribute with newParent
-    for(out <- oldChild.outputs) {
-      out.inputs = out.inputs.filter(_.producer != oldChild) :+ Pipe(newParent.output.get, newParent)
+    // Each Operator that has oldChild in its inputs list as a producer needs to have it replaced with newParent
+    oldChild.outputs foreach { output =>
+      output.consumer foreach { op =>
+        op.inputs = op.inputs.filter(_.producer != oldChild) :+ Pipe(newParent.outPipeName, newParent, List(op))
+      }
     }
 
     // Replacing oldParent with newParent in the outputs attribute of oldParents inputs producers is done by kiamas
@@ -324,18 +329,17 @@ object Rewriter {
     */
   private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                        newChild: T): T2 = {
-    newChild.inputs = List(Pipe(newParent.output.get, newParent))
-    newChild.output = oldChild.output
+    newChild.inputs = List(Pipe(newParent.outPipeName, newParent, List(newChild)))
     newChild.outputs = oldChild.outputs
 
     newParent.inputs = oldParent.inputs
-    newParent.output = oldParent.output
-    newParent.outputs = List(newChild)
+    newParent.outputs = List(Pipe(newParent.outPipeName, newParent, List(newChild)))
 
-    // Replace oldChild in its outputs inputs attribute with newChild
-    for(out <- oldChild.outputs) {
-      out.inputs = out.inputs.filter(_.producer != oldChild)
-      out.inputs = out.inputs :+ Pipe(newChild.output.get, newChild)
+    // Each Operator that has oldChild in its inputs list as a producer needs to have it replaced with newChild
+    oldChild.outputs foreach { output =>
+      output.consumer foreach { op =>
+        op.inputs = op.inputs.filter(_.producer != oldChild) :+ Pipe(newParent.outPipeName, newChild, List(op))
+      }
     }
 
     // Replacing oldParent with newParent in oldParents inputs outputs list is done by kiamas Rewritable trait

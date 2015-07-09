@@ -336,10 +336,10 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   }
   it should "be consistent after removing an operator" in {
-    val op1 = Load("a", "file.csv")
+    val op1 = Load(Pipe("a"), "file.csv")
     val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val op2 = Filter("b", "a", predicate)
-    val op3 = Dump("b")
+    val op2 = Filter(Pipe("b"), Pipe("a"), predicate)
+    val op3 = Dump(Pipe("b"))
 
     val plan = new DataflowPlan(List(op1, op2, op3))
     val newPlan = plan.remove(op2)
@@ -399,7 +399,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
       |STORE b INTO 'res1.data';
       |STORE c INTO 'res2.data';""".stripMargin))
     plan.findOperatorForAlias("b") should not be empty
-    plan.sourceNodes.headOption.value.outputs.headOption.value.outputs should have length 2
+    plan.sourceNodes.headOption.value.outputs.headOption.value.consumer.headOption.value.outputs should have length 2
     assert(plan.checkConnectivity)
   }
 }
