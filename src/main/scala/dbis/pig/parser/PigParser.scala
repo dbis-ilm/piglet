@@ -437,16 +437,22 @@ class PigParser extends JavaTokenParsers {
   def zmqAddress: Parser[SocketAddress] = "'" ~ (tcpSocket | ipcSocket | inprocSocket | pgmSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
 
   /*
-   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] [ AS <schema> ]
+   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] USING <StreamFunc> [ AS <schema> ]
    * 
    * Maybe other modes later
    */
   def socketReadStmt: Parser[PigOperator] =
-  bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (loadSchemaClause?) ^^ {
-    case out ~ _ ~ _ ~ addr ~ schema => SocketRead(out, addr, "", schema)
+  bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
+    case out ~ _ ~ _ ~ addr ~ u ~ schema => u match {
+      case Some(p) => SocketRead(out, addr, "", schema, p._1, if (p._2.isEmpty) null else p._2)
+      case None =>  SocketRead(out, addr, "", schema)
+    }
   } | 
-  bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (loadSchemaClause?) ^^ {
-    case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ schema => SocketRead(out, addr, mode, schema)
+  bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
+    case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema => u match {
+      case Some(p) => SocketRead(out, addr, mode, schema, p._1, if (p._2.isEmpty) null else p._2)
+      case None => SocketRead(out, addr, mode, schema)
+    }
   }
 
   /*

@@ -259,6 +259,31 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
   }
 
   /**
+   * Generates code for the SOCKET_READ Operator
+   *
+   * @param out name of the output bag
+   * @param addr the socket address to connect to
+   * @param mode the connection mode, e.g. zmq or empty for standard sockets
+   * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
+   * @param streamParams an optional list of parameters to a stream function (e.g. separators)
+   * @return the Scala code implementing the SOCKET_READ operator
+   */
+  def emitSocketRead(out: String, addr: SocketAddress, mode: String, streamFunc: String, streamParams: List[String]): String ={
+    if(streamFunc == ""){
+      if(mode!="")
+        callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode))
+      else
+        callST("socketRead", Map("out"->out,"addr"->addr))
+    } else {
+      val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
+      if(mode!="")
+        callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->streamFunc,"params"->params))
+      else
+        callST("socketRead", Map("out"->out,"addr"->addr,"func"->streamFunc,"params"->params))
+    }
+  }
+  
+  /**
    *
    * @param schema
    * @param expr
@@ -514,12 +539,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         "key"->emitSortKey(node.schema, orderSpec, out, in),"asc"->ascendingSortOrder(orderSpec.head).toString))
       case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out,"op"->op,"in"->in,
         "params"->emitParamList(node.schema, params)))
-      case SocketRead(out, address, mode, schema) => {
-        if(mode!="")
-          callST("socketRead", Map("out"->out,"addr"->address,"mode"->mode,"schema"->schema))
-        else
-          callST("socketRead", Map("out"->out,"addr"->address,"schema"->schema))
-      }
+      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(out, address, mode, func, params)
       case SocketWrite(in, address, mode) => {
         if(mode!="")
           callST("socketWrite", Map("in"->in,"addr"->address,"mode"->mode))

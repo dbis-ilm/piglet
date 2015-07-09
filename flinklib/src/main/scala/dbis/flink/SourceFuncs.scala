@@ -24,7 +24,7 @@ import org.apache.flink.streaming.api.functions.source.SourceFunction._
 import org.zeromq._
 import org.zeromq.ZMQ._
 
-class ZmqSubscriber(addr: String) extends RichSourceFunction[List[java.io.Serializable]]{ 
+class ZmqSubscriber(addr: String) extends RichSourceFunction[String]{ 
 
   private var subscriber: Socket = _
   @volatile private var isRunning: Boolean = _
@@ -42,19 +42,19 @@ class ZmqSubscriber(addr: String) extends RichSourceFunction[List[java.io.Serial
   }
 
   @throws(classOf[Exception])
-  override def run(ctx: SourceContext[List[java.io.Serializable]]) = {
+  override def run(ctx: SourceContext[String]) = {
     streamFromSocket(ctx, subscriber)
   }
 
   @throws(classOf[Exception])
-  def streamFromSocket(ctx: SourceContext[List[java.io.Serializable]], socket: Socket) = {
+  def streamFromSocket(ctx: SourceContext[String], socket: Socket) = {
     try {
       while (isRunning) {
         try {
           val msg: Array[Byte] = socket.recv(0)
-          val element = msg match {
+          val element: String = msg match {
             case msg: Array[Byte] => schema.deserialize(msg)
-            case _ => List(msg)
+            case _ => new String(msg)
           }
 //          val element: List[String] = schema.deserialize(msg)
           ctx.collect(element)

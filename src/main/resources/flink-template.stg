@@ -104,11 +104,19 @@ union(out,in,others) ::=<<
 >>
 
 // ------------------ Reads from a SOCKET -------------------------------------
-socketRead(out,addr,mode,schema) ::=<<
-<if (mode)>
-        val <out> = env.addSource(new ZmqSubscriber("<addr.protocol><addr.hostname>:<addr.port>"))
+socketRead(out,addr,mode,func,params) ::=<<
+<if (func)>
+    <if (mode)>
+        val <out> = <func>().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
+    <else>
+        val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
+    <endif>
 <else>
-        val <out> = env.socketTextStream("<addr.hostname>",<addr.port>).map(line => line.split(',').toList)
+    <if (mode)>
+        val <out> = PigStream().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>", '\t')
+    <else>
+        val <out> = PigStream().connect(env, "<addr.hostname>", <addr.port>, '\t')
+    <endif>
 <endif>
 >>
 

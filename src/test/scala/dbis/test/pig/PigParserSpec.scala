@@ -177,9 +177,9 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("""a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);""") ==
       List(Foreach("a", "b", GeneratorList(List(
         GeneratorExpr(Func("TOMAP", List(
-          RefExpr(Value(""""field1"""")),
+          RefExpr(Value("\"field1\"")),
           RefExpr(PositionalField(0)),
-          RefExpr(Value(""""field2"""")),
+          RefExpr(Value("\"field2\"")),
           RefExpr(PositionalField(1)))))
       )))))
   }
@@ -290,14 +290,14 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse expressions with deref operators for map" in {
     assert(parseScript("""a = foreach b generate m1#"k1", m1#"k2";""") ==
-      List(Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), """"k1""""))),
-        GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), """"k2""""))))))))
+      List(Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), "\"k1\""))),
+        GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), "\"k2\""))))))))
   }
 
   it should "parse expressions with deref operators on positional fields for map" in {
     assert(parseScript("""a = foreach b generate $0#"k1", $1#"k2";""") ==
-      List(Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), """"k1""""))),
-        GeneratorExpr(RefExpr(DerefMap(PositionalField(1), """"k2""""))))))))
+      List(Foreach("a", "b", GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
+        GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\""))))))))
   }
 
   it should "parse expressions with deref operators for tuple and bag" in {
@@ -321,7 +321,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a register statement" in {
-    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(Register(""""/usr/local/share/myfile.jar"""")))
+    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(Register("\"/usr/local/share/myfile.jar\"")))
   }
 
   it should "parse a stream statement without schema" in {
@@ -375,6 +375,11 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse a socket read statement in standard mode" in {
     assert(parseScript("a = socket_read '127.0.0.1:5555';") == List(SocketRead("a", SocketAddress("","127.0.0.1","5555"), "")))
+  }
+
+  it should "parse a socket read statement in standard mode with using clause" in {
+    assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');") == List(SocketRead("a", SocketAddress("","127.0.0.1","5555"), "", None, "PigStream",List("""','"""))))
+    assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();") == List(SocketRead("a", SocketAddress("","127.0.0.1","5555"), "", None, "RDFStream")))
   }
 
   it should "parse a socket read statement in zmq mode" in {

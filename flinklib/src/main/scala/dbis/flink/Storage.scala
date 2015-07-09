@@ -49,3 +49,42 @@ object RDFFileStorage {
     new RDFFileStorage
   }
 }
+
+class PigStream extends java.io.Serializable {
+  def connect(env: StreamExecutionEnvironment, host: String, port: Int, delim: Char = ' '): DataStream[List[String]] = {
+    env.socketTextStream(host,port).map(line => line.split(delim).toList)
+  }
+
+  def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, delim: Char = ' '): DataStream[List[String]] = {
+    env.addSource(new ZmqSubscriber(addr)).map(line => line.split(delim).toList)
+  }
+}
+
+object PigStream {
+  def apply(): PigStream = {
+    new PigStream
+  }
+}
+
+class RDFStream extends java.io.Serializable {
+  val pattern = "([^\"]\\S*|\".+?\")\\s*".r
+
+  def rdfize(line: String): Array[String] = {
+    val fields = pattern.findAllIn(line).map(_.trim)
+    fields.toArray.slice(0, 3)
+  }
+
+  def connect(env: StreamExecutionEnvironment, host: String, port: Int): DataStream[Array[String]] = {
+    env.socketTextStream(host,port).map(line => rdfize(line))
+  }
+
+ def zmqSubscribe(env: StreamExecutionEnvironment, addr: String): DataStream[Array[String]] = {
+    env.addSource(new ZmqSubscriber(addr)).map(line => rdfize(line))
+  }
+}
+
+object RDFStream {
+  def apply(): RDFStream = {
+    new RDFStream
+  }
+}

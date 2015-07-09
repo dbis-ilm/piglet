@@ -265,4 +265,36 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
 
+  it should "contain code for SOCKET_READ" in {
+    val op = SocketRead("a", SocketAddress("", "localhost", "9999"), "")
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""val a = PigStream().connect(env, "localhost", 9999, '\t')""")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for SOCKET_READ with PigStream" in {
+    val op = SocketRead("a", SocketAddress("", "localhost", "9999"), "", None, "PigStream", List("""','"""))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(s"""val a = PigStream().connect(env, "localhost", 9999, ',')""")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for SOCKET_READ with RDFStream" in {
+    val op = SocketRead("a", SocketAddress("", "localhost", "9999"), "", None, "RDFStream")
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""val a = RDFStream().connect(env, "localhost", 9999)""")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for SOCKET_READ in ZMQ mode" in {
+    val op = SocketRead("a", SocketAddress("tcp://", "localhost", "9999"), "zmq")
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""val a = PigStream().zmqSubscribe(env, "tcp://localhost:9999", '\t')""")
+    assert(generatedCode == expectedCode)
+  }
+
 }

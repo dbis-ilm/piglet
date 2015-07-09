@@ -22,13 +22,13 @@ import org.apache.flink.streaming.util.serialization._
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.TypeExtractor
 
-class UTF8StringSchema extends DeserializationSchema[List[String]] with SerializationSchema[List[String], Array[Byte]] {
+class UTF8StringSchema extends DeserializationSchema[String] with SerializationSchema[List[String], Array[Byte]] {
 
-  override def deserialize(message: Array[Byte]): List[String] = {
-    new String(message, "UTF-8").split(',').toList
+  override def deserialize(message: Array[Byte]): String = {
+    new String(message, "UTF-8")
   }   
 
-  override def isEndOfStream(nextElement: List[String]): Boolean = {
+  override def isEndOfStream(nextElement: String): Boolean = {
     false
   }   
 
@@ -36,8 +36,8 @@ class UTF8StringSchema extends DeserializationSchema[List[String]] with Serializ
     element.mkString(",").getBytes("UTF-8")
   }   
 
-  override def getProducedType(): TypeInformation[List[String]] = {
-    TypeExtractor.getForClass(classOf[List[String]])
+  override def getProducedType(): TypeInformation[String] = {
+    TypeExtractor.getForClass(classOf[String])
   }   
 }
 

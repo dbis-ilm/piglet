@@ -28,7 +28,7 @@ case class SocketAddress(protocol: String, hostname: String, port: String)
  * @param loadSchema
  */
 case class SocketRead(override val initialOutPipeName: String, addr: SocketAddress, 
-                mode: String, var loadSchema: Option[Schema] = None) extends PigOperator(initialOutPipeName, List(), loadSchema) {
+                mode: String, var streamSchema: Option[Schema] = None, streamFunc: String = "", streamParams: List[String] = null) extends PigOperator(initialOutPipeName, List(), streamSchema) {
   override def constructSchema: Option[Schema] = {
     /*
      * Either the schema was defined or it is None.
