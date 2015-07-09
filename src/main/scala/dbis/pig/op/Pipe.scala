@@ -27,5 +27,7 @@ package dbis.pig.op
 case class Pipe (var name: String, var producer: PigOperator = null, var consumer: List[PigOperator] = List()) {
   override def toString = s"Pipe($name)"
 
+  override def hashCode = name.hashCode
+
   def inputSchema = if (producer != null) producer.schema else None
 }
