@@ -29,7 +29,7 @@ loader(out,file,func,params) ::=<<
 
 // ------------------ DUMP Results --------------------------------------------
 dump(in) ::=<<
-        <in>.print
+        <in>.map(_.mkString(",")).print
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
