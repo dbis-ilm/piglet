@@ -25,13 +25,6 @@ begin_query(name) ::= <<
 // ----------------- LOAD text file -------------------------------------------
 loader(out,file,func,schema,params) ::=<<
 		val <out> = <func>().load(sc, "<file>"<params>)
-<! 
-<if (func)>
-        val <out> = <func>().load(sc, "<file>"<params>)
-<else>
-        val <out> = PigStorage().load(sc, "<file>"<params>)
-<endif>
- !>
 >>
 
 // ------------------ DUMP results --------------------------------------------

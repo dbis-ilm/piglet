@@ -330,7 +330,11 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out, file, func, schema, params)
       case Dump(in) => callST("dump", Map("in"->in))
-      case Store(in, file, func) => callST("store", Map("in"->in,"file"->file,"schema"->s"tuple${in}ToString(t)"/*listToTuple(node.schema)*/,"func"->func))
+      
+      // FIXME: dirty hack! Can't we handle these types uniformly?
+      case Store(in, file, func) if func != "BinStorage" => callST("store", Map("in"->in,"file"->file,"schema"->s"tuple${in}ToString(t)"/*listToTuple(node.schema)*/,"func"->func))
+      case Store(in, file, func) => callST("store", Map("in"->in,"file"->file,"func"->func))
+      
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(node.schema, pred)))
       case Foreach(out, in, gen) => {

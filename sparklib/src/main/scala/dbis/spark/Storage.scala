@@ -75,37 +75,16 @@ object RDFFileStorage {
 
 class BinStorage extends java.io.Serializable {
   
-  def load(sc: SparkContext, path: String): RDD[Any] = {
+  def load(sc: SparkContext, path: String): RDD[List[Any]] = {
     
-    val rdd = sc.objectFile[Any](path)
+    val rdd = sc.objectFile[List[Any]](path)
     
     return rdd
-    
-//    var ois: Option[ObjectInputStream] = None
-//    
-//    try {
-//      ois = Some(new ObjectInputStream(new FileInputStream(path)))
-//      val rdd = ois.get.readObject().asInstanceOf[RDD[Any]]
-//      return rdd  
-//      
-//    } finally {
-//      if(ois.isDefined)
-//        ois.get.close()
-//    }
   }
   
-  def write(sc: SparkContext, path: String, rdd: RDD[Any]) = {
+  def write(path: String, rdd: RDD[_]) = {
     
     rdd.saveAsObjectFile(path);
-    
-//    var oos: Option[ObjectOutputStream] = None
-//    try {
-//      oos = Some(new ObjectOutputStream(new FileOutputStream(path)))
-//      oos.get.writeObject(rdd)
-//    } finally {
-//      if(oos.isDefined)
-//        oos.get.close()
-//    }
   }
   
 }
