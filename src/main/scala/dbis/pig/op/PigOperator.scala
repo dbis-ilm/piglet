@@ -140,6 +140,12 @@ trait PigOperator extends Rewritable {
     inputs.map(p => p.producer.lineageString).mkString("%")
   }
 
+  /**
+   * Returns the arity, i.e. the number of input pipes of
+   * this operator.
+   *
+   * @return the arity of the operator
+   */
   def arity = this.inputs.length
 
   /**

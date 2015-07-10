@@ -24,10 +24,25 @@ package dbis.pig.op
  * @param producer the operator producing the data
  * @param consumer the list of operators reading this data
  */
-case class Pipe (var name: String, var producer: PigOperator = null, var consumer: List[PigOperator] = List()) {
+class Pipe (var name: String, var producer: PigOperator = null, var consumer: List[PigOperator] = List()) {
   override def toString = s"Pipe($name)"
+
+  def canEqual(a: Any) = a.isInstanceOf[Pipe]
+
+  override def equals(that: Any): Boolean =
+    that match {
+      case that: Pipe => that.canEqual(this) && this.name == that.name
+      case _ => false
+    }
 
   override def hashCode = name.hashCode
 
   def inputSchema = if (producer != null) producer.schema else None
+}
+
+object Pipe {
+  def apply(n: String, producer: PigOperator = null, consumers: List[PigOperator] = List()): Pipe =
+    new Pipe(n, producer, consumers)
+
+  def unapply(p: Pipe): Option[(String, PigOperator, List[PigOperator])] = Some((p.name, p.producer, p.consumer))
 }
