@@ -201,6 +201,33 @@ class PigParserSpec extends FlatSpec {
       )))))
   }
 
+  it should "parse a FOREACH statement with a bag constructor" in {
+    assert(parseScript("a = FOREACH b GENERATE {$0, $1, $2} as myBag;") ==
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(ConstructBagExpr(List(RefExpr(PositionalField(0)),
+                                            RefExpr(PositionalField(1)),
+                                            RefExpr(PositionalField(2)))), Some(Field("myBag", Types.ByteArrayType))
+        ))))))
+  }
+
+  it should "parse a FOREACH statement with a tuple constructor" in {
+    assert(parseScript("a = FOREACH b GENERATE $0, ($1, $2) as myTuple;") ==
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
+      GeneratorExpr(RefExpr(PositionalField(0))),
+      GeneratorExpr(ConstructTupleExpr(List(RefExpr(PositionalField(1)),
+                                            RefExpr(PositionalField(2)))), Some(Field("myTuple", Types.ByteArrayType))
+      ))))))
+  }
+
+  it should "parse a FOREACH statement with a map constructor" in {
+    assert(parseScript("a = FOREACH b GENERATE [$0, $1] as myMap;") ==
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(ConstructMapExpr(List(RefExpr(PositionalField(0)),
+                                            RefExpr(PositionalField(1)))), Some(Field("myMap", Types.ByteArrayType))
+      ))))))
+  }
+
+
   it should "parse a simple nested FOREACH statement" in {
     assert(parseScript(
       """a = FOREACH b {

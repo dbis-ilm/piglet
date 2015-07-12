@@ -138,3 +138,37 @@ case class Func(f: String, params: List[ArithmeticExpr]) extends ArithmeticExpr 
   }
 }
 
+trait ConstructExpr extends ArithmeticExpr {
+  var exprs: List[ArithmeticExpr] = _
+
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    traverser(schema, this) &&
+      exprs.map(_.traverseAnd(schema, traverser)).forall(b => b)
+  }
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = {
+    traverser(schema, this) ||
+      exprs.map(_.traverseOr(schema, traverser)).exists(b => b)
+  }
+
+  def exprListToTuple(schema: Option[Schema]): Array[Field] =
+    exprs.map(e => e.resultType(schema)._2).zipWithIndex.map(f => Field(s"f${f._2}", f._1)).toArray
+}
+
+case class ConstructTupleExpr(ex: List[ArithmeticExpr]) extends ConstructExpr {
+  exprs = ex
+
+  override def resultType(schema: Option[Schema]): (String, PigType) = ("", TupleType(exprListToTuple(schema)))
+}
+
+case class ConstructBagExpr(ex: List[ArithmeticExpr]) extends ConstructExpr {
+  exprs = ex
+
+  override def resultType(schema: Option[Schema]): (String, PigType) = ("", BagType(TupleType(exprListToTuple(schema))))
+}
+
+case class ConstructMapExpr(ex: List[ArithmeticExpr]) extends ConstructExpr {
+  exprs = ex
+
+  override def resultType(schema: Option[Schema]): (String, PigType) = ("", MapType(exprs(0).resultType(schema)._2))
+}
