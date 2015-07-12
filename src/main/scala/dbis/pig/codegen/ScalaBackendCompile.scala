@@ -291,6 +291,9 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       }
     }
     case FlattenExpr(e) => emitExpr(schema, e)
+    case ConstructTupleExpr(exprs) => s"PigFuncs.toTuple(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
+    case ConstructBagExpr(exprs) => s"PigFuncs.toBag(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
+    case ConstructMapExpr(exprs) => s"PigFuncs.toMap(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case _ => println("unsupported expression: " + expr); ""
   }
 

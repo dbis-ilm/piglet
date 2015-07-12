@@ -308,6 +308,20 @@ class SparkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for a foreach statement with constructors for tuple, bag, and map" in {
+    val ops = parseScript(
+      """data = load 'file' as (f1: int, f2: int, name:chararray);
+        |out = foreach data generate (f1, f2), {f1, f2}, [name, f1];""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("out").get))
+
+    val expectedCode = cleanString(
+      """val out = data.map(t => List(PigFuncs.toTuple(t(0).toInt,t(1).toInt),PigFuncs.toBag(t(0).toInt,t(1).toInt),PigFuncs.toMap(t(2).toString,t(0).toInt)))""".stripMargin)
+
+    assert(generatedCode == expectedCode)
+  }
+
   it should "contain code for a union operator on two relations" in {
     // a = UNION b, c;
     val op = Union(Pipe("aa"), List(Pipe("bb"), Pipe("cc")))
