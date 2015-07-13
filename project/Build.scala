@@ -77,6 +77,7 @@ object Dependencies {
   lazy val flinkVersion =       "0.9-SNAPSHOT"
   lazy val scoptVersion =       "3.3.0"
   lazy val scalastiVersion =    "2.0.0"
+  lazy val jeromqVersion =      "0.3.4"
   lazy val kiamaVersion =       "1.8.0"
 
   // Libraries
@@ -90,6 +91,7 @@ object Dependencies {
   val flinkDist = "org.apache.flink" %% "flink-dist" % flinkVersion
   val scopt = "com.github.scopt" %% "scopt" % scoptVersion
   val scalasti = "org.clapper" %% "scalasti" % scalastiVersion
+  val jeromq = "org.zeromq" % "jeromq" % jeromqVersion
   val kiama = "com.googlecode.kiama" %% "kiama" % kiamaVersion
 
   // Projects
@@ -112,6 +114,7 @@ object Dependencies {
   val flinkDeps = Seq(
     scalaTest % "test" withSources(),
     scalaCompiler,
+    jeromq,
     flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
   )
 }
