@@ -14,20 +14,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package dbis.pig.op
 
 /**
- * Distinct represents the DISTINCT operator of Pig.
- *
- * @param initialOutPipeName the name of the output pipe (relation).
- * @param initialInPipeName the name of the input pipe.
- */
-case class Distinct(out: Pipe, in: Pipe) extends PigOperator {
+  * Window represents the WINDOW operator of Pig.
+  *
+  * @param initialOutPipeName the name of the output pipe
+  * @param initialInPipeName the name of the input pipe
+  * @param window the window size
+  * @param windowUnit the window sizes time unit 
+  * @param slide the windows slider frequency (every)
+  * @param slideUnit the windows slider time unit
+  */
+case class Window(out: Pipe, in: Pipe, window: Tuple2[Int,String], 
+                  slide: Tuple2[Int,String]) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 
-  override def lineageString: String = {
-    s"""DISTINCT%""" + super.lineageString
+  /** 
+    * Returns the lineage string describing the sub-plan producing the input for this operator.
+    *
+    * @return a string representation of the sub-plan.
+    */
+  override def lineageString: String = { 
+    s"""WINDOW%${window}%""" + super.lineageString
   }
-
 }

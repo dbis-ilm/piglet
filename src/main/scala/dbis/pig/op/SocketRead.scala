@@ -16,14 +16,32 @@
  */
 package dbis.pig.op
 
+import dbis.pig.schema.Schema
+
+case class SocketAddress(protocol: String, hostname: String, port: String)
 /**
-* Describe represents the DESCRIBE operator of Pig.
-*
-* @param initialInPipeName the name of the input pipe
-*/
-case class Describe(in: Pipe) extends PigOperator {
-  _inputs = List(in)
-  _outputs = List()
+ * Load represents the LOAD operator of Pig.
+ *
+ * @param out the name of the initial output pipe (relation).
+ * @param addr the address of the socket to read from
+ * @param mode empty for standard socket or currently also possible "zmq"
+ * @param streamSchema schema definition 
+ * @param streamFunc name of the stream function used for data preprocessing
+ * @param streamParams parameters for streamFunc
+ */
+case class SocketRead(out: Pipe, addr: SocketAddress, mode: String, 
+                      var streamSchema: Option[Schema] = None, 
+                      streamFunc: String = "", streamParams: List[String] = null) extends PigOperator{
+  _outputs = List(out)
+  _inputs = List()
+  schema = streamSchema
+
+  override def constructSchema: Option[Schema] = {
+    /*
+     * Either the schema was defined or it is None.
+     */
+    schema
+  }
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
@@ -31,7 +49,6 @@ case class Describe(in: Pipe) extends PigOperator {
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""DESCRIBE%""" + super.lineageString
+    s"""SOCKET_READ%${addr}%${mode}""" + super.lineageString
   }
-
 }
