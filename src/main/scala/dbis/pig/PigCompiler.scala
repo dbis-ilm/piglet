@@ -19,7 +19,6 @@ package dbis.pig
 
 
 import java.io.File
-
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.plan.DataflowPlan
@@ -27,8 +26,9 @@ import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.FileTools
 import scopt.OptionParser
-
 import scala.io.Source
+import dbis.pig.plan.MaterializationManager
+import dbis.pig.tools.Conf
 
 object PigCompiler extends PigParser {
   case class CompilerConfig(master: String = "local", input: String = "", compile: Boolean = false, outDir: String = ".", backend: String = BuildSettings.backends.get("default").get("name"))
@@ -95,6 +95,9 @@ object PigCompiler extends PigParser {
     val scriptName = fileName.replace(".pig", "")
 
     // 3. now, we should apply optimizations
+    
+    val mm = new MaterializationManager
+    plan = processMaterializations(plan, mm)
     plan = processPlan(plan)
 
     if (FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend)) {

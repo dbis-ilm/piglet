@@ -19,12 +19,21 @@ package dbis.spark
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
+import java.io.FileInputStream
+import java.io.ObjectOutputStream
+import java.io.ObjectInputStream
+import java.io.FileOutputStream
+
 
 class PigStorage extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, delim: Char = ' '): RDD[List[String]] = {
+  def load(sc: SparkContext, path: String, delim: Char = '\t'): RDD[List[String]] = {
     sc.textFile(path).map(line => line.split(delim).toList)
   }
 
+  def write(path: String, rdd: RDD[String]) {
+    rdd.saveAsTextFile(path)
+  }
+  
   /*
   def load(sc: SparkContext, path: String, schema: Schema, delim: String = " "): RDD[List[Any]] = {
     val pattern = "[^,(){}]+".r
@@ -61,4 +70,25 @@ object RDFFileStorage {
   def apply(): RDFFileStorage = {
     new RDFFileStorage
   }
+}
+
+
+class BinStorage extends java.io.Serializable {
+  
+  def load(sc: SparkContext, path: String): RDD[List[Any]] = {
+    
+    val rdd = sc.objectFile[List[Any]](path)
+    
+    return rdd
+  }
+  
+  def write(path: String, rdd: RDD[_]) = {
+    
+    rdd.saveAsObjectFile(path);
+  }
+  
+}
+
+object BinStorage {
+  def apply(): BinStorage = new BinStorage
 }

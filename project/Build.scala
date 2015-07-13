@@ -73,11 +73,11 @@ object Dependencies {
   lazy val scalaIoFileVersion = "0.4.3-1"
   lazy val jlineVersion =       "2.12.1"
   lazy val graphVersion =       "1.9.2"
-  lazy val sparkVersion =       "1.4.0"
+  lazy val sparkVersion =       "1.3.0"
   lazy val flinkVersion =       "0.9-SNAPSHOT"
   lazy val scoptVersion =       "3.3.0"
   lazy val scalastiVersion =    "2.0.0"
-  lazy val kiamaVersion =       "1.8.0"
+  lazy val kiamaVersion = "1.8.0"
 
   // Libraries
   val scalaCompiler = "org.scala-lang" % "scala-compiler" % scalaVersion

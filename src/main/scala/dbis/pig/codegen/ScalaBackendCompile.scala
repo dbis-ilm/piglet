@@ -365,12 +365,6 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       s"custKey_${out}_${in}(${orderSpec.map(r => emitRef(schema, r.field)).mkString(",")})"
   }
 
-  /**
-   * Generate code for any helper class/function if needed by the given operator.
-   *
-   * @param node the Pig operator requiring helper code
-   * @return a string representing the helper code
-   */
   def emitHelperClass(node: PigOperator): String = {
     def genCmpExpr(col: Int, num: Int) : String =
       if (col == num) s"{ this.c$col compare that.c$col }"
@@ -406,7 +400,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
           |  def compare(that: ${cname}) = $cmpExpr
           |}""".stripMargin
       }
-      case Store(in, file) => { s"""
+      case Store(in, file,_) => { s"""
         |def tuple${in.name}ToString(t: List[Any]): String = {
         |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
         |
@@ -457,7 +451,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
    */
   def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator): String = {
     // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
-    val requiresPlainFlatten = node.asInstanceOf[Foreach].containsFlatten(onBag = false)
+    val requiresPlainFlatten =  node.asInstanceOf[Foreach].containsFlatten(onBag = false)
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     gen match {
       case GeneratorList(expr) => {
@@ -494,9 +488,9 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out.name, file, func, params)
       case Dump(in) => callST("dump", Map("in"->in.name))
-      case Store(in, file) => {
+      case Store(in, file,func) => {
         val path = if(file.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
-        callST("store", Map("in"->in.name,"file"->(path + file),"schema"->s"tuple${in.name}ToString(t)"/*listToTuple(node.schema)*/))
+        callST("store", Map("in"->in.name,"file"->(path + file),"schema"->s"tuple${in.name}ToString(t)"/*listToTuple(node.schema)*/,"func"->func))
        }
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out.name,"in"->in.name,"pred"->emitPredicate(node.schema, pred)))

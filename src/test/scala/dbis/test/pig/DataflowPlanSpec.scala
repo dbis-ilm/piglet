@@ -21,6 +21,7 @@ import dbis.pig.op._
 import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
 import dbis.pig.schema._
 import org.scalatest.{FlatSpec, Matchers}
+import dbis.pig.plan.PrettyPrinter
 
 class DataflowPlanSpec extends FlatSpec with Matchers {
   /*
@@ -328,14 +329,75 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     ops.size should be (1)
     val op = ops.head
     op.outPipeName should be ("a")
-    plan.insertAfter(op, Distinct(Pipe("c"), Pipe("a")))
+    val d = Distinct(Pipe("d"),Pipe("a"))
+    plan.insertAfter(op, d)
+    println(op)
   }
 
   it should "be consistent after exchanging two operators" in {
-
+    val plan = new DataflowPlan(parseScript("""
+         |a = load 'file.csv';
+         |b = filter a by $0 > 0;
+         |c = distinct b;
+         |dump c;
+         |""".stripMargin))
+    
+    val ops = plan.findOperator(o => o.outPipeName == "b")
+    withClue("did not find operator a") {ops.size should be (1)}
+    
+    val b = ops.head
+    val newB = Distinct(Pipe("a"),Pipe("b"))
+    
+    println(PrettyPrinter.pretty(plan.sinkNodes.head))
+    
+    plan.replace(b, newB)
+    
+    println("....")
+    
+    println(PrettyPrinter.pretty(plan.sinkNodes.head))
+    
+    plan.operators should contain (newB)
+    plan.operators should not contain (b)
+    
+    withClue("old inputs: ") {b.inputs shouldBe empty}
+    withClue("old ouputs: ") {b.outputs shouldBe empty}
+    // the following two would need to reassign a val --> make it a var?
+    
+    
+    val fs = plan.findOperator(_ == newB)
+    withClue("did not find operator c") {fs.size shouldBe 1}
+    
+    val f = fs.head
+    withClue("unexpected number of inputs") {f.inputs.size shouldBe 1}
+    f should be (newB)
+    withClue("only input should be a") {f.inputs.head.name shouldBe "a"}
+    
+    val a = plan.findOperatorForAlias("a").get
+    val c = plan.findOperatorForAlias("c").get
+    
+    withClue("new op's outputs") {newB.outputs.map(_.consumer).flatten should contain only c}
+    withClue("new op's inputs") {newB.inputs.map(_.producer) should contain only a}
+    
+    withClue("new op's succeccssor's input") {c.inputs should contain only Pipe(newB.outputs.head.name, newB)}
   }
   it should "be consistent after removing an operator" in {
+    val plan = new DataflowPlan(parseScript("""
+         |a = load 'file.csv';
+         |b = filter a by $0 > 0;
+         |c = distinct b;
+         |""".stripMargin))
+    
+    val b = plan.findOperatorForAlias("b").get
+    
+    plan.remove(b)
+    
+    withClue("operators: ") {plan.operators should not contain b}
 
+    val a = plan.findOperatorForAlias("a").get
+    withClue("a outputs: ") {a.outputs should not contain b}
+    
+    val c = plan.findOperatorForAlias("c").get
+    withClue("c inputs: ") {c.inputs.map(_.producer) should not contain b}
   }
 
   /*
