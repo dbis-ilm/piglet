@@ -168,7 +168,9 @@ trait PigOperator extends Rewritable {
     outputs.foreach(_ match {
       // TODO find the correct output relation name
       case op : PigOperator => this.outputs = this.outputs :+ Pipe(this.outPipeName, this, List(op))
-      case ops: List[PigOperator] => this.outputs = this.outputs ++ ops.map(op => Pipe(this.outPipeName, this, List (op)))
+      // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
+      // operators
+      case ops: List[_] => this.reconstruct(ops)
       case _ => illegalArgs("PigOperator", "PigOperator", outputs)
     })
     this
