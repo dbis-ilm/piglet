@@ -70,8 +70,9 @@ class DataflowPlan(var operators: List[PigOperator]) {
       // we can have multiple outputs (e.g. in SplitInto)
       op.outputs.foreach { p: Pipe =>
         if (p.name != "") {
-          if (pipes.contains(p.name))
+          if (pipes.contains(p.name)) {
             throw new InvalidPlanException("duplicate pipe: " + p.name)
+          }
           // we initialize the producer of the pipe
           p.producer = op
           pipes(p.name) = p
@@ -85,7 +86,11 @@ class DataflowPlan(var operators: List[PigOperator]) {
     planOps.foreach(op => {
         for (p <- op.inputs) {
           val element = pipes(p.name)
-          element.consumer = element.consumer :+ op
+          // Pipes already have their consumers set up after rewriting, therefore this step is not necessary. In
+          // fact, it would create duplicate elements in `consumer`.
+          if (!(element.consumer contains op)) {
+            element.consumer = element.consumer :+ op
+          }
         }
     })
 

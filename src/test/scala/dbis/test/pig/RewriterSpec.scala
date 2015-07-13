@@ -40,11 +40,11 @@ class RewriterSpec extends FlatSpec with Matchers {
     val sourceMerged = planMerged.sourceNodes.head
 
     val rewrittenSink = processPigOperator(source)
-    rewrittenSink.outputs should equal (sourceMerged.outputs)
+    rewrittenSink.outputs should equal(sourceMerged.outputs)
 
     val pPlan = processPlan(planUnmerged)
-    pPlan.findOperatorForAlias("c").value should be (opMerged)
-    pPlan.findOperatorForAlias("a").value.outputs should contain only opMerged
+    pPlan.findOperatorForAlias("c").value should be(opMerged)
+    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
   }
 
   it should "order Filter operations before Order By ones" in {
@@ -67,37 +67,36 @@ class RewriterSpec extends FlatSpec with Matchers {
     val sourceReordered = planReordered.sourceNodes.head
 
     val rewrittenSource = processPigOperator(source)
-    rewrittenSource.outputs.head should equal (sourceReordered.outputs.head)
+    rewrittenSource.outputs.head should equal(sourceReordered.outputs.head)
 
     val pPlan = processPlan(plan)
-    pPlan.findOperatorForAlias("b").value should be (op2_2)
+    pPlan.findOperatorForAlias("b").value should be(op2_2)
   }
 
   it should "rewrite SplitInto operators into multiple Filter ones" in {
-    val plan = new DataflowPlan(parseScript(s"""
-      |a = LOAD 'file' AS (x, y);
-      |SPLIT a INTO b IF x < 100, c IF x >= 100;
-      |STORE b INTO 'res1.data';
-      |STORE c INTO 'res2.data';""".stripMargin))
+    val plan = new DataflowPlan(parseScript( s"""
+                                                |a = LOAD 'file' AS (x, y);
+                                                |SPLIT a INTO b IF x < 100, c IF x >= 100;
+                                                |STORE b INTO 'res1.data';
+                                                |STORE c INTO 'res2.data';""".stripMargin))
 
     val filter1 = parseScript("b = filter a by x < 100;").head
     val filter2 = parseScript("c = filter a by x >= 100;").head
     val newPlan = processPlan(plan)
 
-    newPlan.sourceNodes.headOption.value.outputs should have length 2
-    newPlan.sourceNodes.headOption.value.outputs should contain allOf(filter1, filter2)
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should have length 2
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should contain allOf(filter1, filter2)
 
     newPlan.sinkNodes should have size 2
     newPlan.sinkNodes.foreach(node => {
-      println(node.inputs)
       node.inputs should have length 1
     })
 
     val sink1 = newPlan.sinkNodes.head
     val sink2 = newPlan.sinkNodes.last
 
-    sink1.inputs.head.producer should be (if (sink1.inputs.head.name == "b") filter1 else filter2)
-    sink2.inputs.head.producer should be (if (sink2.inputs.head.name == "b") filter2 else filter1)
+    sink1.inputs.head.producer should be(if (sink1.inputs.head.name == "b") filter1 else filter2)
+    sink2.inputs.head.producer should be(if (sink2.inputs.head.name == "c") filter2 else filter1)
 
   }
 
@@ -117,7 +116,7 @@ class RewriterSpec extends FlatSpec with Matchers {
       for (input <- op.inputs.map(_.producer)) {
         val inputIndex = newPlan.operators.indexOf(input)
         withClue(op.toString ++ input.toString) {
-         assert(currentIndex > inputIndex)
+          assert(currentIndex > inputIndex)
         }
       }
     }

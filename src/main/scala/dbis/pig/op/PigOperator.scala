@@ -164,13 +164,34 @@ trait PigOperator extends Rewritable {
   def deconstruct = this.outputs.map(_.consumer)
 
   def reconstruct(outputs: Seq[Any]): PigOperator = {
+    val outname = this.outPipeName
+    reconstruct(outputs, outname)
+  }
+
+  /** Implementation for kiamas Rewritable trait
+    *
+    * It's necessary to set the `outputs` attribute on this object to List.empty, which makes `this.outPipeName`
+    * return "". To work around this, the output name can be provided via `outname`.
+    *
+    * @param outputs
+    * @param outname The output name of this relation
+    * @return
+    */
+  def reconstruct(outputs: Seq[Any], outname: String): PigOperator = {
     this.outputs = List.empty
     outputs.foreach(_ match {
-      // TODO find the correct output relation name
-      case op : PigOperator => this.outputs = this.outputs :+ Pipe(this.outPipeName, this, List(op))
+      case op : PigOperator => {
+        val idx = this.outputs.indexWhere(_.name == outname)
+        if (idx > -1) {
+          // There already is a Pipe to `outname`
+          this.outputs(idx).consumer = this.outputs(idx).consumer :+ op
+        } else {
+                  this.outputs = this.outputs :+ Pipe(outname, this, List(op))
+        }
+      }
       // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
       // operators
-      case ops: List[_] => this.reconstruct(ops)
+      case ops: List[_] => this.reconstruct(ops, outname)
       case _ => illegalArgs("PigOperator", "PigOperator", outputs)
     })
     this

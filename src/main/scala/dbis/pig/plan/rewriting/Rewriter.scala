@@ -134,17 +134,19 @@ object Rewriter {
     case node@SplitInto(inPipeName, splits) =>
       val filters = (for (branch <- splits) yield branch.output.name -> Filter(branch.output, inPipeName, branch
         .expr)).toMap
+      node.inputs = node.inputs.map(p => {
+        p.consumer = p.consumer.filterNot(_ == node)
+        p
+      })
       // For all outputs
       node.outputs.iterator foreach (_.consumer.foreach(output => {
         // Iterate over their inputs
         output.inputs foreach (input => {
-          // Check if the relation name is one of the names our SplitBranches writes
+          // Check if the relation name is one of the names our SplitBranches write
           if (filters contains input.name) {
             // Replace SplitInto with the appropriate Filter
             output.inputs = output.inputs.filter(_.producer != node) :+ Pipe(input.name, filters(input.name))
-            // and add the consumer to the correct Filters outputs
-            filters(input.name).outputs = filters(input.name).outputs :+ Pipe(input.name, filters(input.name), List
-              (output))
+            filters(input.name).inputs = node.inputs
           }
         })
       }
