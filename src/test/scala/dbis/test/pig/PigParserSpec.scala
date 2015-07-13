@@ -401,32 +401,40 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a socket read statement in standard mode" in {
-    assert(parseScript("a = socket_read '127.0.0.1:5555';") == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
+    assert(parseScript("a = socket_read '127.0.0.1:5555';", LanguageFeature.StreamingPig)
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
   }
 
   it should "parse a socket read statement in standard mode with using clause" in {
-    assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');") == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "PigStream",List("""','"""))))
-    assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();") == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "RDFStream")))
+    assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');", LanguageFeature.StreamingPig)
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "PigStream",List("""','"""))))
+    assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();", LanguageFeature.StreamingPig)
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "RDFStream")))
   }
 
   it should "parse a socket read statement in zmq mode" in {
-    assert(parseScript("a = socket_read 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketRead(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
+    assert(parseScript("a = socket_read 'tcp://127.0.0.1:5555' mode zmq;", LanguageFeature.StreamingPig)
+      == List(SocketRead(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
   }
 
   it should "parse a socket write statement in standard mode" in {
-    assert(parseScript("socket_write a to '127.0.0.1:5555';") == List(SocketWrite(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
+    assert(parseScript("socket_write a to '127.0.0.1:5555';", LanguageFeature.StreamingPig)
+      == List(SocketWrite(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
   }
 
   it should "parse a socket write statement in zmq mode" in {
-    assert(parseScript("socket_write a to 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketWrite(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
+    assert(parseScript("socket_write a to 'tcp://127.0.0.1:5555' mode zmq;", LanguageFeature.StreamingPig)
+      == List(SocketWrite(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
   }
 
   it should "parse a window statement using Rows for window and slider" in {
-    assert(parseScript("a = window b rows 100 slide rows 10;") == List(Window(Pipe("a"), Pipe("b"), (100,""), (10,""))))
+    assert(parseScript("a = window b rows 100 slide rows 10;", LanguageFeature.StreamingPig)
+      == List(Window(Pipe("a"), Pipe("b"), (100,""), (10,""))))
   }
  
   it should "parse a window statement using Range for window and slider" in {
-    assert(parseScript("a = window b range 100 seconds slide range 10 seconds;") == List(Window(Pipe("a"), Pipe("b"), (100,"seconds"), (10,"seconds"))))
+    assert(parseScript("a = window b range 100 seconds slide range 10 seconds;", LanguageFeature.StreamingPig)
+      == List(Window(Pipe("a"), Pipe("b"), (100,"seconds"), (10,"seconds"))))
   }
 
   it should "parse a SPLIT INTO statement" in {
