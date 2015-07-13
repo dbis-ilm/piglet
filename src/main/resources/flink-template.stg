@@ -100,7 +100,7 @@ join(out,rel1,key1,rel2,key2) ::=<<
 
 // ------------------ UNIONs multiple streams to one --------------------------
 union(out,in,others) ::=<<
-        val <out> = <in><others:{ e | .merge(<e>)}>
+        val <out> = <in><others:{ e | .union(<e>)}>
 >>
 
 // ------------------ Reads from a SOCKET -------------------------------------
