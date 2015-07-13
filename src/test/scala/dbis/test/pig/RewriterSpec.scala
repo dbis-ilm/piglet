@@ -137,6 +137,6 @@ class RewriterSpec extends FlatSpec with Matchers {
     val source = plan.sourceNodes.head
 
     val rewrittenSource = processPigOperator(source)
-    rewrittenSource.outputs should contain only op2
+    rewrittenSource.outputs should contain only Pipe("a", op1, List(op2))
   }
 }
