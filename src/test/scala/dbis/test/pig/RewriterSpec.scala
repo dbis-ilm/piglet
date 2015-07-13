@@ -23,7 +23,16 @@ import dbis.pig.plan.rewriting.Rewriter._
 import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
 
-class RewriterSpec extends FlatSpec with Matchers{
+class RewriterSpec extends FlatSpec with Matchers {
+  "Calling hashCode" should "not die with a StackOverflowError" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+
+    println(op1.hashCode())
+    val planUnmerged = new DataflowPlan(List(op1))
+    println("built plan")
+    println(op1.hashCode())
+  }
+
   "The rewriter" should "merge two Filter operations" in {
     val op1 = Load(Pipe("a"), "file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))

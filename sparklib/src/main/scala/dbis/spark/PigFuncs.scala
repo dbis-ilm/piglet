@@ -18,6 +18,7 @@
 package dbis.spark
 
 import scala.Numeric.Implicits._
+import scala.collection.mutable.ListBuffer
 
 object PigFuncs {
   def average[T: Numeric](bag: Iterable[T]) : Double = sum(bag).toDouble / count(bag).toDouble
@@ -36,6 +37,19 @@ object PigFuncs {
     var m = Map[String, Any]()
     for (i <- 0 to pList.length-1 by 2) { m += (pList(i).toString -> pList(i+1)) }
     m
+  }
+
+  def toTuple(pList: Any*): List[Any] = pList.toList
+
+  def toBag(pList: Any*): List[Any] = {
+    val buf = ListBuffer[List[Any]]()
+    for (i <- 0 to pList.length-1) {
+      if (pList(i).isInstanceOf[List[Any]])
+        buf += pList(i).asInstanceOf[List[Any]]
+      else
+        buf += List(pList(i))
+    }
+    buf.toList
   }
 
   def flatTuple(tup: List[Any]): List[Any] = tup flatten {

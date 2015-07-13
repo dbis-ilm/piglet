@@ -2,12 +2,12 @@ name := "Piglet"
 
 lazy val commonSettings = Seq(
   version := "1.0",
-  scalaVersion := "2.11.6",
+  scalaVersion := "2.11.7",
   organization := "dbis"
 )
 
 // scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
-
+testOptions in IntegrationTest += Tests.Argument("-oDF")
 
 /*  
  * define the backend for the compiler: currently we support spark and flink
@@ -22,12 +22,6 @@ backends := (backendEnv match {
   case "sparkflink" => flinksparkBackend
   case _            => throw new Exception(s"Backend $backendEnv not available")
 })  
-
-/*
- * For testing:
- */
-lazy val print = taskKey[Unit]("Print out")
-print := println(backends.value.get("default").get("name"))
 
 /*
  * Main Project
@@ -45,7 +39,7 @@ settings(
   libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv)
 ).
 settings(excludes(backendEnv): _*).
-// aggregate(backendlib(backendEnv).map(a => a.project): _*).
+aggregate(backendlib(backendEnv).map(a => a.project): _*).
 dependsOn(backendlib(backendEnv): _*)
 
 /*
@@ -60,7 +54,8 @@ settings(
 lazy val flinklib = (project in file("flinklib")).
 settings(commonSettings: _*).
 settings(
-  libraryDependencies ++= Dependencies.flinkDeps
+  libraryDependencies ++= Dependencies.flinkDeps,
+  resolvers += "Sonatype (releases)" at "https://oss.sonatype.org/content/repositories/releases/"
 )
 
 def backendlib(backend: String): List[ClasspathDep[ProjectReference]] = backend match {

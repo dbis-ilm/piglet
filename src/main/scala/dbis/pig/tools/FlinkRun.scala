@@ -18,15 +18,31 @@
 package dbis.pig.tools
 
 import scala.sys.process._
+import java.security._
+import org.apache.flink.client.CliFrontend
+
 
 class FlinkRun extends Run{
   override def execute(master: String, className: String, jarFile: String){
-    val flinkJar = sys.env.get("FLINK_JAR") match {
-      case Some(n) => n
-      case None => throw new Exception(s"Please set FLINK_JAR to your flink-dist jar file")
+    if (master.startsWith("local") && !master.startsWith("localhost")){
+      //      val zmqJar = "/home/blaze/.ivy2/cache/org.zeromq/zeromq-scala-binding_2.11.0-M3/jars/zeromq-scala-binding_2.11.0-M3-0.0.7.jar"
+      //      val pigJar = "/home/blaze/Masterthesis/projects/pigspark/target/scala-2.11/PigCompiler.jar"
+      /*      
+       val flinkJar = sys.env.get("FLINK_JAR") match {
+         case Some(n) => n
+         case None => throw new Exception(s"Please set FLINK_JAR to your flink-dist jar file")
+       }
+       val run = s"java -Dscala.usejavacp=true -cp ${flinkJar}:${pigJar}:${jarFile} ${className}"
+       println(run)
+       run !
+       */
+      val cli = new CliFrontend
+      val ret = cli.parseParameters(Array("run", "--class", className, jarFile))
     }
-    val run = s"java -Dscala.usejavacp=true -cp ${flinkJar}:${jarFile} ${className}"
-    println(run)
-    run !
+    else {
+      val cli = new CliFrontend
+      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile))
+    }
+
   }
 }

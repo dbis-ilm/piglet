@@ -19,7 +19,6 @@ package dbis.pig.op
 import dbis.pig.plan._
 import dbis.pig.schema._
 
-
 case class SplitBranch(val output: Pipe, val expr: Predicate)
 
 /**

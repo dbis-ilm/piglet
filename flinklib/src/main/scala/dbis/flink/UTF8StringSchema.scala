@@ -14,20 +14,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.op
 
-/**
- * Distinct represents the DISTINCT operator of Pig.
- *
- * @param initialOutPipeName the name of the output pipe (relation).
- * @param initialInPipeName the name of the input pipe.
- */
-case class Distinct(out: Pipe, in: Pipe) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+package dbis.flink
 
-  override def lineageString: String = {
-    s"""DISTINCT%""" + super.lineageString
-  }
+import org.apache.commons.lang3.SerializationUtils
+import org.apache.flink.streaming.util.serialization._
+import org.apache.flink.api.common.typeinfo.TypeInformation
+import org.apache.flink.api.java.typeutils.TypeExtractor
 
+class UTF8StringSchema extends DeserializationSchema[String] with SerializationSchema[List[String], Array[Byte]] {
+
+  override def deserialize(message: Array[Byte]): String = {
+    new String(message, "UTF-8")
+  }   
+
+  override def isEndOfStream(nextElement: String): Boolean = {
+    false
+  }   
+
+  override def serialize(element: List[String]): Array[Byte] = {
+    element.mkString(",").getBytes("UTF-8")
+  }   
+
+  override def getProducedType(): TypeInformation[String] = {
+    TypeExtractor.getForClass(classOf[String])
+  }   
 }
+

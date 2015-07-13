@@ -249,14 +249,40 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
    * @return the Scala code implementing the LOAD operator
    */
   def emitLoader(out: String, file: String, loaderFunc: String, loaderParams: List[String]): String = {
+    val path = if(file.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
     if (loaderFunc == "")
-      callST("loader", Map("out"->out,"file"->file))
+      callST("loader", Map("out"->out,"file"->(path + file)))
     else {
       val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams/*.map(quote(_))*/.mkString(",") else ""
-      callST("loader", Map("out"->out,"file"->file,"func"->loaderFunc,"params"->params))
+      callST("loader", Map("out"->out,"file"->(path + file),"func"->loaderFunc,"params"->params))
     }
   }
 
+  /**
+   * Generates code for the SOCKET_READ Operator
+   *
+   * @param out name of the output bag
+   * @param addr the socket address to connect to
+   * @param mode the connection mode, e.g. zmq or empty for standard sockets
+   * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
+   * @param streamParams an optional list of parameters to a stream function (e.g. separators)
+   * @return the Scala code implementing the SOCKET_READ operator
+   */
+  def emitSocketRead(out: String, addr: SocketAddress, mode: String, streamFunc: String, streamParams: List[String]): String ={
+    if(streamFunc == ""){
+      if(mode!="")
+        callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode))
+      else
+        callST("socketRead", Map("out"->out,"addr"->addr))
+    } else {
+      val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
+      if(mode!="")
+        callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->streamFunc,"params"->params))
+      else
+        callST("socketRead", Map("out"->out,"addr"->addr,"func"->streamFunc,"params"->params))
+    }
+  }
+  
   /**
    *
    * @param schema
@@ -290,6 +316,9 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       }
     }
     case FlattenExpr(e) => emitExpr(schema, e)
+    case ConstructTupleExpr(exprs) => s"PigFuncs.toTuple(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
+    case ConstructBagExpr(exprs) => s"PigFuncs.toBag(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
+    case ConstructMapExpr(exprs) => s"PigFuncs.toMap(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case _ => println("unsupported expression: " + expr); ""
   }
 
@@ -385,6 +414,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
           // TODO: this should be processed recursively
         case BagType(n, t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
         case TupleType(n, f) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
+        case MapType(t, n) => s""".append(t(${i}).asInstanceOf[Map[String,Any]].map{case (k,v) => k + "#" + v}.mkString("[", ",", "]"))"""
         case _ => s".append(t($i))"
       }}.mkString("\n.append(\",\")\n")
       case None => s".append(t(0))\n"
@@ -489,7 +519,10 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out.name, file, func, params)
       case Dump(in) => callST("dump", Map("in"->in.name))
-      case Store(in, file) => callST("store", Map("in"->in.name,"file"->file,"schema"->s"tuple${in.name}ToString(t)"/*listToTuple(node.schema)*/))
+      case Store(in, file) => {
+        val path = if(file.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
+        callST("store", Map("in"->in.name,"file"->(path + file),"schema"->s"tuple${in.name}ToString(t)"/*listToTuple(node.schema)*/))
+       }
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out.name,"in"->in.name,"pred"->emitPredicate(node.schema, pred)))
       case Foreach(out, in, gen) => emitForeach(node, out.name, in.name, gen)
@@ -508,8 +541,15 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       case Sample(out, in, expr) => callST("sample", Map("out"->out.name,"in"->in.name,"expr"->emitExpr(node.schema, expr)))
       case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out.name,"in"->in.name,
         "key"->emitSortKey(node.schema, orderSpec, out.name, in.name),"asc"->ascendingSortOrder(orderSpec.head)))
-      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out.name,"op"->op,"in"->in.name,
-        "params"->emitParamList(node.schema, params)))
+      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out.name,"op"->op,"in"->in.name,"params"->emitParamList(node.schema, params)))
+      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(out.name, address, mode, func, params)
+      case SocketWrite(in, address, mode) => {
+        if(mode!="")
+          callST("socketWrite", Map("in"->in.name,"addr"->address,"mode"->mode))
+        else
+          callST("socketWrite", Map("in"->in.name,"addr"->address))
+      }
+
       /*     
        case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
        case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP

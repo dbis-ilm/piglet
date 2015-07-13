@@ -177,9 +177,9 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("""a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);""") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(Func("TOMAP", List(
-          RefExpr(Value(""""field1"""")),
+          RefExpr(Value("\"field1\"")),
           RefExpr(PositionalField(0)),
-          RefExpr(Value(""""field2"""")),
+          RefExpr(Value("\"field2\"")),
           RefExpr(PositionalField(1)))))
       )))))
   }
@@ -200,6 +200,33 @@ class PigParserSpec extends FlatSpec {
         GeneratorExpr(RefExpr(PositionalField(2)), Some(Field("obj", Types.CharArrayType)))
       )))))
   }
+
+  it should "parse a FOREACH statement with a bag constructor" in {
+    assert(parseScript("a = FOREACH b GENERATE {$0, $1, $2} as myBag;") ==
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(ConstructBagExpr(List(RefExpr(PositionalField(0)),
+                                            RefExpr(PositionalField(1)),
+                                            RefExpr(PositionalField(2)))), Some(Field("myBag", Types.ByteArrayType))
+        ))))))
+  }
+
+  it should "parse a FOREACH statement with a tuple constructor" in {
+    assert(parseScript("a = FOREACH b GENERATE $0, ($1, $2) as myTuple;") ==
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
+      GeneratorExpr(RefExpr(PositionalField(0))),
+      GeneratorExpr(ConstructTupleExpr(List(RefExpr(PositionalField(1)),
+                                            RefExpr(PositionalField(2)))), Some(Field("myTuple", Types.ByteArrayType))
+      ))))))
+  }
+
+  it should "parse a FOREACH statement with a map constructor" in {
+    assert(parseScript("a = FOREACH b GENERATE [$0, $1] as myMap;") ==
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(ConstructMapExpr(List(RefExpr(PositionalField(0)),
+                                            RefExpr(PositionalField(1)))), Some(Field("myMap", Types.ByteArrayType))
+      ))))))
+  }
+
 
   it should "parse a simple nested FOREACH statement" in {
     assert(parseScript(
@@ -321,7 +348,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a register statement" in {
-    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(Register(""""/usr/local/share/myfile.jar"""")))
+    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(Register("\"/usr/local/share/myfile.jar\"")))
   }
 
   it should "parse a stream statement without schema" in {
@@ -371,6 +398,35 @@ class PigParserSpec extends FlatSpec {
     assert(parseScript("a = order b by $1 desc, $2 asc;") ==
       List(OrderBy(Pipe("a"), Pipe("b"), List(OrderBySpec(PositionalField(1), OrderByDirection.DescendingOrder),
         OrderBySpec(PositionalField(2), OrderByDirection.AscendingOrder)))))
+  }
+
+  it should "parse a socket read statement in standard mode" in {
+    assert(parseScript("a = socket_read '127.0.0.1:5555';") == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
+  }
+
+  it should "parse a socket read statement in standard mode with using clause" in {
+    assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');") == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "PigStream",List("""','"""))))
+    assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();") == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "RDFStream")))
+  }
+
+  it should "parse a socket read statement in zmq mode" in {
+    assert(parseScript("a = socket_read 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketRead(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
+  }
+
+  it should "parse a socket write statement in standard mode" in {
+    assert(parseScript("socket_write a to '127.0.0.1:5555';") == List(SocketWrite(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
+  }
+
+  it should "parse a socket write statement in zmq mode" in {
+    assert(parseScript("socket_write a to 'tcp://127.0.0.1:5555' mode zmq;") == List(SocketWrite(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
+  }
+
+  it should "parse a window statement using Rows for window and slider" in {
+    assert(parseScript("a = window b rows 100 slide rows 10;") == List(Window(Pipe("a"), Pipe("b"), (100,""), (10,""))))
+  }
+ 
+  it should "parse a window statement using Range for window and slider" in {
+    assert(parseScript("a = window b range 100 seconds slide range 10 seconds;") == List(Window(Pipe("a"), Pipe("b"), (100,"seconds"), (10,"seconds"))))
   }
 
   it should "parse a SPLIT INTO statement" in {

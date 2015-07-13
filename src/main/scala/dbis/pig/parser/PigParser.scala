@@ -123,12 +123,21 @@ class PigParser extends JavaTokenParsers {
      "(" ~ castTypeSpec ~ ")" ~ refExpr ^^ { case _ ~ t ~ _ ~ e => CastExpr(t, e) }
       | "(" ~ arithmExpr ~ ")" ^^ { case _ ~ e ~ _ => PExpr(e) }
        | "flatten" ~ "(" ~ arithmExpr ~ ")" ^^ { case _ ~ _ ~ e ~ _  => FlattenExpr(e) }
-      | func
+       | typeConstructor
+       | func
       | refExpr
     )
 
   def func: Parser[ArithmeticExpr] = className ~ "(" ~ repsep(arithmExpr, ",") ~ ")" ^^ { case f ~ _ ~ p ~ _ => Func(f, p) }
   def refExpr: Parser[ArithmeticExpr] = ref ^^ { r => RefExpr(r) }
+
+  /*
+   * And it can be also a type constrctor for tuple, bag or map.
+  */
+  def tupleConstructor: Parser[ArithmeticExpr] = "(" ~ repsep(arithmExpr, ",") ~ ")" ^^ { case _ ~ l ~ _ => ConstructTupleExpr(l) }
+  def bagConstructor: Parser[ArithmeticExpr] = "{" ~ repsep(arithmExpr, ",") ~ "}"  ^^ { case _ ~ l ~ _ => ConstructBagExpr(l) }
+  def mapConstructor: Parser[ArithmeticExpr] = "[" ~ repsep(arithmExpr, ",") ~ "]"  ^^ { case _ ~ l ~ _ => ConstructMapExpr(l) }
+  def typeConstructor: Parser[ArithmeticExpr] = (tupleConstructor | bagConstructor | mapConstructor)
 
   def comparisonExpr: Parser[Predicate] = arithmExpr ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ arithmExpr ^^ {
     case a ~ op ~ b => op match {
@@ -187,6 +196,15 @@ class PigParser extends JavaTokenParsers {
   lazy val andKeyword = "and".ignoreCase
   lazy val orKeyword = "or".ignoreCase
   lazy val notKeyword = "not".ignoreCase
+  lazy val toKeyword = "to".ignoreCase
+  lazy val socketReadKeyword = "socket_read".ignoreCase
+  lazy val socketWriteKeyword = "socket_write".ignoreCase
+  lazy val modeKeyword = "mode".ignoreCase
+  lazy val zmqKeyword = "zmq".ignoreCase
+  lazy val windowKeyword = "window".ignoreCase
+  lazy val rowsKeyword = "rows".ignoreCase
+  lazy val rangeKeyword = "range".ignoreCase
+  lazy val slideKeyword = "slide".ignoreCase
   lazy val splitKeyword = "split".ignoreCase
   lazy val ifKeyword = "if".ignoreCase
 
@@ -325,6 +343,20 @@ class PigParser extends JavaTokenParsers {
   def limitStmt: Parser[PigOperator] = bag ~ "=" ~ limitKeyword ~ bag ~ num ^^ { case out ~ _ ~ _ ~ in ~ num => new Limit(Pipe(out), Pipe(in), num) }
 
   /*
+   * <A> = WINDOW <B> ROWS  <Num> SLIDE ROWS <Num>
+   * <A> = WINDOW <B> ROWS  <Num> SLIDE RANGE <Num> <Unit>
+   * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE ROWS <Num>
+   * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE RANGE <Num> <Unit>
+   */
+  def timeUnit: Parser[String] = ("seconds".ignoreCase | "minutes".ignoreCase)
+  def rangeParam: Parser[Tuple2[Int,String]] = rangeKeyword ~ num ~ timeUnit ^^ {case _ ~ n ~ u => (n,u)}
+  def rowsParam: Parser[Tuple2[Int,String]] = rowsKeyword ~ num ^^ {case _ ~ n => (n, "")}
+  def windowParam: Parser[Tuple2[Int,String]] = (rangeParam | rowsParam)
+  def windowStmt: Parser[PigOperator] = bag ~ "=" ~ windowKeyword ~ bag ~ windowParam ~ slideKeyword ~ windowParam ^^ {
+    case out ~ _ ~ _ ~ in ~ on ~ _ ~ slide => Window(Pipe(out), Pipe(in), on, slide)
+  }
+
+  /*
    * <A> = JOIN <B> BY <Ref>, <C> BY <Ref>, ...
    * <A> = JOIN <B> BY ( <ListOfRefs> ), <C> BY ( <ListOfRefs>), ...
    */
@@ -396,6 +428,56 @@ class PigParser extends JavaTokenParsers {
   }
 
   /*
+   * Socket Definitions
+   */
+  def ipMember: Parser[String] = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)".r 
+  def ipv4: Parser[String] = ipMember ~ "." ~ ipMember ~ "." ~ ipMember ~ "." ~ ipMember ^^{
+    case i1 ~ _ ~ i2 ~ _ ~ i3 ~ _ ~i4 => i1 + "." + i2 + "." + i3 + "." + i4
+  }
+  def portNum: Parser[String] = "([0-9]{1,5})".r
+  def port: Parser[String] = (portNum | "*") 
+  def bindAddress: Parser[String] = (ipv4 | "*" | ident)
+  
+  def inetAddress: Parser[SocketAddress] = "'" ~ (ipv4 | ident) ~ ":" ~ portNum ~ "'" ^^ { case _ ~ ip ~ _ ~ p ~ _ => SocketAddress("",ip,p)}
+  def tcpSocket: Parser[SocketAddress] = "tcp://" ~ bindAddress ~ ":" ~ port ^^ { case trans ~ addr ~ _ ~ p => SocketAddress(trans, addr, p)}
+  def ipcSocket: Parser[SocketAddress] = "ipc://" ~ (fileName | "*") ^^ { case trans ~  path => SocketAddress(trans,path,"")}
+  def inprocSocket: Parser[SocketAddress] = "inproc://" ~ ident ^^ { case trans ~ name => SocketAddress(trans,name,"")}
+  def pgmSocket: Parser[SocketAddress] = ("pgm://" | "epgm://") ~ (ipv4 | ident) ~ ";" ~ ipv4 ~ ":" ~ portNum ^^ { 
+      case trans ~ interface ~ _ ~ ip ~ _ ~ p => SocketAddress(trans, interface + ";" + ip, p)
+    }
+  def zmqAddress: Parser[SocketAddress] = "'" ~ (tcpSocket | ipcSocket | inprocSocket | pgmSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
+
+  /*
+   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] USING <StreamFunc> [ AS <schema> ]
+   * 
+   * Maybe other modes later
+   */
+  def socketReadStmt: Parser[PigOperator] =
+  bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
+    case out ~ _ ~ _ ~ addr ~ u ~ schema => u match {
+      case Some(p) => SocketRead(Pipe(out), addr, "", schema, p._1, if (p._2.isEmpty) null else p._2)
+      case None =>  SocketRead(Pipe(out), addr, "", schema)
+    }
+  } | 
+  bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
+    case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema => u match {
+      case Some(p) => SocketRead(Pipe(out), addr, mode, schema, p._1, if (p._2.isEmpty) null else p._2)
+      case None => SocketRead(Pipe(out), addr, mode, schema)
+    }
+  }
+
+  /*
+   * SOCKET_WRITE <A> TO '<address>' [ MODE ZMQ ]
+   */
+  def socketWriteStmt: Parser[PigOperator] =
+  socketWriteKeyword ~ bag ~ toKeyword ~ inetAddress ^^ {
+    case _ ~ b ~ _ ~ addr => SocketWrite(Pipe(b), addr, "")
+  } | 
+  socketWriteKeyword ~ bag ~ toKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ^^ {
+    case _ ~ b ~ _ ~ addr ~ _ ~ mode => SocketWrite(Pipe(b), addr, mode)
+  }
+
+  /*
    * SPLIT <A> INTO <B> IF <Cond>, <C> IF <Cond> ...
    */
   def splitBranch: Parser[SplitBranch] = bag ~ ifKeyword ~ logicalExpr ^^ { case out ~ _ ~ expr => new SplitBranch(Pipe(out), expr)}
@@ -407,9 +489,7 @@ class PigParser extends JavaTokenParsers {
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
-  def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt) ~ ";" ^^ {
+  def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt | socketReadStmt | socketWriteStmt | windowStmt | splitStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*

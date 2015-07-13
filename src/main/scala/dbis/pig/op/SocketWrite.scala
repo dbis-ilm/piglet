@@ -17,17 +17,22 @@
 package dbis.pig.op
 
 /**
- * Distinct represents the DISTINCT operator of Pig.
+ * Store represents the STORE operator of Pig.
  *
- * @param initialOutPipeName the name of the output pipe (relation).
- * @param initialInPipeName the name of the input pipe.
+ * @param in the name of the input pipe
+ * @param addr the socket address to write to
+ * @param mode empty for standard socket or currently also possible "zmq"
  */
-case class Distinct(out: Pipe, in: Pipe) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class SocketWrite(in: Pipe, addr: SocketAddress, mode: String) extends PigOperator {
+  _outputs = List()
+  _inputs = List()
 
+  /**
+   * Returns the lineage string describing the sub-plan producing the input for this operator.
+   *
+   * @return a string representation of the sub-plan.
+   */
   override def lineageString: String = {
-    s"""DISTINCT%""" + super.lineageString
+    s"""SOCKET_WRITE%${addr}%${mode}%""" + super.lineageString
   }
-
 }

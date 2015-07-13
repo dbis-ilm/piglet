@@ -153,6 +153,12 @@ trait PigOperator extends Rewritable {
     outputs.forall(p => p.producer == this) && inputs.forall(p => p.consumer.contains(this))
   }
 
+  /**
+   * Returns the arity, i.e. the number of output pipes of
+   * this operator.
+   *
+   * @return the arity of the operator
+   */
   def arity = this.outputs.length
 
   def deconstruct = this.outputs.map(_.consumer)
