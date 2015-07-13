@@ -16,8 +16,8 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{And, Filter, OrderBy, PigOperator}
-import dbis.pig.plan.{DataflowPlan, Pipe}
+import dbis.pig.op.{And, Filter, OrderBy, PigOperator, Pipe}
+import dbis.pig.plan.DataflowPlan
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
@@ -100,7 +100,7 @@ object Rewriter {
   private def mergeFilters(pigOperator: Any): Option[Filter] = pigOperator match {
     case f1 @ Filter(out, _, predicate) =>
       f1.inputs match {
-        case List((Pipe(_, f2 @ Filter(_, in, predicate2)))) =>
+        case List((Pipe(_, f2 @ Filter(_, in, predicate2), _))) =>
           val newFilter = Filter(out, in, And(predicate, predicate2))
           // TODO extract merging PigOperators into a new method, possibly on PigOperator itself
           // Use the second filters inputs. We don't need to rewrite the inputs output because that always seems to be
@@ -122,12 +122,12 @@ object Rewriter {
   private def filterBeforeOrder(pigOperator: Any): Option[OrderBy] = pigOperator match {
     case f @ Filter(out, in, predicate) =>
       f.inputs match {
-        case List((Pipe(_, order @ OrderBy(out2, in2, orderSpec)))) =>
+        case List((Pipe(_, order @ OrderBy(out2, in2, orderSpec), _))) =>
           // Reorder the operations and swap their input and output names
           val newOrder = order.copy(out, in, orderSpec)
           val newFilter = f.copy(out2, in2, predicate)
 
-          newOrder.inputs = List(Pipe(in, newFilter))
+          newOrder.inputs = List(Pipe(in.name, newFilter))
 
           newFilter.inputs = order.inputs
 

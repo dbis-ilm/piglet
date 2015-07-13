@@ -18,91 +18,62 @@ package dbis.pig.op
 
 import java.security.MessageDigest
 
-import dbis.pig.plan.Pipe
 import dbis.pig.schema._
 import org.kiama.rewriting.Rewritable
 import scala.collection.immutable.Seq
 
 /**
- * PigOperator is the base class for all Pig operators. An operator contains
+ * PigOperator is the base trait for all Pig operators. An operator contains
  * pipes representing the input and output connections to other operators in the
  * dataflow.
- *
- * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
- *                           can be changed later.
- * @param initialInPipeNames the list of names of initial input pipes.
- * @param schema
  */
-abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNames: List[String], var schema:
-Option[Schema]) extends Rewritable {
-  // A list of all pipes that this operator reads from.
-  var inputs: List[Pipe] = List[Pipe]()
+trait PigOperator extends Rewritable {
+  protected var _outputs: List[Pipe] = _
+  protected var _inputs: List[Pipe]  = _
 
-  // If the operator writes a relation, this is its name.
-  private var _output: Option[String] = None
-  def output = _output
+  var schema: Option[Schema] = None
 
-  @throws[IllegalStateException]("if an output name is going to be unset, but there are outputs")
-  @throws[IllegalArgumentException]("if any of the existing outputs doesn't read from the new name")
-  def output_=(newOutput: Option[String]) = _outputs match {
-    case Nil => _output = newOutput
-    case list => {
-      newOutput match {
-        case Some(name) => {
-          list.foreach(op => {
-            if (!op.initialInPipeNames.contains(name)) {
-              throw new IllegalArgumentException(op + " does not read from " + newOutput)
-            }
-          })
-          _output = newOutput
-        }
-        case None => {
-          throw new IllegalStateException("Can't unset the relation name of an operator with outputs")
-        }
-      }
-    }
-  }
-
-
-  // If the operator writes a relation, this is a list of all operators the read that one.
-  private var _outputs: List[PigOperator] = List[PigOperator]()
+  /**
+   * Getter method for the output pipes.
+   *
+   * @return the list of output pipes
+   */
   def outputs = _outputs
 
-  @throws[IllegalStateException]("if the operator doesn't return a relation")
-  @throws[IllegalArgumentException]("if newOps is not empty and any of the new operators doesn't read from this " +
-    "operator")
-  def outputs_=(newOps: List[PigOperator]) = newOps match {
-    case Nil => _outputs = newOps
-    case _ => {
-      if (output.isEmpty) {
-        throw new IllegalStateException("Can't set the outputs of an operator that doesn't return a relation")
-      }
-      newOps.foreach(op => {
-        if (!op.initialInPipeNames.contains(output.get)) {
-          throw new IllegalArgumentException(op + " does not read from " + output.get)
-        }
-      })
-      _outputs = newOps
-    }
+  /**
+   * Setter method for the output pipes. It ensures
+   * that this is producer of all pipes.
+   *
+   * @param o the new list of output pipes
+   */
+  def outputs_=(o: List[Pipe]) = {
+    _outputs = o
+    // make sure that we are producer in all pipes
+    _outputs.foreach(p => p.producer = this)
   }
 
-  def this(out: String, in: List[String]) = this(out, in, None)
+  /**
+   * Getter method for the input pipes.
+   *
+   * @return the list of input pipes
+   */
+  def inputs = _inputs
 
-  def this(out: String) = this(out, List(), None)
-
-  def this(out: String, in: String) = this(out, List(in), None)
-
-  def outPipeName: String = _output match {
-    case Some(name) => name
-    case None => ""
+  /**
+   * Setter method for the input pipes. It ensures
+   * that this is a consumer in all pipes.
+   *
+   * @param i the new list of input pipes
+   */
+  def inputs_=(i: List[Pipe]) = {
+    _inputs = i
+    // make sure that we are consumer in all pipes
+    _inputs.foreach(p => if (!p.consumer.contains(this)) p.consumer = p.consumer :+ this)
   }
 
-  def initialOutPipeNames: List[String] = List(initialOutPipeName)
+  def outPipeName: String = if (outputs.nonEmpty) outputs.head.name else ""
 
-  def inPipeName: String = if (inPipeNames.isEmpty) "" else inPipeNames.head
-  def inPipeNames: List[String] = if (inputs.isEmpty) initialInPipeNames else inputs.map(p => p.name)
-
-  def inputSchema =   if (inputs.nonEmpty) inputs.head.producer.schema else None
+  def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 
   def preparePlan: Unit = {}
 
@@ -168,7 +139,25 @@ Option[Schema]) extends Rewritable {
   def lineageString: String = {
     inputs.map(p => p.producer.lineageString).mkString("%")
   }
+
+  /**
+   * Returns the arity, i.e. the number of input pipes of
+   * this operator.
+   *
+   * @return the arity of the operator
+   */
   def arity = this.inputs.length
+
+  /**
+   * Check whether the input and output pipes are still consistent, i.e.
+   * for all output pipes the producer is the current operator and the current
+   * operator is also a consumer in each input pipe.
+   *
+   * @return true if the operator pipes are consistent
+   */
+  def checkConsistency: Boolean = {
+    outputs.forall(p => p.producer == this) && inputs.forall(p => p.consumer.contains(this))
+  }
 
   def deconstruct = this.inputs
 
@@ -176,7 +165,7 @@ Option[Schema]) extends Rewritable {
     case inputs: Seq[_] => {
       this match {
         case obj: PigOperator => {
-          obj.inputs = inputs.toList.asInstanceOf[List[Pipe]]
+          obj._inputs = inputs.toList.asInstanceOf[List[Pipe]]
           obj
         }
       }

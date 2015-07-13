@@ -23,8 +23,10 @@ package dbis.pig.op
  * @param initialInPipeName the name of the input pipe.
  * @param num
  */
-case class Limit(override val initialOutPipeName: String, initialInPipeName: String, num: Int)
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Limit(out: Pipe, in: Pipe, num: Int) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
+
   override def lineageString: String = {
     s"""LIMIT%${num}%""" + super.lineageString
   }

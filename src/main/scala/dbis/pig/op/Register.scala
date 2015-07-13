@@ -24,5 +24,5 @@ package dbis.pig.op
  *
  * @param jarFile the URI of the Jar file to be registered
  */
-case class Register(jarFile: String) extends PigOperator("")
+case class Register(jarFile: String) extends PigOperator
 

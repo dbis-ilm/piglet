@@ -23,8 +23,10 @@ package dbis.pig.op
  * @param initialInPipeName
  * @param ref a reference des
  */
-case class Tuplify(override val initialOutPipeName: String, initialInPipeName: String, ref: Ref)
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Tuplify(out: Pipe, in: Pipe, ref: Ref) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
+
   override def lineageString: String = s"""TUPLIFY%""" + super.lineageString
 
   // TODO

@@ -27,9 +27,10 @@ package dbis.pig.op
   * @param slide the windows slider frequency (every)
   * @param slideUnit the windows slider time unit
   */
-case class Window(override val initialOutPipeName: String, initialInPipeName: String, 
-                  window: Tuple2[Int,String], slide: Tuple2[Int,String]) 
-                  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Window(out: Pipe, in: Pipe, window: Tuple2[Int,String], 
+                  slide: Tuple2[Int,String]) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
 
   /** 
     * Returns the lineage string describing the sub-plan producing the input for this operator.

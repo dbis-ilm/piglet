@@ -22,13 +22,20 @@ case class SocketAddress(protocol: String, hostname: String, port: String)
 /**
  * Load represents the LOAD operator of Pig.
  *
- * @param initialOutPipeName the name of the initial output pipe (relation).
+ * @param out the name of the initial output pipe (relation).
  * @param addr the address of the socket to read from
  * @param mode empty for standard socket or currently also possible "zmq"
- * @param loadSchema
+ * @param streamSchema schema definition 
+ * @param streamFunc name of the stream function used for data preprocessing
+ * @param streamParams parameters for streamFunc
  */
-case class SocketRead(override val initialOutPipeName: String, addr: SocketAddress, 
-                mode: String, var streamSchema: Option[Schema] = None, streamFunc: String = "", streamParams: List[String] = null) extends PigOperator(initialOutPipeName, List(), streamSchema) {
+case class SocketRead(out: Pipe, addr: SocketAddress, mode: String, 
+                      var streamSchema: Option[Schema] = None, 
+                      streamFunc: String = "", streamParams: List[String] = null) extends PigOperator{
+  _outputs = List(out)
+  _inputs = List()
+  schema = streamSchema
+
   override def constructSchema: Option[Schema] = {
     /*
      * Either the schema was defined or it is None.
