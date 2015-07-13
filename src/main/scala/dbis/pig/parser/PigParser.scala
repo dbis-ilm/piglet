@@ -207,6 +207,7 @@ class PigParser extends JavaTokenParsers {
   lazy val slideKeyword = "slide".ignoreCase
   lazy val splitKeyword = "split".ignoreCase
   lazy val ifKeyword = "if".ignoreCase
+  lazy val materializeKeyword = "materialize".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
