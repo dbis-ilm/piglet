@@ -89,8 +89,8 @@ object PigREPL extends PigParser {
         |Diagnostic commands:
         |    describe <alias> - Show the schema for the alias.
         |    dump <alias> - Compute the alias and writes the results to stdout.
-        |    prettyprint - Prints the dataflowplans operator list
-        |    rewrite - Rewrites the current DataflowPlan
+        |    prettyprint - Prints the dataflow plans operator list.
+        |    rewrite - Rewrites the current dataflow plan.
         |Utility Commands:
         |    help - Display this message.
         |    quit - Quit the Pig shell.

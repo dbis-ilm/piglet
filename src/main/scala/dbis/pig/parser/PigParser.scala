@@ -208,6 +208,7 @@ class PigParser extends JavaTokenParsers {
   lazy val splitKeyword = "split".ignoreCase
   lazy val ifKeyword = "if".ignoreCase
   lazy val materializeKeyword = "materialize".ignoreCase
+  lazy val rscriptKeyword = "rscript".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
@@ -488,13 +489,17 @@ class PigParser extends JavaTokenParsers {
   }
 
   def materializeStmt: Parser[PigOperator] = materializeKeyword ~ bag ^^ { case _ ~ b => Materialize(Pipe(b))}
-  
+
+  def rscriptStmt: Parser[PigOperator] = bag ~ "=" ~ rscriptKeyword ~ bag ~ usingKeyword ~ pigStringLiteral ~ (loadSchemaClause?) ^^{
+    case out ~ _ ~ _ ~ in ~ _ ~ script ~ schema => new RScript(Pipe(out), Pipe(in), script, schema)
+  }
+
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | socketReadStmt | socketWriteStmt | windowStmt | materializeStmt) ~ ";" ^^ {
+    splitStmt | socketReadStmt | socketWriteStmt | windowStmt | materializeStmt | rscriptStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*
