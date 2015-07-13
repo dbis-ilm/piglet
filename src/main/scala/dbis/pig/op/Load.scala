@@ -29,7 +29,7 @@ import dbis.pig.schema.Schema
  */
 case class Load(out: Pipe, file: String,
                 var loadSchema: Option[Schema] = None,
-                loaderFunc: String = "", loaderParams: List[String] = null) extends PigOperator {
+                loaderFunc: String = "PigStorage", loaderParams: List[String] = null) extends PigOperator {
   _outputs = List(out)
   _inputs = List()
   schema = loadSchema

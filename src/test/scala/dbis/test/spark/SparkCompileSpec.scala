@@ -56,7 +56,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
-    val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}", '\\t')""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -109,7 +109,8 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
-    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
+//    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
+    val expectedCode = cleanString(s"""val A_storehelper = A.map(t => tupleAToString(t)).coalesce(1, true) PigStorage().write("$file", A_storehelper)""")
     assert(generatedCode == expectedCode)
   }
 
