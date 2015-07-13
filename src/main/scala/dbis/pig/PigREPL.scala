@@ -37,10 +37,16 @@ case object EOF extends JLineEvent
 object PigREPL extends PigParser {
   val consoleReader = new ConsoleReader()
 
-  def unbalancedBrackets(s: String): Boolean = {
+  private def unbalancedBrackets(s: String): Boolean = {
     val leftBrackets = s.count(_ == '{')
     val rightBrackets = s.count(_ == '}')
     leftBrackets != rightBrackets
+  }
+
+  private def isCommand(s: String): Boolean = {
+    val cmdList = List("help", "describe", "dump", "prettyprint", "rewrite", "quit")
+    val line = s.toLowerCase
+    cmdList.exists(cmd => line.startsWith(cmd))
   }
 
   def console(handler: JLineEvent => Boolean) {
@@ -64,7 +70,7 @@ object PigREPL extends PigParser {
         // if the line doesn't end with a semicolon or the current
         // buffer contains a unbalanced number of brackets
         // then we change the prompt and do not execute the command.
-        if (! line.trim.endsWith(";") || unbalancedBrackets(lineBuffer)) {
+        if (!isCommand(line) && (! line.trim.endsWith(";") || unbalancedBrackets(lineBuffer))) {
           prompt = "    | "
         }
         else {
