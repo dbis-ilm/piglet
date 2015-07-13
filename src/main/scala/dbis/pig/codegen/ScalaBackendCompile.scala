@@ -389,6 +389,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
           // TODO: this should be processed recursively
         case BagType(n, t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
         case TupleType(n, f) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
+        case MapType(t, n) => s""".append(t(${i}).asInstanceOf[Map[String,Any]].map{case (k,v) => k + "#" + v}.mkString("[", ",", "]"))"""
         case _ => s".append(t($i))"
       }}.mkString("\n.append(\",\")\n")
       case None => s".append(t(0))\n"
