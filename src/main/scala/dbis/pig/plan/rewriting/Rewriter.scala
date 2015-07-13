@@ -257,6 +257,27 @@ object Rewriter {
     processPlan(plan, buildBinaryPigOperatorStrategy(strategy))
   }
 
+  /** Swap the positions of `op1` and `op2` in `plan`
+    *
+    * @param plan
+    * @param op1 The parent and new child operator.
+    * @param op2 The child and new parent operator.
+    * @return
+    */
+  def swap(plan: DataflowPlan, op1: PigOperator, op2: PigOperator): DataflowPlan = {
+    val strategy = (parent: PigOperator, child: PigOperator) => {
+      if (parent == op1 && child == op2) {
+        val np = fixInputsAndOutputs(parent, child, child, parent)
+        Some(np)
+      }
+      else {
+        None
+      }
+    }
+
+    processPlan(plan, buildBinaryPigOperatorStrategy(strategy))
+  }
+
   /** Add a strategy that applies a function to two operators.
     *
     * @param f The function to apply.
@@ -331,11 +352,17 @@ object Rewriter {
     */
   private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                        newChild: T): T2 = {
+    // If oldparent == newChild (for example when this is called from `swap`, we need to save oldParent.outPipename
+    // because it depends on oldParent.outputs
+    val oldparent_outpipename = oldParent.outPipeName
+
+    // See above, of oldParent == newChild, we need to use oldParent.inputs while we can
+    newParent.inputs = oldParent.inputs
+
     newChild.inputs = List(Pipe(newParent.outPipeName, newParent, List(newChild)))
     newChild.outputs = oldChild.outputs
 
-    newParent.inputs = oldParent.inputs
-    newParent.outputs = List(Pipe(newParent.outPipeName, newParent, List(newChild)))
+    newParent.outputs = List(Pipe(oldparent_outpipename, newParent, List(newChild)))
 
     // Each Operator that has oldChild in its inputs list as a producer needs to have it replaced with newChild
     oldChild.outputs foreach { output =>

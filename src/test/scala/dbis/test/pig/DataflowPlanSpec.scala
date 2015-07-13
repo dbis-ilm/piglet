@@ -333,8 +333,22 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "be consistent after exchanging two operators" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+    val spec1 = OrderBySpec(PositionalField(1), OrderByDirection.AscendingOrder)
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List(spec1))
+    val spec2 = OrderBySpec(NamedField("a"), OrderByDirection.DescendingOrder)
+    val op3 = OrderBy(Pipe("c"), Pipe("b"), List(spec2))
+    val op4 = Dump(Pipe("c"))
 
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val newPlan = plan.swap(op2, op3)
+
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should contain only(op3)
+    val sinkInput = newPlan.sinkNodes.headOption.value.inputs.headOption.value
+    sinkInput.name shouldBe "c"
+    sinkInput.producer shouldBe op2
   }
+
   it should "be consistent after removing an operator" in {
     val op1 = Load(Pipe("a"), "file.csv")
     val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))

@@ -191,15 +191,15 @@ class DataflowPlan(var operators: List[PigOperator]) {
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
 
   /**
-   * Swaps the two operators in the dataflow plan. Both operators are unary operators and have to be already
+   * Swaps two successive operators in the dataflow plan. Both operators are unary operators and have to be already
    * part of the plan.
    *
-   * @param n1 the first operator
-   * @param n2 the second operator
+   * @param n1 the parent operator
+   * @param n2 the child operator
    * @return the resulting dataflow plan
    */
   def swap(n1: PigOperator, n2: PigOperator) : DataflowPlan = {
-    this
+    Rewriter.swap(this, n1, n2)
   }
 
   /**
@@ -228,7 +228,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @param repl the new operator
    * @return the resulting dataflow plan
    */
-  def replace(old: PigOperator, repl: PigOperator) : DataflowPlan =  {
+  def replace(old: PigOperator, repl: PigOperator): DataflowPlan =  {
     Rewriter.replace(this, old, repl)
   }
 
