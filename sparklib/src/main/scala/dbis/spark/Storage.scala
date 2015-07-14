@@ -19,6 +19,7 @@ package dbis.spark
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
+import org.apache.spark.sql._
 import java.io.FileInputStream
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
@@ -26,25 +27,10 @@ import java.io.FileOutputStream
 
 
 class PigStorage extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, delim: Char = '\t'): RDD[List[String]] = {
+  def load(sc: SparkContext, path: String, delim: Char = '\t'): RDD[List[String]] =
     sc.textFile(path).map(line => line.split(delim).toList)
-  }
 
-  def write(path: String, rdd: RDD[String]) {
-    rdd.saveAsTextFile(path)
-  }
-  
-  /*
-  def load(sc: SparkContext, path: String, schema: Schema, delim: String = " "): RDD[List[Any]] = {
-    val pattern = "[^,(){}]+".r
-    val fields = schema.element.valueType.fields
-    sc.textFile(path).map(line => {
-      val strings = pattern.findAllIn(line).toList
-      for (f <- fields) {
-      }
-    })
-  }
-  */
+  def write(path: String, rdd: RDD[String]) = rdd.saveAsTextFile(path)
 }
 
 object PigStorage {
@@ -53,17 +39,17 @@ object PigStorage {
   }
 }
 
+//-----------------------------------------------------------------------------------------------------
+
 class RDFFileStorage extends java.io.Serializable {
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
-  def rdfize(line: String): Array[String] = {
+  def rdfize(line: String): List[String] = {
     val fields = pattern.findAllIn(line).map(_.trim)
-    fields.toArray.slice(0, 3)
+    fields.toArray.slice(0, 3).toList
   }
 
-  def load(sc: SparkContext, path: String): RDD[Array[String]] = {
-    sc.textFile(path).map(line => rdfize(line))
-  }
+  def load(sc: SparkContext, path: String): RDD[List[String]] = sc.textFile(path).map(line => rdfize(line))
 }
 
 object RDFFileStorage {
@@ -72,23 +58,29 @@ object RDFFileStorage {
   }
 }
 
+//-----------------------------------------------------------------------------------------------------
 
 class BinStorage extends java.io.Serializable {
   
-  def load(sc: SparkContext, path: String): RDD[List[Any]] = {
-    
-    val rdd = sc.objectFile[List[Any]](path)
-    
-    return rdd
-  }
-  
-  def write(path: String, rdd: RDD[_]) = {
-    
-    rdd.saveAsObjectFile(path);
-  }
-  
+  def load(sc: SparkContext, path: String): RDD[List[Any]] = sc.objectFile[List[Any]](path)
+
+  def write(path: String, rdd: RDD[_]) = rdd.saveAsObjectFile(path)
 }
 
 object BinStorage {
   def apply(): BinStorage = new BinStorage
+}
+
+//-----------------------------------------------------------------------------------------------------
+
+class JsonStorage extends java.io.Serializable {
+  def load(sc: SparkContext, path: String): RDD[List[Any]] = {
+    val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+    // TODO: convert a DataFrame to a RDD with generic components
+    sqlContext.read.json(path).rdd.map(_.toSeq.toList)
+  }
+}
+
+object JsonStorage {
+  def apply(): JsonStorage = new JsonStorage
 }
