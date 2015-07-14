@@ -21,7 +21,7 @@ import dbis.pig.schema.Schema
 /**
  * Created by kai on 13.07.15.
  */
-class RScript(out: Pipe, in: Pipe, script: String, var loadSchema: Option[Schema] = None) extends PigOperator {
+case class RScript(out: Pipe, in: Pipe, script: String, var loadSchema: Option[Schema] = None) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
   schema = loadSchema

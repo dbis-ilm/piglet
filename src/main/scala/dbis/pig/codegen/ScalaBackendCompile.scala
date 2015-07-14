@@ -536,6 +536,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out.name,"in"->in.name,
         "key"->emitSortKey(node.schema, orderSpec, out.name, in.name),"asc"->ascendingSortOrder(orderSpec.head)))
       case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out.name,"op"->op,"in"->in.name,"params"->emitParamList(node.schema, params)))
+      case RScript(out, in, script, schema) => callST("rscript", Map("out"->out.name,"in"->in.name,"script"->script))
       case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(out.name, address, mode, func, params)
       case SocketWrite(in, address, mode) => {
         if(mode!="")

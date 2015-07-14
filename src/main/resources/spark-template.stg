@@ -107,6 +107,11 @@ streamOp(out,in,op,params) ::=<<
         val <out> = <op>(<in><params>)
 >>
 
+// ------------------ RSCRIPT operators ----------------------------------------
+rscript(out,in,script) ::=<<
+        val <out> = RScriptOp.process(<script>)
+>>
+
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
     
