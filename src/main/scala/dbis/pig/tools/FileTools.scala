@@ -94,8 +94,8 @@ object FileTools {
 
     // 8. copy the sparklib library to output
     backend match {
-      case "flink" => FileTools.extractJarToDir("flinklib/target/scala-2.11/flinklib_2.11-1.0.jar", outputDirectory)
-      case "spark" => FileTools.extractJarToDir("sparklib/target/scala-2.11/sparklib_2.11-1.0.jar", outputDirectory)
+      case "flink" => FileTools.extractJarToDir(Conf.flinkBackendJar, outputDirectory)
+      case "spark" => FileTools.extractJarToDir(Conf.sparkBackendJar, outputDirectory)
     }
 
     // 9. build a jar file
