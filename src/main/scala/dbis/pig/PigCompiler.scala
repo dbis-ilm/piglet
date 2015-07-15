@@ -101,7 +101,7 @@ object PigCompiler extends PigParser {
     }
 
     val scriptName = fileName.replace(".pig", "")
-    if (plan.checkConnectivity) {
+    if (!plan.checkConnectivity) {
       println(s"dataflow plan not connected")
       return
     }
