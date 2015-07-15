@@ -458,13 +458,21 @@ class PigParser extends JavaTokenParsers {
    */
   lazy val tuplifyKeyword = "tuplify".ignoreCase
   lazy val onKeyword = "on".ignoreCase
+  lazy val bgpFilterKeyword = "bgp_filter".ignoreCase
 
   def tuplifyStmt: Parser[PigOperator] = bag ~ "=" ~ tuplifyKeyword ~ bag ~ onKeyword ~ ref ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ r => new Tuplify(Pipe(out), Pipe(in), r) }
 
+  def bgPattern: Parser[TriplePattern] = ref ~ ref ~ ref ^^ { case r1 ~ r2 ~ r3 => TriplePattern(r1, r2, r3)}
+
+  def bgpFilterStmt: Parser[PigOperator] = bag ~ "=" ~ bgpFilterKeyword ~ bag ~
+    byKeyword ~ "{" ~ repsep(bgPattern, ".") ~ "}" ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ _ ~ pattern ~ _ => new BGPFilter(Pipe(out), Pipe(in), pattern)
+  }
+
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt) ~ ";" ^^ {
+    splitStmt | tuplifyStmt | bgpFilterStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
 
