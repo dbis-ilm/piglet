@@ -20,6 +20,7 @@ import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
 import dbis.pig.schema._
+import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
 import dbis.pig.plan.PrettyPrinter
 
@@ -335,69 +336,33 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "be consistent after exchanging two operators" in {
-    val plan = new DataflowPlan(parseScript("""
-         |a = load 'file.csv';
-         |b = filter a by $0 > 0;
-         |c = distinct b;
-         |dump c;
-         |""".stripMargin))
-    
-    val ops = plan.findOperator(o => o.outPipeName == "b")
-    withClue("did not find operator a") {ops.size should be (1)}
-    
-    val b = ops.head
-    val newB = Distinct(Pipe("a"),Pipe("b"))
-    
-    println(PrettyPrinter.pretty(plan.sinkNodes.head))
-    
-    plan.replace(b, newB)
-    
-    println("....")
-    
-    println(PrettyPrinter.pretty(plan.sinkNodes.head))
-    
-    plan.operators should contain (newB)
-    plan.operators should not contain (b)
-    
-    withClue("old inputs: ") {b.inputs shouldBe empty}
-    withClue("old ouputs: ") {b.outputs shouldBe empty}
-    // the following two would need to reassign a val --> make it a var?
-    
-    
-    val fs = plan.findOperator(_ == newB)
-    withClue("did not find operator c") {fs.size shouldBe 1}
-    
-    val f = fs.head
-    withClue("unexpected number of inputs") {f.inputs.size shouldBe 1}
-    f should be (newB)
-    withClue("only input should be a") {f.inputs.head.name shouldBe "a"}
-    
-    val a = plan.findOperatorForAlias("a").get
-    val c = plan.findOperatorForAlias("c").get
-    
-    withClue("new op's outputs") {newB.outputs.map(_.consumer).flatten should contain only c}
-    withClue("new op's inputs") {newB.inputs.map(_.producer) should contain only a}
-    
-    withClue("new op's succeccssor's input") {c.inputs should contain only Pipe(newB.outputs.head.name, newB)}
-  }
-  it should "be consistent after removing an operator" in {
-    val plan = new DataflowPlan(parseScript("""
-         |a = load 'file.csv';
-         |b = filter a by $0 > 0;
-         |c = distinct b;
-         |""".stripMargin))
-    
-    val b = plan.findOperatorForAlias("b").get
-    
-    plan.remove(b)
-    
-    withClue("operators: ") {plan.operators should not contain b}
+    val op1 = Load(Pipe("a"), "file.csv")
+    val spec1 = OrderBySpec(PositionalField(1), OrderByDirection.AscendingOrder)
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List(spec1))
+    val spec2 = OrderBySpec(NamedField("a"), OrderByDirection.DescendingOrder)
+    val op3 = OrderBy(Pipe("c"), Pipe("b"), List(spec2))
+    val op4 = Dump(Pipe("c"))
 
-    val a = plan.findOperatorForAlias("a").get
-    withClue("a outputs: ") {a.outputs should not contain b}
-    
-    val c = plan.findOperatorForAlias("c").get
-    withClue("c inputs: ") {c.inputs.map(_.producer) should not contain b}
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val newPlan = plan.swap(op2, op3)
+
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should contain only(op3)
+    val sinkInput = newPlan.sinkNodes.headOption.value.inputs.headOption.value
+    sinkInput.name shouldBe "c"
+    sinkInput.producer shouldBe op2
+  }
+
+  it should "be consistent after removing an operator" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+    val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = Filter(Pipe("b"), Pipe("a"), predicate)
+    val op3 = Dump(Pipe("b"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3))
+    val newPlan = plan.remove(op2)
+
+    newPlan.sinkNodes.headOption.value.inputs should contain only(Pipe("b", op1))
+    newPlan.sourceNodes.headOption.value.outputs should not contain op2
   }
 
   /*
@@ -429,6 +394,20 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     op5.inputs should contain only (Pipe("c", op4))
     op5.outputs shouldBe empty
   }
+
+  it should "be consistent after replacing an operator" in {
+    val op1 = Load("a", "file.csv")
+    val op2 = Load("a", "file2.csv")
+
+    val op3 = Dump("a")
+
+    val plan = new DataflowPlan(List(op1, op3))
+    val newPlan = plan.replace(op1, op2)
+    newPlan.sinkNodes.headOption.value.inputs should contain only(Pipe("a", op2))
+    newPlan.sourceNodes.headOption.value should equal(op2)
+    newPlan.sourceNodes.headOption.value.outputs should contain only(op3)
+  }
+
 */
   it should "construct pipes for SPLIT INTO" in {
     val plan = new DataflowPlan(parseScript(s"""
@@ -436,6 +415,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
       |SPLIT a INTO b IF x < 100, c IF x >= 100;
       |STORE b INTO 'res1.data';
       |STORE c INTO 'res2.data';""".stripMargin))
+    plan.findOperatorForAlias("b") should not be empty
+    plan.sourceNodes.headOption.value.outputs.headOption.value.consumer.headOption.value.outputs should have length 2
     assert(plan.checkConnectivity)
   }
 }
