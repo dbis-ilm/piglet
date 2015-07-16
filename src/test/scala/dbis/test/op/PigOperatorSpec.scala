@@ -16,10 +16,11 @@
  */
 package dbis.test.op
 
-import dbis.pig.op.{PigOperator, Foreach, Limit, Store, Pipe}
-import dbis.pig.schema._
 import dbis.pig.PigCompiler._
+import dbis.pig.op.Foreach
 import dbis.pig.plan._
+import dbis.pig.schema._
+import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
 
 class PigOperatorSpec extends FlatSpec with Matchers {
@@ -102,5 +103,16 @@ class PigOperatorSpec extends FlatSpec with Matchers {
     foreachOp.containsFlatten(true) should be (true)
 
 
+  }
+
+  "Arity" should "be the number of consumers for all outputs" in {
+    val plan = new DataflowPlan(parseScript( s"""
+                                                |a = LOAD 'file' AS (x, y);
+                                                |SPLIT a INTO b IF x < 100, c IF x >= 100;
+                                                |STORE b INTO 'res1.data';
+                                                |STORE c INTO 'res2.data';
+                                                |d = FILTER b by x < 50;""".stripMargin))
+    val splitOp = plan.findOperatorForAlias("b")
+    splitOp.value.arity shouldBe 3
   }
 }

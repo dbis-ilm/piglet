@@ -161,7 +161,11 @@ trait PigOperator extends Rewritable {
    *
    * @return the arity of the operator
    */
-  def arity = this.outputs.length
+  def arity = {
+    var numConsumers = 0
+    this.outputs.foreach(p => numConsumers += p.consumer.length)
+    numConsumers
+  }
 
   def deconstruct = this.outputs.map(_.consumer)
 
