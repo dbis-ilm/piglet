@@ -372,6 +372,8 @@ object Rewriter {
         case _ =>
       }
     }
+
+    var newPlan = plan
     
     /* we should check here if the op is still connected to a sink
      * the ops will all still be in the plan, but they might be disconnected
@@ -395,12 +397,12 @@ object Rewriter {
           plan.disconnect(inPipe.producer, matInput)
         }
         
-        plan.replace(matInput, loader)
+        newPlan = plan.replace(matInput, loader)
         /* TODO: do we need to remove all other nodes that get disconnected now by hand
          * or do they get removed during code generation (because there is no sink?)
          */
         
-        plan.remove(materialize)
+        newPlan.remove(materialize)
         
       } else {
         /* there is a MATERIALIZE operator, for which no results could be found
@@ -411,12 +413,12 @@ object Rewriter {
         val file = mm.saveMapping(materialize.lineageSignature)
         val storer = new Store(materialize.inputs.head, file, "BinStorage")
         
-        plan.insertAfter(materialize.inputs(0).producer, storer)
-        plan.remove(materialize)
+        newPlan = plan.insertAfter(materialize.inputs(0).producer, storer)
+        newPlan = newPlan.remove(materialize)
       }
     }
     
-    plan
+    newPlan
   }
   
   merge[Filter, Filter](mergeFilters)
