@@ -238,26 +238,6 @@ object Rewriter {
     processPlan(plan, strategyf(t => strategy(t)))
   }
 
-  /** Remove `rem` from `plan`
-    *
-    * @param plan
-    * @param rem
-    * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
-    val strategy = (parent: PigOperator, child: PigOperator) => {
-      if (child == rem) {
-        parent.outputs = parent.outputs.filter(_.consumer != child)
-        Some(fixInputsAndOutputs(parent, child, parent))
-      }
-      else {
-        None
-      }
-    }
-    processPlan(plan, buildBinaryPigOperatorStrategy(strategy))
-  }
-
   /** Swap the positions of `op1` and `op2` in `plan`
     *
     * @param plan

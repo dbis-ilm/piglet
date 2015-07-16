@@ -233,7 +233,30 @@ class DataflowPlan(var operators: List[PigOperator]) {
   def remove(op: PigOperator) : DataflowPlan = {
     require(operators.contains(op), "operator to remove is not member of the plan")
     require(op.inputs.size == 1, "Currently, only one input operator is allowed")
-    Rewriter.remove(this, op)
+
+    require(operators.contains(op), "operator to remove is not member of the plan")
+    require(op.inputs.size == 1, "Currently, only one input operator is allowed")
+
+
+    val preds = op.inputs
+    for(pred <- preds) {
+      pred.producer.outputs = pred.producer.outputs.filter { pipe => pipe.consumer != op }
+    }
+
+    val succs = op.outputs
+    for(succ <- succs) {
+      //      succ.consumer.inputs = succ.consumer.inputs.filter { pipe => pipe.producer != op }
+      for(consumer <- succ.consumer) {
+        consumer.inputs = consumer.inputs.filter { pipe => pipe.producer != op }
+      }
+    }
+
+    op.inputs = List.empty
+    op.outputs = List.empty
+
+    operators = operators.filter(_ != op)
+
+    this
   }
 
   /**
