@@ -45,6 +45,12 @@ object ScalaCompiler {
     settings.unchecked.value = true // enable detailed unchecked warnings
     settings.usejavacp.value = true
 */
+    
+    settings.classpath.value = targetDir
+    
+    println(s"classpath: ${settings.classpath.value}")
+    println(s"boot cp: ${settings.bootclasspath}")
+    
     settings.outputDirs.setSingleOutput(target)
     settings.embeddedDefaults[Probe]
     val reporter = new ConsoleReporter(settings)

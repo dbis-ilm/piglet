@@ -83,6 +83,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
     /*
      * 2. We add operators that *read* from a pipe to this pipe
      */
+    // TODO: replace by PigOperator.addConsumer
     planOps.foreach(op => {
         for (p <- op.inputs) {
           val element = pipes(p.name)
@@ -102,13 +103,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
       planOps.foreach(op => {
         val newPipes = op.inputs.map(p => pipes(p.name))
         op.inputs = newPipes
-        // TODO!!!!!
-        /*
-        op.inputs = op.initialInPipeNames.map(p => Pipe(p, pipes(p)._1))
-        op.output = if (op.initialOutPipeName != "") Some(op.initialOutPipeName) else None
-        op.outputs = if (op.initialOutPipeName != "") pipes(op.initialOutPipeName)._2 else op.outputs
-        */
-        // println("op: " + op)
         op.preparePlan
         op.constructSchema
       })
@@ -140,7 +134,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return true if the plan is connected, false otherwise
    */
   def checkConnectivity: Boolean = {
-    // TODO: check connectivity of subplans in nested foreach
     // we simply construct a graph and check its connectivity
     /*
     var graph = Graph[PigOperator,DiEdge]()
@@ -152,8 +145,29 @@ class DataflowPlan(var operators: List[PigOperator]) {
      * (1) all input pipes have a producer
      * (2) all output pipes have a non-empty consumer list
      */
+    // println("DataflowPlan.checkConnectivity")
+    var result: Boolean = true
+    operators.foreach { op => {
+      // println("check operator: " + op)
+      if (!op.inputs.forall(p => p.producer != null)) {
+        println("op: " + op + " : invalid input pipes")
+        result = false
+      }
+      if (!op.outputs.forall(p => p.consumer.nonEmpty)) {
+        println("op: " + op + " : invalid output pipes")
+        result = false
+      }
+      if (!op.checkConnectivity) {
+        println("op: " + op + " : not connected")
+        result = false
+      }
+    }
+    }
+    result
+    /*
     operators.forall(op =>
-      op.inputs.forall(p => p.producer != null) && op.outputs.forall(p => p.consumer.nonEmpty))
+      op.inputs.forall(p => p.producer != null) && op.outputs.forall(p => p.consumer.nonEmpty) && op.checkConnectivity)
+      */
   }
 
   def checkConsistency: Boolean = operators.forall(_.checkConsistency)
