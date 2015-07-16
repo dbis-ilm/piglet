@@ -228,8 +228,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @param repl the new operator
    * @return the resulting dataflow plan
    */
-  def replace(old: PigOperator, repl: PigOperator): DataflowPlan =  {
-    Rewriter.replace(this, old, repl)
-  }
+  def replace(old: PigOperator, repl: PigOperator): DataflowPlan = Rewriter.replace(this, old, repl)
 
 }
