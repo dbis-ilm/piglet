@@ -320,6 +320,68 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     val plan = new DataflowPlan(ops)
   }
 
+  it should "check connectivity of a plan with a nested FOREACH" in {
+    val ops = parseScript(
+      """daily = load 'data.csv' as (exchange, symbol);
+        |grpd  = group daily by exchange;
+        |uniqcnt  = foreach grpd {
+        |           sym      = daily.symbol;
+        |           uniq_sym = distinct sym;
+        |           generate group, COUNT(uniq_sym);
+        |};
+        |dump uniqcnt;""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    plan.checkConnectivity should be (true)
+  }
+
+  it should "check detect an invalid plan with a nested FOREACH" in {
+    val ops = parseScript(
+      """daily = load 'data.csv' as (exchange, symbol);
+        |grpd  = group daily by exchange;
+        |uniqcnt  = foreach grpd {
+        |           sym      = daily2.symbol;
+        |           uniq_sym = distinct sym;
+        |           generate group, COUNT(uniq_sym);
+        |};""".stripMargin)
+    an [SchemaException] should be thrownBy new DataflowPlan(ops)
+  }
+
+  it should "check detect another invalid plan with a nested FOREACH" in {
+    val ops = parseScript(
+      """daily = load 'data.csv' as (exchange, symbol);
+        |grpd  = group daily by exchange;
+        |uniqcnt  = foreach grpd {
+        |           sym      = daily.symbol;
+        |           uniq_sym = distinct sym2;
+        |           generate group, COUNT(uniq_sym2);
+        |};""".stripMargin)
+    an [InvalidPlanException] should be thrownBy new DataflowPlan(ops)
+  }
+
+  it should "check detect a third invalid plan with a nested FOREACH" in {
+    val ops = parseScript(
+      """daily = load 'data.csv' as (exchange, symbol);
+        |grpd  = group daily by exchange;
+        |uniqcnt  = foreach grpd {
+        |           sym      = daily.symbol;
+        |           uniq_sym = distinct sym;
+        |           generate group, COUNT(uniq_sym2);
+        |};""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    an [SchemaException] should be thrownBy plan.checkSchemaConformance
+  }
+
+  it should "check detect a fourth invalid plan with a nested FOREACH" in {
+    val ops = parseScript(
+      """daily = load 'data.csv' as (exchange, symbol);
+        |grpd  = group daily by exchange;
+        |uniqcnt  = foreach grpd {
+        |           sym      = daily.symbol;
+        |           uniq_sym = distinct sym;
+        |};""".stripMargin)
+    an [InvalidPlanException] should be thrownBy new DataflowPlan(ops)
+  }
+
   it should "be consistent after adding a new operator using insertAfter" in {
     val plan = new DataflowPlan(parseScript("""
          |a = load 'file.csv';

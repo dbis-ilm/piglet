@@ -80,6 +80,19 @@ trait PigOperator extends Rewritable {
   def checkConnectivity: Boolean = true
 
   /**
+   * Add an operator as a consumer to the output pipe with the given name.
+   *
+   * @param name the name of the output pipe
+   * @param op the operator instance
+   */
+  def addConsumer(name: String, op: PigOperator): Unit = {
+    _outputs.find(_.name == name) match {
+      case Some(p) => if (! p.consumer.contains(op)) p.consumer = p.consumer :+ op
+      case None => {}
+    }
+  }
+
+  /**
    * Constructs the output schema of this operator based on the input + the semantics of the operator.
    * The default implementation is to simply take over the schema of the input operator.
    *
