@@ -72,6 +72,24 @@ case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator) extends Pig
     }
   }
 
+  override def checkConnectivity: Boolean = {
+    def checkSubOperatorConnectivity(op: PigOperator): Boolean = op match {
+      case Generate(exprs) => true // check all exprs
+      case ConstructBag(out, ref) => true // check ref
+      case _ => true
+    }
+
+    generator match {
+      case GeneratorList(expr) => true
+      case GeneratorPlan(plan) => {
+        plan.forall(op => op.inputs.forall(p => p.producer != null) &&
+                          op.outputs.forall(p => p.consumer.nonEmpty) &&
+                          checkSubOperatorConnectivity(op)
+        )
+      }
+    }
+  }
+
   def constructFieldList(exprs: List[GeneratorExpr]): Array[Field] =
     exprs.map(e => {
       e.alias match {

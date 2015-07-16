@@ -453,7 +453,19 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "accept TUPLIFY in SparqlPig" in {
-    parseScript("a = TUPLIFY b ON $0;", LanguageFeature.SparqlPig)
+    assert(parseScript("a = TUPLIFY b ON $0;", LanguageFeature.SparqlPig) ==
+      List(Tuplify(Pipe("a"), Pipe("b"), PositionalField(0))))
   }
 
+  it should "parse BGP_FILTER in SparqlPig" in {
+    assert(parseScript("""a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
+      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\""))))))
+  }
+
+  it should "parse BGP_FILTER with a complex pattern" in {
+    assert(parseScript("""a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""",
+      LanguageFeature.SparqlPig) ==
+    List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
+      TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
+  }
 }
