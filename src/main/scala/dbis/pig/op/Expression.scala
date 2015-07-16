@@ -48,7 +48,6 @@ trait Expr {
    * Determines the result type of the expression.
    * 
    * @param schema The input schema for the operator providing the context of this expression (if defined).
-   *               
    * @return
    */
   def resultType(schema: Option[Schema]): (String, PigType)

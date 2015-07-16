@@ -34,8 +34,8 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("nforeach.pig", "nested.out", "nested.data", true),
     ("grouping.pig", "grouping.out", "grouping.data", false),
     ("wordcount.pig", "marycounts.out", "marycount.data", false),
-    // ("skyline.pig", "skyline.out", "skyline.data")
-      ("construct.pig", "result3.out", "result3.data", true)
+    ("construct.pig", "result3.out", "result3.data", true)
+    // ("json.pig", "json.out", "json.data", true)
   )
 
   def cleanupResult(dir: String): Unit = {
