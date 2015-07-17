@@ -423,8 +423,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     val plan = new DataflowPlan(List(op1, op2, op3))
     val newPlan = plan.remove(op2)
 
-    newPlan.sinkNodes.headOption.value.inputs should contain only(Pipe("b", op1))
-    newPlan.sourceNodes.headOption.value.outputs should not contain op2
+    newPlan.sinkNodes.headOption.value.inputs should contain only Pipe("a", op1)
+    newPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op3
   }
 
   it should "construct pipes for SPLIT INTO" in {

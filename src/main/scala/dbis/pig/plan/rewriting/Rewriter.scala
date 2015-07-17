@@ -238,6 +238,39 @@ object Rewriter {
     processPlan(plan, strategyf(t => strategy(t)))
   }
 
+  /** Removes `rem` from `plan`.
+    *
+    * If `rem` has any child nodes in the plan, they will take its place.
+    *
+    * @param plan
+    * @param rem
+    * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
+    val strategy = (op: Any) => {
+      if (op == rem) {
+        val pigOp = op.asInstanceOf[PigOperator]
+        val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
+          // Remove input pipes to `op` and replace them with `ops` input pipes
+          inOp.inputs = inOp.inputs.filterNot(_.producer == pigOp) ++ pigOp.inputs
+          inOp
+        })
+        // Replace `op` in its inputs output pipes with `ops` children
+        pigOp.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
+          if (out.consumer contains op) {
+            out.consumer = out.consumer.filterNot(_ == op) ++ newOps
+          }
+        }))
+        Some(newOps)
+      }
+      else {
+        None
+      }
+    }
+    processPlan(plan, strategyf(t => strategy(t)))
+  }
+
   /** Swap the positions of `op1` and `op2` in `plan`
     *
     * @param plan
@@ -245,6 +278,7 @@ object Rewriter {
     * @param op2 The child and new parent operator.
     * @return
     */
+  //noinspection ScalaDocMissingParameterDescription
   def swap(plan: DataflowPlan, op1: PigOperator, op2: PigOperator): DataflowPlan = {
     val strategy = (parent: PigOperator, child: PigOperator) => {
       if (parent == op1 && child == op2) {
