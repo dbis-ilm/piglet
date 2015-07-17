@@ -69,34 +69,40 @@ object FileTools {
     if(!outputDir.exists()) {
       outputDir.mkdirs()
     }
-
-    val outputFile = s"$outputDir${File.separator}${scriptName}.scala" //scriptName + ".scala"
-    val writer = new FileWriter(outputFile)
-    writer.append(code)
-    writer.close()
-
-    if (compileOnly) false // sys.exit(0)
-
-      // 6. compile the Scala code
-    val outputDirectory = outputDir.getCanonicalPath + s"${File.separator}out"
-
+    
+    // 6. compile the Scala code
+    val outputDirectory = s"${outputDir.getCanonicalPath}${File.separator}out"
+    
     // check whether output directory exists
     val dirFile = new File(outputDirectory)
     // if not then create it
     if (!dirFile.exists)
       dirFile.mkdir()
 
-    if (!ScalaCompiler.compile(outputDirectory, outputFile))
-      false
+    val outputFile = s"$outputDirectory${File.separator}${scriptName}.scala" //scriptName + ".scala"
+    val writer = new FileWriter(outputFile)
+    writer.append(code)
+    writer.close()
 
     // 7. extract all additional jar files to output
     plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
-
+    
     // 8. copy the sparklib library to output
     backend match {
-      case "flink" => FileTools.extractJarToDir("flinklib/target/scala-2.11/flinklib_2.11-1.0.jar", outputDirectory)
-      case "spark" => FileTools.extractJarToDir("sparklib/target/scala-2.11/sparklib_2.11-1.0.jar", outputDirectory)
+      // TODO: we could simplify this by giving the backend to the Conf class which uses this value to build the config key to retrieve: "backends.$backend.jar" 
+      case "flink" => FileTools.extractJarToDir(Conf.flinkBackendJar, outputDirectory)
+      case "spark" => FileTools.extractJarToDir(Conf.sparkBackendJar, outputDirectory)
     }
+    
+//    if (compileOnly) 
+//      return false // sys.exit(0)
+
+    if (!ScalaCompiler.compile(outputDirectory, outputFile))
+      return false
+
+
+
+    
 
     // 9. build a jar file
     val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"

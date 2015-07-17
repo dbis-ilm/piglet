@@ -27,6 +27,8 @@ import scala.collection.immutable.Seq
  * pipes representing the input and output connections to other operators in the
  * dataflow.
  */
+
+
 trait PigOperator extends Rewritable {
   protected var _outputs: List[Pipe] = _
   protected var _inputs: List[Pipe]  = _
@@ -104,7 +106,7 @@ trait PigOperator extends Rewritable {
       // the bag should be named with the output pipe
       schema match {
         case Some(s) => s.setBagName(outPipeName)
-        case None => {}
+        case None =>
       }
     }
     schema
@@ -120,8 +122,8 @@ trait PigOperator extends Rewritable {
      * schemaToString is mainly called from DESCRIBE. Thus, we can take outPipeName as relation name.
      */
     schema match {
-      case Some(s) => s"${outPipeName}: ${s.element.descriptionString}"
-      case None => s"Schema for ${outPipeName} unknown."
+      case Some(s) => s"$outPipeName: ${s.element.descriptionString}"
+      case None => s"Schema for $outPipeName unknown."
     }
   }
 
@@ -156,14 +158,6 @@ trait PigOperator extends Rewritable {
   }
 
   /**
-   * Returns the arity, i.e. the number of input pipes of
-   * this operator.
-   *
-   * @return the arity of the operator
-   */
-  def arity = this.inputs.length
-
-  /**
    * Check whether the input and output pipes are still consistent, i.e.
    * for all output pipes the producer is the current operator and the current
    * operator is also a consumer in each input pipe.
@@ -174,17 +168,51 @@ trait PigOperator extends Rewritable {
     outputs.forall(p => p.producer == this) && inputs.forall(p => p.consumer.contains(this))
   }
 
-  def deconstruct = this.inputs
+  /**
+   * Returns the arity, i.e. the number of output pipes of
+   * this operator.
+   *
+   * @return the arity of the operator
+   */
+  def arity = {
+    var numConsumers = 0
+    this.outputs.foreach(p => numConsumers += p.consumer.length)
+    numConsumers
+  }
 
-  def reconstruct(output: Seq[Any]): PigOperator = output match {
-    case inputs: Seq[_] => {
-      this match {
-        case obj: PigOperator => {
-          obj._inputs = inputs.toList.asInstanceOf[List[Pipe]]
-          obj
+  def deconstruct = this.outputs.map(_.consumer)
+
+  def reconstruct(outputs: Seq[Any]): PigOperator = {
+    val outname = this.outPipeName
+    reconstruct(outputs, outname)
+  }
+
+  /** Implementation for kiamas Rewritable trait
+    *
+    * It's necessary to set the `outputs` attribute on this object to List.empty, which makes `this.outPipeName`
+    * return "". To work around this, the output name can be provided via `outname`.
+    *
+    * @param outputs
+    * @param outname The output name of this relation
+    * @return
+    */
+  def reconstruct(outputs: Seq[Any], outname: String): PigOperator = {
+    this.outputs = List.empty
+    outputs.foreach(_ match {
+      case op : PigOperator => {
+        val idx = this.outputs.indexWhere(_.name == outname)
+        if (idx > -1) {
+          // There already is a Pipe to `outname`
+          this.outputs(idx).consumer = this.outputs(idx).consumer :+ op
+        } else {
+                  this.outputs = this.outputs :+ Pipe(outname, this, List(op))
         }
       }
-    }
-    case _ => illegalArgs("PigOperator", "Pipe", output)
+      // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
+      // operators
+      case ops: List[_] => this.reconstruct(ops, outname)
+      case _ => illegalArgs("PigOperator", "PigOperator", outputs)
+    })
+    this
   }
 }

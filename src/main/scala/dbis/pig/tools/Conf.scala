@@ -12,5 +12,9 @@ object Conf {
   def materializationBaseDir: File = new File(appconf.getString("materialization.basedir"))
   def materializationMapFile: File = new File(materializationBaseDir, 
                                                 appconf.getString("materialization.mapfile"))
+ 
+  
+  def flinkBackendJar: String = appconf.getString("backends.flink.jar")
+  def sparkBackendJar: String = appconf.getString("backends.spark.jar")
   
 }
