@@ -427,50 +427,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     newPlan.sourceNodes.headOption.value.outputs should not contain op2
   }
 
-  /*
-  it should "correctly assign inputs and outputs" in {
-    val op1 = Load(Pipe("a"), "file.csv")
-    val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val op2 = Filter(Pipe("b"), Pipe("a"), predicate)
-    val op3 = Dump(Pipe("b"))
-    val op4 = OrderBy(Pipe("c"), Pipe("b"), List())
-    val op5 = Dump(Pipe("c"))
-    val ops = List[PigOperator](op1, op2, op3, op4, op5)
-    for(op <- ops) {
-      op.inputs shouldBe empty
-      op.outputs shouldBe empty
-    }
-    val plan = new DataflowPlan(ops)
-
-    op1.outputs should contain only (op2)
-
-    op2.inputs should contain only (Pipe("a", op1))
-    op2.outputs should contain allOf(op3, op4)
-
-    op3.inputs should contain only (Pipe("b", op2))
-    op3.outputs shouldBe empty
-
-    op4.inputs should contain only (Pipe("b", op2))
-    op4.outputs should contain only(op5)
-
-    op5.inputs should contain only (Pipe("c", op4))
-    op5.outputs shouldBe empty
-  }
-
-  it should "be consistent after replacing an operator" in {
-    val op1 = Load("a", "file.csv")
-    val op2 = Load("a", "file2.csv")
-
-    val op3 = Dump("a")
-
-    val plan = new DataflowPlan(List(op1, op3))
-    val newPlan = plan.replace(op1, op2)
-    newPlan.sinkNodes.headOption.value.inputs should contain only(Pipe("a", op2))
-    newPlan.sourceNodes.headOption.value should equal(op2)
-    newPlan.sourceNodes.headOption.value.outputs should contain only(op3)
-  }
-
-*/
   it should "construct pipes for SPLIT INTO" in {
     val plan = new DataflowPlan(parseScript(s"""
       |a = LOAD 'file' AS (x, y);

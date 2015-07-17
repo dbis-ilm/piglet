@@ -24,63 +24,6 @@ import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
 
 class PigOperatorSpec extends FlatSpec with Matchers {
-  /*
-  "An operator" should "allow updating its output relation name if it has no outputs" in {
-    val op = Limit(Pipe("b"), Pipe("a"), 5)
-    op.outputs = List(Pipe("b"))
-  }
-
-  it should "not allow updating its output relation name if not all outputs read from the new name" in {
-    val op = Limit(Pipe("b"), Pipe("a"), 5)
-    val op2 = Limit(Pipe("c"), Pipe("b"), 3)
-    op.outputs = List(op2)
-    intercept[IllegalArgumentException] {
-      op.output = Some("d")
-    }
-  }
-
-  it should "not allow unsetting its output relation if it has outputs" in {
-    val op = Limit(Pipe("b"), Pipe("a"), 5)
-    val op2 = Limit(Pipe("c"), Pipe("b"), 3)
-    op.output = Some(Pipe("b"))
-    op.outputs = List(op2)
-    intercept[IllegalStateException] {
-      op.output = None
-    }
-  }
-
-  it should "not allow updating its outputs if it doesn't return a relation" in {
-    val op = Store(Pipe("a"), "foo.csv")
-    val op2 = Limit(Pipe("a"), Pipe("b"), 5)
-    intercept[IllegalStateException] {
-      op.outputs = List(op2)
-    }
-  }
-
-  it should "allow updating its outputs if the new ones read from it" in {
-    val op = Limit(Pipe("b"), Pipe("a"), 5)
-    op.output = Some(Pipe("b"))
-    val op2 = Limit(Pipe("c"), Pipe("b"), 3)
-    op.outputs = List(op2)
-  }
-
-  it should "not allow updating its outputs if the new ones don't read from it" in {
-    val op = Limit(Pipe("b"), Pipe("a"), 5)
-    op.output = Some(Pipe("b"))
-    val op2 = Limit("d", Pipe("c"), 3)
-    intercept[IllegalArgumentException] {
-      op.outputs = List(op2)
-    }
-  }
-
-  it should "allow unsetting its outputs" in {
-    val op = Limit(Pipe("b"), Pipe("a"), 5)
-    op.output = Some(Pipe("b"))
-    val op2 = Limit(Pipe("c"), Pipe("b"), 3)
-    op.outputs = List(op2)
-    op.outputs = List()
-  }
-*/
   "The FOREACH operator" should "allow to check for FLATTEN expression" in {
     val plan = new DataflowPlan(parseScript("b = load 'data'; a = foreach b generate $0, flatten($1);"))
     val ops = plan.operators
