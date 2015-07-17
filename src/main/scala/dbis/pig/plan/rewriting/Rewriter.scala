@@ -402,7 +402,7 @@ object Rewriter {
          * or do they get removed during code generation (because there is no sink?)
          */
         
-        newPlan.remove(materialize)
+        newPlan = newPlan.remove(materialize)
         
       } else {
         /* there is a MATERIALIZE operator, for which no results could be found
