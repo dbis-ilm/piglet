@@ -52,7 +52,7 @@ class FlinkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", '\\t')""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 

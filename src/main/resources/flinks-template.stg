@@ -33,7 +33,7 @@ dump(in) ::=<<
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
-store(in,file,schema) ::=<<
+store(in,file,func,schema) ::=<<
         <in>.map(t => <schema>).writeAsText("<file>")
 <!        
         if (<in>.getJavaStream.getType.getTypeClass.isInstanceOf[Class[List[Any]]]) 

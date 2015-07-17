@@ -40,11 +40,13 @@ object PigBuild extends Build {
       Dependencies.flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
     )
     case "spark" | "sparks" => Seq (
-      Dependencies.sparkCore % "provided"
+      Dependencies.sparkCore % "provided",
+      Dependencies.sparkSql % "provided"
     )
     case "scala" => Seq(
       Dependencies.flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar",
-      Dependencies.sparkCore % "provided"
+      Dependencies.sparkCore % "provided",
+      Dependencies.sparkSql % "provided"
     )
     case _ => throw new Exception(s"Backend $backend not available")
   }
@@ -145,6 +147,7 @@ object Dependencies {
   val jline = "jline" % "jline" % jlineVersion
   val graphCore = "com.assembla.scala-incubator" %% "graph-core" % graphVersion
   val sparkCore = "org.apache.spark" %% "spark-core" % sparkVersion
+  val sparkSql = "org.apache.spark" %% "spark-sql" % sparkVersion
   val flinkDist = "org.apache.flink" %% "flink-dist" % flinkVersion
   val scopt = "com.github.scopt" %% "scopt" % scoptVersion
   val scalasti = "org.clapper" %% "scalasti" % scalastiVersion
@@ -166,7 +169,8 @@ object Dependencies {
   val sparkDeps = Seq(
     scalaTest % "test" withSources(),
     scalaCompiler,
-    sparkCore % "provided"
+    sparkCore % "provided",
+    sparkSql % "provided"
   )
   val flinkDeps = Seq(
     scalaTest % "test" withSources(),

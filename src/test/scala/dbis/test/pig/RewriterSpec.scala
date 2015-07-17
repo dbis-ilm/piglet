@@ -20,6 +20,11 @@ import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import org.scalatest.{FlatSpec, Matchers}
+import dbis.pig.PigCompiler._
+import dbis.pig.plan.MaterializationManager
+import java.io.File
+import dbis.pig.plan.PrettyPrinter
+import java.io.PrintWriter
 
 class RewriterSpec extends FlatSpec with Matchers {
   "Calling hashCode" should "not die with a StackOverflowError" in {
@@ -92,4 +97,6 @@ class RewriterSpec extends FlatSpec with Matchers {
       }
     }
   }
+  
+
 }

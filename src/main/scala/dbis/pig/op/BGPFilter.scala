@@ -15,17 +15,35 @@
  * limitations under the License.
  */
 
-package dbis.pig.tools
+package dbis.pig.op
 
-import org.apache.spark.deploy.SparkSubmit
-import org.apache.log4j.Logger
-import org.apache.log4j.Level
+import dbis.pig.schema.Schema
 
-class SparkRun extends Run{
-  override def execute(master: String, className: String, jarFile: String) {
-    Logger.getLogger("org").setLevel(Level.WARN)
-    Logger.getLogger("akka").setLevel(Level.WARN)
-    Logger.getLogger("Remoting").setLevel(Level.WARN)
-    SparkSubmit.main(Array("--master", master, "--class", className, jarFile))
+
+case class TriplePattern(subj: Ref, pred: Ref, obj: Ref)
+/**
+ *
+ * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
+ *                           can be changed later.
+ * @param initialInPipeName
+ * @param opName
+ * @param params
+ * @param loadSchema
+ */
+case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
+
+  override def lineageString: String = s"""BGPFilter%""" + super.lineageString
+
+  override def checkSchemaConformance: Boolean = {
+    // TODO
+    true
+  }
+
+  override def constructSchema: Option[Schema] = {
+    // TODO
+    schema
   }
 }
+

@@ -19,6 +19,8 @@ package dbis.pig.op
 import dbis.pig.plan.{InvalidPlanException, DataflowPlan}
 import dbis.pig.schema._
 
+import scala.collection.mutable.ListBuffer
+
 
 /**
  * A trait for the GENERATE part of a FOREACH operator.
@@ -66,9 +68,65 @@ case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator) extends Pig
     generator match {
       case GeneratorPlan(opList) => {
         // nested foreach require special handling: we construct a subplan for the operator list
-        subPlan = Some(new DataflowPlan(opList))
+        val plan = new DataflowPlan(opList)
+        opList.foreach(op => if (op.isInstanceOf[Generate]) {
+          // we extract the input pipes of the GENERATE statements (which are hidden
+          // inside the expressions
+          val pipes = op.asInstanceOf[Generate].findInputPipes(plan)
+          // and update the other ends of the pipes accordingly
+          pipes.foreach(p => p.producer.addConsumer(p.name, op))
+        }
+        )
+        val genOp = opList.last
+        if (genOp.isInstanceOf[Generate]) {
+          genOp.asInstanceOf[Generate].parentOp = this
+        }
+        else
+          throw new InvalidPlanException("last statement in nested foreach must be a generate")
+
+        subPlan = Some(plan)
       }
       case _ => {}
+    }
+  }
+
+  override def checkConnectivity: Boolean = {
+    /*
+    def checkSubOperatorConnectivity(op: PigOperator): Boolean = op match {
+      case Generate(exprs) => true // check all exprs
+      case ConstructBag(out, ref) => println("check: " + ref); true // check ref
+      case _ => true
+    }
+*/
+    generator match {
+      case GeneratorList(expr) => true
+      case GeneratorPlan(plan) => {
+        var result: Boolean = true
+        plan.foreach { op => {
+          /*
+          // println("check operator: " + op)
+          if (!checkSubOperatorConnectivity(op)) {
+            println("op: " + op + " : not connected")
+            result = false
+          }
+          */
+          if (!op.inputs.forall(p => p.producer != null)) {
+            println("op: " + op + " : invalid input pipes: " + op.inputs.mkString(","))
+            result = false
+          }
+          if (!op.outputs.forall(p => p.consumer.nonEmpty)) {
+            println("op: " + op + " : invalid output pipes: " + op.outputs.mkString(","))
+            result = false
+          }
+        }
+        }
+        result
+/*
+        plan.forall(op => op.inputs.forall(p => p.producer != null) &&
+                          op.outputs.forall(p => p.consumer.nonEmpty)
+
+        )*/
+      }
     }
   }
 
@@ -133,10 +191,23 @@ case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator) extends Pig
           expr.map(_.expr.traverseAnd(null, Expr.containsNoNamedFields)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
         }
       }
-      case GeneratorPlan(plan) => true // TODO: implement checkSchemaConformance for nested foreach
+      case GeneratorPlan(plan) => {
+        subPlan.get.checkSchemaConformance
+        true
+      }
     }
   }
 
+  /**
+   * Looks for an operator in the subplan that produces a bag with the given name.
+   *
+   * @param name
+   * @return
+   */
+  def findOperatorInSubplan(name: String): Option[PigOperator] = subPlan match {
+    case Some(plan) => plan.findOperatorForAlias(name)
+    case None => None
+  }
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
    *
@@ -164,6 +235,26 @@ case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator) extends Pig
   }
 }
 
+class NamedFieldExtractor {
+  val fields = ListBuffer[NamedField]()
+
+  def collectNamedFields(schema: Schema, ex: Expr): Boolean = ex match {
+    case RefExpr(r) => r match {
+      case NamedField(n) => fields += r.asInstanceOf[NamedField]; true
+      case _ => true
+    }
+    case _ => true
+  }
+}
+
+class RefExprExtractor {
+  val exprs = ListBuffer[RefExpr]()
+
+  def collectRefExprs(schema: Schema, ex: Expr): Boolean = ex match {
+    case RefExpr(r) => exprs += ex.asInstanceOf[RefExpr]; true
+    case _ => true
+  }
+}
 /**
  * GENERATE represents the final generate statement inside a nested FOREACH.
  *
@@ -173,11 +264,60 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
   _outputs = List()
   _inputs = List()
 
+  var parentOp: Foreach = null
+
+  /**
+   * Check all generate expressions and derive from the NamedField objects all possible
+   * input pipes. Input pipes are pipes which are output pipes of other operators.
+   *
+   * @param plan
+   */
+  def findInputPipes(plan: DataflowPlan): List[Pipe] = {
+    val traverse = new NamedFieldExtractor
+    exprs.foreach(e => e.expr.traverseAnd(null, traverse.collectNamedFields))
+    val newInput: List[Pipe] = traverse.fields.map(field => plan.findOperatorForAlias(field.name) match {
+      case Some(op) => Pipe(field.name, op, List(this))
+      case None => Pipe("")
+    }).filter(p => p.name != "").toList
+   _inputs =  newInput
+    _inputs
+  }
+
   // TODO: what do we need here?
   override def constructSchema: Option[Schema] = {
     val fields = constructFieldList(exprs)
     schema = Some(new Schema(new BagType(new TupleType(fields))))
     schema
+  }
+
+  override def checkSchemaConformance: Boolean = {
+    def findFieldInInputSchema(op: PigOperator, f: String) = op.inputSchema match {
+      case Some(s) => s.field(f)
+      case None => -1
+    }
+
+    require(parentOp != null)
+    // we have to extract all RefExprs
+    val traverse = new RefExprExtractor
+    exprs.foreach(e => e.expr.traverseAnd(null, traverse.collectRefExprs))
+    // then we have to handle the different kinds of RefExprs
+    traverse.exprs.foreach(rex => rex.r match {
+      case NamedField(n) => {
+        // case 1: n refers to a pipe
+        if (parentOp.findOperatorInSubplan(n).isEmpty &&
+          // case 2: n refers to a field of the input schema
+           findFieldInInputSchema(parentOp, n) == -1)
+          throw SchemaException("invalid field $n in GENERATE")
+      } // is a a valid n?
+      case PositionalField(p) => parentOp.inputSchema match { // is p a valid index in the input schema of FOREACH?
+        case Some(s) => if (p >= s.fields.length) throw SchemaException("invalid index $p in GENERATE")
+        case None => if (p > 0) throw SchemaException("invalid index $p in GENERATE")
+      }
+      case Value(v) => {} // okay
+      case DerefTuple(r1, r2) => {} // TODO: is r1 a valid ref?
+      case DerefMap(r1, r2) => {} // TODO: is r1 a valid ref?
+    })
+    true
   }
 
   // TODO: eliminate replicated code

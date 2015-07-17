@@ -81,6 +81,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
     /*
      * 2. We add operators that *read* from a pipe to this pipe
      */
+    // TODO: replace by PigOperator.addConsumer
     planOps.foreach(op => {
         for (p <- op.inputs) {
           val element = pipes(p.name)
@@ -96,13 +97,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
       planOps.foreach(op => {
         val newPipes = op.inputs.map(p => pipes(p.name))
         op.inputs = newPipes
-        // TODO!!!!!
-        /*
-        op.inputs = op.initialInPipeNames.map(p => Pipe(p, pipes(p)._1))
-        op.output = if (op.initialOutPipeName != "") Some(op.initialOutPipeName) else None
-        op.outputs = if (op.initialOutPipeName != "") pipes(op.initialOutPipeName)._2 else op.outputs
-        */
-        // println("op: " + op)
         op.preparePlan
         op.constructSchema
       })
@@ -134,7 +128,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return true if the plan is connected, false otherwise
    */
   def checkConnectivity: Boolean = {
-    // TODO: check connectivity of subplans in nested foreach
     // we simply construct a graph and check its connectivity
     /*
     var graph = Graph[PigOperator,DiEdge]()
@@ -146,8 +139,29 @@ class DataflowPlan(var operators: List[PigOperator]) {
      * (1) all input pipes have a producer
      * (2) all output pipes have a non-empty consumer list
      */
+    // println("DataflowPlan.checkConnectivity")
+    var result: Boolean = true
+    operators.foreach { op => {
+      // println("check operator: " + op)
+      if (!op.inputs.forall(p => p.producer != null)) {
+        println("op: " + op + " : invalid input pipes")
+        result = false
+      }
+      if (!op.outputs.forall(p => p.consumer.nonEmpty)) {
+        println("op: " + op + " : invalid output pipes")
+        result = false
+      }
+      if (!op.checkConnectivity) {
+        println("op: " + op + " : not connected")
+        result = false
+      }
+    }
+    }
+    result
+    /*
     operators.forall(op =>
-      op.inputs.forall(p => p.producer != null) && op.outputs.forall(p => p.consumer.nonEmpty))
+      op.inputs.forall(p => p.producer != null) && op.outputs.forall(p => p.consumer.nonEmpty) && op.checkConnectivity)
+      */
   }
 
   def checkConsistency: Boolean = operators.forall(_.checkConsistency)
@@ -184,6 +198,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
    */
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
 
+  def containsOperator(op: PigOperator): Boolean = operators.contains(op)
+  
   /**
    * Swaps the two operators in the dataflow plan. Both operators are unary operators and have to be already
    * part of the plan.
@@ -204,16 +220,48 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return the resulting dataflow plan
    */
   def insertAfter(old: PigOperator, op: PigOperator) : DataflowPlan =  {
+    
+    val p = new Pipe(old.outPipeName, old, List(op))
+    
+    old.outputs = (old.outputs :+ p)
+    
+    op.inputs = (op.inputs :+ p)
+    
+    operators = operators :+ op
+    
     this
   }
 
   /**
    * Remove the given operator from the dataflow plan.
    *
-   * @param n the operator to be removed from the plan
+   * @param op the operator to be removed from the plan
    * @return the resulting dataflow plan
    */
-  def remove(n: PigOperator) : DataflowPlan = {
+  def remove(op: PigOperator) : DataflowPlan = {
+    
+    require(operators.contains(op), "operator to remove is not member of the plan")
+    require(op.inputs.size == 1, "Currently, only one input operator is allowed")
+    
+    
+    val preds = op.inputs
+    for(pred <- preds) {
+      pred.producer.outputs = pred.producer.outputs.filter { pipe => pipe.consumer != op }
+    } 
+    
+    val succs = op.outputs
+    for(succ <- succs) {
+//      succ.consumer.inputs = succ.consumer.inputs.filter { pipe => pipe.producer != op }
+      for(consumer <- succ.consumer) {
+        consumer.inputs = consumer.inputs.filter { pipe => pipe.producer != op }
+      }
+    }
+    
+    op.inputs = List.empty
+    op.outputs = List.empty
+    
+    operators = operators.filter(_ != op)
+
     this
   }
 
@@ -225,6 +273,39 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return the resulting dataflow plan
    */
   def replace(old: PigOperator, repl: PigOperator) : DataflowPlan =  {
+    require(operators.contains(old), "operator to replace is not member of the plan")
+    
+    /* 1. set intputs for new op as inputs of old op
+     * and clear old's inputs
+     */
+    repl.inputs = old.inputs.map { p => new Pipe(p.name, p.producer, p.consumer.filter(_ != old) :+ repl) }
+    println("in: "+repl.inputs.mkString(","))
+    old.inputs = List.empty
+    
+    // 2. copy outputs
+    repl.outputs = old.outputs.map { p => new Pipe(p.name, repl, p.consumer) }
+    repl.outputs.map(_.consumer).flatten.foreach{ consumer => consumer.inputs.map { p => Pipe(p.name, repl, p.consumer) } }  
+    println("out: "+repl.outputs.mkString(","))
+    
+
+    
+    // 4. clear old's outputs
+    old.outputs = List.empty
+    
+    // 5. finally, remove old from the operator list and add the new one
+    operators = operators.filter(_ != old) :+ repl
+    
+    this
+  }
+  
+  def disconnect(op1: PigOperator, op2: PigOperator): DataflowPlan = {
+    require(operators.contains(op1), s"operator is not member of the plan: $op1")
+    require(operators.contains(op2), s"operator is not member of the plan: $op2")
+    
+    op2.inputs = op2.inputs.filter { op => op.producer != op1 }
+    op1.outputs = op1.outputs.filter { op => op != op2 }
+    
+    
     this
   }
 

@@ -23,12 +23,8 @@ begin_query(name) ::= <<
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,func,params) ::=<<
-<if (func)>
-        val <out> = <func>().load(sc, "<file>"<params>)
-<else>
-        val <out> = PigStorage().load(sc, "<file>", '\t')
-<endif>
+loader(out,file,func,schema,params) ::=<<
+		val <out> = <func>().load(sc, "<file>"<params>)
 >>
 
 // ------------------ DUMP results --------------------------------------------
@@ -37,8 +33,15 @@ dump(in) ::=<<
 >>
 
 // ------------------ STORE Results on disk -----------------------------------
-store(in,file,schema) ::=<<
-        <in>.map(t => <schema>).coalesce(1, true).saveAsTextFile("<file>")
+
+store(in,file,schema,func) ::=<<
+	<if (schema)>
+    	val <in>_storehelper = <in>.map(t => <schema>).coalesce(1, true)
+	<else>
+		val <in>_storehelper = <in>
+	<endif>
+	
+    <func>().write("<file>", <in>_storehelper)
 >>
 
 // ------------------ FILTER for a predicate ----------------------------------

@@ -207,6 +207,7 @@ class PigParser extends JavaTokenParsers {
   lazy val slideKeyword = "slide".ignoreCase
   lazy val splitKeyword = "split".ignoreCase
   lazy val ifKeyword = "if".ignoreCase
+  lazy val materializeKeyword = "materialize".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
@@ -428,56 +429,6 @@ class PigParser extends JavaTokenParsers {
   }
 
   /*
-   * Socket Definitions
-   */
-  def ipMember: Parser[String] = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)".r 
-  def ipv4: Parser[String] = ipMember ~ "." ~ ipMember ~ "." ~ ipMember ~ "." ~ ipMember ^^{
-    case i1 ~ _ ~ i2 ~ _ ~ i3 ~ _ ~i4 => i1 + "." + i2 + "." + i3 + "." + i4
-  }
-  def portNum: Parser[String] = "([0-9]{1,5})".r
-  def port: Parser[String] = (portNum | "*") 
-  def bindAddress: Parser[String] = (ipv4 | "*" | ident)
-  
-  def inetAddress: Parser[SocketAddress] = "'" ~ (ipv4 | ident) ~ ":" ~ portNum ~ "'" ^^ { case _ ~ ip ~ _ ~ p ~ _ => SocketAddress("",ip,p)}
-  def tcpSocket: Parser[SocketAddress] = "tcp://" ~ bindAddress ~ ":" ~ port ^^ { case trans ~ addr ~ _ ~ p => SocketAddress(trans, addr, p)}
-  def ipcSocket: Parser[SocketAddress] = "ipc://" ~ (fileName | "*") ^^ { case trans ~  path => SocketAddress(trans,path,"")}
-  def inprocSocket: Parser[SocketAddress] = "inproc://" ~ ident ^^ { case trans ~ name => SocketAddress(trans,name,"")}
-  def pgmSocket: Parser[SocketAddress] = ("pgm://" | "epgm://") ~ (ipv4 | ident) ~ ";" ~ ipv4 ~ ":" ~ portNum ^^ { 
-      case trans ~ interface ~ _ ~ ip ~ _ ~ p => SocketAddress(trans, interface + ";" + ip, p)
-    }
-  def zmqAddress: Parser[SocketAddress] = "'" ~ (tcpSocket | ipcSocket | inprocSocket | pgmSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
-
-  /*
-   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] USING <StreamFunc> [ AS <schema> ]
-   * 
-   * Maybe other modes later
-   */
-  def socketReadStmt: Parser[PigOperator] =
-  bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
-    case out ~ _ ~ _ ~ addr ~ u ~ schema => u match {
-      case Some(p) => SocketRead(Pipe(out), addr, "", schema, p._1, if (p._2.isEmpty) null else p._2)
-      case None =>  SocketRead(Pipe(out), addr, "", schema)
-    }
-  } | 
-  bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
-    case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema => u match {
-      case Some(p) => SocketRead(Pipe(out), addr, mode, schema, p._1, if (p._2.isEmpty) null else p._2)
-      case None => SocketRead(Pipe(out), addr, mode, schema)
-    }
-  }
-
-  /*
-   * SOCKET_WRITE <A> TO '<address>' [ MODE ZMQ ]
-   */
-  def socketWriteStmt: Parser[PigOperator] =
-  socketWriteKeyword ~ bag ~ toKeyword ~ inetAddress ^^ {
-    case _ ~ b ~ _ ~ addr => SocketWrite(Pipe(b), addr, "")
-  } | 
-  socketWriteKeyword ~ bag ~ toKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ^^ {
-    case _ ~ b ~ _ ~ addr ~ _ ~ mode => SocketWrite(Pipe(b), addr, mode)
-  }
-
-  /*
    * SPLIT <A> INTO <B> IF <Cond>, <C> IF <Cond> ...
    */
   def splitBranch: Parser[SplitBranch] = bag ~ ifKeyword ~ logicalExpr ^^ { case out ~ _ ~ expr => new SplitBranch(Pipe(out), expr)}
@@ -486,10 +437,14 @@ class PigParser extends JavaTokenParsers {
     case _ ~ in ~ _ ~ splitList => new SplitInto(Pipe(in), splitList)
   }
 
+  def materializeStmt: Parser[PigOperator] = materializeKeyword ~ bag ^^ { case _ ~ b => Materialize(Pipe(b))}
+  
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
-  def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt | socketReadStmt | socketWriteStmt | windowStmt | splitStmt) ~ ";" ^^ {
+  def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
+    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    splitStmt | materializeStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*
@@ -503,13 +458,21 @@ class PigParser extends JavaTokenParsers {
    */
   lazy val tuplifyKeyword = "tuplify".ignoreCase
   lazy val onKeyword = "on".ignoreCase
+  lazy val bgpFilterKeyword = "bgp_filter".ignoreCase
 
   def tuplifyStmt: Parser[PigOperator] = bag ~ "=" ~ tuplifyKeyword ~ bag ~ onKeyword ~ ref ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ r => new Tuplify(Pipe(out), Pipe(in), r) }
 
+  def bgPattern: Parser[TriplePattern] = ref ~ ref ~ ref ^^ { case r1 ~ r2 ~ r3 => TriplePattern(r1, r2, r3)}
+
+  def bgpFilterStmt: Parser[PigOperator] = bag ~ "=" ~ bgpFilterKeyword ~ bag ~
+    byKeyword ~ "{" ~ repsep(bgPattern, ".") ~ "}" ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ _ ~ pattern ~ _ => new BGPFilter(Pipe(out), Pipe(in), pattern)
+  }
+
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt) ~ ";" ^^ {
+    splitStmt | tuplifyStmt | bgpFilterStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
 
@@ -520,7 +483,62 @@ class PigParser extends JavaTokenParsers {
    * Pig extensions for processing streaming data.
    */
 
-  def streamingPigScript: Parser[List[PigOperator]] = rep(stmt)
+  /*
+   * Socket Definitions
+   */
+  def ipMember: Parser[String] = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)".r
+  def ipv4: Parser[String] = ipMember ~ "." ~ ipMember ~ "." ~ ipMember ~ "." ~ ipMember ^^{
+    case i1 ~ _ ~ i2 ~ _ ~ i3 ~ _ ~i4 => i1 + "." + i2 + "." + i3 + "." + i4
+  }
+  def portNum: Parser[String] = "([0-9]{1,5})".r
+  def port: Parser[String] = (portNum | "*")
+  def bindAddress: Parser[String] = (ipv4 | "*" | ident)
+
+  def inetAddress: Parser[SocketAddress] = "'" ~ (ipv4 | ident) ~ ":" ~ portNum ~ "'" ^^ { case _ ~ ip ~ _ ~ p ~ _ => SocketAddress("",ip,p)}
+  def tcpSocket: Parser[SocketAddress] = "tcp://" ~ bindAddress ~ ":" ~ port ^^ { case trans ~ addr ~ _ ~ p => SocketAddress(trans, addr, p)}
+  def ipcSocket: Parser[SocketAddress] = "ipc://" ~ (fileName | "*") ^^ { case trans ~  path => SocketAddress(trans,path,"")}
+  def inprocSocket: Parser[SocketAddress] = "inproc://" ~ ident ^^ { case trans ~ name => SocketAddress(trans,name,"")}
+  def pgmSocket: Parser[SocketAddress] = ("pgm://" | "epgm://") ~ (ipv4 | ident) ~ ";" ~ ipv4 ~ ":" ~ portNum ^^ {
+    case trans ~ interface ~ _ ~ ip ~ _ ~ p => SocketAddress(trans, interface + ";" + ip, p)
+  }
+  def zmqAddress: Parser[SocketAddress] = "'" ~ (tcpSocket | ipcSocket | inprocSocket | pgmSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
+
+  /*
+   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] USING <StreamFunc> [ AS <schema> ]
+   *
+   * Maybe other modes later
+   */
+  def socketReadStmt: Parser[PigOperator] =
+    bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
+      case out ~ _ ~ _ ~ addr ~ u ~ schema => u match {
+        case Some(p) => SocketRead(Pipe(out), addr, "", schema, p._1, if (p._2.isEmpty) null else p._2)
+        case None =>  SocketRead(Pipe(out), addr, "", schema)
+      }
+    } |
+      bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
+        case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema => u match {
+          case Some(p) => SocketRead(Pipe(out), addr, mode, schema, p._1, if (p._2.isEmpty) null else p._2)
+          case None => SocketRead(Pipe(out), addr, mode, schema)
+        }
+      }
+
+  /*
+   * SOCKET_WRITE <A> TO '<address>' [ MODE ZMQ ]
+   */
+  def socketWriteStmt: Parser[PigOperator] =
+    socketWriteKeyword ~ bag ~ toKeyword ~ inetAddress ^^ {
+      case _ ~ b ~ _ ~ addr => SocketWrite(Pipe(b), addr, "")
+    } |
+      socketWriteKeyword ~ bag ~ toKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ^^ {
+        case _ ~ b ~ _ ~ addr ~ _ ~ mode => SocketWrite(Pipe(b), addr, mode)
+      }
+
+  def streamingStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
+    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    splitStmt | socketReadStmt | socketWriteStmt | windowStmt ) ~ ";" ^^ {
+    case op ~ _  => op }
+
+  def streamingPigScript: Parser[List[PigOperator]] = rep(streamingStmt)
 
   /* ---------------------------------------------------------------------------------------------------------------- */
 
