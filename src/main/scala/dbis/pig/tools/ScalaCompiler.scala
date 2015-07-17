@@ -47,10 +47,7 @@ object ScalaCompiler {
 */
     
     settings.classpath.value = targetDir
-    
-    println(s"classpath: ${settings.classpath.value}")
-    println(s"boot cp: ${settings.bootclasspath}")
-    
+        
     settings.outputDirs.setSingleOutput(target)
     settings.embeddedDefaults[Probe]
     val reporter = new ConsoleReporter(settings)
