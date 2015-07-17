@@ -17,10 +17,12 @@ val backendEnv = sys.props.getOrElse("backend", default="spark")
 //possibleBackends.contains(backendEnv) //TODO: outsource case _ => Exception part in all functions to here
 val backends = settingKey[Map[String,Map[String,String]]]("Backend Settings")
 backends := (backendEnv match {
-  case "flink"      => flinkBackend
-  case "spark"      => sparkBackend
-  case "sparkflink" => flinksparkBackend
-  case _            => throw new Exception(s"Backend $backendEnv not available")
+  case "flink"            => flinkBackend
+  case "flinks"           => flinksBackend
+  case "spark"            => sparkBackend
+  case "sparks"           => sparksBackend
+  case "scala"            => scalaBackend
+  case _                  => throw new Exception(s"Backend $backendEnv not available")
 })  
 
 /*
@@ -56,12 +58,13 @@ settings(commonSettings: _*).
 settings(
   libraryDependencies ++= Dependencies.flinkDeps,
   resolvers += "Sonatype (releases)" at "https://oss.sonatype.org/content/repositories/releases/"
-)
+).
+settings(excludes(backendEnv): _*)
 
 def backendlib(backend: String): List[ClasspathDep[ProjectReference]] = backend match {
-  case "flink" => List(flinklib)
-  case "spark" => List(sparklib)
-  case "sparkflink" => List(sparklib, flinklib)
+  case "flink" | "flinks" => List(flinklib)
+  case "spark" | "sparks" => List(sparklib)
+  case "scala" => List(sparklib, flinklib)
   case _ => throw new Exception(s"Backend $backend not available")
 }
 

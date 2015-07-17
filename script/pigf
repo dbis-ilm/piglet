@@ -25,4 +25,4 @@ else
 	CP=$FLINK_JAR:$CP
 fi
 
-java -Dscala.usejavacp=true -cp $CP dbis.pig.PigCompiler --backend flink $*
+java -Dscala.usejavacp=true -cp $CP dbis.pig.PigCompiler --backend flinks $*
