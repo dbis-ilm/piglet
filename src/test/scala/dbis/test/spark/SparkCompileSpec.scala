@@ -460,4 +460,11 @@ class SparkCompileSpec extends FlatSpec {
         |val a = b.flatMap(t => List(t(1).asInstanceOf[Seq[Any]].map(s => (List(t(0)), s))).map(t => List(t))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
+
+  it should "not contain code for EMPTY operators" in {
+    val op = Empty(Pipe(""))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+
+    assert(codeGenerator.emitNode(op) == "")
+  }
 }

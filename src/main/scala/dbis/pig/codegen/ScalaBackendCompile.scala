@@ -543,7 +543,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         else
           callST("socketWrite", Map("in"->in.name,"addr"->address))
       }
-
+      case Empty(_) => ""
       /*     
        case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
        case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
