@@ -147,4 +147,16 @@ class RewriterSpec extends FlatSpec with Matchers {
 
     newPlan.sourceNodes.headOption.value shouldBe Empty(Pipe(""))
   }
+
+  it should "pull up Empty nodes" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val plan = new DataflowPlan(List(op1, op2))
+    plan.operators should have length 2
+
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes.headOption.value shouldBe Empty(Pipe(""))
+    newPlan.operators should have length 1
+  }
 }

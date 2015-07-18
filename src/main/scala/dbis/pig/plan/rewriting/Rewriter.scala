@@ -182,6 +182,15 @@ object Rewriter {
     case _ => None
   }
 
+  /** If an operators is followed by an Empty node, replace it with the Empty node
+    *
+    * @param parent
+    * @param child
+    * @return
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  private def mergeWithEmpty(parent: PigOperator, child: Empty): Option[PigOperator] = Some(child)
+
   /** Add a new strategy for merging operators of two types.
     *
     * An example method to merge Filter operators is
@@ -481,6 +490,7 @@ object Rewriter {
   }
 
   merge[Filter, Filter](mergeFilters)
+  merge[PigOperator, Empty](mergeWithEmpty)
   reorder[OrderBy, Filter](filterBeforeOrder)
   addStrategy(strategyf(t => splitIntoToFilters(t)))
   addStrategy(removeNonStorageSinks _)
