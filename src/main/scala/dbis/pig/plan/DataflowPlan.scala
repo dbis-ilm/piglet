@@ -21,9 +21,6 @@ import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.schema.SchemaException
 
 import scala.collection.mutable.{ListBuffer, Map}
-import scalax.collection.GraphEdge.DiEdge
-import scalax.collection.mutable.Graph
-import scalax.collection.GraphPredef._
 
 /**
  * An exception indicating that the dataflow plan is invalid.
