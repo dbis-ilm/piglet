@@ -1,3 +1,6 @@
+import sbt.Keys._
+import sbt._
+
 name := "Piglet"
 
 lazy val commonSettings = Seq(
@@ -49,7 +52,8 @@ dependsOn(backendlib(backendEnv): _*)
 lazy val sparklib = (project in file("sparklib")).
 settings(commonSettings: _*).
 settings(
-  libraryDependencies ++= Dependencies.sparkDeps
+  libraryDependencies ++= Dependencies.sparkDeps,
+    unmanagedJars in Compile += file("lib/jvmr_2.11-2.11.2.1.jar")
 )
 
 lazy val flinklib = (project in file("flinklib")).
