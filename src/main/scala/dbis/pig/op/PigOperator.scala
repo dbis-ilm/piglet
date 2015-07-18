@@ -31,7 +31,7 @@ import scala.collection.immutable.Seq
 
 trait PigOperator extends Rewritable {
   protected var _outputs: List[Pipe] = _
-  protected var _inputs: List[Pipe]  = _
+  protected var _inputs: List[Pipe] = _
 
   var schema: Option[Schema] = None
 
@@ -89,7 +89,7 @@ trait PigOperator extends Rewritable {
    */
   def addConsumer(name: String, op: PigOperator): Unit = {
     _outputs.find(_.name == name) match {
-      case Some(p) => if (! p.consumer.contains(op)) p.consumer = p.consumer :+ op
+      case Some(p) => if (!p.consumer.contains(op)) p.consumer = p.consumer :+ op
       case None => {}
     }
   }
@@ -199,13 +199,13 @@ trait PigOperator extends Rewritable {
   def reconstruct(outputs: Seq[Any], outname: String): PigOperator = {
     this.outputs = List.empty
     outputs.foreach(_ match {
-      case op : PigOperator => {
+      case op: PigOperator => {
         val idx = this.outputs.indexWhere(_.name == outname)
         if (idx > -1) {
           // There already is a Pipe to `outname`
           this.outputs(idx).consumer = this.outputs(idx).consumer :+ op
         } else {
-                  this.outputs = this.outputs :+ Pipe(outname, this, List(op))
+          this.outputs = this.outputs :+ Pipe(outname, this, List(op))
         }
       }
       // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
