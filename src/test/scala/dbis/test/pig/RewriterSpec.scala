@@ -17,6 +17,7 @@
 package dbis.test.pig
 
 import dbis.pig.PigCompiler._
+import dbis.pig.op
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
@@ -137,5 +138,13 @@ class RewriterSpec extends FlatSpec with Matchers {
 
     val rewrittenSource = processPigOperator(source)
     rewrittenSource.outputs should contain only Pipe("a", op1, List(op2))
+  }
+
+  it should "remove sink nodes that don't store a relation" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+    val plan = new DataflowPlan(List(op1))
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes.headOption.value shouldBe Empty(Pipe(""))
   }
 }

@@ -156,6 +156,31 @@ object Rewriter {
     case _ => None
   }
 
+  /** Replaces sink nodes that are not [[dbis.pig.op.Store]] operators with [[dbis.pig.op.Empty]] ones.
+    *
+    * @param node
+    * @return
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  private def removeNonStorageSinks(node: Any): Option[PigOperator] = node match {
+    // Store and Dump are ok
+    case Store(_, _, _) => None
+    case Dump(_) => None
+    // To prevent recursion, empty is ok as well
+    case Empty(_) => None
+    case op: PigOperator =>
+      op.outputs match {
+      case Pipe(_, _, Nil) :: Nil =>
+        val newNode = Empty(Pipe(""))
+        // Set outputs *again*. Passing a Pipe("") to the constructor causes problems because other parts of the code
+        // expect Pipe.consumer and Pipe.producer to be non-null, but we can't set Pipe.producer without the new node.
+        newNode.outputs = List(Pipe("", newNode, List.empty))
+        newNode.inputs = op.inputs
+        Some(newNode)
+      case _ => None
+    }
+    case _ => None
+  }
 
   /** Add a new strategy for merging operators of two types.
     *
@@ -393,14 +418,14 @@ object Rewriter {
   def processMaterializations(plan: DataflowPlan, mm: MaterializationManager): DataflowPlan = {
     require(plan != null, "Plan must not be null")
     require(mm != null, "Materialization Manager must not be null")
-    
+
     val sinks = plan.sinkNodes
-    
+
     val walker = new BreadthFirstBottomUpWalker
-    
+
     val materializes = ListBuffer.empty[Materialize]
-    
-    walker.walk(plan){ op => 
+
+    walker.walk(plan) { op =>
       op match {
         case o: Materialize => materializes += o
         case _ =>
@@ -408,54 +433,55 @@ object Rewriter {
     }
 
     var newPlan = plan
-    
+
     /* we should check here if the op is still connected to a sink
      * the ops will all still be in the plan, but they might be disconnected
      * if a load was inserted before
      */
-    for(materialize <- materializes if plan.containsOperator(materialize)) {
-      
+    for (materialize <- materializes if plan.containsOperator(materialize)) {
+
       val data = mm.getDataFor(materialize.lineageSignature)
-      
+
       /*
        * The materialization manager has data for the current materialization 
        * operator. So create a new Load operator for the materialized result 
        * and add it to the plan by replacing the input of the Materialize-Op
        * with the loader.
        */
-      if(data.isDefined) {
+      if (data.isDefined) {
         val loader = Load(materialize.inputs.head, data.get, materialize.constructSchema, "BinStorage")
         val matInput = materialize.inputs(0).producer
-        
-        for(inPipe <- matInput.inputs) {
+
+        for (inPipe <- matInput.inputs) {
           plan.disconnect(inPipe.producer, matInput)
         }
-        
+
         newPlan = plan.replace(matInput, loader)
         /* TODO: do we need to remove all other nodes that get disconnected now by hand
          * or do they get removed during code generation (because there is no sink?)
          */
-        
+
         newPlan = newPlan.remove(materialize)
-        
+
       } else {
         /* there is a MATERIALIZE operator, for which no results could be found
          * --> store them by adding a STORE operator to the MATERIALIZE operator's input op
          * then, remove the materialize op
          */
-        
+
         val file = mm.saveMapping(materialize.lineageSignature)
         val storer = new Store(materialize.inputs.head, file, "BinStorage")
-        
+
         newPlan = plan.insertAfter(materialize.inputs(0).producer, storer)
         newPlan = newPlan.remove(materialize)
       }
     }
-    
+
     newPlan
   }
-  
+
   merge[Filter, Filter](mergeFilters)
   reorder[OrderBy, Filter](filterBeforeOrder)
   addStrategy(strategyf(t => splitIntoToFilters(t)))
+  addStrategy(removeNonStorageSinks _)
 }
