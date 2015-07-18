@@ -24,6 +24,8 @@ import org.scalatest.{FlatSpec, Matchers}
 
 import org.ddahl.jvmr.RInScala
 
+import scala.io.Source
+
 class RIntegrationSpec extends FlatSpec with Matchers {
   "The R integration" should "allow to invoke a R script" in {
     val R = RInScala()
@@ -32,6 +34,34 @@ class RIntegrationSpec extends FlatSpec with Matchers {
     R.eval("res <- x + y")
     val res = R.toVector[Double]("res")
     res should be(Array(15.0, 26.0, 37.0))
+  }
+
+  it should "run DBSCAN in R" in {
+    /**
+     * Prepare the data in R as follows:
+     * > data(ruspini, package="cluster")
+     * > ruspini ruspini[sample(1:nrow(ruspini)),]
+     * > ruspini = scale(ruspini)
+     * > finalData = ruspini[order(as.numeric(rownames(ruspini))),,drop=FALSE]
+     * > write.table(finalData, file = "data.csv",row.names=FALSE,col.names=FALSE,sep=",")
+     */
+    val source = Source.fromFile("./src/test/resources/cluster-data.csv")
+    val input = source.getLines().map(line => line.split(","))
+    val matrix = input.map(v => v.map(s => s.toDouble))
+
+    val script =
+      """
+        |library(fpc);
+        |db = dbscan(inp, eps=.3, MinPts=5);
+        |cluster = cbind(inp, data.frame(db$cluster + 1L))
+        |res = data.matrix(cluster)
+        |""".stripMargin
+    val R = RInScala()
+    R.inp = matrix.toArray
+    R.eval(script)
+    val res = R.toMatrix[Double]("res")
+    res.length should be (75)
+    println(res)
   }
 
   "The parser" should "accept the SCRIPT statement" in  {
