@@ -94,6 +94,7 @@ object Dependencies {
   val scalasti = "org.clapper" %% "scalasti" % scalastiVersion
   val jeromq = "org.zeromq" % "jeromq" % jeromqVersion
   val kiama = "com.googlecode.kiama" %% "kiama" % kiamaVersion
+  val typesafe = "com.typesafe" % "config" % "1.3.0"
 
   // Projects
   val rootDeps = Seq(
@@ -104,7 +105,8 @@ object Dependencies {
     scopt,
     scalaIoFile,
     scalasti,
-    kiama
+    kiama,
+    typesafe
   )
   val sparkDeps = Seq(
     scalaTest % "test" withSources(),
