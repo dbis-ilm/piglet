@@ -180,7 +180,7 @@ trait PigOperator extends Rewritable {
     numConsumers
   }
 
-  def deconstruct = this.outputs.map(_.consumer)
+  def deconstruct: List[PigOperator] = this.outputs.flatMap(_.consumer)
 
   def reconstruct(outputs: Seq[Any]): PigOperator = {
     val outname = this.outPipeName
