@@ -182,7 +182,7 @@ object Rewriter {
     case _ => None
   }
 
-  /** If an operators is followed by an Empty node, replace it with the Empty node
+  /** If an operator is followed by an Empty node, replace it with the Empty node
     *
     * @param parent
     * @param child
