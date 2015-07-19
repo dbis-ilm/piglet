@@ -117,19 +117,6 @@ object Rewriter {
   private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] =
     Some(Filter(child.out, parent.in, And(parent.pred, child.pred)))
 
-  /** Puts [[dbis.pig.op.Filter]] operators before [[dbis.pig.op.OrderBy]] ones.
-    *
-    * @param parent The parent operator, in this case, a [[dbis.pig.op.Filter]] object.
-    * @param child The child operator, in this case, a [[dbis.pig.op.OrderBy]] object.
-    * @return On success, an Option containing a new [[dbis.pig.op.OrderBy]] operators whose input is the
-    *         [[dbis.pig.op.Filter]] passed into this method, None otherwise.
-    */
-  private def filterBeforeOrder(parent: OrderBy, child: Filter): Option[(Filter, OrderBy)] = {
-    val newOrder = parent.copy(child.out, child.in, parent.orderSpec)
-    val newFilter = child.copy(parent.out, parent.in, child.pred)
-    Some((newFilter, newOrder))
-  }
-
   private def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
     case node@SplitInto(inPipeName, splits) =>
       val filters = (for (branch <- splits) yield branch.output.name -> Filter(branch.output, inPipeName, branch
@@ -218,29 +205,18 @@ object Rewriter {
 
   /** Add a new strategy for reordering two operators.
     *
-    * An example method to reorder Filter operators before OrderBy ones is
+    * A new reordering strategy can be added to the rewriter via
     * {{{
-    * def filterBeforeOrder(parent: OrderBy, child: Filter): Option[(Filter, OrderBy)] = {
-    *   val newOrder = parent.copy(child.initialOutPipeName, child.initialInPipeName, parent.orderSpec)
-    *   val newFilter = child.copy(parent.initialOutPipeName, parent.initialInPipeName, child.pred)
-    *   Some((newFilter, newOrder))
-    * }
+    *  reorder[OrderBy, Filter]
     * }}}
     *
-    * It can be added to the rewriter via
-    * {{{
-    *  reorder[OrderBy, Filter](filterBeforeOrder)
-    * }}}
-    *
-    * @param f The function to perform the reordering. It does not have to modify inputs and outputs, this will be
-    *          done automatically.
     * @tparam T The type of the parent operator.
     * @tparam T2 The type of the child operator.
     */
-  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[(T2, T)]):
+  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]():
   Unit = {
     val strategy = (parent: T, child: T2) =>
-      f(parent, child).map(tup => fixInputsAndOutputs(parent, tup._1, child, tup._2))
+      Some(fixInputsAndOutputs(parent, child, child, parent))
     addBinaryPigOperatorStrategy(strategy)
   }
 
@@ -396,7 +372,7 @@ object Rewriter {
     */
   private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                        newChild: T): T2 = {
-    // If oldparent == newChild (for example when this is called from `swap`, we need to save oldParent.outPipename
+    // If oldParent == newChild (for example when this is called from `swap`, we need to save oldParent.outPipename
     // because it depends on oldParent.outputs
     val oldparent_outpipename = oldParent.outPipeName
 
@@ -486,7 +462,7 @@ object Rewriter {
 
   merge[Filter, Filter](mergeFilters)
   merge[PigOperator, Empty](mergeWithEmpty)
-  reorder[OrderBy, Filter](filterBeforeOrder)
+  reorder[OrderBy, Filter]
   addStrategy(strategyf(t => splitIntoToFilters(t)))
   addStrategy(removeNonStorageSinks _)
 }

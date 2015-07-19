@@ -57,21 +57,14 @@ class RewriterSpec extends FlatSpec with Matchers {
     val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
     val op4 = Dump(Pipe("c"))
 
-    // ops after reordering
-    val op2_2 = Filter(Pipe("b"), Pipe("a"), predicate1)
-    val op3_2 = OrderBy(Pipe("c"), Pipe("b"), List())
-    val op4_2 = op4.copy()
-
     val plan = new DataflowPlan(List(op1, op2, op3, op4))
-    val planReordered = new DataflowPlan(List(op1, op2_2, op3_2, op4_2))
-    val source = plan.sourceNodes.head
-    val sourceReordered = planReordered.sourceNodes.head
-
-    val rewrittenSource = processPigOperator(source)
-    rewrittenSource.outputs.head should equal(sourceReordered.outputs.head)
-
     val pPlan = processPlan(plan)
-    pPlan.findOperatorForAlias("b").value should be(op2_2)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
+    pPlan.findOperatorForAlias("b").value shouldBe op3
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
   }
 
   it should "rewrite SplitInto operators into multiple Filter ones" in {
