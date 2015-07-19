@@ -114,9 +114,8 @@ object Rewriter {
     * @return On success, an Option containing a new [[dbis.pig.op.Filter]] operator with the predicates of both input
     *         Filters, None otherwise.
     */
-  private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
+  private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] =
     Some(Filter(child.out, parent.in, And(parent.pred, child.pred)))
-  }
 
   /** Puts [[dbis.pig.op.Filter]] operators before [[dbis.pig.op.OrderBy]] ones.
     *
