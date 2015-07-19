@@ -68,8 +68,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
       op.outputs.foreach { p: Pipe =>
         if (p.name != "") {
           if (pipes.contains(p.name)) {
-            println(op)
-            println("The producer of " + op.outPipeName + " is " + pipes(p.name).producer)
             throw new InvalidPlanException("duplicate pipe: " + p.name)
           }
           // we initialize the producer of the pipe
