@@ -211,10 +211,8 @@ object Rewriter {
     */
   def merge[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[PigOperator]):
   Unit = {
-    val strategy = (parent: T, child: T2) => {
-      val result = f(parent, child)
-      result.map(fixInputsAndOutputs(parent, child, _))
-    }
+    val strategy = (parent: T, child: T2) =>
+      f(parent, child).map(fixInputsAndOutputs(parent, child, _))
     addBinaryPigOperatorStrategy(strategy)
   }
 
@@ -241,10 +239,8 @@ object Rewriter {
     */
   def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[(T2, T)]):
   Unit = {
-    val strategy = (parent: T, child: T2) => {
-      val result = f(parent, child)
-      result.map(tup => fixInputsAndOutputs(parent, tup._1, child, tup._2))
-    }
+    val strategy = (parent: T, child: T2) =>
+      f(parent, child).map(tup => fixInputsAndOutputs(parent, tup._1, child, tup._2))
     addBinaryPigOperatorStrategy(strategy)
   }
 
