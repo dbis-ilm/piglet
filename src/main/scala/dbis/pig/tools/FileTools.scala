@@ -88,11 +88,12 @@ object FileTools {
     plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
     
     // 8. copy the sparklib library to output
-    backend match {
-      // TODO: we could simplify this by giving the backend to the Conf class which uses this value to build the config key to retrieve: "backends.$backend.jar" 
-      case "flink" => FileTools.extractJarToDir(Conf.flinkBackendJar, outputDirectory)
-      case "spark" => FileTools.extractJarToDir(Conf.sparkBackendJar, outputDirectory)
-    }
+//    backend match {
+//      case "flink" => FileTools.extractJarToDir(Conf.flinkBackendJar, outputDirectory)
+//      case "spark" => FileTools.extractJarToDir(Conf.sparkBackendJar, outputDirectory)
+//    }
+    
+    FileTools.extractJarToDir(Conf.backendJar(backend), outputDirectory)
     
 //    if (compileOnly) 
 //      return false // sys.exit(0)
