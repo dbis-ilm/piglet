@@ -17,12 +17,10 @@
 package dbis.pig.plan
 
 import dbis.pig.op._
+import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.schema.SchemaException
 
 import scala.collection.mutable.{ListBuffer, Map}
-import scalax.collection.GraphEdge.DiEdge
-import scalax.collection.mutable.Graph
-import scalax.collection.GraphPredef._
 
 /**
  * An exception indicating that the dataflow plan is invalid.
@@ -69,8 +67,9 @@ class DataflowPlan(var operators: List[PigOperator]) {
       // we can have multiple outputs (e.g. in SplitInto)
       op.outputs.foreach { p: Pipe =>
         if (p.name != "") {
-          if (pipes.contains(p.name))
+          if (pipes.contains(p.name)) {
             throw new InvalidPlanException("duplicate pipe: " + p.name)
+          }
           // we initialize the producer of the pipe
           p.producer = op
           pipes(p.name) = p
@@ -85,7 +84,11 @@ class DataflowPlan(var operators: List[PigOperator]) {
     planOps.foreach(op => {
         for (p <- op.inputs) {
           val element = pipes(p.name)
-          element.consumer = element.consumer :+ op
+          // Pipes already have their consumers set up after rewriting, therefore this step is not necessary. In
+          // fact, it would create duplicate elements in `consumer`.
+          if (!(element.consumer contains op)) {
+            element.consumer = element.consumer :+ op
+          }
         }
     })
 
@@ -201,15 +204,15 @@ class DataflowPlan(var operators: List[PigOperator]) {
   def containsOperator(op: PigOperator): Boolean = operators.contains(op)
   
   /**
-   * Swaps the two operators in the dataflow plan. Both operators are unary operators and have to be already
+   * Swaps two successive operators in the dataflow plan. Both operators are unary operators and have to be already
    * part of the plan.
    *
-   * @param n1 the first operator
-   * @param n2 the second operator
+   * @param n1 the parent operator
+   * @param n2 the child operator
    * @return the resulting dataflow plan
    */
   def swap(n1: PigOperator, n2: PigOperator) : DataflowPlan = {
-    this
+    Rewriter.swap(this, n1, n2)
   }
 
   /**
@@ -239,30 +242,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return the resulting dataflow plan
    */
   def remove(op: PigOperator) : DataflowPlan = {
-    
     require(operators.contains(op), "operator to remove is not member of the plan")
-    require(op.inputs.size == 1, "Currently, only one input operator is allowed")
-    
-    
-    val preds = op.inputs
-    for(pred <- preds) {
-      pred.producer.outputs = pred.producer.outputs.filter { pipe => pipe.consumer != op }
-    } 
-    
-    val succs = op.outputs
-    for(succ <- succs) {
-//      succ.consumer.inputs = succ.consumer.inputs.filter { pipe => pipe.producer != op }
-      for(consumer <- succ.consumer) {
-        consumer.inputs = consumer.inputs.filter { pipe => pipe.producer != op }
-      }
-    }
-    
-    op.inputs = List.empty
-    op.outputs = List.empty
-    
-    operators = operators.filter(_ != op)
-
-    this
+    Rewriter.remove(this, op)
   }
 
   /**
@@ -272,32 +253,11 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @param repl the new operator
    * @return the resulting dataflow plan
    */
-  def replace(old: PigOperator, repl: PigOperator) : DataflowPlan =  {
+  def replace(old: PigOperator, repl: PigOperator) : DataflowPlan = {
     require(operators.contains(old), "operator to replace is not member of the plan")
-    
-    /* 1. set intputs for new op as inputs of old op
-     * and clear old's inputs
-     */
-    repl.inputs = old.inputs.map { p => new Pipe(p.name, p.producer, p.consumer.filter(_ != old) :+ repl) }
-    println("in: "+repl.inputs.mkString(","))
-    old.inputs = List.empty
-    
-    // 2. copy outputs
-    repl.outputs = old.outputs.map { p => new Pipe(p.name, repl, p.consumer) }
-    repl.outputs.map(_.consumer).flatten.foreach{ consumer => consumer.inputs.map { p => Pipe(p.name, repl, p.consumer) } }  
-    println("out: "+repl.outputs.mkString(","))
-    
-
-    
-    // 4. clear old's outputs
-    old.outputs = List.empty
-    
-    // 5. finally, remove old from the operator list and add the new one
-    operators = operators.filter(_ != old) :+ repl
-    
-    this
+    Rewriter.replace(this, old, repl)
   }
-  
+
   def disconnect(op1: PigOperator, op2: PigOperator): DataflowPlan = {
     require(operators.contains(op1), s"operator is not member of the plan: $op1")
     require(operators.contains(op2), s"operator is not member of the plan: $op2")
@@ -308,5 +268,4 @@ class DataflowPlan(var operators: List[PigOperator]) {
     
     this
   }
-
 }
