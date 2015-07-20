@@ -20,7 +20,7 @@ package dbis.flink
 import org.apache.flink.streaming.api.scala._
 
 class PigStorage extends java.io.Serializable {
-  def load(env: StreamExecutionEnvironment, path: String, delim: Char = ' '): DataStream[List[String]] = {
+  def load(env: StreamExecutionEnvironment, path: String, delim: Char = '\t'): DataStream[List[String]] = {
     env.readTextFile(path).map(line => line.split(delim).toList)
   }
 }

@@ -282,7 +282,7 @@ class FlinksCompileSpec extends FlatSpec {
     val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List(PositionalField(0))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b.groupBy(t => t(0))")
+    val expectedCode = cleanString("val a = b.groupBy(t => t(0)).map(t => List(t(0),List(t)))")
     assert(generatedCode == expectedCode)
   }
 

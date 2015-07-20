@@ -20,11 +20,7 @@ begin_query(name) ::= <<
 
 // ----------------- LOAD text file -------------------------------------------
 loader(out,file,func,params) ::=<<
-<if (func)>
         val <out> = <func>().load(env, "<file>"<params>)
-<else>
-        val <out> = PigStorage().load(env, "<file>", '\t')
-<endif>
 >>
 
 // ------------------ DUMP Results --------------------------------------------
@@ -48,15 +44,20 @@ filter(out,in,pred) ::=<<
         val <out> = <in>.filter(t => {<pred>})
 >>
 
-// ------------------ Executes an expression FOR EACH input element -----------
+// ------------------ Executes an expression FOREACH input element ------------
 foreach(out,in,expr) ::=<<
         val <out> = <in>.map(t => <expr>)
+>>
+
+// ----- Executes an expression FOREACH input element requiring a flatMap -----
+foreachFlatMap(out,in,expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
 >>
 
 // ------------------ GROUPS elements on an expression ------------------------
 groupBy(out,in,expr) ::=<<
 <if (expr)>
-        val <out> = <in>.groupBy(t => <expr>)
+        val <out> = <in>.groupBy(t => <expr>).map(t => List(<expr>,List(t)))
 <else>
         val <out> = <in>
 <endif>
