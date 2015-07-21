@@ -21,12 +21,12 @@ import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
-
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.reflect.{ClassTag, classTag}
+import com.typesafe.scalalogging.LazyLogging
 
-object Rewriter {
+object Rewriter extends LazyLogging {
   private var ourStrategy = fail
 
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
@@ -407,6 +407,8 @@ object Rewriter {
       }
     }
 
+    logger.debug(s"found ${materializes.size} materialize operators")
+    
     var newPlan = plan
     
     /* we should check here if the op is still connected to a sink
@@ -424,6 +426,8 @@ object Rewriter {
        * with the loader.
        */
       if(data.isDefined) {
+        logger.debug(s"found materialized data for materialize operator $materialize")
+        
         val loader = Load(materialize.inputs.head, data.get, materialize.constructSchema, "BinStorage")
         val matInput = materialize.inputs(0).producer
         
@@ -432,10 +436,12 @@ object Rewriter {
         }
         
         newPlan = plan.replace(matInput, loader)
+
+        logger.info(s"replaced materialize op with loader $loader")
+        
         /* TODO: do we need to remove all other nodes that get disconnected now by hand
          * or do they get removed during code generation (because there is no sink?)
          */
-        
         newPlan = newPlan.remove(materialize)
         
       } else {
@@ -444,11 +450,15 @@ object Rewriter {
          * then, remove the materialize op
          */
         
+        logger.debug(s"did not find materialized data for materialize operator $materialize")
+        
         val file = mm.saveMapping(materialize.lineageSignature)
         val storer = new Store(materialize.inputs.head, file, "BinStorage")
         
         newPlan = plan.insertAfter(materialize.inputs(0).producer, storer)
         newPlan = newPlan.remove(materialize)
+        
+        logger.info(s"inserted new store operator $storer")
       }
     }
     
