@@ -369,7 +369,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val aa = myOp(bb)""".stripMargin)
+        |val aa = myOp(sc, bb)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -379,7 +379,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = package.myOp(b,1,42.0)""".stripMargin)
+        |val a = package.myOp(sc, b,1,42.0)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 

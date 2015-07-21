@@ -104,7 +104,7 @@ orderBy(out,in,key,asc) ::=<<
 
 // ------------------ STREAM operators ----------------------------------------
 streamOp(out,in,op,params) ::=<<
-        val <out> = <op>(sc,<in><params>)
+        val <out> = <op>(sc, <in><params>)
 >>
 
 // ----------------- END of the code implementing the query -------------------
