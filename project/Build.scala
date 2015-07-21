@@ -21,22 +21,7 @@ object PigBuild extends Build {
 
   val flinkBackend =      Map("flink" -> flinkSettings, "default" -> flinkSettings)
   val sparkBackend =      Map("spark" -> sparkSettings, "default" -> sparkSettings)
-  val flinksparkBackend = Map("flink" -> flinkSettings, "spark" -> sparkSettings, "default" -> sparkSettings)
 
-  def backendDependencies(backend: String): Seq[sbt.ModuleID] = backend match {
-    case "flink" => Seq (
-      Dependencies.flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
-    )
-    case "spark" => Seq (
-      Dependencies.sparkCore % "provided",
-      Dependencies.sparkSql % "provided"
-    )
-    case "sparkflink" => Seq(
-      Dependencies.flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar",
-      Dependencies.sparkCore % "provided"
-    )
-    case _ => throw new Exception(s"Backend $backend not available")
-  }
 
   def excludes(backend: String): Seq[sbt.Def.SettingsDefinition] = backend match{
     case "flink" => { Seq(
@@ -46,10 +31,10 @@ object PigBuild extends Build {
       "*SparkCompile.scala"       ||
       "*SparkCompileIt.scala"     ||
       "*SparkCompileSpec.scala",
-      excludeFilter in unmanagedResources := 
-      HiddenFileFilter || 
+      excludeFilter in unmanagedResources :=
+      HiddenFileFilter ||
       "spark-template.stg"
-    )} 
+    )}
     case "spark" =>{ Seq(
       excludeFilter in unmanagedSources :=
       HiddenFileFilter            ||
@@ -57,51 +42,36 @@ object PigBuild extends Build {
       "*FlinkCompile.scala"       ||
       "*FlinkCompileIt.scala"     ||
       "*FlinkCompileSpec.scala",
-      excludeFilter in unmanagedResources := 
-      HiddenFileFilter || 
+      excludeFilter in unmanagedResources :=
+      HiddenFileFilter ||
       "flink-template.stg"
     )}
-    case "sparkflink" => excludeFilter in unmanagedSources := HiddenFileFilter
     case _ => throw new Exception(s"Backend $backend not available")
   }
 }
 
 object Dependencies {
-  // Versions
-  lazy val scalaVersion =       "2.11.7"
-  lazy val scalaTestVersion =   "2.2.0"
-  lazy val scalaPCVersion =     "1.0.3"
-  lazy val scalaIoFileVersion = "0.4.3-1"
-  lazy val jlineVersion =       "2.12.1"
-  lazy val graphVersion =       "1.9.2"
-  lazy val sparkVersion =       "1.4.0"
-  lazy val flinkVersion =       "0.9-SNAPSHOT"
-  lazy val scoptVersion =       "3.3.0"
-  lazy val scalastiVersion =    "2.0.0"
-  lazy val jeromqVersion =      "0.3.4"
-  lazy val kiamaVersion =       "1.8.0"
-
   // Libraries
-  val scalaCompiler = "org.scala-lang" % "scala-compiler" % scalaVersion
-  val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion
-  val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % scalaPCVersion
-  val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % scalaIoFileVersion
-  val jline = "jline" % "jline" % jlineVersion
-  val graphCore = "com.assembla.scala-incubator" %% "graph-core" % graphVersion
-  val sparkCore = "org.apache.spark" %% "spark-core" % sparkVersion
-  val sparkSql = "org.apache.spark" %% "spark-sql" % sparkVersion
-  val flinkDist = "org.apache.flink" %% "flink-dist" % flinkVersion
-  val scopt = "com.github.scopt" %% "scopt" % scoptVersion
-  val scalasti = "org.clapper" %% "scalasti" % scalastiVersion
-  val jeromq = "org.zeromq" % "jeromq" % jeromqVersion
-  val kiama = "com.googlecode.kiama" %% "kiama" % kiamaVersion
+  val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.7"
+  val scalaTest = "org.scalatest" %% "scalatest" % "2.2.0"
+  val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
+  val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
+  val jline = "jline" % "jline" % "2.12.1"
+  val graphCore = "com.assembla.scala-incubator" %% "graph-core" % "1.9.2"
+  val sparkCore = "org.apache.spark" %% "spark-core" % "1.4.0"
+  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.4.0"
+  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.9-SNAPSHOT"
+  val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
+  val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
+  val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
+  val kiama = "com.googlecode.kiama" %% "kiama" % "1.8.0"
   val typesafe = "com.typesafe" % "config" % "1.3.0"
-  val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0" 
+  val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0"
   val log4j = "log4j" % "log4j" % "1.2.17"
 
   // Projects
   val rootDeps = Seq(
-    jline, 
+    jline,
     scalaTest % "test,it" withSources(),
     scalaParserCombinators withSources(),
     scalaCompiler,
@@ -112,17 +82,5 @@ object Dependencies {
     typesafe,
     scalaLogging,
     log4j
-  )
-  val sparkDeps = Seq(
-    scalaTest % "test" withSources(),
-    scalaCompiler,
-    sparkCore % "provided",
-    sparkSql % "provided"
-  )
-  val flinkDeps = Seq(
-    scalaTest % "test" withSources(),
-    scalaCompiler,
-    jeromq,
-    flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
   )
 }

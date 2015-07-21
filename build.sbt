@@ -6,22 +6,18 @@ lazy val commonSettings = Seq(
   organization := "dbis"
 )
 
-// scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
-testOptions in IntegrationTest += Tests.Argument("-oDF")
 
-/*  
+/*
  * define the backend for the compiler: currently we support spark and flink
  */
-
 val backendEnv = sys.props.getOrElse("backend", default="spark")
 //possibleBackends.contains(backendEnv) //TODO: outsource case _ => Exception part in all functions to here
 val backends = settingKey[Map[String,Map[String,String]]]("Backend Settings")
 backends := (backendEnv match {
   case "flink"      => flinkBackend
   case "spark"      => sparkBackend
-  case "sparkflink" => flinksparkBackend
   case _            => throw new Exception(s"Backend $backendEnv not available")
-})  
+})
 
 /*
  * Main Project
@@ -36,32 +32,21 @@ settings(
   buildInfoPackage := "dbis.pig",
   buildInfoObject := "BuildSettings",
   bintrayResolverSettings,
-  libraryDependencies ++= Dependencies.rootDeps ++ backendDependencies(backendEnv)
+  libraryDependencies ++= Dependencies.rootDeps
 ).
 settings(excludes(backendEnv): _*).
 aggregate(backendlib(backendEnv).map(a => a.project): _*).
 dependsOn(backendlib(backendEnv): _*)
 
-/*
- * Sub projects: supporting classes for Spark and Flink.
- */
-lazy val sparklib = (project in file("sparklib")).
-settings(commonSettings: _*).
-settings(
-  libraryDependencies ++= Dependencies.sparkDeps
-)
+lazy val common = project in file("common")
 
-lazy val flinklib = (project in file("flinklib")).
-settings(commonSettings: _*).
-settings(
-  libraryDependencies ++= Dependencies.flinkDeps,
-  resolvers += "Sonatype (releases)" at "https://oss.sonatype.org/content/repositories/releases/"
-)
+lazy val sparklib = (project in file("sparklib")).dependsOn(common)
+lazy val flinklib = (project in file("flinklib")).dependsOn(common)
+
 
 def backendlib(backend: String): List[ClasspathDep[ProjectReference]] = backend match {
-  case "flink" => List(flinklib)
-  case "spark" => List(sparklib)
-  case "sparkflink" => List(sparklib, flinklib)
+  case "flink" => List(common, flinklib)
+  case "spark" => List(common, sparklib)
   case _ => throw new Exception(s"Backend $backend not available")
 }
 
@@ -77,3 +62,6 @@ assemblyJarName in assembly := "PigCompiler.jar"
 test in assembly := {}
 
 mainClass in assembly := Some("dbis.pig.PigCompiler")
+
+// scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
+testOptions in IntegrationTest += Tests.Argument("-oDF")
