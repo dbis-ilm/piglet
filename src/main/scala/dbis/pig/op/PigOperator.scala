@@ -210,7 +210,7 @@ trait PigOperator extends Rewritable {
       }
       // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
       // operators
-      case ops: List[_] => this.reconstruct(ops, outname)
+      case ops: Seq[_] => this.reconstruct(ops, outname)
       case _ => illegalArgs("PigOperator", "PigOperator", outputs)
     })
     this
