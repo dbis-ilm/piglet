@@ -1,27 +1,94 @@
 import sbt._
 import Keys._
+import sbtbuildinfo._
+import sbtbuildinfo.BuildInfoPlugin
+import sbtbuildinfo.BuildInfoKeys._
 
-object PigBuild extends Build {
+object PigBuild extends AutoPlugin with Build {
 
-  val possibleBackends = List("flink","spark","sparkflink")
+  /*
+   * Common Settings **********************************************************
+   */
+  lazy val commonSettings = Seq(
+    version := "1.0",
+    scalaVersion := "2.11.7",
+    organization := "dbis"
+  )
+
+  /*
+   * Projects *****************************************************************
+   */
+  lazy val root = (project in file(".")).
+  configs(IntegrationTest).
+  settings(commonSettings: _*).
+  settings(Defaults.itSettings: _*).
+  enablePlugins(BuildInfoPlugin).
+  settings(
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, backends),
+    buildInfoPackage := "dbis.pig",
+    buildInfoObject := "BuildSettings"
+    //bintrayResolverSettings
+  ).
+  settings(excludes(backendEnv): _*).
+  aggregate(backendlib(backendEnv).map(a => a.project): _*).
+  dependsOn(backendlib(backendEnv): _*)
+
+  lazy val common = (project in file("common")).
+    settings(commonSettings: _*)
+
+  lazy val sparklib = (project in file("sparklib")).
+    settings(commonSettings: _*).  
+    dependsOn(common)
+
+  lazy val flinklib = (project in file("flinklib")).
+    settings(commonSettings: _*).
+    dependsOn(common)
+
+
+  /*
+   * Values *******************************************************************
+   */
+  val possibleBackends = List("flink","spark")
+
+  /*
+   * define the backend for the compiler: currently we support spark and flink
+   */
+  val backendEnv = sys.props.getOrElse("backend", default="spark")
+  
+  //possibleBackends.contains(backendEnv) //TODO: outsource case _ => Exception part in all functions to here
+
+  val backends = settingKey[Map[String,Map[String,String]]]("Backend Settings")
+  backends := (backendEnv match {
+      case "flink"      => flinkBackend
+      case "spark"      => sparkBackend
+      case _            => throw new Exception(s"Backend $backendEnv not available")
+  })
+
 
   val flinkSettings = Map(
     "name"  -> "flink",
     "runClass" -> "dbis.pig.tools.FlinkRun",
-//    "compilerClass" -> "dbis.pig.FlinkCompile",
-    "templateFile" -> "flink-template.stg"//"src/main/resources/flink-template.stg"
+    "templateFile" -> "flink-template.stg"
   )
 
   val sparkSettings = Map(
     "name"  -> "spark",
     "runClass" -> "dbis.pig.tools.SparkRun",
-//    "compilerClass" -> "dbis.pig.SparkCompile",
-    "templateFile" -> "spark-template.stg"//"src/main/resources/spark-template.stg"
+    "templateFile" -> "spark-template.stg"
   )
 
-  val flinkBackend =      Map("flink" -> flinkSettings, "default" -> flinkSettings)
-  val sparkBackend =      Map("spark" -> sparkSettings, "default" -> sparkSettings)
+  val flinkBackend = Map("flink" -> flinkSettings, "default" -> flinkSettings)
+  val sparkBackend = Map("spark" -> sparkSettings, "default" -> sparkSettings)
 
+
+  /*
+   * Methods ******************************************************************
+   */
+  def backendlib(backend: String): List[ClasspathDep[ProjectReference]] = backend match {
+    case "flink" => List(common, flinklib)
+    case "spark" => List(common, sparklib)
+    case _ => throw new Exception(s"Backend $backend not available")
+  }
 
   def excludes(backend: String): Seq[sbt.Def.SettingsDefinition] = backend match{
     case "flink" => { Seq(
@@ -50,6 +117,9 @@ object PigBuild extends Build {
   }
 }
 
+/*
+ * Dependencies
+ */
 object Dependencies {
   // Libraries
   val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.7"
