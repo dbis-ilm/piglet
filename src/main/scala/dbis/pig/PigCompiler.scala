@@ -30,14 +30,16 @@ import scala.io.Source
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.backends.BackendManager
 
 object PigCompiler extends PigParser with LazyLogging {
+  
   case class CompilerConfig(master: String = "local",
                             input: String = "",
                             compile: Boolean = false,
                             outDir: String = ".",
                             params: Map[String,String] = Map(),
-                            backend: String = BuildSettings.backends.get("default").get("name"))
+                            backend: String = Conf.defaultBackend) // XXX: does this work?
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
@@ -123,7 +125,8 @@ object PigCompiler extends PigParser with LazyLogging {
       if (!compileOnly) {
         // 4. and finally deploy/submit
         val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
-        val runner = FileTools.getRunner(backend)
+//        val runner = FileTools.getRunner(backend)
+        val runner = BackendManager.backendConf(backend).runnerClass
         
         logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
         

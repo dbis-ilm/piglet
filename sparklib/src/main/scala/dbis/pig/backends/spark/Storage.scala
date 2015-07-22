@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.spark
+package dbis.pig.backends.spark
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._

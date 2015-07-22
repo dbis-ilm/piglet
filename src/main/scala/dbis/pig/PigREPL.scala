@@ -26,8 +26,9 @@ import dbis.pig.plan.PrettyPrinter._
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.FileTools
 import jline.console.ConsoleReader
-
 import scala.collection.mutable.ListBuffer
+import dbis.pig.backends.BackendManager
+import dbis.pig.tools.Conf
 
 sealed trait JLineEvent
 case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
@@ -98,7 +99,7 @@ object PigREPL extends PigParser {
   }
 
   def main(args: Array[String]): Unit = {
-    val backend = if(args.length==0) BuildSettings.backends.get("default").get("name")
+    val backend = if(args.length==0) Conf.defaultBackend
                   else { 
                     args(0) match{
                       case "flink" => "flink"
@@ -155,7 +156,9 @@ object PigREPL extends PigParser {
         if (FileTools.compileToJar(plan, "script", ".", false, backend)) {
           val jarFile = s".${File.separator}script${File.separator}script.jar"
 //          val jarFile = "script.jar"
-          val runner = FileTools.getRunner(backend)
+//          val runner = FileTools.getRunner(backend)
+          val runner = BackendManager.backendConf(backend).runnerClass
+          
           runner.execute("local", "script", jarFile)
         }
         // buf.clear()

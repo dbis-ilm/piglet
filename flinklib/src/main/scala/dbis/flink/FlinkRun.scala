@@ -20,9 +20,33 @@ package dbis.pig.tools
 import scala.sys.process._
 import java.security._
 import org.apache.flink.client.CliFrontend
+import dbis.pig.backends.PigletBackend
+import com.typesafe.config.ConfigFactory
 
 
-class FlinkRun extends Run{
+class FlinkRun extends PigletBackend {
+  
+  // loads the default configuration file in resources/sparkbackend.conf
+  private val appconf = ConfigFactory.load("flinkbackend.conf")
+  
+  /**
+   * Get the name of this backend
+   * 
+   * @return Returns the name of this backend
+   */
+  override def name: String = appconf.getString("backend.name")
+  
+  /**
+   * Get the path to the runner class that implements the PigletBackend interface
+   */
+  override def runnerClass: PigletBackend = {
+    this
+  } 
+  
+  override def jobJar: String = appconf.getString("backend.jar")
+  
+  override def templateFile: String = appconf.getString("backend.template")
+  
   override def execute(master: String, className: String, jarFile: String){
     if (master.startsWith("local") && !master.startsWith("localhost")){
       //      val zmqJar = "/home/blaze/.ivy2/cache/org.zeromq/zeromq-scala-binding_2.11.0-M3/jars/zeromq-scala-binding_2.11.0-M3-0.0.7.jar"

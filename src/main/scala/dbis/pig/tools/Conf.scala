@@ -14,5 +14,9 @@ object Conf {
                                                 appconf.getString("materialization.mapfile"))
  
   
-  def backendJar(backend: String) = appconf.getString(s"backends.$backend.jar")
+//  def backendJar(backend: String) = appconf.getString(s"backends.$backend.jar")
+  
+  def defaultBackend = appconf.getString("backends.default")
+  
+  def backendConf(backend: String) = appconf.getString(s"backends.$backend.conf")
 }

@@ -5,6 +5,7 @@ name := "sparklib"
 libraryDependencies ++= Seq(
     scalaCompiler,
     scalaTest % "test" withSources(),
-    sparkCore,
-    sparkSql
+    sparkCore % "provided",
+    sparkSql % "provided",
+    typesafe
 )

@@ -37,7 +37,7 @@ object PigBuild extends AutoPlugin with Build {
     settings(commonSettings: _*)
 
   lazy val sparklib = (project in file("sparklib")).
-    settings(commonSettings: _*).  
+    settings(commonSettings: _*).
     dependsOn(common)
 
   lazy val flinklib = (project in file("flinklib")).
@@ -54,7 +54,7 @@ object PigBuild extends AutoPlugin with Build {
    * define the backend for the compiler: currently we support spark and flink
    */
   val backendEnv = sys.props.getOrElse("backend", default="spark")
-  
+
   //possibleBackends.contains(backendEnv) //TODO: outsource case _ => Exception part in all functions to here
 
   val backends = settingKey[Map[String,Map[String,String]]]("Backend Settings")

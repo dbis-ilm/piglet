@@ -23,6 +23,7 @@ import dbis.pig._
 import dbis.pig.codegen.ScalaBackendCompile
 import dbis.pig.plan.DataflowPlan
 import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.backends.BackendManager
 
 object FileTools extends LazyLogging {
   def copyStream(istream : InputStream, ostream : OutputStream) : Unit = {
@@ -62,7 +63,7 @@ object FileTools extends LazyLogging {
   
   def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, compileOnly: Boolean = false, backend: String = "spark"): Boolean = {
     // 4. compile it into Scala code for Spark
-    val compiler = new ScalaBackendCompile(getTemplateFile(backend)) 
+    val compiler = new ScalaBackendCompile(BackendManager.backendConf(backend).templateFile) 
 
     // 5. generate the Scala code
     val code = compiler.compile(scriptName, plan)
@@ -94,12 +95,8 @@ object FileTools extends LazyLogging {
     plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
     
     // 8. copy the sparklib library to output
-//    backend match {
-//      case "flink" => FileTools.extractJarToDir(Conf.flinkBackendJar, outputDirectory)
-//      case "spark" => FileTools.extractJarToDir(Conf.sparkBackendJar, outputDirectory)
-//    }
-    
-    FileTools.extractJarToDir(Conf.backendJar(backend), outputDirectory)
+    val jobJar = BackendManager.backendConf(backend).jobJar
+    FileTools.extractJarToDir(jobJar, outputDirectory)
     
 //    if (compileOnly) 
 //      return false // sys.exit(0)
@@ -118,12 +115,14 @@ object FileTools extends LazyLogging {
     true
   }
 
-  private def getTemplateFile(backend: String): String = {
-    BuildSettings.backends.get(backend).get("templateFile")
-  }
-
-  def getRunner(backend: String): Run = { 
-    val className = BuildSettings.backends.get(backend).get("runClass")
-    Class.forName(className).newInstance().asInstanceOf[Run]
-  }
+  
+  
+//  private def getTemplateFile(backend: String): String = {
+//    BuildSettings.backends.get(backend).get("templateFile")
+//  }
+//
+//  def getRunner(backend: String): Run = { 
+//    val className = BuildSettings.backends.get(backend).get("runClass")
+//    Class.forName(className).newInstance().asInstanceOf[Run]
+//  }
 }
