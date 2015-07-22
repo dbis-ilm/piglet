@@ -198,8 +198,8 @@ trait PigOperator extends Rewritable {
     */
   def reconstruct(outputs: Seq[Any], outname: String): PigOperator = {
     this.outputs = List.empty
-    outputs.foreach(_ match {
-      case op: PigOperator => {
+    outputs.foreach {
+      case op: PigOperator =>
         val idx = this.outputs.indexWhere(_.name == outname)
         if (idx > -1) {
           // There already is a Pipe to `outname`
@@ -207,12 +207,11 @@ trait PigOperator extends Rewritable {
         } else {
           this.outputs = this.outputs :+ Pipe(outname, this, List(op))
         }
-      }
       // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
       // operators
       case ops: Seq[_] => this.reconstruct(ops, outname)
       case _ => illegalArgs("PigOperator", "PigOperator", outputs)
-    })
+    }
     this
   }
 }
