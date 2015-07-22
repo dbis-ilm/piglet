@@ -56,7 +56,7 @@ object Rewriter {
     * @param strategy The strategy to apply.
     * @return
     */
-  def processPigOperator(sink: PigOperator, strategy: Strategy): PigOperator = {
+  private def processPigOperator(sink: PigOperator, strategy: Strategy): PigOperator = {
     val rewriter = bottomup(attempt(strategy))
     rewrite(rewriter)(sink)
   }
