@@ -22,10 +22,11 @@ import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
+import dbis.pig.backends.BackendManager
 
 class SparkCompileSpec extends FlatSpec {
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = "src/main/resources/spark-template.stg"
+  val templateFile = BackendManager.backendConf("spark").templateFile
   "The compiler output" should "contain the Spark header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport
@@ -38,7 +39,7 @@ class SparkCompileSpec extends FlatSpec {
         |import org.apache.spark.SparkContext._
         |import org.apache.spark.SparkConf
         |import org.apache.spark.rdd._
-        |import dbis.spark._
+        |import dbis.pig.backends.spark._
         |
         |object test {
         |    def main(args: Array[String]) {
