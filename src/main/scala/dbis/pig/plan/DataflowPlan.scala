@@ -223,15 +223,15 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return the resulting dataflow plan
    */
   def insertAfter(old: PigOperator, op: PigOperator) : DataflowPlan =  {
-    
+
     val p = new Pipe(old.outPipeName, old, List(op))
-    
+
     old.outputs = (old.outputs :+ p)
-    
+
     op.inputs = (op.inputs :+ p)
-    
+
     operators = operators :+ op
-    
+
     this
   }
 
