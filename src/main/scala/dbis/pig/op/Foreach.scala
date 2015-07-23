@@ -364,6 +364,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
           case DerefTuple(t, r) => t match {
             case NamedField(n) => s.field(n)
             case PositionalField(p) => s.field(p)
+            case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
           }
           case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
         }
@@ -376,6 +377,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
           case DerefTuple(t, r) => r match {
             case NamedField(n) => fieldType.typeOfComponent(n)
             case PositionalField(p) => fieldType.typeOfComponent(p)
+            case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
           }
           case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
         }

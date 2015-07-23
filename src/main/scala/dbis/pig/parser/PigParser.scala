@@ -23,6 +23,8 @@ import dbis.pig.schema._
 
 import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.input.CharSequenceReader
+import scala.language.implicitConversions
+import scala.language.postfixOps
 
 /**
  * An enumeration type representing the various language sets

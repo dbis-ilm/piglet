@@ -62,6 +62,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         case Some(s) => s.field(p).fType
         case None => None
       }
+      case _ => None
     }
     if (tp == None)
       None
