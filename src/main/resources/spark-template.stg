@@ -24,7 +24,7 @@ begin_query(name) ::= <<
 
 // ----------------- LOAD text file -------------------------------------------
 loader(out,file,func,schema,params) ::=<<
-		val <out> = <func>().load(sc, "<file>"<params>)
+        val <out> = <func>().load(sc, "<file>"<params>)
 >>
 
 // ------------------ DUMP results --------------------------------------------
@@ -104,7 +104,7 @@ orderBy(out,in,key,asc) ::=<<
 
 // ------------------ STREAM operators ----------------------------------------
 streamOp(out,in,op,params) ::=<<
-        val <out> = <op>(<in><params>)
+        val <out> = <op>(sc, <in><params>)
 >>
 
 // ----------------- END of the code implementing the query -------------------

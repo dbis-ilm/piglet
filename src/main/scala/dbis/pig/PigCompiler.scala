@@ -30,8 +30,9 @@ import scopt.OptionParser
 import scala.io.Source
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.tools.Conf
+import com.typesafe.scalalogging.LazyLogging
 
-object PigCompiler extends PigParser {
+object PigCompiler extends PigParser with LazyLogging {
   case class CompilerConfig(master: String = "local",
                             input: String = "",
                             compile: Boolean = false,
@@ -85,6 +86,8 @@ object PigCompiler extends PigParser {
     
     // 1. we read the Pig file
     val source = Source.fromFile(inputFile)
+    
+    logger.debug(s"""loaded pig script from "$inputFile" """)
 
     val fileName = new File(inputFile).getName
 
@@ -107,6 +110,8 @@ object PigCompiler extends PigParser {
       return
     }
 
+    logger.debug("successfully created dataflow plan")
+    
     // 3. now, we should apply optimizations
     
     val mm = new MaterializationManager
@@ -114,16 +119,22 @@ object PigCompiler extends PigParser {
     if (backend=="flinks")
       plan = processWindows(plan)
     plan = processPlan(plan)
+    
+    logger.debug("finished optimizations")
 
     if (FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend)) {
-      val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
-
       if (!compileOnly) {
         // 4. and finally deploy/submit
+        val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
         val runner = FileTools.getRunner(backend)
+        
+        logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
+        
         runner.execute(master, scriptName, jarFile)
-      }
-    }
+      } else
+        logger.info("successfully compiled program - exiting.")
+    } else 
+      logger.error("creating jar file failed")
   }
 
   def replaceParameters(line: String, params: Map[String,String]): String = {

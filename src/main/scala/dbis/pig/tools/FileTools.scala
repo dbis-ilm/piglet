@@ -19,12 +19,12 @@ package dbis.pig.tools
 
 import java.io.{File, FileOutputStream, FileWriter, InputStream, OutputStream}
 import java.util.jar.JarFile
-
 import dbis.pig._
 import dbis.pig.codegen.ScalaBackendCompile
 import dbis.pig.plan.DataflowPlan
+import com.typesafe.scalalogging.LazyLogging
 
-object FileTools {
+object FileTools extends LazyLogging {
   def copyStream(istream : InputStream, ostream : OutputStream) : Unit = {
     var bytes =  new Array[Byte](1024)
     var len = -1
@@ -33,6 +33,9 @@ object FileTools {
   }
 
   def extractJarToDir(jarName: String, outDir: String): Unit = {
+    
+    logger.debug(s"extracting jar $jarName to $outDir" )
+    
     val jar = new JarFile(jarName)
     val enu = jar.entries
     while (enu.hasMoreElements) {
@@ -61,16 +64,19 @@ object FileTools {
     // 4. compile it into Scala code for Spark
     val compiler = new ScalaBackendCompile(getTemplateFile(backend)) 
 
+    // 5. generate the Scala code
     val code = compiler.compile(scriptName, plan)
 
-    // 5. write it to a file
+    logger.debug("successfully generated scala program")
+    
+    // 6. write it to a file
 
     val outputDir = new File(s"$outDir${File.separator}${scriptName}")
     if(!outputDir.exists()) {
       outputDir.mkdirs()
     }
     
-    // 6. compile the Scala code
+
     val outputDirectory = s"${outputDir.getCanonicalPath}${File.separator}out"
     
     // check whether output directory exists
@@ -88,25 +94,27 @@ object FileTools {
     plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
     
     // 8. copy the sparklib library to output
-    backend match {
-      // TODO: we could simplify this by giving the backend to the Conf class which uses this value to build the config key to retrieve: "backends.$backend.jar" 
-      case "flink" | "flinks" => FileTools.extractJarToDir(Conf.flinkBackendJar, outputDirectory)
-      case "spark" | "sparks" => FileTools.extractJarToDir(Conf.sparkBackendJar, outputDirectory)
-    }
+//    backend match {
+//      case "flink" => FileTools.extractJarToDir(Conf.flinkBackendJar, outputDirectory)
+//      case "spark" => FileTools.extractJarToDir(Conf.sparkBackendJar, outputDirectory)
+//    }
+    
+    FileTools.extractJarToDir(Conf.backendJar(backend), outputDirectory)
     
 //    if (compileOnly) 
 //      return false // sys.exit(0)
 
+    // 9. compile the scala code
     if (!ScalaCompiler.compile(outputDirectory, outputFile))
       return false
 
 
-
-    
-
-    // 9. build a jar file
+    // 10. build a jar file
     val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
     JarBuilder.apply(outputDirectory, jarFile, verbose = false)
+    
+    logger.info(s"created job's jar file at $jarFile")
+    
     true
   }
 

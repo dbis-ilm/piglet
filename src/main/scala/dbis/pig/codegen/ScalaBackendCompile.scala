@@ -239,6 +239,16 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       s"Array(${joinExpr.map(e => emitRef(schema, e)).mkString(",")}).mkString"
   }
 
+  def emitJoin(node: PigOperator, out: String, rels: List[Pipe], 
+               exprs: List[List[Ref]], window: Tuple2[Int,String]): String = {
+    val res = node.inputs.zip(exprs)
+    val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
+    if(window!=null)
+      callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail,"window"->window._1,"wUnit"->window._2))
+    else
+      callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
+  }
+
   /**
    * Generates code for the LOAD operator.
    *
@@ -526,11 +536,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       }
       case Distinct(out, in) => callST("distinct", Map("out"->out.name,"in"->in.name))
       case Limit(out, in, num) => callST("limit", Map("out"->out.name,"in"->in.name,"num"->num))
-      case Join(out, rels, exprs, window) => {
-        val res = node.inputs.zip(exprs)
-        val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
-        callST("join", Map("out"->out.name,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail,"window"->window._1,"wUnit"->window._2))
-      }
+      case Join(out, rels, exprs, window) => emitJoin(node, out.name, rels, exprs, window)
       case Union(out, rels) => callST("union", Map("out"->out.name,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
       case Sample(out, in, expr) => callST("sample", Map("out"->out.name,"in"->in.name,"expr"->emitExpr(node.schema, expr)))
       case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out.name,"in"->in.name,
