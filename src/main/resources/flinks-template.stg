@@ -91,9 +91,9 @@ window(out,in,window,wUnit,slider,sUnit) ::=<<
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
-join(out,rel1,key1,rel2,key2) ::=<<
+join(out,rel1,key1,rel2,key2,window,wUnit) ::=<<
         val <out> = <rel1><rel2,key2:{ r,k |<\\>
-        .join(<r>).onWindow(5, TimeUnit.SECONDS).where(t => <key1>).equalTo(t => <k>)<\\>
+        .join(<r>).onWindow(<window>, TimeUnit.<wUnit>).where(t => <key1>).equalTo(t => <k>)<\\>
         .map{ t => t._1 ++ t._2 \}<\\>
         }>
 

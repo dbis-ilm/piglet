@@ -209,8 +209,8 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for a binary JOIN statement with simple expression" in {
-    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))))
-    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
+   val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
     val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
@@ -227,7 +227,7 @@ class FlinksCompileSpec extends FlatSpec {
 
   it should "contain code for a binary JOIN statement with expression lists" in {
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
-      List(PositionalField(1), PositionalField(2))))
+      List(PositionalField(1), PositionalField(2))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
@@ -245,7 +245,7 @@ class FlinksCompileSpec extends FlatSpec {
 
   it should "contain code for a multiway JOIN statement" in {
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
-      List(PositionalField(0)), List(PositionalField(0))))
+      List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))

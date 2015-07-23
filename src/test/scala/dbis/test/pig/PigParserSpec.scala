@@ -434,7 +434,7 @@ class PigParserSpec extends FlatSpec {
  
   it should "parse a window statement using Range for window and slider" in {
     assert(parseScript("a = window b range 100 seconds slide range 10 seconds;", LanguageFeature.StreamingPig)
-      == List(Window(Pipe("a"), Pipe("b"), (100,"seconds"), (10,"seconds"))))
+      == List(Window(Pipe("a"), Pipe("b"), (100,"SECONDS"), (10,"SECONDS"))))
   }
 
   it should "parse a SPLIT INTO statement" in {

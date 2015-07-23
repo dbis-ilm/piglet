@@ -21,6 +21,7 @@ package dbis.pig
 import java.io.File
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
+import dbis.pig.parser.LanguageFeature._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.schema.SchemaException
@@ -88,7 +89,7 @@ object PigCompiler extends PigParser {
     val fileName = new File(inputFile).getName
 
     // 2. then we parse it and construct a dataflow plan
-    var plan = new DataflowPlan(parseScriptFromSource(source, params))
+    var plan = new DataflowPlan(parseScriptFromSource(source, params, backend))
     
     try {
       // if this does _not_ throw an exception, the schema is ok
@@ -110,6 +111,8 @@ object PigCompiler extends PigParser {
     
     val mm = new MaterializationManager
     plan = processMaterializations(plan, mm)
+    if (backend=="flinks")
+      plan = processWindows(plan)
     plan = processPlan(plan)
 
     if (FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend)) {
@@ -129,12 +132,16 @@ object PigCompiler extends PigParser {
     s
   }
 
-  private def parseScriptFromSource(source: Source, params: Map[String,String]): List[PigOperator] = {
-    parseScript(
+  private def parseScriptFromSource(source: Source, params: Map[String,String], backend: String): List[PigOperator] = {
       if (params.nonEmpty)
-        source.getLines().map(line => replaceParameters(line, params)).mkString("\n")
+        if (backend == "flinks")
+          parseScript(source.getLines().map(line => replaceParameters(line, params)).mkString("\n"), StreamingPig)
+        else
+          parseScript(source.getLines().map(line => replaceParameters(line, params)).mkString("\n"))
       else
-        source.getLines().mkString("\n")
-    )
+        if (backend == "flinks")
+          parseScript(source.getLines().mkString("\n"), StreamingPig)
+        else
+          parseScript(source.getLines().mkString("\n"))
   }
 }

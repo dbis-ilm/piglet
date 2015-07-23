@@ -28,9 +28,9 @@ class FlinksCompileIt extends FlatSpec with Matchers {
     ("script", "result", "truth"), // only the header of the table
     ("load.pig", "result1.out", "result1.data"),
     ("load2.pig", "result2.out", "result2.data"),
-    ("selfjoin.pig", "joined.out", "joined.data"),
     ("foreach1.pig", "distances.out", "distances.data"),
-    ("construct.pig", "result3.out", "result3.data")
+    ("construct.pig", "result3.out", "result3.data"),
+    ("windowJoin.pig", "joinedW.out", "joined.data")
    // ("grouping.pig", "grouping.out", "grouping.data") //TODO: Make Window equivalent
    // ("nforeach.pig", "nested.out", "nested.data") //TODO: Make Window equivalent
    // ("wordcount.pig", "marycounts.out", "marycount.data") //TODO: Make Window equivalent

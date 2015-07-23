@@ -26,6 +26,8 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.reflect.{ClassTag, classTag}
 
+case class RewriterException(msg:String)  extends Exception(msg)
+
 object Rewriter {
   private var ourStrategy = fail
 
@@ -452,6 +454,71 @@ object Rewriter {
       }
     }
     
+    newPlan
+  }
+
+  def processWindows(plan: DataflowPlan): DataflowPlan = {
+    require(plan != null, "Plan must not be null")
+
+    val walker = new BreadthFirstBottomUpWalker
+
+    val joins = ListBuffer.empty[Join]
+
+    walker.walk(plan){ op => 
+      op match {
+        case o: Join => joins += o
+        case _ =>
+      }
+    }
+
+    var newPlan = plan
+    /*
+     * Foreach Join Operator check if Input requirements are met.
+     * Collect Window input relations and create new Join with Window 
+     * definition and window inputs as new inputs.
+     */
+    for(joinOp <- joins) {
+      var newInputs = ListBuffer.empty[Pipe]
+      var windowDef: Option[Tuple2[Int,String]] = None
+      for(joinInputPipe <- joinOp.inputs){
+        val inputOp = joinInputPipe.producer
+        if(!inputOp.isInstanceOf[Window]) 
+          throw new RewriterException("Join inputs must be Window Definitions")
+        val inputWindow = inputOp.asInstanceOf[Window]
+        if(inputWindow.window._2=="") 
+          throw new RewriterException("Join input windows must be defined via RANGE")
+        if (!windowDef.isDefined) 
+          windowDef = Some(inputWindow.window)
+        if(windowDef!=Some(inputWindow.window)) 
+          throw new RewriterException("Join input windows must have the same definition")
+        newInputs += inputWindow.in
+      }
+      val newJoin = Join(joinOp.out, newInputs.toList, joinOp.fieldExprs, windowDef.getOrElse(null.asInstanceOf[Tuple2[Int,String]]))
+
+      /*
+       * Delete all involved Window Operators
+       */
+      for(windowPipe <- joinOp.inputs)
+        newPlan = newPlan.remove(windowPipe.producer)
+
+      /*
+       * Replace Old Join with new Join (new Input Pipes and Window Parameter)
+       */
+//      newPlan = newPlan.replace(joinOp, newJoin)
+//      newPlan = newPlan.insertAfter(joinOp, newJoin)
+//      newPlan = newPlan.remove(joinOp)
+      val strategy = (op: Any) => {
+        if (op == joinOp) {
+          joinOp.outputs = List.empty
+          joinOp.inputs = List.empty
+          Some(newJoin)
+        }
+        else {
+          None
+        }
+      }
+      newPlan = processPlan(newPlan, strategyf(t => strategy(t)))
+    }
     newPlan
   }
   

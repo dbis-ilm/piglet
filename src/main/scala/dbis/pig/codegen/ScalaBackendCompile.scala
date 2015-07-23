@@ -526,10 +526,10 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       }
       case Distinct(out, in) => callST("distinct", Map("out"->out.name,"in"->in.name))
       case Limit(out, in, num) => callST("limit", Map("out"->out.name,"in"->in.name,"num"->num))
-      case Join(out, rels, exprs) => { //TODO: Window Parameters
+      case Join(out, rels, exprs, window) => {
         val res = node.inputs.zip(exprs)
         val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
-        callST("join", Map("out"->out.name,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
+        callST("join", Map("out"->out.name,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail,"window"->window._1,"wUnit"->window._2))
       }
       case Union(out, rels) => callST("union", Map("out"->out.name,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
       case Sample(out, in, expr) => callST("sample", Map("out"->out.name,"in"->in.name,"expr"->emitExpr(node.schema, expr)))
