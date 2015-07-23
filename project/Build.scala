@@ -19,19 +19,12 @@ object PigBuild extends AutoPlugin with Build {
    * Projects *****************************************************************
    */
   lazy val root = (project in file(".")).
-  configs(IntegrationTest).
-  settings(commonSettings: _*).
-  settings(Defaults.itSettings: _*).
-  enablePlugins(BuildInfoPlugin).
-  settings(
-    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, backends),
-    buildInfoPackage := "dbis.pig",
-    buildInfoObject := "BuildSettings"
-    //bintrayResolverSettings
-  ).
-  settings(excludes(backendEnv): _*).
-  aggregate(backendlib(backendEnv).map(a => a.project): _*).
-  dependsOn(backendlib(backendEnv): _*)
+    configs(IntegrationTest).
+    settings(commonSettings: _*).
+    settings(Defaults.itSettings: _*).
+    settings(excludes(backendEnv): _*).
+    aggregate(backendlib(backendEnv).map(a => a.project): _*).
+    dependsOn(backendlib(backendEnv): _*)
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -48,38 +41,11 @@ object PigBuild extends AutoPlugin with Build {
   /*
    * Values *******************************************************************
    */
-  val possibleBackends = List("flink","spark")
 
   /*
    * define the backend for the compiler: currently we support spark and flink
    */
   val backendEnv = sys.props.getOrElse("backend", default="spark")
-
-  //possibleBackends.contains(backendEnv) //TODO: outsource case _ => Exception part in all functions to here
-
-  val backends = settingKey[Map[String,Map[String,String]]]("Backend Settings")
-  backends := (backendEnv match {
-      case "flink"      => flinkBackend
-      case "spark"      => sparkBackend
-      case _            => throw new Exception(s"Backend $backendEnv not available")
-  })
-
-
-  val flinkSettings = Map(
-    "name"  -> "flink",
-    "runClass" -> "dbis.pig.tools.FlinkRun",
-    "templateFile" -> "flink-template.stg"
-  )
-
-  val sparkSettings = Map(
-    "name"  -> "spark",
-    "runClass" -> "dbis.pig.tools.SparkRun",
-    "templateFile" -> "spark-template.stg"
-  )
-
-  val flinkBackend = Map("flink" -> flinkSettings, "default" -> flinkSettings)
-  val sparkBackend = Map("spark" -> sparkSettings, "default" -> sparkSettings)
-
 
   /*
    * Methods ******************************************************************
