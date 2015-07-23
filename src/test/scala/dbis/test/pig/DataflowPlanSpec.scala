@@ -22,7 +22,6 @@ import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
 import dbis.pig.schema._
 import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
-import dbis.pig.plan.PrettyPrinter
 
 class DataflowPlanSpec extends FlatSpec with Matchers {
   /*
