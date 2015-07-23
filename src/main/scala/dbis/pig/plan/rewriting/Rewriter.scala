@@ -220,6 +220,43 @@ object Rewriter {
     addBinaryPigOperatorStrategy(strategy)
   }
 
+  ///////////
+  // insertAfter, replace, remove and swap are methods that usually do not get called directly, but indirectly
+  // through their counterparts on DataflowPLan
+  ///////////
+
+  /** Insert `newOp` after `old` in `plan`.
+    *
+    * @param plan
+    * @param old
+    * @param newOp
+    * @return
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  def insertAfter(plan: DataflowPlan, old: PigOperator, newOp: PigOperator): DataflowPlan = {
+    require(!newOp.isInstanceOf[Load], "Can't insert a Load operator after another operator")
+    require((old.outPipeName == "") || (old.outPipeName == newOp.inputs.head.name), "The new operator has to read " +
+      "from " +
+      "the old one")
+    val strategy = (op: Any) => {
+      if (op == old){
+        val outIdx = old.outputs.indexWhere(_.name == newOp.inputs.head.name)
+        if (outIdx > -1) {
+          // newOp doesn't read from old - in practice, this can only happen if old's outPipeName is "", which means
+          // it simply does not yet have any outputs
+          old.outputs(outIdx).consumer = old.outputs(outIdx).consumer :+ newOp
+        } else {
+          old.outputs :+ List(Pipe(newOp.inputs.head.name, old, List(newOp)))
+        }
+        newOp.inputs.head.producer = old
+        Some(op)
+      }
+      else {
+        None
+      }
+    }
+    processPlan(plan, strategyf(t => strategy(t)))
+  }
   /** Replace `old` with `repl` in `plan`.
     *
     * @param plan
