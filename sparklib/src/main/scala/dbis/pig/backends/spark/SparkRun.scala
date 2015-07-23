@@ -40,7 +40,7 @@ class SparkRun extends PigletBackend {
    * 
    * @return Returns the name of this backend
    */
-  override def name: String = appconf.getString("backend.name")
+  override def name: String = appconf.getString("backends.name")
   
   /**
    * Get the path to the runner class that implements the PigletBackend interface
@@ -49,7 +49,7 @@ class SparkRun extends PigletBackend {
     this
   } 
   
-  override def jobJar: String = appconf.getString("backend.jar")
+  override def jobJar: String = appconf.getString("backends.jar")
   
-  override def templateFile: String = appconf.getString("backend.template")
+  override def templateFile: String = appconf.getString("backends.template")
 }
