@@ -51,7 +51,12 @@ trait PigOperator extends Rewritable {
   def outputs_=(o: List[Pipe]) = {
     _outputs = o
     // make sure that we are producer in all pipes
-    _outputs.foreach(p => p.producer = this)
+    _outputs.foreach(p => {
+      p.producer = this
+      p.consumer.foreach(_.inputs.foreach(
+        _.producer = this
+      ))
+    })
   }
 
   /**
