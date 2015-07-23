@@ -523,10 +523,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out.name, file, func, params)
       case Dump(in) => callST("dump", Map("in"->in.name))
-      case Store(in, file,func) => {
-        val path = if(file.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
-        callST("store", Map("in"->in.name,"file"->(path + file),"schema"->s"tuple${in.name}ToString(t)"/*listToTuple(node.schema)*/,"func"->func))
-       }
+      case Store(in, file,func) => callST("store", Map("in"->in.name,"file"->new java.io.File(file).getAbsolutePath,"schema"->s"tuple${in.name}ToString(t)","func"->func))
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred) => callST("filter", Map("out"->out.name,"in"->in.name,"pred"->emitPredicate(node.schema, pred)))
       case Foreach(out, in, gen) => emitForeach(node, out.name, in.name, gen)
@@ -549,6 +546,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         else
           callST("socketWrite", Map("in"->in.name,"addr"->address))
       }
+      case Window(out, in, window, slide) => callST("window", Map("out"-> out.name,"in"->in.name, "window"->window._1, "wUnit"->window._2, "slider"->slide._1, "sUnit"->slide._2))
 
       /*     
        case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
