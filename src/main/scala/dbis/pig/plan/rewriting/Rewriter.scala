@@ -436,8 +436,6 @@ object Rewriter extends LazyLogging {
     require(plan != null, "Plan must not be null")
     require(mm != null, "Materialization Manager must not be null")
 
-    val sinks = plan.sinkNodes
-
     val walker = new BreadthFirstBottomUpWalker
 
     val materializes = ListBuffer.empty[Materialize]
@@ -471,7 +469,7 @@ object Rewriter extends LazyLogging {
         logger.debug(s"found materialized data for materialize operator $materialize")
         
         val loader = Load(materialize.inputs.head, data.get, materialize.constructSchema, "BinStorage")
-        val matInput = materialize.inputs(0).producer
+        val matInput = materialize.inputs.head.producer
 
         for (inPipe <- matInput.inputs) {
           plan.disconnect(inPipe.producer, matInput)
@@ -496,7 +494,7 @@ object Rewriter extends LazyLogging {
         val file = mm.saveMapping(materialize.lineageSignature)
         val storer = new Store(materialize.inputs.head, file, "BinStorage")
 
-        newPlan = plan.insertAfter(materialize.inputs(0).producer, storer)
+        newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
         newPlan = newPlan.remove(materialize)
         
         logger.info(s"inserted new store operator $storer")
