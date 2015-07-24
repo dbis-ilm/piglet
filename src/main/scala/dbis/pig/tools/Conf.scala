@@ -14,7 +14,5 @@ object Conf {
                                                 appconf.getString("materialization.mapfile"))
  
   
-  def flinkBackendJar: String = appconf.getString("backends.flink.jar")
-  def sparkBackendJar: String = appconf.getString("backends.spark.jar")
-  
+  def backendJar(backend: String) = appconf.getString(s"backends.$backend.jar")
 }

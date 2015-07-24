@@ -21,10 +21,10 @@ import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
-
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.reflect.{ClassTag, classTag}
+import com.typesafe.scalalogging.LazyLogging
 
 /** Provides various methods for rewriting [[DataflowPlan]]s by wrapping functionality provided by
   * Kiamas [[org.kiama.rewriting.Rewriter]] and [[org.kiama.rewriting.Strategy]] objects.
@@ -67,7 +67,7 @@ import scala.reflect.{ClassTag, classTag}
   * @todo Not all links in this documentation link to the correct methods, most notably links to overloaded ones.
   *
   */
-object Rewriter {
+object Rewriter extends LazyLogging {
   private var ourStrategy = fail
 
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
@@ -477,8 +477,6 @@ object Rewriter {
     require(plan != null, "Plan must not be null")
     require(mm != null, "Materialization Manager must not be null")
 
-    val sinks = plan.sinkNodes
-
     val walker = new BreadthFirstBottomUpWalker
 
     val materializes = ListBuffer.empty[Materialize]
@@ -490,6 +488,8 @@ object Rewriter {
       }
     }
 
+    logger.debug(s"found ${materializes.size} materialize operators")
+    
     var newPlan = plan
 
     /* we should check here if the op is still connected to a sink
@@ -506,19 +506,23 @@ object Rewriter {
        * and add it to the plan by replacing the input of the Materialize-Op
        * with the loader.
        */
-      if (data.isDefined) {
+      if(data.isDefined) {
+        logger.debug(s"found materialized data for materialize operator $materialize")
+        
         val loader = Load(materialize.inputs.head, data.get, materialize.constructSchema, "BinStorage")
-        val matInput = materialize.inputs(0).producer
+        val matInput = materialize.inputs.head.producer
 
         for (inPipe <- matInput.inputs) {
           plan.disconnect(inPipe.producer, matInput)
         }
 
         newPlan = plan.replace(matInput, loader)
+
+        logger.info(s"replaced materialize op with loader $loader")
+        
         /* TODO: do we need to remove all other nodes that get disconnected now by hand
          * or do they get removed during code generation (because there is no sink?)
          */
-
         newPlan = newPlan.remove(materialize)
 
       } else {
@@ -526,12 +530,15 @@ object Rewriter {
          * --> store them by adding a STORE operator to the MATERIALIZE operator's input op
          * then, remove the materialize op
          */
-
+        logger.debug(s"did not find materialized data for materialize operator $materialize")
+        
         val file = mm.saveMapping(materialize.lineageSignature)
         val storer = new Store(materialize.inputs.head, file, "BinStorage")
 
-        newPlan = plan.insertAfter(materialize.inputs(0).producer, storer)
+        newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
         newPlan = newPlan.remove(materialize)
+        
+        logger.info(s"inserted new store operator $storer")
       }
     }
 

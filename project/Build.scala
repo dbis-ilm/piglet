@@ -95,6 +95,8 @@ object Dependencies {
   val jeromq = "org.zeromq" % "jeromq" % jeromqVersion
   val kiama = "com.googlecode.kiama" %% "kiama" % kiamaVersion
   val typesafe = "com.typesafe" % "config" % "1.3.0"
+  val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0" 
+  val log4j = "log4j" % "log4j" % "1.2.17"
 
   // Projects
   val rootDeps = Seq(
@@ -106,7 +108,9 @@ object Dependencies {
     scalaIoFile,
     scalasti,
     kiama,
-    typesafe
+    typesafe,
+    scalaLogging,
+    log4j
   )
   val sparkDeps = Seq(
     scalaTest % "test" withSources(),
