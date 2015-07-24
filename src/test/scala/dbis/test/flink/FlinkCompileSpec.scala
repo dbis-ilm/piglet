@@ -26,7 +26,7 @@ import dbis.pig.backends.BackendManager
 
 class FlinkCompileSpec extends FlatSpec {
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = BackendManager.backendConf("flink").templateFile
+  val templateFile = BackendManager.backend("flink").templateFile
 
   "The compiler output" should "contain the Flink header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)

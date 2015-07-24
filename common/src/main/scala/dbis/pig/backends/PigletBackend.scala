@@ -23,36 +23,6 @@ package dbis.pig.backends
 trait PigletBackend {
   
   /**
-   * Get the name of this backend
-   * 
-   * @return Returns the name of this backend
-   */
-  def name: String
-  
-  /**
-   * Get the path to the runner class that implements the PigletBackend interface. 
-   * This class can be used to submit jobs
-   * 
-   * @return Returns the full qualified name of the runner class
-   */
-  def runnerClass: PigletBackend
-  
-  /**
-   * Get the path to the jar file containing the job's code
-   * 
-   * @return Returns the path the the job's jar file
-   */
-  def jobJar: String
-  
-  /**
-   * Get the full path to the template file to use for the backend
-   * 
-   * @return the name of the template file
-   */
-  def templateFile: String
-  
-  
-  /**
    * Execute the job using this backend
    * 
    * @param master The master information (execution mode)

@@ -22,9 +22,11 @@ object PigBuild extends AutoPlugin with Build {
     configs(IntegrationTest).
     settings(commonSettings: _*).
     settings(Defaults.itSettings: _*).
-    settings(excludes(backendEnv): _*).
-    aggregate(backendlib(backendEnv).map(a => a.project): _*).
-    dependsOn(backendlib(backendEnv): _*)
+    //settings(excludes(backendEnv): _*).
+    //aggregate(backendlib(backendEnv).map(a => a.project): _*).
+    //dependsOn(backendlib(backendEnv): _*)
+    dependsOn(common).
+    aggregate(common, sparklib, flinklib)
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -41,7 +43,7 @@ object PigBuild extends AutoPlugin with Build {
   /*
    * Values *******************************************************************
    */
-
+/*
   /*
    * define the backend for the compiler: currently we support spark and flink
    */
@@ -81,6 +83,8 @@ object PigBuild extends AutoPlugin with Build {
     )}
     case _ => throw new Exception(s"Backend $backend not available")
   }
+  
+  */
 }
 
 /*

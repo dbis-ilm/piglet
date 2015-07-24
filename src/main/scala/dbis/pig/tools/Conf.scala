@@ -2,6 +2,8 @@ package dbis.pig.tools
 
 import com.typesafe.config.ConfigFactory
 import java.io.File
+import java.nio.file.Path
+import java.nio.file.Paths
 
 object Conf {
   
@@ -14,9 +16,9 @@ object Conf {
                                                 appconf.getString("materialization.mapfile"))
  
   
-//  def backendJar(backend: String) = appconf.getString(s"backends.$backend.jar")
-  
   def defaultBackend = appconf.getString("backends.default")
+  
+  def backendJar(backend: String): Path = Paths.get(appconf.getString(s"backends.$backend.jar")) 
   
   def backendConf(backend: String) = appconf.getString(s"backends.$backend.conf")
 }

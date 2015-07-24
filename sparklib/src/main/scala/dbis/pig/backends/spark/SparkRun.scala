@@ -22,16 +22,16 @@ import org.apache.log4j.Logger
 import org.apache.log4j.Level
 import dbis.pig.backends.PigletBackend
 import com.typesafe.config.ConfigFactory
+import com.typesafe.config.Config
+import scala.collection.JavaConversions._
+import dbis.pig.backends.BackendConf
 
-class SparkRun extends PigletBackend {
+class SparkRun extends PigletBackend with BackendConf {
 
   // loads the default configuration file in resources/sparkbackend.conf
-  private val appconf = ConfigFactory.load("sparkbackend.conf")
+  private val appconf = ConfigFactory.load() 
   
   override def execute(master: String, className: String, jarFile: String) {
-//    Logger.getLogger("org").setLevel(Level.WARN)
-//    Logger.getLogger("akka").setLevel(Level.WARN)
-//    Logger.getLogger("Remoting").setLevel(Level.WARN)
     SparkSubmit.main(Array("--master", master, "--class", className, jarFile))
   }
   
@@ -40,7 +40,7 @@ class SparkRun extends PigletBackend {
    * 
    * @return Returns the name of this backend
    */
-  override def name: String = appconf.getString("backends.name")
+  override def name: String = appconf.getString("backends.spark.name")
   
   /**
    * Get the path to the runner class that implements the PigletBackend interface
@@ -49,7 +49,5 @@ class SparkRun extends PigletBackend {
     this
   } 
   
-  override def jobJar: String = appconf.getString("backends.jar")
-  
-  override def templateFile: String = appconf.getString("backends.template")
+  override def templateFile = appconf.getString("backends.spark.template")
 }

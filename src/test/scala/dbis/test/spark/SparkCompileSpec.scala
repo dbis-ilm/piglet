@@ -26,7 +26,7 @@ import dbis.pig.backends.BackendManager
 
 class SparkCompileSpec extends FlatSpec {
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = BackendManager.backendConf("spark").templateFile
+  val templateFile = BackendManager.backend("spark").templateFile
   "The compiler output" should "contain the Spark header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport

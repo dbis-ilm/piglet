@@ -24,6 +24,8 @@ import dbis.pig.codegen.ScalaBackendCompile
 import dbis.pig.plan.DataflowPlan
 import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.backends.BackendManager
+import dbis.pig.backends.BackendConf
+import java.nio.file.Path
 
 object FileTools extends LazyLogging {
   def copyStream(istream : InputStream, ostream : OutputStream) : Unit = {
@@ -61,9 +63,9 @@ object FileTools extends LazyLogging {
     }
   }
   
-  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, compileOnly: Boolean = false, backend: String = "spark"): Boolean = {
+  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, compileOnly: Boolean = false, backendJar: Path, templateFile: String): Boolean = {
     // 4. compile it into Scala code for Spark
-    val compiler = new ScalaBackendCompile(BackendManager.backendConf(backend).templateFile) 
+    val compiler = new ScalaBackendCompile(templateFile) 
 
     // 5. generate the Scala code
     val code = compiler.compile(scriptName, plan)
@@ -95,7 +97,7 @@ object FileTools extends LazyLogging {
     plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
     
     // 8. copy the sparklib library to output
-    val jobJar = BackendManager.backendConf(backend).jobJar
+    val jobJar = backendJar.toAbsolutePath().toString()
     FileTools.extractJarToDir(jobJar, outputDirectory)
     
 //    if (compileOnly) 

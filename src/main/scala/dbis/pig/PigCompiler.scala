@@ -120,13 +120,18 @@ object PigCompiler extends PigParser with LazyLogging {
     plan = processPlan(plan)
     
     logger.debug("finished optimizations")
+    
+    
+    val backendConf = BackendManager.backend(backend)
+    val templateFile = backendConf.templateFile
+    val jarFile = Conf.backendJar(backend)
 
-    if (FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend)) {
+    if (FileTools.compileToJar(plan, scriptName, outDir, compileOnly, jarFile, templateFile)) {
       if (!compileOnly) {
         // 4. and finally deploy/submit
         val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
 //        val runner = FileTools.getRunner(backend)
-        val runner = BackendManager.backendConf(backend).runnerClass
+        val runner = backendConf.runnerClass
         
         logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
         

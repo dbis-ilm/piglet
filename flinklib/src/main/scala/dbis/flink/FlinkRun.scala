@@ -22,19 +22,20 @@ import java.security._
 import org.apache.flink.client.CliFrontend
 import dbis.pig.backends.PigletBackend
 import com.typesafe.config.ConfigFactory
+import dbis.pig.backends.BackendConf
 
 
-class FlinkRun extends PigletBackend {
+class FlinkRun extends PigletBackend with BackendConf {
   
   // loads the default configuration file in resources/sparkbackend.conf
-  private val appconf = ConfigFactory.load("flinkbackend.conf")
+  private val appconf = ConfigFactory.load()
   
   /**
    * Get the name of this backend
    * 
    * @return Returns the name of this backend
    */
-  override def name: String = appconf.getString("backends.name")
+  override def name: String = appconf.getString("backends.flink.name")
   
   /**
    * Get the path to the runner class that implements the PigletBackend interface
@@ -43,9 +44,7 @@ class FlinkRun extends PigletBackend {
     this
   } 
   
-  override def jobJar: String = appconf.getString("backends.jar")
-  
-  override def templateFile: String = appconf.getString("backends.template")
+  override def templateFile: String = appconf.getString("backends.flink.template")
   
   override def execute(master: String, className: String, jarFile: String){
     if (master.startsWith("local") && !master.startsWith("localhost")){
