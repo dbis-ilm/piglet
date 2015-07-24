@@ -22,7 +22,7 @@ if [ -z "$FLINK_JAR" ]; then
     echo "Please set FLINK_JAR to your flink-dist jar file (built with scala 2.11)"
 	exit 1
 else
-	CP=$FLINK_JAR:$CP
+	CP=$CP:$FLINK_JAR
 fi
 
 # the directory to include in classpath to enable backends
