@@ -26,6 +26,47 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.reflect.{ClassTag, classTag}
 
+/** Provides various methods for rewriting [[DataflowPlan]]s by wrapping functionality provided by
+  * Kiamas [[org.kiama.rewriting.Rewriter]] and [[org.kiama.rewriting.Strategy]] objects.
+  *
+  * This object keeps an internal [[Strategy]] object that holds all strategies added via [[addStrategy]]. Calling
+  * [[processPlan]] with a [[DataflowPlan]] will apply ```all``` those strategies to the plan until none applies
+  * anymore.
+  *
+  * ==Low-level methods==
+  *
+  * Methods that directly handle Strategies are provided:
+  *
+  *  - [[addStrategy]] adds a single strategy to this object. Later calls to [[processPlan]] will then use this
+  *    strategy in addition to all other ones added via this method.
+  *
+  *  - [[processPlan]] applies a single strategy to a [[DataflowPlan]].
+  *
+  * ==Higher-level methods==
+  *
+  * For common operations on [[DataflowPlan]]s, some convenience methods to build and register a strategy are provided:
+  *
+  *  - [[addStrategy]] for easily adding any method with a signature of `Any => Option[PigOperator]` as a strategy
+  *
+  *  - [[merge]] for merging two operators
+  *
+  *  - [[reorder]] for reordering two operators
+  *
+  * ==DataflowPlan helper methods==
+  *
+  * Some operations provided by [[DataflowPlan]] objects are not implemented there, but on this object. These include
+  *
+  *  - [[insertAfter]] to insert an operator as a child operator of another
+  *
+  *  - [[remove]] to remove an operator
+  *
+  *  - [[replace]] to replace one operator with another
+  *
+  *  - [[swap]] to swap the positions of two operators
+  *
+  * @todo Not all links in this documentation link to the correct methods, most notably links to overloaded ones.
+  *
+  */
 object Rewriter {
   private var ourStrategy = fail
 
