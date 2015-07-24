@@ -31,7 +31,7 @@ import scala.collection.immutable.Seq
 
 trait PigOperator extends Rewritable {
   protected var _outputs: List[Pipe] = _
-  protected var _inputs: List[Pipe]  = _
+  protected var _inputs: List[Pipe] = _
 
   var schema: Option[Schema] = None
 
@@ -51,7 +51,12 @@ trait PigOperator extends Rewritable {
   def outputs_=(o: List[Pipe]) = {
     _outputs = o
     // make sure that we are producer in all pipes
-    _outputs.foreach(p => p.producer = this)
+    _outputs.foreach(p => {
+      p.producer = this
+      p.consumer.foreach(_.inputs.foreach(
+        _.producer = this
+      ))
+    })
   }
 
   /**
@@ -89,7 +94,7 @@ trait PigOperator extends Rewritable {
    */
   def addConsumer(name: String, op: PigOperator): Unit = {
     _outputs.find(_.name == name) match {
-      case Some(p) => if (! p.consumer.contains(op)) p.consumer = p.consumer :+ op
+      case Some(p) => if (!p.consumer.contains(op)) p.consumer = p.consumer :+ op
       case None => {}
     }
   }
@@ -180,7 +185,7 @@ trait PigOperator extends Rewritable {
     numConsumers
   }
 
-  def deconstruct = this.outputs.map(_.consumer)
+  def deconstruct: List[PigOperator] = this.outputs.flatMap(_.consumer)
 
   def reconstruct(outputs: Seq[Any]): PigOperator = {
     val outname = this.outPipeName
@@ -198,21 +203,20 @@ trait PigOperator extends Rewritable {
     */
   def reconstruct(outputs: Seq[Any], outname: String): PigOperator = {
     this.outputs = List.empty
-    outputs.foreach(_ match {
-      case op : PigOperator => {
+    outputs.foreach {
+      case op: PigOperator =>
         val idx = this.outputs.indexWhere(_.name == outname)
         if (idx > -1) {
           // There already is a Pipe to `outname`
           this.outputs(idx).consumer = this.outputs(idx).consumer :+ op
         } else {
-                  this.outputs = this.outputs :+ Pipe(outname, this, List(op))
+          this.outputs = this.outputs :+ Pipe(outname, this, List(op))
         }
-      }
       // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
       // operators
-      case ops: List[_] => this.reconstruct(ops, outname)
+      case ops: Seq[_] => this.reconstruct(ops, outname)
       case _ => illegalArgs("PigOperator", "PigOperator", outputs)
-    })
+    }
     this
   }
 }

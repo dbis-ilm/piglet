@@ -22,7 +22,6 @@ import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
 import dbis.pig.schema._
 import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
-import dbis.pig.plan.PrettyPrinter
 
 class DataflowPlanSpec extends FlatSpec with Matchers {
   /*
@@ -388,13 +387,16 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
          |a = load 'file.csv';
          |b = filter a by $0 > 0;
          |""".stripMargin))
-    val ops = plan.findOperator(o => o.outPipeName == "a")
-    ops.size should be (1)
-    val op = ops.head
-    op.outPipeName should be ("a")
+    var op = plan.findOperatorForAlias("a").value
     val d = Distinct(Pipe("d"),Pipe("a"))
-    plan.insertAfter(op, d)
-    println(op)
+    val newPlan = plan.insertAfter(op, d)
+
+    op = newPlan.findOperatorForAlias("a").value
+    val b = newPlan.findOperatorForAlias("b").value
+    op.outputs should have size 1
+    val output = op.outputs.headOption.value
+    
+    output.consumer should contain only(b, d)
   }
 
   it should "be consistent after exchanging two operators" in {
