@@ -344,18 +344,23 @@ object Rewriter extends LazyLogging {
     val strategy = (op: Any) => {
       if (op == rem) {
         val pigOp = op.asInstanceOf[PigOperator]
-        val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
-          // Remove input pipes to `op` and replace them with `ops` input pipes
-          inOp.inputs = inOp.inputs.filterNot(_.producer == pigOp) ++ pigOp.inputs
-          inOp
-        })
-        // Replace `op` in its inputs output pipes with `ops` children
-        pigOp.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
-          if (out.consumer contains op) {
-            out.consumer = out.consumer.filterNot(_ == op) ++ newOps
-          }
-        }))
-        Some(newOps)
+        if (pigOp.inputs.length == 0){
+          Some(Empty(Pipe("")))
+        }
+        else {
+          val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
+            // Remove input pipes to `op` and replace them with `ops` input pipes
+            inOp.inputs = inOp.inputs.filterNot(_.producer == pigOp) ++ pigOp.inputs
+            inOp
+          })
+          // Replace `op` in its inputs output pipes with `ops` children
+          pigOp.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
+            if (out.consumer contains op) {
+              out.consumer = out.consumer.filterNot(_ == op) ++ newOps
+            }
+          }))
+          Some(newOps)
+        }
       }
       else {
         None
