@@ -429,6 +429,13 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     newPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op3
   }
 
+  it should "return an empty DataflowPlan when the last operator in the plan is removed" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+    val plan = new DataflowPlan(List(op1))
+    val newPlan = plan.remove(op1)
+    newPlan.operators shouldBe empty
+  }
+
   it should "construct pipes for SPLIT INTO" in {
     val plan = new DataflowPlan(parseScript(s"""
       |a = LOAD 'file' AS (x, y);

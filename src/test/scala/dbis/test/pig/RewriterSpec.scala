@@ -138,7 +138,7 @@ class RewriterSpec extends FlatSpec with Matchers {
     val plan = new DataflowPlan(List(op1))
     val newPlan = processPlan(plan)
 
-    newPlan.sourceNodes.headOption.value shouldBe Empty(Pipe(""))
+    newPlan.sourceNodes shouldBe empty
   }
 
   it should "pull up Empty nodes" in {
@@ -149,7 +149,7 @@ class RewriterSpec extends FlatSpec with Matchers {
 
     val newPlan = processPlan(plan)
 
-    newPlan.sourceNodes.headOption.value shouldBe Empty(Pipe(""))
-    newPlan.operators should have length 1
+    newPlan.sourceNodes shouldBe empty
+    newPlan.operators shouldBe empty
   }
 }

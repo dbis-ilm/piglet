@@ -124,7 +124,7 @@ object Rewriter extends LazyLogging {
 
   def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
     // This looks innocent, but this is where the rewriting happens.
-    val newSources = plan.sourceNodes.map(processPigOperator(_, strategy))
+    val newSources = plan.sourceNodes.map(processPigOperator(_, strategy)).filterNot(_.isInstanceOf[Empty])
 
     var newPlanNodes = mutable.LinkedHashSet[PigOperator]() ++= newSources
     var nodesToProcess = newSources.toList
