@@ -40,6 +40,12 @@ import com.typesafe.scalalogging.LazyLogging
   *  - [[addStrategy]] adds a single strategy to this object. Later calls to [[processPlan]] will then use this
   *    strategy in addition to all other ones added via this method.
   *
+  *  - [[addBinaryPigOperatorStrategy]] turns a function operating on two operators of specific subtypes of
+  *    [[dbis.pig.op.PigOperator]] that are in a parent-child relationship into a strategy and adds it to this object.
+  *
+  *  - [[buildBinaryPigOperatorStrategy]] is the same as [[addBinaryPigOperatorStrategy]] but doesn't add the
+  *    strategy to this object.
+  *
   *  - [[processPlan]] applies a single strategy to a [[DataflowPlan]].
   *
   * ==Higher-level methods==
@@ -63,6 +69,13 @@ import com.typesafe.scalalogging.LazyLogging
   *  - [[replace]] to replace one operator with another
   *
   *  - [[swap]] to swap the positions of two operators
+  *
+  *  ==Helper methods for maintaining connectivity==
+  *
+  *  After a rewriting operation, the `inputs` and `outputs` attribute of operators other than the rewritten ones
+  *  might be changed (for example to accommodate new or deleted operators). To help maintaining these relationships,
+  *  the method [[fixInputsAndOutputs]] in several versions is provided. Their documentation include hints in which
+  *  cases they apply.
   *
   * @todo Not all links in this documentation link to the correct methods, most notably links to overloaded ones.
   *
@@ -382,13 +395,13 @@ object Rewriter extends LazyLogging {
     * @tparam T2 The second operators type.
     * @tparam T The first operators type.
     */
-  private def addBinaryPigOperatorStrategy[T2 <: PigOperator : ClassTag, T <: PigOperator : ClassTag](f: (T, T2)
+  def addBinaryPigOperatorStrategy[T2 <: PigOperator : ClassTag, T <: PigOperator : ClassTag](f: (T, T2)
     => Option[PigOperator]): Unit = {
     val strategy = buildBinaryPigOperatorStrategy(f)
     addStrategy(strategy)
   }
 
-  private def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+  def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
   (f: (T, T2) => Option[PigOperator]): Strategy = {
     strategyf(op => {
       op match {
@@ -421,7 +434,7 @@ object Rewriter extends LazyLogging {
     * @tparam T3 The type of the new operator.
     * @return
     */
-  private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
+  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                           newParent: T3): T3 = {
     newParent.inputs = oldParent.inputs
     newParent.outputs = oldChild.outputs
@@ -448,7 +461,7 @@ object Rewriter extends LazyLogging {
     * @tparam T2 The type of the old child and new parent operators.
     * @return
     */
-  private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
+  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                        newChild: T): T2 = {
     // If oldParent == newChild (for example when this is called from `swap`, we need to save oldParent.outPipename
     // because it depends on oldParent.outputs
