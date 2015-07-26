@@ -212,9 +212,6 @@ object Rewriter extends LazyLogging {
       op.outputs match {
       case Pipe(_, _, Nil) :: Nil =>
         val newNode = Empty(Pipe(""))
-        // Set outputs *again*. Passing a Pipe("") to the constructor causes problems because other parts of the code
-        // expect Pipe.consumer and Pipe.producer to be non-null, but we can't set Pipe.producer without the new node.
-        newNode.outputs = List(Pipe("", newNode, List.empty))
         newNode.inputs = op.inputs
         Some(newNode)
       case _ => None
