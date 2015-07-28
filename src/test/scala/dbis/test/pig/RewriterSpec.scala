@@ -17,6 +17,7 @@
 package dbis.test.pig
 
 import dbis.pig.PigCompiler._
+import dbis.pig.op
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
@@ -56,21 +57,14 @@ class RewriterSpec extends FlatSpec with Matchers {
     val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
     val op4 = Dump(Pipe("c"))
 
-    // ops after reordering
-    val op2_2 = Filter(Pipe("b"), Pipe("a"), predicate1)
-    val op3_2 = OrderBy(Pipe("c"), Pipe("b"), List())
-    val op4_2 = op4.copy()
-
     val plan = new DataflowPlan(List(op1, op2, op3, op4))
-    val planReordered = new DataflowPlan(List(op1, op2_2, op3_2, op4_2))
-    val source = plan.sourceNodes.head
-    val sourceReordered = planReordered.sourceNodes.head
-
-    val rewrittenSource = processPigOperator(source)
-    rewrittenSource.outputs.head should equal(sourceReordered.outputs.head)
-
     val pPlan = processPlan(plan)
-    pPlan.findOperatorForAlias("b").value should be(op2_2)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
+    pPlan.findOperatorForAlias("b").value shouldBe op3
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
   }
 
   it should "rewrite SplitInto operators into multiple Filter ones" in {
@@ -137,5 +131,25 @@ class RewriterSpec extends FlatSpec with Matchers {
 
     val rewrittenSource = processPigOperator(source)
     rewrittenSource.outputs should contain only Pipe("a", op1, List(op2))
+  }
+
+  it should "remove sink nodes that don't store a relation" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+    val plan = new DataflowPlan(List(op1))
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes.headOption.value shouldBe Empty(Pipe(""))
+  }
+
+  it should "pull up Empty nodes" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val plan = new DataflowPlan(List(op1, op2))
+    plan.operators should have length 2
+
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes.headOption.value shouldBe Empty(Pipe(""))
+    newPlan.operators should have length 1
   }
 }
