@@ -141,6 +141,16 @@ class RewriterSpec extends FlatSpec with Matchers {
     newPlan.sourceNodes shouldBe empty
   }
 
+  it should "remove sink nodes that don't store a relation and have an empty outputs list" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+    val plan = new DataflowPlan(List(op1))
+
+    op1.outputs = List.empty
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes shouldBe empty
+  }
+
   it should "pull up Empty nodes" in {
     val op1 = Load(Pipe("a"), "file.csv")
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())

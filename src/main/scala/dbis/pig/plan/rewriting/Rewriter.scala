@@ -210,7 +210,7 @@ object Rewriter extends LazyLogging {
     case Empty(_) => None
     case op: PigOperator =>
       op.outputs match {
-      case Pipe(_, _, Nil) :: Nil =>
+      case Pipe(_, _, Nil) :: Nil | Nil =>
         val newNode = Empty(Pipe(""))
         newNode.inputs = op.inputs
         Some(newNode)
@@ -264,7 +264,7 @@ object Rewriter extends LazyLogging {
     * @tparam T The type of the parent operator.
     * @tparam T2 The type of the child operator.
     */
-  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]():
+  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]:
   Unit = {
     val strategy = (parent: T, child: T2) =>
       Some(fixInputsAndOutputs(parent, child, child, parent))
