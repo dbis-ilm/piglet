@@ -38,6 +38,7 @@ class FlinksCompileSpec extends FlatSpec {
       |import dbis.flink._
       |import java.util.concurrent.TimeUnit
       |import org.apache.flink.streaming.api.windowing.helper._
+      |import org.apache.flink.util.Collector
       |
       |object test {
       |    def main(args: Array[String]) {

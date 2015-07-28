@@ -116,8 +116,7 @@ object PigCompiler extends PigParser with LazyLogging {
     
     val mm = new MaterializationManager
     plan = processMaterializations(plan, mm)
-    if (backend=="flinks")
-      plan = processWindows(plan)
+    if (backend=="flinks") plan = processWindows(plan)
     plan = processPlan(plan)
     
     logger.debug("finished optimizations")

@@ -58,7 +58,7 @@ case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
  * @param initialInPipeName the name of the input pipe
  * @param generator the generator (a list of expressions or a subplan)
  */
-case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator) extends PigOperator {
+case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator, var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 

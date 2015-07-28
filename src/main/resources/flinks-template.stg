@@ -4,6 +4,7 @@ import org.apache.flink.streaming.api.scala._
 import dbis.flink._
 import java.util.concurrent.TimeUnit
 import org.apache.flink.streaming.api.windowing.helper._
+import org.apache.flink.util.Collector
 
 <\n>
 >>
@@ -32,33 +33,35 @@ dump(in) ::=<<
 // ------------------ STORE Results on Disk -----------------------------------
 store(in,file,func,schema) ::=<<
         <in>.map(t => <schema>).writeAsText("<file>")
-<!        
-        if (<in>.getJavaStream.getType.getTypeClass.isInstanceOf[Class[List[Any]]]) 
-            <in>.map(_.mkString(",")).writeAsText("<file>")
-        else 
-            <in>.writeAsText("<file>")
- !>
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
-filter(out,in,pred) ::=<<
+filter(out,in,pred,windowMode) ::=<<
         val <out> = <in>.filter(t => {<pred>})
 >>
 
 // ------------------ Executes an expression FOREACH input element ------------
-foreach(out,in,expr) ::=<<
+foreach(out,in,expr,windowMode) ::=<<
+<if(windowMode)>
+        val <out> = <in>.mapWindow(custom<out>Map _).flatten()
+<else>
         val <out> = <in>.map(t => <expr>)
+<endif>
 >>
 
 // ----- Executes an expression FOREACH input element requiring a flatMap -----
-foreachFlatMap(out,in,expr) ::=<<
+foreachFlatMap(out,in,expr,windowMode) ::=<<
         val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
 >>
 
 // ------------------ GROUPS elements on an expression ------------------------
-groupBy(out,in,expr) ::=<<
+groupBy(out,in,expr,windowMode) ::=<<
 <if (expr)>
+    <if(windowMode)>
+        val <out> = <in>.groupBy(t => <expr>).mapWindow(custom<out>Map _)
+    <else>
         val <out> = <in>.groupBy(t => <expr>).map(t => List(<expr>,List(t)))
+    <endif>
 <else>
         val <out> = <in>
 <endif>
@@ -70,7 +73,7 @@ distinct(out,in) ::=<<
 >>
 
 // ------------------ Outputs only num records --------------------------------
-limit(out,in,num) ::=<<
+limit(out,in,num,windowMode) ::=<<
         val <out> = <in>.window(Count.of(<num>)).every(Time.of(5, TimeUnit.SECONDS))
 >>
 

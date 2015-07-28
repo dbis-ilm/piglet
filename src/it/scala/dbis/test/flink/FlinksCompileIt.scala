@@ -30,10 +30,10 @@ class FlinksCompileIt extends FlatSpec with Matchers {
     ("load2.pig", "result2.out", "result2.data"),
     ("foreach1.pig", "distances.out", "distances.data"),
     ("construct.pig", "result3.out", "result3.data"),
-    ("windowJoin.pig", "joinedW.out", "joined.data")
+    ("windowJoin.pig", "joinedW.out", "joined.data"),
    // ("grouping.pig", "grouping.out", "grouping.data") //TODO: Make Window equivalent
    // ("nforeach.pig", "nested.out", "nested.data") //TODO: Make Window equivalent
-   // ("wordcount.pig", "marycounts.out", "marycount.data") //TODO: Make Window equivalent
+    ("windowCount.pig", "marycounts.out", "marycount.data")
   )
 
   def cleanupResult(dir: String): Unit = {

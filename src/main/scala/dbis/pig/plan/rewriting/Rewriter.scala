@@ -19,6 +19,8 @@ package dbis.pig.plan.rewriting
 import dbis.pig.op.{And, Filter, Load, Materialize, OrderBy, PigOperator, Pipe, Store, _}
 import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
+import dbis.pig.tools.BreadthFirstTopDownWalker
+import scala.collection.mutable.Queue
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 import scala.collection.mutable
@@ -470,21 +472,118 @@ object Rewriter extends LazyLogging {
   def processWindows(plan: DataflowPlan): DataflowPlan = {
     require(plan != null, "Plan must not be null")
 
-    val walker = new BreadthFirstBottomUpWalker
+    val walker1 = new BreadthFirstBottomUpWalker
+    val walker2 = new BreadthFirstTopDownWalker
 
     val joins = ListBuffer.empty[Join]
-    var usedWindows = ListBuffer.empty[Window]
 
-    walker.walk(plan){ op => 
+    walker1.walk(plan){ op => 
       op match {
         case o: Join => joins += o
         case _ =>
       }
     }
+    var newPlan = processWindowJoins(plan, joins.toList)
+    
+    // All Window Ops: Group,Filter,Distinct,Limit,OrderBy,Foreach
+    // Two modes: Group,Filter,Limit,Foreach
+    // Terminator: Foreach, Join
+    
 
+    logger.debug(s"Searching for Window Operators")
+    
+    walker2.walk(newPlan){ op => 
+      op match {
+        case o: Window => {
+          logger.debug(s"Found Window Operator")
+          newPlan = markForWindowMode(newPlan, o)
+        }
+        case _ =>
+      }
+    }
+    newPlan
+  }
+
+  def markForWindowMode(plan: DataflowPlan, windowOp: Window): DataflowPlan = {
     var newPlan = plan
 
-    /*
+    
+    val littleWalker = Queue(windowOp.outputs.flatMap(_.consumer).toSeq: _*)
+    while(!littleWalker.isEmpty){
+      val operator = littleWalker.dequeue()
+      operator match {
+//        case o @ ( _:Filter | _:Limit | _:Grouping) => {
+//        case o @ ( Filter(_,_,_,w) | Limit(_,_,_,w) | Grouping(_,_,_,w)) => {
+        case o: Filter => {
+          logger.debug(s"Rewrite Grouping to WindowMode")
+          val strategy = (op: Any) => {
+            if (op == o) {
+              o.windowMode = true
+              Some(o)
+            }
+            else {
+              None
+            }
+          }
+          newPlan = processPlan(newPlan, strategyf(t => strategy(t)))
+        }
+        case o: Limit => {
+          logger.debug(s"Rewrite Grouping to WindowMode")
+          val strategy = (op: Any) => {
+            if (op == o) {
+              o.windowMode = true
+              Some(o)
+            }
+            else {
+              None
+            }
+          }
+          newPlan = processPlan(newPlan, strategyf(t => strategy(t)))
+        }
+       case o: Grouping => {
+          logger.debug(s"Rewrite Grouping to WindowMode")
+          val strategy = (op: Any) => {
+            if (op == o) {
+              o.windowMode = true
+              Some(o)
+            }
+            else {
+              None
+            }
+          }
+          newPlan = processPlan(newPlan, strategyf(t => strategy(t)))
+        }
+
+        case o: Foreach => {
+          logger.debug(s"Rewrite Foreach to WindowMode")
+          val strategy = (op: Any) => {
+            if (op == o) {
+              o.windowMode = true
+              Some(o)
+            }
+            else {
+              None
+            }
+          }
+          newPlan = processPlan(newPlan, strategyf(t => strategy(t)))
+          return newPlan
+        }
+        case o: Join => {
+          logger.debug(s"Found Join Node, abort")
+          return plan
+        }
+        case _ =>
+      }
+      littleWalker ++= operator.outputs.flatMap(_.consumer)
+    }
+    newPlan
+  }
+
+  def processWindowJoins(plan: DataflowPlan, joins: List[Join]): DataflowPlan = {
+
+    var newPlan = plan
+    var usedWindows = ListBuffer.empty[Window]
+     /*
      * Foreach Join Operator check if Input requirements are met.
      * Collect Window input relations and create new Join with Window 
      * definition and window inputs as new inputs.
@@ -510,9 +609,6 @@ object Rewriter extends LazyLogging {
       /*
        * Replace Old Join with new Join (new Input Pipes and Window Parameter)
        */
-//      newPlan = newPlan.replace(joinOp, newJoin)
-//      newPlan = newPlan.insertAfter(joinOp, newJoin)
-//      newPlan = newPlan.remove(joinOp)
       val strategy = (op: Any) => {
         if (op == joinOp) {
           joinOp.outputs = List.empty
@@ -525,12 +621,6 @@ object Rewriter extends LazyLogging {
       }
       newPlan = processPlan(newPlan, strategyf(t => strategy(t)))
     }
-    /*
-     * Delete all involved Window Operators
-     */
- //   for(windowPipe <- joinOp.inputs)
- //     newPlan = newPlan.remove(windowPipe.producer)
-
     newPlan
   }
   

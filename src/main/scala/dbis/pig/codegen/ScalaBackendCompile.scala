@@ -444,7 +444,22 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         |  sb${genStringRepOfTuple(node.schema)}
         |  sb.toString
         |}""".stripMargin
-
+      }
+      case Grouping(out, in, groupExpr, windowMode) => { 
+        if (windowMode)
+          s"""
+          |def custom${out.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+          |  out.collect(ts.groupBy(t => ${emitGrouping(node.inputSchema,groupExpr)}).flatMap(x => List(x._1,x._2)).toList)
+          |}""".stripMargin
+        else ""
+      }
+      case Foreach(out, in, gen, windowMode) => { 
+        if (windowMode)
+          s"""
+          |def custom${out.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+          |  ts.foreach { t => out.collect(${emitForeachExpr(node, gen)})}
+          |}""".stripMargin
+        else ""
       }
       case _ => ""
     }
@@ -470,8 +485,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         case _ => "" // should not happen
       }
       case Distinct(out, in) => callST("distinct", Map("out" -> out.name, "in" -> in.name))
-      case n@Filter(out, in, pred) => callST("filter", Map("out" -> out.name, "in" -> in.name, "pred" -> emitPredicate(n.schema, pred)))
-      case Limit(out, in, num) => callST("limit", Map("out" -> out.name, "in" -> in.name, "num" -> num))
+    case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> out.name, "in" -> in.name, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
+    case Limit(out, in, num, windowMode) => callST("limit", Map("out" -> out.name, "in" -> in.name, "num" -> num,"windowMode"->windowMode))
       case OrderBy(out, in, orderSpec) => "" // TODO!!!!
       case _ => ""
     }.mkString("\n") + "}"
@@ -485,27 +500,56 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
    * @param gen
    * @return
    */
-  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator): String = {
+  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator, windowMode: Boolean): String = {
+    // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
+    val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
+    if (requiresFlatMap)
+      if (windowMode)
+        callST("foreachFlatMap", Map("out" -> out, "in" -> in, 
+        "expr" ->emitForeachExpr(node, gen),"windowMode"->windowMode))
+      else
+        callST("foreachFlatMap", Map("out" -> out, "in" -> in, 
+        "expr" ->emitForeachExpr(node, gen)))
+    else
+      if (windowMode)
+        callST("foreach", Map("out" -> out, "in" -> in, 
+        "expr" -> emitForeachExpr(node, gen),"windowMode"->windowMode))
+      else
+        callST("foreach", Map("out" -> out, "in" -> in, 
+        "expr" ->emitForeachExpr(node, gen)))
+
+  }
+
+  def emitForeachExpr(node: PigOperator, gen: ForeachGenerator): String = {
     // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
     val requiresPlainFlatten =  node.asInstanceOf[Foreach].containsFlatten(onBag = false)
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     gen match {
       case GeneratorList(expr) => {
-        if (requiresFlatMap)
-          callST("foreachFlatMap", Map("out" -> out, "in" -> in, "expr" -> emitBagFlattenGenerator(node.inputSchema, expr)))
-        else
-          callST("foreach", Map("out" -> out, "in" -> in,
-            "expr" -> {
-              if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
-              else emitGenerator(node.inputSchema, expr)
-            }))
+        if (requiresFlatMap) emitBagFlattenGenerator(node.inputSchema, expr)
+        else {
+          if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
+          else emitGenerator(node.inputSchema, expr)
+        }
       }
       case GeneratorPlan(plan) => {
         val subPlan = node.asInstanceOf[Foreach].subPlan.get
-        callST("foreach", Map("out" -> out, "in" -> in,
-          "expr" -> emitNestedPlan(node.inputSchema, subPlan)))
+        emitNestedPlan(node.inputSchema, subPlan)
       }
     }
+  }
+
+  def emitWindow(out: String, in: String, window: Tuple2[Int, String], 
+                 slide: Tuple2[Int, String]): String = {
+    if(window._2==""){
+      if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1))
+      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1, "sUnit"->slide._2))
+    } 
+    else {
+      if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1))
+      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1, "sUnit"->slide._2))
+    }
+
   }
 
 
@@ -526,14 +570,22 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
       case Dump(in) => callST("dump", Map("in"->in.name))
       case Store(in, file,func) => callST("store", Map("in"->in.name,"file"->new java.io.File(file).getAbsolutePath,"schema"->s"tuple${in.name}ToString(t)","func"->func))
       case Describe(in) => s"""println("${node.schemaToString}")"""
-      case Filter(out, in, pred) => callST("filter", Map("out"->out.name,"in"->in.name,"pred"->emitPredicate(node.schema, pred)))
-      case Foreach(out, in, gen) => emitForeach(node, out.name, in.name, gen)
-      case Grouping(out, in, groupExpr) => {
-        if (groupExpr.keyList.isEmpty) callST("groupBy", Map("out"->out.name,"in"->in.name))
-        else callST("groupBy", Map("out"->out.name,"in"->in.name,"expr"->emitGrouping(node.inputSchema, groupExpr)))
+      case Filter(out, in, pred, windowMode) => callST("filter", Map("out"->out.name,"in"->in.name,"pred"->emitPredicate(node.schema, pred),"windowMode"->windowMode))
+      case Foreach(out, in, gen, windowMode) => emitForeach(node, out.name, in.name, gen, windowMode)
+      case Grouping(out, in, groupExpr, windowMode) => {
+        if (groupExpr.keyList.isEmpty) 
+          if (windowMode)
+            callST("groupBy", Map("out"->out.name,"in"->in.name,"windowMode"->windowMode))
+          else 
+            callST("groupBy", Map("out"->out.name,"in"->in.name))
+        else
+          if (windowMode)
+            callST("groupBy", Map("out"->out.name,"in"->in.name,"expr"->emitGrouping(node.inputSchema, groupExpr),"windowMode"->windowMode))
+          else
+            callST("groupBy", Map("out"->out.name,"in"->in.name,"expr"->emitGrouping(node.inputSchema, groupExpr)))
       }
       case Distinct(out, in) => callST("distinct", Map("out"->out.name,"in"->in.name))
-      case Limit(out, in, num) => callST("limit", Map("out"->out.name,"in"->in.name,"num"->num))
+    case Limit(out, in, num, windowMode) => callST("limit", Map("out"->out.name,"in"->in.name,"num"->num,"windowMode"->windowMode))
       case Join(out, rels, exprs, window) => emitJoin(node, out.name, rels, exprs, window)
       case Union(out, rels) => callST("union", Map("out"->out.name,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
       case Sample(out, in, expr) => callST("sample", Map("out"->out.name,"in"->in.name,"expr"->emitExpr(node.schema, expr)))
@@ -547,8 +599,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         else
           callST("socketWrite", Map("in"->in.name,"addr"->address))
       }
-      case Window(out, in, window, slide) => callST("window", Map("out"-> out.name,"in"->in.name, "window"->window._1, "wUnit"->window._2, "slider"->slide._1, "sUnit"->slide._2))
-
+      case Window(out, in, window, slide) => emitWindow(out.name,in.name,window,slide) 
       /*     
        case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
        case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
