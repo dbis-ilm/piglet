@@ -274,7 +274,6 @@ object Rewriter extends LazyLogging {
       if (op == old) {
         repl.inputs = old.inputs
         repl.outputs = old.outputs
-        repl.outputs = old.outputs
         Some(repl)
       }
       else {
