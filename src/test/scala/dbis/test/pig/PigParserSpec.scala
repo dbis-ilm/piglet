@@ -458,28 +458,74 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse BGP_FILTER in SparqlPig" in {
-    assert(parseScript("""a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
+    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
       List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\""))))))
   }
 
   it should "parse BGP_FILTER with a complex pattern" in {
-    assert(parseScript("""a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""",
+    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""",
       LanguageFeature.SparqlPig) ==
-    List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
-      TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
+      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
+        TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
   }
 
   it should "parse RDFLoad operators for plain triples" in {
-    assert(parseScript("""a = RDFLoad('rdftest.rdf');""", LanguageFeature.SparqlPig) ==
-      List(RDFLoad(Pipe("a"), "rdftest.rdf", None)))
+    val ungrouped = parseScript( """a = RDFLoad('rdftest.rdf');""", LanguageFeature.SparqlPig)
+    assert(ungrouped == List(RDFLoad(Pipe("a"), "rdftest.rdf", None)))
+    assert(ungrouped.head.schema == Some(Schema(BagType(TupleType(Array(
+      Field("subject", Types.CharArrayType),
+      Field("predicate", Types.CharArrayType),
+      Field("object", Types.CharArrayType)))))))
   }
 
   it should "parse RDFLoad operators for triple groups" in {
-    assert(parseScript("""a = RDFLoad('rdftest.rdf') grouped on subject;""", LanguageFeature.SparqlPig) ==
-      List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("subject"))))
-    assert(parseScript("""a = RDFLoad('rdftest.rdf') grouped on predicate;""", LanguageFeature.SparqlPig) ==
-      List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("predicate"))))
-    assert(parseScript("""a = RDFLoad('rdftest.rdf') grouped on object;""", LanguageFeature.SparqlPig) ==
-      List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("object"))))
+    val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on subject;""", LanguageFeature.SparqlPig)
+    val grouped_on_pred = parseScript( """a = RDFLoad('rdftest.rdf') grouped on predicate;""", LanguageFeature.SparqlPig)
+    val grouped_on_obj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on object;""", LanguageFeature.SparqlPig)
+    assert(grouped_on_subj == List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("subject"))))
+    assert(grouped_on_pred == List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("predicate"))))
+    assert(grouped_on_obj == List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("object"))))
+
+    val grouped_on_subj_schema = Some(
+      Schema(
+        BagType(
+          TupleType(
+            Array(
+              Field("subject", Types.CharArrayType),
+              Field("stmts",
+                BagType(
+                  TupleType(
+                    Array(
+                      Field("predicate", Types.CharArrayType),
+                      Field("object", Types.CharArrayType))))))))))
+    assert(grouped_on_subj.head.schema == grouped_on_subj_schema)
+
+    val grouped_on_pred_schema = Some(
+      Schema(
+        BagType(
+          TupleType(
+            Array(
+              Field("predicate", Types.CharArrayType),
+              Field("stmts",
+                BagType(
+                  TupleType(
+                    Array(
+                      Field("subject", Types.CharArrayType),
+                      Field("object", Types.CharArrayType))))))))))
+    assert(grouped_on_pred.head.schema == grouped_on_pred_schema)
+
+    val grouped_on_obj_schema = Some(
+      Schema(
+        BagType(
+          TupleType(
+            Array(
+              Field("object", Types.CharArrayType),
+              Field("stmts",
+                BagType(
+                  TupleType(
+                    Array(
+                      Field("subject", Types.CharArrayType),
+                      Field("predicate", Types.CharArrayType))))))))))
+    assert(grouped_on_obj.head.schema == grouped_on_obj_schema)
   }
 }
