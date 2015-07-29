@@ -468,4 +468,18 @@ class PigParserSpec extends FlatSpec {
     List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
       TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
   }
+
+  it should "parse RDFLoad operators for plain triples" in {
+    assert(parseScript("""a = RDFLoad('rdftest.rdf');""", LanguageFeature.SparqlPig) ==
+      List(RDFLoad(Pipe("a"), "rdftest.rdf", None)))
+  }
+
+  it should "parse RDFLoad operators for triple groups" in {
+    assert(parseScript("""a = RDFLoad('rdftest.rdf') grouped on subject;""", LanguageFeature.SparqlPig) ==
+      List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("subject"))))
+    assert(parseScript("""a = RDFLoad('rdftest.rdf') grouped on predicate;""", LanguageFeature.SparqlPig) ==
+      List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("predicate"))))
+    assert(parseScript("""a = RDFLoad('rdftest.rdf') grouped on object;""", LanguageFeature.SparqlPig) ==
+      List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("object"))))
+  }
 }

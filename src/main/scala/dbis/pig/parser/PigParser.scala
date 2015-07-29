@@ -208,6 +208,8 @@ class PigParser extends JavaTokenParsers {
   lazy val splitKeyword = "split".ignoreCase
   lazy val ifKeyword = "if".ignoreCase
   lazy val materializeKeyword = "materialize".ignoreCase
+  lazy val rdfLoadKeyword = "rdfload".ignoreCase
+  lazy val groupedOnKeyword = "grouped on".ignoreCase
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
@@ -263,6 +265,18 @@ class PigParser extends JavaTokenParsers {
         case Some(p) => new Load(Pipe(b), f, s, p._1, if (p._2.isEmpty) null else p._2)
         case None => new Load(Pipe(b), f, s)
       }
+  }
+
+  def groupedOnClause: Parser[String] = groupedOnKeyword ~ ("subject" | "predicate" | "object") ^^ {
+    case _ ~ groupingColumn => groupingColumn
+  }
+
+  /*
+   * <A> = RDFLOAD('<FileName>') grouped on <subject|predicate|object>;
+   */
+
+  def rdfLoadStmt: Parser[PigOperator] = bag ~ "=" ~ rdfLoadKeyword ~ "(" ~ fileName ~ ")" ~ (groupedOnClause?) ^^ {
+    case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped => new RDFLoad(Pipe(b), filename, grouped)
   }
 
   /*
@@ -472,7 +486,7 @@ class PigParser extends JavaTokenParsers {
 
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt | bgpFilterStmt) ~ ";" ^^ {
+    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
 
