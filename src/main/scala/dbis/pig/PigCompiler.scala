@@ -100,14 +100,14 @@ object PigCompiler extends PigParser with LazyLogging {
       plan.checkSchemaConformance
     } catch {
       case e:SchemaException => {
-        println(s"schema conformance error in ${e.getMessage}")
+        logger.error(s"schema conformance error in ${e.getMessage}")
         return
       }
     }
 
     val scriptName = fileName.toString().replace(".pig", "")
     if (!plan.checkConnectivity) {
-      println(s"dataflow plan not connected")
+      logger.error(s"dataflow plan not connected")
       return
     }
 
@@ -121,19 +121,23 @@ object PigCompiler extends PigParser with LazyLogging {
     
     logger.debug("finished optimizations")
 
-    if (FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend)) {
-      if (!compileOnly) {
-        // 4. and finally deploy/submit
-        val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
+    FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend) match {
+      // the file was created --> execute it
+      case Some(jarFile) =>  
+        if (!compileOnly) {
+        // 4. and finally deploy/submit          
         val runner = FileTools.getRunner(backend)
+        logger.debug(s"using runner class ${runner.getClass.toString()}")
         
         logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
         
         runner.execute(master, scriptName, jarFile)
       } else
         logger.info("successfully compiled program - exiting.")
-    } else 
-      logger.error("creating jar file failed")
+        
+      case None => logger.error("creating jar file failed") 
+    } 
+      
   }
 
   def replaceParameters(line: String, params: Map[String,String]): String = {

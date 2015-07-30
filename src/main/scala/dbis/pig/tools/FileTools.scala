@@ -63,7 +63,7 @@ object FileTools extends LazyLogging {
     }
   }
   
-  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean = false, backend: String = "spark"): Boolean = {
+  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean = false, backend: String = "spark"): Option[Path] = {
     // 4. compile it into Scala code for Spark
     val compiler = new ScalaBackendCompile(getTemplateFile(backend)) 
 
@@ -113,7 +113,7 @@ object FileTools extends LazyLogging {
 
     // 9. compile the scala code
     if (!ScalaCompiler.compile(outputDirectory, outputFile))
-      return false
+      return None
 
 
     // 10. build a jar file
@@ -122,7 +122,7 @@ object FileTools extends LazyLogging {
     
     logger.info(s"created job's jar file at $jarFile")
     
-    true
+    Some(jarFile)
   }
 
   private def getTemplateFile(backend: String): String = {

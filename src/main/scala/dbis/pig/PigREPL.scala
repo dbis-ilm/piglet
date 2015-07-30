@@ -152,12 +152,16 @@ object PigREPL extends PigParser {
       case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") || s.toLowerCase.startsWith(s"socket_write "))=> {
         buf ++= parseScript(s)
         val plan = new DataflowPlan(buf.toList)
-        if (FileTools.compileToJar(plan, "script", Paths.get("."), false, backend)) {
-          val jarFile = s".${File.separator}script${File.separator}script.jar"
-//          val jarFile = "script.jar"
-          val runner = FileTools.getRunner(backend)
-          runner.execute("local", "script", jarFile)
+        
+        
+        FileTools.compileToJar(plan, "script", Paths.get("."), false, backend) match {
+          case Some(jarFile) =>
+            val runner = FileTools.getRunner(backend)
+            runner.execute("local", "script", jarFile)
+          
+          case None => println("failed to build jar file for job")
         }
+
         // buf.clear()
         false
       }

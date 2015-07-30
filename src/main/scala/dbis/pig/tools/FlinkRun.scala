@@ -20,10 +20,11 @@ package dbis.pig.tools
 import scala.sys.process._
 import java.security._
 import org.apache.flink.client.CliFrontend
+import java.nio.file.Path
 
 
 class FlinkRun extends Run{
-  override def execute(master: String, className: String, jarFile: String){
+  override def execute(master: String, className: String, jarFile: Path){
     if (master.startsWith("local") && !master.startsWith("localhost")){
       //      val zmqJar = "/home/blaze/.ivy2/cache/org.zeromq/zeromq-scala-binding_2.11.0-M3/jars/zeromq-scala-binding_2.11.0-M3-0.0.7.jar"
       //      val pigJar = "/home/blaze/Masterthesis/projects/pigspark/target/scala-2.11/PigCompiler.jar"
@@ -37,11 +38,11 @@ class FlinkRun extends Run{
        run !
        */
       val cli = new CliFrontend
-      val ret = cli.parseParameters(Array("run", "--class", className, jarFile))
+      val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
     }
     else {
       val cli = new CliFrontend
-      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile))
+      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
     }
 
   }
