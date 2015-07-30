@@ -118,11 +118,12 @@ object FileTools extends LazyLogging {
 
     // 10. build a jar file
     val jarFile = Paths.get(outDir.toAbsolutePath().toString(), scriptName, s"$scriptName.jar") //s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
-    JarBuilder.apply(outputDirectory, jarFile, verbose = false)
     
-    logger.info(s"created job's jar file at $jarFile")
-    
-    Some(jarFile)
+    if(JarBuilder(outputDirectory, jarFile, verbose = false)) {
+      logger.info(s"created job's jar file at $jarFile")
+      return Some(jarFile)
+    } else 
+      return None
   }
 
   private def getTemplateFile(backend: String): String = {
