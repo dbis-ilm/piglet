@@ -22,6 +22,7 @@ import dbis.pig.plan._
 import dbis.pig.schema._
 import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
+import java.net.URI
 
 class PigOperatorSpec extends FlatSpec with Matchers {
   "The FOREACH operator" should "allow to check for FLATTEN expression" in {

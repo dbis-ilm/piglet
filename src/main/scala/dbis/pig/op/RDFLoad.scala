@@ -1,8 +1,9 @@
 package dbis.pig.op
 
 import dbis.pig.schema._
+import java.net.URI
 
-case class RDFLoad(out: Pipe, file: String, grouped: Option[String]) extends PigOperator {
+case class RDFLoad(out: Pipe, uri: URI, grouped: Option[String]) extends PigOperator {
   _outputs = List(out)
   _inputs = List.empty
 

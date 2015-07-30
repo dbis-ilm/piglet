@@ -17,6 +17,8 @@
 
 package dbis.test.pig
 
+import java.net.URI
+
 import dbis.pig._
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
@@ -471,7 +473,7 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse RDFLoad operators for plain triples" in {
     val ungrouped = parseScript( """a = RDFLoad('rdftest.rdf');""", LanguageFeature.SparqlPig)
-    assert(ungrouped == List(RDFLoad(Pipe("a"), "rdftest.rdf", None)))
+    assert(ungrouped == List(RDFLoad(Pipe("a"), new URI("rdftest.rdf"), None)))
     assert(ungrouped.head.schema == Some(Schema(BagType(TupleType(Array(
       Field("subject", Types.CharArrayType),
       Field("predicate", Types.CharArrayType),
@@ -482,9 +484,9 @@ class PigParserSpec extends FlatSpec {
     val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on subject;""", LanguageFeature.SparqlPig)
     val grouped_on_pred = parseScript( """a = RDFLoad('rdftest.rdf') grouped on predicate;""", LanguageFeature.SparqlPig)
     val grouped_on_obj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on object;""", LanguageFeature.SparqlPig)
-    assert(grouped_on_subj == List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("subject"))))
-    assert(grouped_on_pred == List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("predicate"))))
-    assert(grouped_on_obj == List(RDFLoad(Pipe("a"), "rdftest.rdf", Some("object"))))
+    assert(grouped_on_subj == List(RDFLoad(Pipe("a"), new URI("rdftest.rdf"), Some("subject"))))
+    assert(grouped_on_pred == List(RDFLoad(Pipe("a"), new URI("rdftest.rdf"), Some("predicate"))))
+    assert(grouped_on_obj == List(RDFLoad(Pipe("a"), new URI("rdftest.rdf"), Some("object"))))
 
     val grouped_on_subj_schema = Some(
       Schema(

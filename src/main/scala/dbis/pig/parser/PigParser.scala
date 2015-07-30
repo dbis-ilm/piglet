@@ -24,6 +24,8 @@ import dbis.pig.schema._
 import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.input.CharSequenceReader
 
+import java.net.URI
+
 /**
  * An enumeration type representing the various language sets
  * supported by the Pig compiler.
@@ -276,7 +278,7 @@ class PigParser extends JavaTokenParsers {
    */
 
   def rdfLoadStmt: Parser[PigOperator] = bag ~ "=" ~ rdfLoadKeyword ~ "(" ~ fileName ~ ")" ~ (groupedOnClause?) ^^ {
-    case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped => new RDFLoad(Pipe(b), filename, grouped)
+    case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped => new RDFLoad(Pipe(b), new URI(filename), grouped)
   }
 
   /*
