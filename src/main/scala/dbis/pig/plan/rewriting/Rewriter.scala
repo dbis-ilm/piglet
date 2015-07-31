@@ -375,20 +375,16 @@ object Rewriter extends LazyLogging {
     processPlan(plan, strategyf(t => strategy(t)))
   }
 
-  /** Removes `rem` from `plan`.
-    *
-    * If `rem` has any child nodes in the plan, they will take its place.
-    *
-    * @param plan
-    * @param rem
-    * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
-    val strategy = (op: Any) => {
+  /** Returns a strategy to remove `rem` from a DataflowPlan
+   *
+   * @param rem
+   * @return
+   */
+  private def removalStrategy(rem: PigOperator): Strategy = {
+    strategyf((op: Any) => {
       if (op == rem) {
         val pigOp = op.asInstanceOf[PigOperator]
-        if (pigOp.inputs.length == 0){
+        if (pigOp.inputs.length == 0) {
           Some(Empty(Pipe("")))
         }
         else {
@@ -409,8 +405,19 @@ object Rewriter extends LazyLogging {
       else {
         None
       }
-    }
-    processPlan(plan, strategyf(t => strategy(t)))
+    })}
+
+  /** Removes `rem` from `plan`.
+    *
+    * If `rem` has any child nodes in the plan, they will take its place.
+    *
+    * @param plan
+    * @param rem
+    * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
+    processPlan(plan, removalStrategy(rem))
   }
 
   /** Swap the positions of `op1` and `op2` in `plan`
