@@ -24,9 +24,10 @@ import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import org.scalatest.OptionValues._
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FlatSpec, Matchers}
 
-class RewriterSpec extends FlatSpec with Matchers {
+class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks {
   "The rewriter" should "merge two Filter operations" in {
     val op1 = Load(Pipe("a"), "file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -188,5 +189,16 @@ class RewriterSpec extends FlatSpec with Matchers {
     assume(false, "The conversion of TriplePatterns to Strings is not yet implemented")
     source shouldBe Load(Pipe("b"), "http://example.com", op1.schema, "pig.SPARQLLoader",
       List("""SELECT * WHERE { $0 "firstName" "Stefan" }"""))
+  }
+
+  it should "apply rewriting rule L2" in {
+    val possibleGroupers = Table(("subject"), ("predicate"), ("object"))
+    forAll (possibleGroupers) { (g: String) =>
+      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+      val op2 = Dump(Pipe("a"))
+      val plan = processPlan(new DataflowPlan(List(op1, op2)))
+      val source = plan.sourceNodes.headOption.value
+      source shouldBe Load(Pipe("a"), "hdfs://somewhere", op1.schema, "BinStorage")
+    }
   }
 }
