@@ -438,9 +438,8 @@ object Rewriter extends LazyLogging {
     * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
     */
   //noinspection ScalaDocMissingParameterDescription
-  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
+  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan =
     processPlan(plan, removalStrategy(rem))
-  }
 
   /** Swap the positions of `op1` and `op2` in `plan`
     *
