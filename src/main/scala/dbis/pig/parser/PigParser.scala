@@ -82,17 +82,16 @@ class PigParser extends JavaTokenParsers {
 
   def ref: Parser[Ref] = (derefMap |  derefBagOrTuple | fieldSpec) // ( fieldSpec | derefBagOrTuple | derefMap)
 
-  def arithmExpr: Parser[ArithmeticExpr] = ( 
-      literalField ^^ { f => RefExpr(f) }
-      | term ~ rep("+" ~ term | "-" ~ term) ^^ {
-        case l ~ list => list.foldLeft(l) {
-          case (x, "+" ~ i) => Add(x,i)
-          case (x, "-" ~ i) => Minus(x,i)
-        }
-      }
+  def arithmExpr: Parser[ArithmeticExpr] = term ~ rep("+" ~ term | "-" ~ term) ^^ {
+    case l ~ list => list.foldLeft(l) {
+      case (x, "+" ~ i) => Add(x,i)
+      case (x, "-" ~ i) => Minus(x,i)
+    }
+  }
     
-    | func ^^ { f => f } 
-    )
+//  literalField ^^ { f => RefExpr(f) }
+//    | func ^^ { f => f } 
+    
 
   def term: Parser[ArithmeticExpr] = factor ~ rep("*" ~ factor | "/" ~ factor) ^^ {
     case l ~ list => list.foldLeft(l) {
@@ -167,7 +166,7 @@ class PigParser extends JavaTokenParsers {
           case "OR" => Or(a, b)
         }
       }
-      | notKeyword ~ logicalExpr ^^ { case _ ~ e => Not(e) }
+      | notKeyword ~ logicalTerm ^^ { case _ ~ e => Not(e) }
       | logicalTerm ^^ { e => e }
 //      | func ^^ { f => Eq(f,RefExpr(Value(true))) }
      )
