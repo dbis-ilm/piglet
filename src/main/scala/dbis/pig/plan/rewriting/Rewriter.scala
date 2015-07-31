@@ -406,7 +406,7 @@ object Rewriter extends LazyLogging {
     strategyf((op: Any) => {
       if (op == rem) {
         val pigOp = op.asInstanceOf[PigOperator]
-        if (pigOp.inputs.length == 0) {
+        if (pigOp.inputs.isEmpty) {
           Some(Empty(Pipe("")))
         }
         else {
