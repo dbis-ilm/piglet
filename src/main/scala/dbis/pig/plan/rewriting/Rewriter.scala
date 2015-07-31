@@ -228,6 +228,22 @@ object Rewriter extends LazyLogging {
   //noinspection ScalaDocMissingParameterDescription
   private def mergeWithEmpty(parent: PigOperator, child: Empty): Option[PigOperator] = Some(child)
 
+  /** Applies rewriting rule R1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin
+    *
+    * @param term
+    * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  private def R1(term: Any): Option[PigOperator] = term match {
+    case op@RDFLoad(p, uri, None) =>
+      if (uri.getScheme == "http" || uri.getScheme == "https") {
+        Some(Load(p, uri.toString, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
+      } else {
+        None
+      }
+    case _ => None
+  }
+
   /** Add a new strategy for merging operators of two types.
     *
     * An example method to merge Filter operators is
@@ -564,4 +580,5 @@ object Rewriter extends LazyLogging {
   reorder[OrderBy, Filter]
   addStrategy(strategyf(t => splitIntoToFilters(t)))
   addStrategy(removeNonStorageSinks _)
+  addStrategy(R1 _)
 }

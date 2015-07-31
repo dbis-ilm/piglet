@@ -16,6 +16,8 @@
  */
 package dbis.test.pig
 
+import java.net.URI
+
 import dbis.pig.PigCompiler._
 import dbis.pig.op
 import dbis.pig.op._
@@ -161,5 +163,14 @@ class RewriterSpec extends FlatSpec with Matchers {
 
     newPlan.sourceNodes shouldBe empty
     newPlan.operators shouldBe empty
+  }
+
+  it should "apply rewriting rule R1" in {
+    var op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
+    val op2 = Dump(Pipe("a"))
+    var plan = processPlan(new DataflowPlan(List(op1, op2)))
+    val source = plan.sourceNodes.headOption.value
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, "pig.SPARQLLoader",
+      List("SELECT * WHERE { ?s ?p ?o }"))
   }
 }
