@@ -228,7 +228,7 @@ object Rewriter extends LazyLogging {
   //noinspection ScalaDocMissingParameterDescription
   private def mergeWithEmpty(parent: PigOperator, child: Empty): Option[PigOperator] = Some(child)
 
-  /** Applies rewriting rule R1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin
+  /** Applies rewriting rule R1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
     *
     * @param term
     * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
@@ -244,7 +244,7 @@ object Rewriter extends LazyLogging {
     case _ => None
   }
 
-  /** Applies rewriting rule R2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin
+  /** Applies rewriting rule R2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
     *
     * @param parent
     * @param child
@@ -257,7 +257,7 @@ object Rewriter extends LazyLogging {
     )
   }
 
-  /** Applies rewriting rule L2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin
+  /** Applies rewriting rule L2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
     *
     * @param term
     * @return Some Load operator, if `term` was an RDFLoad operator loading a resource from hdfs
@@ -273,7 +273,7 @@ object Rewriter extends LazyLogging {
     case _ => None
   }
 
-  /** Applies rewriting rule F1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin
+  /** Applies rewriting rule F1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
    *
    * @return A strategy that removes BGPFilters that use only unbound variables in their single pattern
    */
