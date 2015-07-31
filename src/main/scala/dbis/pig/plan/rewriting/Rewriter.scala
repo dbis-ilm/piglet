@@ -273,6 +273,27 @@ object Rewriter extends LazyLogging {
     case _ => None
   }
 
+  /** Applies rewriting rule F1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin
+   *
+   * @return A strategy that removes BGPFilters that use only unbound variables in their single pattern
+   */
+  private def F1 = rulefs[BGPFilter] {
+    case op@BGPFilter(_, _, patterns) =>
+      if (patterns.length > 1 || patterns.isEmpty) {
+        fail
+      } else {
+        val pattern = patterns.head
+        if (!pattern.subj.isInstanceOf[Value]
+          && !pattern.pred.isInstanceOf[Value]
+          && !pattern.obj.isInstanceOf[Value]) {
+          removalStrategy(op)
+        } else {
+          fail
+        }
+      }
+    case _ => fail
+  }
+
   /** Add a new strategy for merging operators of two types.
     *
     * An example method to merge Filter operators is
@@ -380,6 +401,7 @@ object Rewriter extends LazyLogging {
    * @param rem
    * @return
    */
+  //noinspection ScalaDocMissingParameterDescription
   private def removalStrategy(rem: PigOperator): Strategy = {
     strategyf((op: Any) => {
       if (op == rem) {
@@ -555,7 +577,7 @@ object Rewriter extends LazyLogging {
     }
 
     logger.debug(s"found ${materializes.size} materialize operators")
-    
+
     var newPlan = plan
 
     /* we should check here if the op is still connected to a sink
@@ -574,7 +596,7 @@ object Rewriter extends LazyLogging {
        */
       if(data.isDefined) {
         logger.debug(s"found materialized data for materialize operator $materialize")
-        
+
         val loader = Load(materialize.inputs.head, data.get, materialize.constructSchema, "BinStorage")
         val matInput = materialize.inputs.head.producer
 
@@ -585,7 +607,7 @@ object Rewriter extends LazyLogging {
         newPlan = plan.replace(matInput, loader)
 
         logger.info(s"replaced materialize op with loader $loader")
-        
+
         /* TODO: do we need to remove all other nodes that get disconnected now by hand
          * or do they get removed during code generation (because there is no sink?)
          */
@@ -597,13 +619,13 @@ object Rewriter extends LazyLogging {
          * then, remove the materialize op
          */
         logger.debug(s"did not find materialized data for materialize operator $materialize")
-        
+
         val file = mm.saveMapping(materialize.lineageSignature)
         val storer = new Store(materialize.inputs.head, file, "BinStorage")
 
         newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
         newPlan = newPlan.remove(materialize)
-        
+
         logger.info(s"inserted new store operator $storer")
       }
     }
@@ -619,4 +641,5 @@ object Rewriter extends LazyLogging {
   addStrategy(removeNonStorageSinks _)
   addStrategy(R1 _)
   addStrategy(L2 _)
+  addStrategy(F1)
 }

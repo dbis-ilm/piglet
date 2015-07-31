@@ -201,4 +201,24 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       source shouldBe Load(Pipe("a"), "hdfs://somewhere", op1.schema, "BinStorage")
     }
   }
+
+  it should "apply rewriting rule F1" in {
+    val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
+    // Add something between op1 and op3 to prevent R2 from being applied
+    val op2 = Distinct(Pipe("b"), Pipe("a"))
+    val op3 = BGPFilter(Pipe("c"), Pipe("b"),
+      List(
+        TriplePattern(
+          PositionalField(0),
+          NamedField("predicate"),
+          PositionalField(2))))
+    val op4 = Dump(Pipe("c"))
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
+    val source = plan.sourceNodes.headOption.value
+    source.outputs.flatMap(_.consumer) should contain only(op2)
+
+    val sink = plan.sinkNodes.headOption.value
+    sink shouldBe op4
+    sink.inputs.map(_.producer) should contain only(op2)
+  }
 }
