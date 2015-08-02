@@ -25,19 +25,19 @@ import dbis.pig.schema._
 import org.scalatest.FlatSpec
 
 class PigParserSpec extends FlatSpec {
-  "The parser" should "parse a simple load statement" in {
+  "The parser" should "parse a simple load statement" in  {
     assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), "file.csv")))
   }
 
-  it should "parse also a case insensitive load statement" in {
+  it should "parse also a case insensitive load statement" in  {
     assert(parseScript("""a = LOAD 'file.csv';""") == List(Load(Pipe("a"), "file.csv")))
   }
 
-  it should "parse also a load statement with a path" in {
+  it should "parse also a load statement with a path" in  {
     assert(parseScript("""a = LOAD 'dir1/dir2/file.csv';""") == List(Load(Pipe("a"), "dir1/dir2/file.csv")))
   }
 
-  it should "parse also a load statement with the using clause" in {
+  it should "parse also a load statement with the using clause" in  {
     assert(parseScript("""a = LOAD 'file.data' using PigStorage(',');""") ==
       List(Load(Pipe("a"), "file.data", None, "PigStorage", List("""','"""))))
     assert(parseScript("""a = LOAD 'file.n3' using RDFFileStorage();""") ==
@@ -46,8 +46,8 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse a load statement with typed schema specification" in {
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
-      Field("b", Types.CharArrayType),
-      Field("c", Types.DoubleType))))
+                                                Field("b", Types.CharArrayType),
+                                                Field("c", Types.DoubleType))))
     assert(parseScript("""a = load 'file.csv' as (a:int, b:chararray, c:double); """) ==
       List(Load(Pipe("a"), "file.csv", Some(Schema(schema)))))
   }
@@ -129,14 +129,14 @@ class PigParserSpec extends FlatSpec {
   it should "parse a filter with a logical expression" in {
     assert(parseScript("a = FILTER b BY x > 0 AND y < 1;") ==
       List(Filter(Pipe("a"), Pipe("b"), And(Gt(RefExpr(NamedField("x")), RefExpr(Value("0"))),
-        Lt(RefExpr(NamedField("y")), RefExpr(Value("1")))))))
+                                Lt(RefExpr(NamedField("y")), RefExpr(Value("1")))))))
   }
 
   it should "parse a filter with a complex logical expression" in {
     assert(parseScript("a = FILTER b BY x > 0 AND (y < 0 OR (NOT a == b));") ==
       List(Filter(Pipe("a"), Pipe("b"), And(Gt(RefExpr(NamedField("x")), RefExpr(Value("0"))),
-        PPredicate(Or(Lt(RefExpr(NamedField("y")), RefExpr(Value("0"))),
-          PPredicate(Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))))))))))
+      PPredicate(Or(Lt(RefExpr(NamedField("y")), RefExpr(Value("0"))),
+        PPredicate(Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))))))))))
   }
 
   it should "parse a simple foreach statement" in {
@@ -144,7 +144,8 @@ class PigParserSpec extends FlatSpec {
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(RefExpr(NamedField("x"))),
         GeneratorExpr(RefExpr(NamedField("y"))),
-        GeneratorExpr(RefExpr(NamedField("z"))))))))
+        GeneratorExpr(RefExpr(NamedField("z")))
+      )))))
   }
 
   it should "parse a foreach statement with aliases for fields" in {
@@ -152,21 +153,24 @@ class PigParserSpec extends FlatSpec {
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(RefExpr(PositionalField(0)), Some(Field("f1"))),
         GeneratorExpr(RefExpr(PositionalField(1)), Some(Field("f2"))),
-        GeneratorExpr(RefExpr(PositionalField(2)), Some(Field("f3"))))))))
+        GeneratorExpr(RefExpr(PositionalField(2)), Some(Field("f3")))
+      )))))
   }
 
   it should "parse a foreach statement with field expressions" in {
     assert(parseScript("a = foreach b generate $0 + $1 as f1, $1 * 42 as f2;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(Add(RefExpr(PositionalField(0)), RefExpr(PositionalField(1))), Some(Field("f1"))),
-        GeneratorExpr(Mult(RefExpr(PositionalField(1)), RefExpr(Value("42"))), Some(Field("f2"))))))))
+        GeneratorExpr(Mult(RefExpr(PositionalField(1)), RefExpr(Value("42"))), Some(Field("f2")))
+      )))))
   }
 
   it should "parse a foreach statement with flatten" in {
     assert(parseScript("a = foreach b generate $0, flatten($1);") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(RefExpr(PositionalField(0))),
-        GeneratorExpr(FlattenExpr(RefExpr(PositionalField(1)))))))))
+        GeneratorExpr(FlattenExpr(RefExpr(PositionalField(1))))
+      )))))
   }
 
   it should "parse a foreach statement with function expressions" in {
@@ -176,14 +180,16 @@ class PigParserSpec extends FlatSpec {
           RefExpr(Value("\"field1\"")),
           RefExpr(PositionalField(0)),
           RefExpr(Value("\"field2\"")),
-          RefExpr(PositionalField(1))))))))))
+          RefExpr(PositionalField(1)))))
+      )))))
   }
 
   it should "parse a foreach statement with another function expression" in {
     assert(parseScript("a = FOREACH b GENERATE f0, COUNT(f1) AS CNT;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(RefExpr(NamedField("f0"))),
-        GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("f1")))), Some(Field("CNT", Types.ByteArrayType))))))))
+        GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("f1")))), Some(Field("CNT", Types.ByteArrayType)))
+      )))))
   }
 
   it should "parse a simple foreach statement with a schema" in {
@@ -191,31 +197,36 @@ class PigParserSpec extends FlatSpec {
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(RefExpr(PositionalField(0)), Some(Field("subj", Types.CharArrayType))),
         GeneratorExpr(RefExpr(PositionalField(1)), Some(Field("pred", Types.ByteArrayType))),
-        GeneratorExpr(RefExpr(PositionalField(2)), Some(Field("obj", Types.CharArrayType))))))))
+        GeneratorExpr(RefExpr(PositionalField(2)), Some(Field("obj", Types.CharArrayType)))
+      )))))
   }
 
   it should "parse a FOREACH statement with a bag constructor" in {
     assert(parseScript("a = FOREACH b GENERATE {$0, $1, $2} as myBag;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(ConstructBagExpr(List(RefExpr(PositionalField(0)),
-          RefExpr(PositionalField(1)),
-          RefExpr(PositionalField(2)))), Some(Field("myBag", Types.ByteArrayType))))))))
+                                            RefExpr(PositionalField(1)),
+                                            RefExpr(PositionalField(2)))), Some(Field("myBag", Types.ByteArrayType))
+        ))))))
   }
 
   it should "parse a FOREACH statement with a tuple constructor" in {
     assert(parseScript("a = FOREACH b GENERATE $0, ($1, $2) as myTuple;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
-        GeneratorExpr(RefExpr(PositionalField(0))),
-        GeneratorExpr(ConstructTupleExpr(List(RefExpr(PositionalField(1)),
-          RefExpr(PositionalField(2)))), Some(Field("myTuple", Types.ByteArrayType))))))))
+      GeneratorExpr(RefExpr(PositionalField(0))),
+      GeneratorExpr(ConstructTupleExpr(List(RefExpr(PositionalField(1)),
+                                            RefExpr(PositionalField(2)))), Some(Field("myTuple", Types.ByteArrayType))
+      ))))))
   }
 
   it should "parse a FOREACH statement with a map constructor" in {
     assert(parseScript("a = FOREACH b GENERATE [$0, $1] as myMap;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(ConstructMapExpr(List(RefExpr(PositionalField(0)),
-          RefExpr(PositionalField(1)))), Some(Field("myMap", Types.ByteArrayType))))))))
+                                            RefExpr(PositionalField(1)))), Some(Field("myMap", Types.ByteArrayType))
+      ))))))
   }
+
 
   it should "parse a simple nested FOREACH statement" in {
     assert(parseScript(
@@ -224,7 +235,8 @@ class PigParserSpec extends FlatSpec {
       |};""".stripMargin) ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorPlan(List(
         Generate(List(GeneratorExpr(RefExpr(NamedField("c"))),
-          GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("d"))))))))))))
+          GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("d")))))))
+      )))))
   }
 
   it should "parse a nested FOREACH statement with multiple statements" in {
@@ -234,11 +246,12 @@ class PigParserSpec extends FlatSpec {
         |unique_d = DISTINCT data;
         |generate key, COUNT(unique_d);
         |};""".stripMargin) ==
-      List(Foreach(Pipe("a"), Pipe("b"), GeneratorPlan(List(
-        ConstructBag(Pipe("data"), DerefTuple(NamedField("d"), NamedField("dat"))),
-        Distinct(Pipe("unique_d"), Pipe("data")),
-        Generate(List(GeneratorExpr(RefExpr(NamedField("key"))),
-          GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("unique_d"))))))))))))
+    List(Foreach(Pipe("a"), Pipe("b"), GeneratorPlan(List(
+    ConstructBag(Pipe("data"), DerefTuple(NamedField("d"), NamedField("dat"))),
+    Distinct(Pipe("unique_d"), Pipe("data")),
+    Generate(List(GeneratorExpr(RefExpr(NamedField("key"))),
+      GeneratorExpr(Func("COUNT", List(RefExpr(NamedField("unique_d")))))))
+    )))))
   }
 
   it should "detect an invalid statement" in {
@@ -280,7 +293,7 @@ class PigParserSpec extends FlatSpec {
   it should "parse a group by statement with multiple named keys" in {
     assert(parseScript("a = group b by (k1, k2, k3);") ==
       List(Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List(NamedField("k1"),
-        NamedField("k2"), NamedField("k3"))))))
+      NamedField("k2"), NamedField("k3"))))))
   }
 
   it should "parse the distinct statement" in {
@@ -389,39 +402,39 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse a socket read statement in standard mode" in {
     assert(parseScript("a = socket_read '127.0.0.1:5555';", LanguageFeature.StreamingPig)
-      == List(SocketRead(Pipe("a"), SocketAddress("", "127.0.0.1", "5555"), "")))
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
   }
 
   it should "parse a socket read statement in standard mode with using clause" in {
     assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');", LanguageFeature.StreamingPig)
-      == List(SocketRead(Pipe("a"), SocketAddress("", "127.0.0.1", "5555"), "", None, "PigStream", List("""','"""))))
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "PigStream",List("""','"""))))
     assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();", LanguageFeature.StreamingPig)
-      == List(SocketRead(Pipe("a"), SocketAddress("", "127.0.0.1", "5555"), "", None, "RDFStream")))
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "RDFStream")))
   }
 
   it should "parse a socket read statement in zmq mode" in {
     assert(parseScript("a = socket_read 'tcp://127.0.0.1:5555' mode zmq;", LanguageFeature.StreamingPig)
-      == List(SocketRead(Pipe("a"), SocketAddress("tcp://", "127.0.0.1", "5555"), "zmq")))
+      == List(SocketRead(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
   }
 
   it should "parse a socket write statement in standard mode" in {
     assert(parseScript("socket_write a to '127.0.0.1:5555';", LanguageFeature.StreamingPig)
-      == List(SocketWrite(Pipe("a"), SocketAddress("", "127.0.0.1", "5555"), "")))
+      == List(SocketWrite(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
   }
 
   it should "parse a socket write statement in zmq mode" in {
     assert(parseScript("socket_write a to 'tcp://127.0.0.1:5555' mode zmq;", LanguageFeature.StreamingPig)
-      == List(SocketWrite(Pipe("a"), SocketAddress("tcp://", "127.0.0.1", "5555"), "zmq")))
+      == List(SocketWrite(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
   }
 
   it should "parse a window statement using Rows for window and slider" in {
     assert(parseScript("a = window b rows 100 slide rows 10;", LanguageFeature.StreamingPig)
-      == List(Window(Pipe("a"), Pipe("b"), (100, ""), (10, ""))))
+      == List(Window(Pipe("a"), Pipe("b"), (100,""), (10,""))))
   }
-
+ 
   it should "parse a window statement using Range for window and slider" in {
     assert(parseScript("a = window b range 100 seconds slide range 10 seconds;", LanguageFeature.StreamingPig)
-      == List(Window(Pipe("a"), Pipe("b"), (100, "seconds"), (10, "seconds"))))
+      == List(Window(Pipe("a"), Pipe("b"), (100,"seconds"), (10,"seconds"))))
   }
 
   it should "parse a SPLIT INTO statement" in {
@@ -429,7 +442,8 @@ class PigParserSpec extends FlatSpec {
       List(SplitInto(Pipe("a"), List(
         SplitBranch(Pipe("b"), Gt(RefExpr(PositionalField(0)), RefExpr(Value("12")))),
         SplitBranch(Pipe("c"), Lt(RefExpr(PositionalField(0)), RefExpr(Value("12")))),
-        SplitBranch(Pipe("d"), Eq(RefExpr(PositionalField(0)), RefExpr(Value("0"))))))))
+        SplitBranch(Pipe("d"), Eq(RefExpr(PositionalField(0)), RefExpr(Value("0"))))
+    ))))
   }
 
   it should "reject statements not supported in the plain language feature" in {
@@ -451,92 +465,7 @@ class PigParserSpec extends FlatSpec {
   it should "parse BGP_FILTER with a complex pattern" in {
     assert(parseScript("""a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""",
       LanguageFeature.SparqlPig) ==
-      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
-        TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
-  }
-
-  it should "parse a matcher  statement using only mode" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_next_match;", LanguageFeature.ComplexEventPig)
-      == List(Matcher(Pipe("a"), Pipe("b"),
-        SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
-        "skip_till_next_match",
-        (0, "seconds"))))
-  }
-
-  it should "parse a matcher  statement using skip_till_any_match mode" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_any_match;", LanguageFeature.ComplexEventPig)
-      == List(Matcher(Pipe("a"), Pipe("b"),
-        SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
-        "skip_till_any_match",
-        (0, "seconds"))))
-  }
-
-  it should "parse a matcher  statement using only window" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
-      == List(Matcher(Pipe("a"), Pipe("b"),
-        SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
-        "skip_till_next_match",
-        (30, "seconds"))))
-  }
-
-  it should "parse a matcher  statement using a simple event" in {
-    assert(parseScript("a = Matcher b PATTERN A EVENTS (A = x == 0) WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
-      == List(Matcher(Pipe("a"), Pipe("b"),
-        SimplePattern("A"),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
-        "skip_till_next_match",
-        (30, "seconds"))))
-  }
-  it should "parse a matcher  statement using a sequence and  three events" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B, C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
-      == List(Matcher(Pipe("a"), Pipe("b"),
-        SeqPattern(List(SimplePattern("A"), SimplePattern("B"), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
-        "skip_till_next_match",
-        (30, "seconds"))))
-  }
-  it should "parse a matcher  statement using a sequence event with negation" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
-      == List(Matcher(Pipe("a"), Pipe("b"),
-        SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
-        "skip_till_next_match",
-        (30, "seconds"))))
-  }
-
-  it should "parse a matcher  statement using more simple event definitions" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0, C = x == 1) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
-      == List(Matcher(Pipe("a"), Pipe("b"),
-        SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
-          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))))),
-        "skip_till_next_match",
-        (30, "seconds"))))
-  }
-  it should "parse a matcher  statement using composite sequence pattern" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, seq(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
-      == List(Matcher(Pipe("a"), Pipe("b"),
-        SeqPattern(List(SimplePattern("A"),
-          SeqPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
-          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
-          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
-        "skip_till_next_match",
-        (30, "seconds"))))
-  }
-
-  it should "parse a matcher  statement using conjunction and disjunction" in {
-    assert(parseScript("a = Matcher b PATTERN conj (A, disj(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
-      == List(Matcher(Pipe("a"), Pipe("b"),
-        ConjPattern(List(SimplePattern("A"),
-          DisjPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
-          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
-          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
-        "skip_till_next_match",
-        (30, "seconds"))))
+    List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
+      TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
   }
 }
