@@ -2,7 +2,7 @@ daily = load 'src/it/resources/nested.csv' using PigStorage(',') as (exchange, s
 win = window daily range 10 seconds slide range 10 seconds;
 grpd  = group win by exchange;
 uniqcnt  = foreach grpd {
-           sym      = daily.symbol;
+           sym      = win.symbol;
            uniq_sym = distinct sym;
            generate group, COUNT(uniq_sym);
 };

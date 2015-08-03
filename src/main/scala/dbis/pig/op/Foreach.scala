@@ -184,6 +184,7 @@ case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator, var windowM
       case GeneratorList(expr) => inputSchema match {
         case Some(s) => {
           // if we know the schema we check all named fields
+          println(s)
           expr.map(_.expr.traverseAnd(s, Expr.checkExpressionConformance)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
         }
         case None => {

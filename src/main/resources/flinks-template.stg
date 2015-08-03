@@ -43,7 +43,7 @@ filter(out,in,pred,windowMode) ::=<<
 // ------------------ Executes an expression FOREACH input element ------------
 foreach(out,in,expr,windowMode) ::=<<
 <if(windowMode)>
-    val <out> = <in>.mapWindow(custom<out>Map _).flatten()
+    val <out> = <in>.mapWindow(custom<out>Map _)
 <else>
     val <out> = <in>.map(t => <expr>)
 <endif>

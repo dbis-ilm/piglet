@@ -32,7 +32,7 @@ class FlinksCompileIt extends FlatSpec with Matchers {
     ("construct.pig", "result3.out", "result3.data"),
     ("windowJoin.pig", "joinedW.out", "joined.data"),
     ("windowGrouping.pig", "grouping.out", "grouping.data"),
- //   ("windowNforeach.pig", "nested.out", "nested.data"),  //TODO
+    ("windowNforeach.pig", "nested.out", "nested.data"),
     ("windowCount.pig", "marycounts.out", "marycount.data")
     //TODO: Limit, Distinct, Filter, OrderBy
   )

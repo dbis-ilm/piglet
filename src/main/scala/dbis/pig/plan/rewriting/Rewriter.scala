@@ -545,6 +545,10 @@ object Rewriter extends LazyLogging {
     val walker1 = new BreadthFirstTopDownWalker
     val walker2 = new BreadthFirstBottomUpWalker
 
+    // All Window Ops: Group,Filter,Distinct,Limit,OrderBy,Foreach
+    // Two modes: Group,Filter,Limit,Foreach
+    // Terminator: Foreach, Join
+ 
     logger.debug(s"Searching for Window Operators")
     walker1.walk(newPlan){ op => 
       op match {
@@ -555,9 +559,9 @@ object Rewriter extends LazyLogging {
         case _ =>
       }
     }
-
+    
+    // Find and process Window Joins 
     val joins = ListBuffer.empty[Join]
-
     walker2.walk(newPlan){ op => 
       op match {
         case o: Join => joins += o
@@ -565,13 +569,6 @@ object Rewriter extends LazyLogging {
       }
     }
     newPlan = processWindowJoins(newPlan, joins.toList)
-    
-    // All Window Ops: Group,Filter,Distinct,Limit,OrderBy,Foreach
-    // Two modes: Group,Filter,Limit,Foreach
-    // Terminator: Foreach, Join
-    
-
-
 
     newPlan
   }
@@ -597,8 +594,9 @@ object Rewriter extends LazyLogging {
         case o: Foreach => {
           logger.debug(s"Rewrite Foreach to WindowMode")
           o.windowMode = true
-          //TODO: Add Flatten
-          return plan
+          val flatten = new WindowFlatten(Pipe("flattenNode"), o.outputs.head)
+          val newPlan = plan.insertBetween(o, o.outputs.head.consumer.head, flatten)
+          return newPlan
         }
         case o: Join => {
           logger.debug(s"Found Join Node, abort")
@@ -609,13 +607,11 @@ object Rewriter extends LazyLogging {
       littleWalker ++= operator.outputs.flatMap(_.consumer)
       if (littleWalker.isEmpty) lastOp = operator
     }
+
     logger.debug(s"Reached End of Plan - Adding Flatten Node")
     val before = lastOp.inputs.head
     val flatten = new WindowFlatten(Pipe("flattenNode"), before.producer.outputs.head)
-
-    logger.debug(s"Defined Node - Inserting ...")
-    val newPlan = plan.insertBetween(before.producer, lastOp, flatten) //TODO
-    logger.debug(s"Inserted Flatten Node")
+    val newPlan = plan.insertBetween(before.producer, lastOp, flatten)
 
     newPlan
   }
