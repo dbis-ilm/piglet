@@ -421,44 +421,44 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         case TupleType(n, f) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
         case MapType(t, n) => s""".append(t(${i}).asInstanceOf[Map[String,Any]].map{case (k,v) => k + "#" + v}.mkString("[", ",", "]"))"""
         case _ => s".append(t($i))"
-      }}.mkString("\n.append(\",\")\n")
+      }}.mkString("\n    .append(\",\")\n")
       case None => s".append(t(0))\n"
     }
 
     node match {
       case OrderBy(out, in, orderSpec) => {
-        val cname = s"custKey_${out.name}_${in.name}"
+        val cname = s"custKey_${out.name}_${node.inputs.head.name}"
         var col = 0
         val fields = orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
         val cmpExpr = genCmpExpr(1, orderSpec.size)
         s"""
-        |case class ${cname}(${fields}) extends Ordered[${cname}] {
-          |  def compare(that: ${cname}) = $cmpExpr
-          |}""".stripMargin
+        |  case class ${cname}(${fields}) extends Ordered[${cname}] {
+        |    def compare(that: ${cname}) = $cmpExpr
+        |  }""".stripMargin
       }
       case Store(in, file,_) => { s"""
-        |def tuple${in.name}ToString(t: List[Any]): String = {
-        |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
+        |  def tuple${node.inputs.head.name}ToString(t: List[Any]): String = {
+        |    implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
         |
-        |  val sb = new StringBuilder
-        |  sb${genStringRepOfTuple(node.schema)}
-        |  sb.toString
-        |}""".stripMargin
+        |    val sb = new StringBuilder
+        |    sb${genStringRepOfTuple(node.schema)}
+        |    sb.toString
+        |  }""".stripMargin
       }
       case Grouping(out, in, groupExpr, windowMode) => { 
         if (windowMode)
           s"""
-          |def custom${out.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-          |  out.collect(ts.groupBy(t => ${emitGrouping(node.inputSchema,groupExpr)}).flatMap(x => List(x._1,x._2)).toList)
-          |}""".stripMargin
+          |  def custom${out.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+          |    out.collect(ts.groupBy(t => ${emitGrouping(node.inputSchema,groupExpr)}).flatMap(x => List(x._1,x._2)).toList)
+          |  }""".stripMargin
         else ""
       }
       case Foreach(out, in, gen, windowMode) => { 
         if (windowMode)
           s"""
-          |def custom${out.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-          |  ts.foreach { t => out.collect(${emitForeachExpr(node, gen)})}
-          |}""".stripMargin
+          |  def custom${out.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+          |    ts.foreach { t => out.collect(${emitForeachExpr(node, gen)})}
+          |  }""".stripMargin
         else ""
       }
       case _ => ""
@@ -473,7 +473,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
    * @return the generated code
    */
   def emitNestedPlan(schema: Option[Schema], plan: DataflowPlan): String = {
-    "{\n" + plan.operators.map {
+    "{\n" + plan.operators.map { node => node match {
       case Generate(expr) => s"""( ${emitGenerator(schema, expr)} )"""
       case ConstructBag(out, ref) => ref match {
         case DerefTuple(r1, r2) => {
@@ -484,12 +484,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
         }
         case _ => "" // should not happen
       }
-      case Distinct(out, in) => callST("distinct", Map("out" -> out.name, "in" -> in.name))
-    case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> out.name, "in" -> in.name, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
-    case Limit(out, in, num, windowMode) => callST("limit", Map("out" -> out.name, "in" -> in.name, "num" -> num,"windowMode"->windowMode))
+      case Distinct(out, in) => callST("distinct", Map("out" -> out.name, "in" -> node.inputs.head.name))
+    case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> out.name, "in" -> node.inputs.head.name, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
+    case Limit(out, in, num, windowMode) => callST("limit", Map("out" -> out.name, "in" -> node.inputs.head.name, "num" -> num,"windowMode"->windowMode))
       case OrderBy(out, in, orderSpec) => "" // TODO!!!!
       case _ => ""
-    }.mkString("\n") + "}"
+    }}.mkString("\n") + "}"
   }
 
   /**
@@ -567,49 +567,50 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     val group = STGroupFile(templateFile)
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out.name, file, func, params)
-      case Dump(in) => callST("dump", Map("in"->in.name))
-      case Store(in, file,func) => callST("store", Map("in"->in.name,"file"->new java.io.File(file).getAbsolutePath,"schema"->s"tuple${in.name}ToString(t)","func"->func))
+      case Dump(in) => callST("dump", Map("in"->node.inputs.head.name))
+      case Store(in, file,func) => callST("store", Map("in"->node.inputs.head.name,"file"->new java.io.File(file).getAbsolutePath,"schema"->s"tuple${node.inputs.head.name}ToString(t)","func"->func))
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred, windowMode) => {
         if (windowMode)
-          callST("filter", Map("out"->out.name,"in"->in.name,"pred"->emitPredicate(node.schema, pred),"windowMode"->windowMode))
+          callST("filter", Map("out"->out.name,"in"->node.inputs.head.name,"pred"->emitPredicate(node.schema, pred),"windowMode"->windowMode))
         else
-          callST("filter", Map("out"->out.name,"in"->in.name,"pred"->emitPredicate(node.schema, pred)))
+          callST("filter", Map("out"->out.name,"in"->node.inputs.head.name,"pred"->emitPredicate(node.schema, pred)))
       }
-      case Foreach(out, in, gen, windowMode) => emitForeach(node, out.name, in.name, gen, windowMode)
+      case Foreach(out, in, gen, windowMode) => emitForeach(node, out.name, node.inputs.head.name, gen, windowMode)
       case Grouping(out, in, groupExpr, windowMode) => {
         if (groupExpr.keyList.isEmpty) 
           if (windowMode)
-            callST("groupBy", Map("out"->out.name,"in"->in.name,"windowMode"->windowMode))
+            callST("groupBy", Map("out"->out.name,"in"->node.inputs.head.name,"windowMode"->windowMode))
           else 
-            callST("groupBy", Map("out"->out.name,"in"->in.name))
+            callST("groupBy", Map("out"->out.name,"in"->node.inputs.head.name))
         else
           if (windowMode)
-            callST("groupBy", Map("out"->out.name,"in"->in.name,"expr"->emitGrouping(node.inputSchema, groupExpr),"windowMode"->windowMode))
+            callST("groupBy", Map("out"->out.name,"in"->node.inputs.head.name,"expr"->emitGrouping(node.inputSchema, groupExpr),"windowMode"->windowMode))
           else
-            callST("groupBy", Map("out"->out.name,"in"->in.name,"expr"->emitGrouping(node.inputSchema, groupExpr)))
+            callST("groupBy", Map("out"->out.name,"in"->node.inputs.head.name,"expr"->emitGrouping(node.inputSchema, groupExpr)))
       }
-      case Distinct(out, in) => callST("distinct", Map("out"->out.name,"in"->in.name))
+      case Distinct(out, in) => callST("distinct", Map("out"->out.name,"in"->node.inputs.head.name))
       case Limit(out, in, num, windowMode) => {
         if(windowMode)
-          callST("limit", Map("out"->out.name,"in"->in.name,"num"->num,"windowMode"->windowMode))
+          callST("limit", Map("out"->out.name,"in"->node.inputs.head.name,"num"->num,"windowMode"->windowMode))
         else
-          callST("limit", Map("out"->out.name,"in"->in.name,"num"->num))
+          callST("limit", Map("out"->out.name,"in"->node.inputs.head.name,"num"->num))
       }
       case Join(out, rels, exprs, window) => emitJoin(node, out.name, rels, exprs, window)
       case Union(out, rels) => callST("union", Map("out"->out.name,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
-      case Sample(out, in, expr) => callST("sample", Map("out"->out.name,"in"->in.name,"expr"->emitExpr(node.schema, expr)))
-      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out.name,"in"->in.name,
-        "key"->emitSortKey(node.schema, orderSpec, out.name, in.name),"asc"->ascendingSortOrder(orderSpec.head)))
-      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out.name,"op"->op,"in"->in.name,"params"->emitParamList(node.schema, params)))
+      case Sample(out, in, expr) => callST("sample", Map("out"->out.name,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
+      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->out.name,"in"->node.inputs.head.name,
+        "key"->emitSortKey(node.schema, orderSpec, out.name, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
+      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->out.name,"op"->op,"in"->node.inputs.head.name,"params"->emitParamList(node.schema, params)))
       case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(out.name, address, mode, func, params)
       case SocketWrite(in, address, mode) => {
         if(mode!="")
-          callST("socketWrite", Map("in"->in.name,"addr"->address,"mode"->mode))
+          callST("socketWrite", Map("in"->node.inputs.head.name,"addr"->address,"mode"->mode))
         else
-          callST("socketWrite", Map("in"->in.name,"addr"->address))
+          callST("socketWrite", Map("in"->node.inputs.head.name,"addr"->address))
       }
-      case Window(out, in, window, slide) => emitWindow(out.name,in.name,window,slide) 
+      case Window(out, in, window, slide) => emitWindow(out.name,node.inputs.head.name,window,slide)
+      case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->out.name,"in"->node.inputs.head.name))
       case Empty(_) => ""
       /*     
        case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }

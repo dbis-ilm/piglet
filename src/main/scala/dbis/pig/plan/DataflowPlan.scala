@@ -225,6 +225,19 @@ class DataflowPlan(var operators: List[PigOperator]) {
   def insertAfter(old: PigOperator, op: PigOperator) : DataflowPlan =  {
     Rewriter.insertAfter(this, old, op)
   }
+ 
+  /**
+   * Inserts the operator op between the given operators inOp and outOp in the dataflow plan. inOp and oldOp has to be already part of the plan.
+   *
+   * @param inOp the operator after we insert
+   * @param outOp the operator before we insert
+   * @param op the new operator to be inserted in between
+   * @return the resulting dataflow plan
+   */
+  def insertBetween(inOp: PigOperator, outOp: PigOperator, op: PigOperator) : DataflowPlan =  {
+    Rewriter.insertBetween(this, inOp, outOp, op)
+  }
+
 
   /**
    * Remove the given operator from the dataflow plan.

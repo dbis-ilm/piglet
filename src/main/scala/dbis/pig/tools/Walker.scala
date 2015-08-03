@@ -82,7 +82,7 @@ class BreadthFirstTopDownWalker extends Walker[PigOperator] {
     	  visit(op)    // apply the visitor to the current op
       }
       
-      // add all producers of the current op to our todo list
+      // add all consumers of the current op to our todo list
       // execpt the ones that we have already seen
       todo ++= op.outputs.flatMap(_.consumer).filter { op => !seen.contains(op.lineageSignature) }
     }
