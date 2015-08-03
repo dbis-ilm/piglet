@@ -9,6 +9,9 @@ package dbis.pig.tools
 
 import java.io.{BufferedInputStream, File, FileInputStream, FileOutputStream}
 import java.util.jar.{JarEntry, JarOutputStream}
+import java.nio.file.Path
+import java.nio.file.Files
+import com.typesafe.scalalogging.LazyLogging
 
 
 /** Utility class for building a .jar file from a directory of .class files.
@@ -18,7 +21,7 @@ import java.util.jar.{JarEntry, JarOutputStream}
   * CBB: turn this into a function that uses more of a classical Builder wrapping a JarOutputStream
   * to construct the .jar file.
   */
-object JarBuilder {
+object JarBuilder extends LazyLogging {
   /** Given an input directory containing other directories which may include Java .class
     * files and a .jar output file name, this routine builds a jar file at the given location
     * by adding all the .class files into it and attaching a manifest.
@@ -43,28 +46,27 @@ object JarBuilder {
     * @param verbose if true, prints verbose debug messages
     * @return true if the .jar file was successfully created, false if not
     */
-  def apply(inputDirectoryPath: String, jarFilePath: String, verbose: Boolean): Boolean = {
+  def apply(rootDirectory: Path, jarFilePath: Path, verbose: Boolean): Boolean = {
     // ascertain that the target directory exists
-    val rootDirectory = new File(inputDirectoryPath)
-    if( !rootDirectory.exists ) {
-      println("error: .class directory does not exist: " + inputDirectoryPath)
+    //    val rootDirectory = new File(inputDirectoryPath)
+    
+    if(!Files.exists(rootDirectory)) {
+      logger.error(s"error: .class directory does not exist: $rootDirectory")
       false
-    }
-    else
-    if( !rootDirectory.isDirectory ) {
-      println("error: .class path is not a directory: " + inputDirectoryPath)
+    } else if (!Files.isDirectory(rootDirectory)) {
+      logger.error(s"error: .class path is not a directory: $rootDirectory")
       false
-    }
-    else {
-      val rootPath = rootDirectory.getAbsolutePath
+    } else {
+      // IMPORTANT: Do _not_ make this absolute!
+      val rootPath = rootDirectory.toString()
       val canonicalRootPath = canonizeSlashesInPath(rootPath, true)
 
       val fileOutputStream =
         try {
-          new FileOutputStream(jarFilePath)
+          new FileOutputStream(jarFilePath.toFile())
         } catch {
           case e: Throwable =>
-            println("error: failed to open file output stream on: " + jarFilePath + ": " + e)
+            logger.error(s"failed to open file output stream on: $jarFilePath  (${e.getMessage})",e)
             return false
         }
 
@@ -76,20 +78,25 @@ object JarBuilder {
         } catch {
           case e: Throwable =>
             fileOutputStream.close()
-            println("error: failed to open jar output stream: " + e)
+            logger.error("failed to open jar output stream", e)
             return false
         }
 
       try {
-        if( verbose ) println("      building jar file '" + jarFilePath + "' from class files in '" + inputDirectoryPath + "'...")
+        if( verbose ) {
+          logger.debug(s"""building jar file "$jarFilePath" from class files in "$rootDirectory"...""")
+        } 
+          
 
         // recursively add the files in the input directory
-        add(rootDirectory, canonicalRootPath, jarOutputStream, verbose)
+        add(rootDirectory.toFile(), canonicalRootPath, jarOutputStream, verbose)
 
-        if( verbose ) println("      ...jar file assembly completed.")
+        if( verbose ) {
+          logger.debug("...jar file assembly completed.")
+        } 
       } catch {
         case e: Throwable =>
-          System.err.println("error: failed to build jar file: " + jarFilePath + ": " + e)
+          logger.error(s"""failed to build jar file: "$jarFilePath"""", e)
           return false
       } finally {
         jarOutputStream.close() // closes JarOutputStream and FileOutputStream

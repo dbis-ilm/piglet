@@ -17,6 +17,7 @@
 package dbis.pig.op
 
 import dbis.pig.schema.Schema
+import java.net.URI
 
 /**
  * Load represents the LOAD operator of Pig.
@@ -27,7 +28,7 @@ import dbis.pig.schema.Schema
  * @param loaderFunc
  * @param loaderParams
  */
-case class Load(out: Pipe, file: String,
+case class Load(out: Pipe, file: URI,
                 var loadSchema: Option[Schema] = None,
                 loaderFunc: String = "PigStorage", loaderParams: List[String] = null) extends PigOperator {
   _outputs = List(out)

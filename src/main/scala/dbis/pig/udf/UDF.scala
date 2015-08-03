@@ -42,7 +42,9 @@ object UDFTable {
     UDF("MAX", "PigFuncs.max", List(Types.FloatType), Types.FloatType, true),
     UDF("MAX", "PigFuncs.max", List(Types.DoubleType), Types.DoubleType, true),
     UDF("TOKENIZE", "PigFuncs.tokenize", List(Types.CharArrayType), BagType(TupleType(Array(Field("", Types.ByteArrayType)))), false),
-    UDF("TOMAP", "PigFuncs.toMap", List(Types.AnyType), MapType(Types.ByteArrayType), false)
+    UDF("TOMAP", "PigFuncs.toMap", List(Types.AnyType), MapType(Types.ByteArrayType), false),
+    UDF("STARTSWITH","PigFuncs.startswith", List(Types.CharArrayType, Types.CharArrayType), Types.BooleanType, false),
+    UDF("STRLEN", "PigFuncs.strlen", List(Types.CharArrayType), Types.IntType,false)
   )
 
   /**

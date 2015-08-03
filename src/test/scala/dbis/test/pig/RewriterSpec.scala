@@ -18,8 +18,9 @@ package dbis.test.pig
 
 import java.net.URI
 
+import dbis.test.TestTools._
+
 import dbis.pig.PigCompiler._
-import dbis.pig.op
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._

@@ -25,6 +25,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.reflect.{ClassTag, classTag}
 import com.typesafe.scalalogging.LazyLogging
+import java.net.URI
 
 /** Provides various methods for rewriting [[DataflowPlan]]s by wrapping functionality provided by
   * Kiamas [[org.kiama.rewriting.Rewriter]] and [[org.kiama.rewriting.Strategy]] objects.
@@ -237,7 +238,7 @@ object Rewriter extends LazyLogging {
   private def R1(term: Any): Option[PigOperator] = term match {
     case op@RDFLoad(p, uri, None) =>
       if (uri.getScheme == "http" || uri.getScheme == "https") {
-        Some(Load(p, uri.toString, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
+        Some(Load(p, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
       } else {
         None
       }
@@ -252,7 +253,7 @@ object Rewriter extends LazyLogging {
     */
   //noinspection ScalaDocMissingParameterDescription
   private def R2(parent: RDFLoad, child: BGPFilter): Option[PigOperator] = {
-    Some(Load(child.out, parent.uri.toString, parent.schema, "pig.SPARQLLoader",
+    Some(Load(child.out, parent.uri, parent.schema, "pig.SPARQLLoader",
     List(child.patterns.head.toString))
     )
   }
@@ -266,7 +267,7 @@ object Rewriter extends LazyLogging {
   private def L2(term: Any): Option[PigOperator] = term match {
     case op@RDFLoad(p, uri, grouped : Some[String]) =>
       if (uri.getScheme == "hdfs") {
-        Some(Load(p, uri.toString, op.schema, "BinStorage"))
+        Some(Load(p, uri, op.schema, "BinStorage"))
       } else {
         None
       }
@@ -595,8 +596,8 @@ object Rewriter extends LazyLogging {
        */
       if(data.isDefined) {
         logger.debug(s"found materialized data for materialize operator $materialize")
-
-        val loader = Load(materialize.inputs.head, data.get, materialize.constructSchema, "BinStorage")
+        
+        val loader = Load(materialize.inputs.head, new URI(data.get), materialize.constructSchema, "BinStorage")
         val matInput = materialize.inputs.head.producer
 
         for (inPipe <- matInput.inputs) {
@@ -620,7 +621,7 @@ object Rewriter extends LazyLogging {
         logger.debug(s"did not find materialized data for materialize operator $materialize")
 
         val file = mm.saveMapping(materialize.lineageSignature)
-        val storer = new Store(materialize.inputs.head, file, "BinStorage")
+        val storer = new Store(materialize.inputs.head, new URI(file), "BinStorage")
 
         newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
         newPlan = newPlan.remove(materialize)

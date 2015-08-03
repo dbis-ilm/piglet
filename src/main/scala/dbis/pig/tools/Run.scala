@@ -17,9 +17,11 @@
 
 package dbis.pig.tools
 
+import java.nio.file.Path
+
 /**
   * Defines the interface to the backend execution.
   */
 trait Run {
-  def execute(master: String, className: String, jarFile: String): Unit
+  def execute(master: String, className: String, jarFile: Path): Unit
 }

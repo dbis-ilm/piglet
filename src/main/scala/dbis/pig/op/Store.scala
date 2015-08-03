@@ -16,13 +16,15 @@
  */
 package dbis.pig.op
 
+import java.net.URI
+
 /**
  * Store represents the STORE operator of Pig.
  *
  * @param initialInPipeName the name of the input pipe
  * @param file the name of the output file
  */
-case class Store(in: Pipe, file: String, func: String = "PigStorage") extends PigOperator {
+case class Store(in: Pipe, file: URI, func: String = "PigStorage") extends PigOperator {
   _outputs = List()
   _inputs = List(in)
 

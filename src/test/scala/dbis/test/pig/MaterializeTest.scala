@@ -121,7 +121,7 @@ class MaterializeTest extends FlatSpec with Matchers with BeforeAndAfter {
     
     val op = loadOp.get
     
-    withClue("loader file name: ") {op.file shouldBe matResultFile}
+    withClue("loader file name: ") {op.file.toString() shouldBe matResultFile}
     
     withClue("loader inputs") {op.inputs shouldBe empty}
     
