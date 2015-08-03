@@ -16,6 +16,8 @@
  */
 package dbis.test.flink
 
+import dbis.test.TestTools._
+
 import dbis.pig.PigCompiler._
 import dbis.pig.codegen.ScalaBackendGenCode
 import dbis.pig.op._
@@ -48,28 +50,35 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD" in {
-    val op = Load(Pipe("a"), "file.csv")
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
+    val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val op = Load(Pipe("a"), "file.csv", None, "PigStorage", List("""','"""))
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
+    val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
+        val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with RDFFileStorage" in {
-    val op = Load(Pipe("a"), "file.n3", None, "RDFFileStorage")
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    
+    val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
@@ -91,10 +100,10 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for STORE" in {
-    val op = Store(Pipe("A"), "file.csv")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${file}")""")
     assert(generatedCode == expectedCode)
   }

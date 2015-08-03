@@ -31,6 +31,8 @@ import scala.io.Source
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
+import java.nio.file.Path
+import java.nio.file.Paths
 
 object PigCompiler extends PigParser with LazyLogging {
   case class CompilerConfig(master: String = "local",
@@ -42,9 +44,9 @@ object PigCompiler extends PigParser with LazyLogging {
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
-    var inputFile: String = null
+    var inputFile: Path = null
     var compileOnly: Boolean = false
-    var outDir: String = null
+    var outDir: Path = null
     var params: Map[String,String] = null
     var backend: String = null
 
@@ -64,9 +66,9 @@ object PigCompiler extends PigParser with LazyLogging {
       case Some(config) => {
         // do stuff
         master = config.master
-        inputFile = config.input
+        inputFile = Paths.get(config.input)
         compileOnly = config.compile
-        outDir = config.outDir
+        outDir = Paths.get(config.outDir)
         params = config.params
         backend = config.backend
       }
@@ -82,14 +84,14 @@ object PigCompiler extends PigParser with LazyLogging {
   /**
    * Start compiling the Pig script into a the desired program
    */
-  def run(inputFile: String, outDir: String, compileOnly: Boolean, master: String, backend: String, params: Map[String,String]): Unit = {
+  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String]): Unit = {
     
     // 1. we read the Pig file
-    val source = Source.fromFile(inputFile)
+    val source = Source.fromFile(inputFile.toFile())
     
     logger.debug(s"""loaded pig script from "$inputFile" """)
 
-    val fileName = new File(inputFile).getName
+    val fileName = inputFile.getFileName
 
     // 2. then we parse it and construct a dataflow plan
     var plan = new DataflowPlan(parseScriptFromSource(source, params, backend))
@@ -99,14 +101,14 @@ object PigCompiler extends PigParser with LazyLogging {
       plan.checkSchemaConformance
     } catch {
       case e:SchemaException => {
-        println(s"schema conformance error in ${e.getMessage}")
+        logger.error(s"schema conformance error in ${e.getMessage}")
         return
       }
     }
 
-    val scriptName = fileName.replace(".pig", "")
+    val scriptName = fileName.toString().replace(".pig", "")
     if (!plan.checkConnectivity) {
-      println(s"dataflow plan not connected")
+      logger.error(s"dataflow plan not connected")
       return
     }
 
@@ -121,19 +123,23 @@ object PigCompiler extends PigParser with LazyLogging {
     
     logger.debug("finished optimizations")
 
-    if (FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend)) {
-      if (!compileOnly) {
-        // 4. and finally deploy/submit
-        val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar"
+    FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend) match {
+      // the file was created --> execute it
+      case Some(jarFile) =>  
+        if (!compileOnly) {
+        // 4. and finally deploy/submit          
         val runner = FileTools.getRunner(backend)
+        logger.debug(s"using runner class ${runner.getClass.toString()}")
         
         logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
         
         runner.execute(master, scriptName, jarFile)
       } else
         logger.info("successfully compiled program - exiting.")
-    } else 
-      logger.error("creating jar file failed")
+        
+      case None => logger.error("creating jar file failed") 
+    } 
+      
   }
 
   def replaceParameters(line: String, params: Map[String,String]): String = {

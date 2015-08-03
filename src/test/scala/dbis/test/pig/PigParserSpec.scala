@@ -17,6 +17,10 @@
 
 package dbis.test.pig
 
+import java.net.URI
+
+import dbis.test.TestTools._
+
 import dbis.pig._
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
@@ -458,14 +462,159 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse BGP_FILTER in SparqlPig" in {
-    assert(parseScript("""a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
+    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
       List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\""))))))
   }
 
   it should "parse BGP_FILTER with a complex pattern" in {
-    assert(parseScript("""a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""",
+    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""",
       LanguageFeature.SparqlPig) ==
-    List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
-      TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
+      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
+        TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
+  }
+
+  it should "parse RDFLoad operators for plain triples" in {
+    val ungrouped = parseScript( """a = RDFLoad('rdftest.rdf');""", LanguageFeature.SparqlPig)
+    assert(ungrouped == List(RDFLoad(Pipe("a"), new URI("rdftest.rdf"), None)))
+    assert(ungrouped.head.schema == Some(Schema(BagType(TupleType(Array(
+      Field("subject", Types.CharArrayType),
+      Field("predicate", Types.CharArrayType),
+      Field("object", Types.CharArrayType)))))))
+  }
+
+  it should "parse RDFLoad operators for triple groups" in {
+    val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on subject;""", LanguageFeature.SparqlPig)
+    val grouped_on_pred = parseScript( """a = RDFLoad('rdftest.rdf') grouped on predicate;""", LanguageFeature.SparqlPig)
+    val grouped_on_obj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on object;""", LanguageFeature.SparqlPig)
+    assert(grouped_on_subj == List(RDFLoad(Pipe("a"), new URI("rdftest.rdf"), Some("subject"))))
+    assert(grouped_on_pred == List(RDFLoad(Pipe("a"), new URI("rdftest.rdf"), Some("predicate"))))
+    assert(grouped_on_obj == List(RDFLoad(Pipe("a"), new URI("rdftest.rdf"), Some("object"))))
+
+    val grouped_on_subj_schema = Some(
+      Schema(
+        BagType(
+          TupleType(
+            Array(
+              Field("subject", Types.CharArrayType),
+              Field("stmts",
+                BagType(
+                  TupleType(
+                    Array(
+                      Field("predicate", Types.CharArrayType),
+                      Field("object", Types.CharArrayType))))))))))
+    assert(grouped_on_subj.head.schema == grouped_on_subj_schema)
+
+    val grouped_on_pred_schema = Some(
+      Schema(
+        BagType(
+          TupleType(
+            Array(
+              Field("predicate", Types.CharArrayType),
+              Field("stmts",
+                BagType(
+                  TupleType(
+                    Array(
+                      Field("subject", Types.CharArrayType),
+                      Field("object", Types.CharArrayType))))))))))
+    assert(grouped_on_pred.head.schema == grouped_on_pred_schema)
+
+    val grouped_on_obj_schema = Some(
+      Schema(
+        BagType(
+          TupleType(
+            Array(
+              Field("object", Types.CharArrayType),
+              Field("stmts",
+                BagType(
+                  TupleType(
+                    Array(
+                      Field("subject", Types.CharArrayType),
+                      Field("predicate", Types.CharArrayType))))))))))
+    assert(grouped_on_obj.head.schema == grouped_on_obj_schema)
+  }
+
+  it should "parse a matcher  statement using only mode" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_next_match;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (0, "seconds"))))
+  }
+
+  it should "parse a matcher  statement using skip_till_any_match mode" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_any_match;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_any_match",
+        (0, "seconds"))))
+  }
+
+  it should "parse a matcher  statement using only window" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (30, "seconds"))))
+  }
+
+  it should "parse a matcher  statement using a simple event" in {
+    assert(parseScript("a = Matcher b PATTERN A EVENTS (A = x == 0) WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SimplePattern("A"),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (30, "seconds"))))
+  }
+  it should "parse a matcher  statement using a sequence and  three events" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, B, C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), SimplePattern("B"), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (30, "seconds"))))
+  }
+  it should "parse a matcher  statement using a sequence event with negation" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (30, "seconds"))))
+  }
+
+  it should "parse a matcher  statement using more simple event definitions" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0, C = x == 1) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
+          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))))),
+        "skip_till_next_match",
+        (30, "seconds"))))
+  }
+  it should "parse a matcher  statement using composite sequence pattern" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, seq(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"),
+          SeqPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
+          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
+          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
+        "skip_till_next_match",
+        (30, "seconds"))))
+  }
+
+  it should "parse a matcher  statement using conjunction and disjunction" in {
+    assert(parseScript("a = Matcher b PATTERN conj (A, disj(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        ConjPattern(List(SimplePattern("A"),
+          DisjPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
+          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
+          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
+        "skip_till_next_match",
+        (30, "seconds"))))
   }
 }

@@ -16,15 +16,19 @@
  */
 package dbis.test.pig
 
+import java.net.URI
+
+import dbis.test.TestTools._
+
 import dbis.pig.PigCompiler._
-import dbis.pig.op
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import org.scalatest.OptionValues._
+import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FlatSpec, Matchers}
 
-class RewriterSpec extends FlatSpec with Matchers {
+class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks {
   "The rewriter" should "merge two Filter operations" in {
     val op1 = Load(Pipe("a"), "file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -138,7 +142,7 @@ class RewriterSpec extends FlatSpec with Matchers {
     val plan = new DataflowPlan(List(op1))
     val newPlan = processPlan(plan)
 
-    newPlan.sourceNodes.headOption.value shouldBe Empty(Pipe(""))
+    newPlan.sourceNodes shouldBe empty
   }
 
   it should "remove sink nodes that don't store a relation and have an empty outputs list" in {
@@ -159,7 +163,63 @@ class RewriterSpec extends FlatSpec with Matchers {
 
     val newPlan = processPlan(plan)
 
-    newPlan.sourceNodes.headOption.value shouldBe Empty(Pipe(""))
-    newPlan.operators should have length 1
+    newPlan.sourceNodes shouldBe empty
+    newPlan.operators shouldBe empty
+  }
+
+  it should "apply rewriting rule R1" in {
+    val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
+    val op2 = Dump(Pipe("a"))
+    val plan = processPlan(new DataflowPlan(List(op1, op2)))
+    val source = plan.sourceNodes.headOption.value
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, "pig.SPARQLLoader",
+      List("SELECT * WHERE { ?s ?p ?o }"))
+  }
+
+  it should "apply rewriting rule R2" in {
+    val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
+    val op2 = BGPFilter(Pipe("b"), Pipe("a"),
+      List(
+        TriplePattern(
+          PositionalField(0),
+          Value(""""firstName""""),
+          Value(""""Stefan""""))))
+    val op3 = Dump(Pipe("b"))
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
+    val source = plan.sourceNodes.headOption.value
+    assume(false, "The conversion of TriplePatterns to Strings is not yet implemented")
+    source shouldBe Load(Pipe("b"), "http://example.com", op1.schema, "pig.SPARQLLoader",
+      List("""SELECT * WHERE { $0 "firstName" "Stefan" }"""))
+  }
+
+  it should "apply rewriting rule L2" in {
+    val possibleGroupers = Table(("subject"), ("predicate"), ("object"))
+    forAll (possibleGroupers) { (g: String) =>
+      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+      val op2 = Dump(Pipe("a"))
+      val plan = processPlan(new DataflowPlan(List(op1, op2)))
+      val source = plan.sourceNodes.headOption.value
+      source shouldBe Load(Pipe("a"), "hdfs://somewhere", op1.schema, "BinStorage")
+    }
+  }
+
+  it should "apply rewriting rule F1" in {
+    val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
+    // Add something between op1 and op3 to prevent R2 from being applied
+    val op2 = Distinct(Pipe("b"), Pipe("a"))
+    val op3 = BGPFilter(Pipe("c"), Pipe("b"),
+      List(
+        TriplePattern(
+          PositionalField(0),
+          NamedField("predicate"),
+          PositionalField(2))))
+    val op4 = Dump(Pipe("c"))
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
+    val source = plan.sourceNodes.headOption.value
+    source.outputs.flatMap(_.consumer) should contain only(op2)
+
+    val sink = plan.sinkNodes.headOption.value
+    sink shouldBe op4
+    sink.inputs.map(_.producer) should contain only(op2)
   }
 }

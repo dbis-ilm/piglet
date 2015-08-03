@@ -21,6 +21,7 @@ import scala.reflect.internal.util.BatchSourceFile
 import scala.tools.nsc.io.AbstractFile
 import scala.tools.nsc.reporters.ConsoleReporter
 import scala.tools.nsc.{Global, Settings}
+import java.nio.file.Path
 
 trait Probe
 
@@ -37,8 +38,8 @@ object ScalaCompiler {
    * @param targetDir the target directory for the compiled code
    * @param sourceFile the Scala file to be compiled
    */
-  def compile (targetDir: String, sourceFile: String) : Boolean = {
-    val target = AbstractFile.getDirectory(targetDir)
+  def compile (targetDir: Path, sourceFile: Path) : Boolean = {
+    val target = AbstractFile.getDirectory(targetDir.toFile())
     val settings = new Settings
     /*
     settings.deprecation.value = true // enable detailed deprecation warnings
@@ -46,7 +47,7 @@ object ScalaCompiler {
     settings.usejavacp.value = true
 */
     
-    settings.classpath.value = targetDir
+    settings.classpath.value = targetDir.toString()
         
     settings.outputDirs.setSingleOutput(target)
     settings.embeddedDefaults[Probe]
@@ -56,10 +57,10 @@ object ScalaCompiler {
     import global._
 
     val file = sourceFile
-    val fileContent = Source.fromFile(file).mkString
+    val fileContent = Source.fromFile(file.toFile()).mkString
 
     val run = new Run
-    val sourceFiles = List(new BatchSourceFile(file, fileContent))
+    val sourceFiles = List(new BatchSourceFile(file.toString(), fileContent))
     run.compileSources(sourceFiles)
 
     !reporter.hasErrors

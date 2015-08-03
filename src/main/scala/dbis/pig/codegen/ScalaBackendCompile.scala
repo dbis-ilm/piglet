@@ -16,10 +16,15 @@
  */
 package dbis.pig.codegen
 
+import com.typesafe.scalalogging.LazyLogging
+
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import dbis.pig.udf._
+
+import java.net.URI
+
 import org.clapper.scalasti._
 
 /**
@@ -33,7 +38,7 @@ import org.clapper.scalasti._
  *
  * @param templateFile the name of the backend-specific template fle
  */
-class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
+class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLogging {
 
   /**
    * An exception representing an error in handling the templates for code generation.
@@ -259,13 +264,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
    * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
    * @return the Scala code implementing the LOAD operator
    */
-  def emitLoader(out: String, file: String, loaderFunc: String, loaderParams: List[String]): String = {
-    val path = if(file.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
+  def emitLoader(out: String, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
+    val path = if(file.isAbsolute()) "" else new java.io.File(".").getCanonicalPath + "/"
+    
     if (loaderFunc == "")
-      callST("loader", Map("out"->out,"file"->(path + file)))
+      callST("loader", Map("out"->out,"file"->(path + file.toString())))
     else {
       val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams/*.map(quote(_))*/.mkString(",") else ""
-      callST("loader", Map("out"->out,"file"->(path + file),"func"->loaderFunc,"params"->params))
+      callST("loader", Map("out"->out,"file"->(path + file.toString()),"func"->loaderFunc,"params"->params))
     }
   }
 
@@ -568,7 +574,11 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase {
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out.name, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inputs.head.name))
-      case Store(in, file,func) => callST("store", Map("in"->node.inputs.head.name,"file"->new java.io.File(file).getAbsolutePath,"schema"->s"tuple${node.inputs.head.name}ToString(t)","func"->func))
+      case Store(in, file,func) => {
+        val path = if(file.isAbsolute()) "" else new java.io.File(".").getCanonicalPath + "/"
+        callST("store", Map("in"->node.inputs.head.name,
+        "file"->(path + file.toString()),"schema"->s"tuple${node.inputs.head.name}ToString(t)","func"->func))
+      }
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred, windowMode) => {
         if (windowMode)

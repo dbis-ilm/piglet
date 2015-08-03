@@ -17,7 +17,6 @@
 
 package dbis.pig.tools
 
-import org.apache.flink.client.CliFrontend
 import org.apache.flink.client.RemoteExecutor
 import org.apache.flink.client.program.Client
 import org.apache.flink.client.program.PackagedProgram
@@ -25,6 +24,7 @@ import org.apache.flink.client.program.ProgramInvocationException
 import org.apache.flink.configuration.Configuration
 
 import java.io.File
+import java.nio.file.Path
 import java.net.InetSocketAddress
 import java.net.URI
 import java.net.URISyntaxException
@@ -34,32 +34,32 @@ import org.apache.log4j.Level
 
 
 class FlinkRun extends Run{
-  override def execute(master: String, className: String, jarFile: String){
+  override def execute(master: String, className: String, jarFile: Path){
     Logger.getLogger("org").setLevel(Level.WARN)
     Logger.getLogger("akka").setLevel(Level.WARN)
     Logger.getLogger("Remoting").setLevel(Level.WARN)
 
     if (master.startsWith("local") && !master.startsWith("localhost")){
- //     val cli = new CliFrontend
- //     val ret = cli.parseParameters(Array("run", "--class", className, jarFile))
+//      val cli = new CliFrontend
+//      val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
       submitJar("localhost:6123", jarFile, className)
     }
     else {
-      val cli = new CliFrontend
-      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile))
+//      val cli = new CliFrontend
+//      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
+      submitJar(master, jarFile, className)
     }
-
   }
 
-  def submitJar(master: String, path: String, className: String, args: String*) = { 
-    val file = new File(path)
+  def submitJar(master: String, path: Path, className: String, args: String*) = { 
+    val file = new File(path.toString())
     val parallelism = 1 
     val wait = true
     try { 
       val program = new PackagedProgram(file, className, args:_*)
       val jobManagerAddress = getInetFromHostport(master)
       val client = new Client(jobManagerAddress, new Configuration(), program.getUserCodeClassLoader(), 1)  
-      println("Executing " + path); 
+      println("Executing " + path.toString()); 
       client.run(program, parallelism, wait); 
     } catch {
       case e: ProgramInvocationException => e.printStackTrace()

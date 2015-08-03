@@ -27,9 +27,64 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.reflect.{ClassTag, classTag}
 import com.typesafe.scalalogging.LazyLogging
+import java.net.URI
 
 case class RewriterException(msg:String)  extends Exception(msg)
 
+/** Provides various methods for rewriting [[DataflowPlan]]s by wrapping functionality provided by
+  * Kiamas [[org.kiama.rewriting.Rewriter]] and [[org.kiama.rewriting.Strategy]] objects.
+  *
+  * This object keeps an internal [[Strategy]] object that holds all strategies added via [[addStrategy]]. Calling
+  * [[processPlan]] with a [[DataflowPlan]] will apply ```all``` those strategies to the plan until none applies
+  * anymore.
+  *
+  * ==Low-level methods==
+  *
+  * Methods that directly handle Strategies are provided:
+  *
+  *  - [[addStrategy]] adds a single strategy to this object. Later calls to [[processPlan]] will then use this
+  *    strategy in addition to all other ones added via this method.
+  *
+  *  - [[addBinaryPigOperatorStrategy]] turns a function operating on two operators of specific subtypes of
+  *    [[dbis.pig.op.PigOperator]] that are in a parent-child relationship into a strategy and adds it to this object.
+  *
+  *  - [[buildBinaryPigOperatorStrategy]] is the same as [[addBinaryPigOperatorStrategy]] but doesn't add the
+  *    strategy to this object.
+  *
+  *  - [[processPlan]] applies a single strategy to a [[DataflowPlan]].
+  *
+  * ==Higher-level methods==
+  *
+  * For common operations on [[DataflowPlan]]s, some convenience methods to build and register a strategy are provided:
+  *
+  *  - [[addStrategy]] for easily adding any method with a signature of `Any => Option[PigOperator]` as a strategy
+  *
+  *  - [[merge]] for merging two operators
+  *
+  *  - [[reorder]] for reordering two operators
+  *
+  * ==DataflowPlan helper methods==
+  *
+  * Some operations provided by [[DataflowPlan]] objects are not implemented there, but on this object. These include
+  *
+  *  - [[insertAfter]] to insert an operator as a child operator of another
+  *
+  *  - [[remove]] to remove an operator
+  *
+  *  - [[replace]] to replace one operator with another
+  *
+  *  - [[swap]] to swap the positions of two operators
+  *
+  *  ==Helper methods for maintaining connectivity==
+  *
+  *  After a rewriting operation, the `inputs` and `outputs` attribute of operators other than the rewritten ones
+  *  might be changed (for example to accommodate new or deleted operators). To help maintaining these relationships,
+  *  the method [[fixInputsAndOutputs]] in several versions is provided. Their documentation include hints in which
+  *  cases they apply.
+  *
+  * @todo Not all links in this documentation link to the correct methods, most notably links to overloaded ones.
+  *
+  */
 object Rewriter extends LazyLogging {
   private var ourStrategy = fail
 
@@ -74,7 +129,7 @@ object Rewriter extends LazyLogging {
 
   def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
     // This looks innocent, but this is where the rewriting happens.
-    val newSources = plan.sourceNodes.map(processPigOperator(_, strategy))
+    val newSources = plan.sourceNodes.map(processPigOperator(_, strategy)).filterNot(_.isInstanceOf[Empty])
 
     var newPlanNodes = mutable.LinkedHashSet[PigOperator]() ++= newSources
     var nodesToProcess = newSources.toList
@@ -162,9 +217,6 @@ object Rewriter extends LazyLogging {
       op.outputs match {
       case Pipe(_, _, Nil) :: Nil | Nil =>
         val newNode = Empty(Pipe(""))
-        // Set outputs *again*. Passing a Pipe("") to the constructor causes problems because other parts of the code
-        // expect Pipe.consumer and Pipe.producer to be non-null, but we can't set Pipe.producer without the new node.
-        newNode.outputs = List(Pipe("", newNode, List.empty))
         newNode.inputs = op.inputs
         Some(newNode)
       case _ => None
@@ -180,6 +232,72 @@ object Rewriter extends LazyLogging {
     */
   //noinspection ScalaDocMissingParameterDescription
   private def mergeWithEmpty(parent: PigOperator, child: Empty): Option[PigOperator] = Some(child)
+
+  /** Applies rewriting rule R1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+    *
+    * @param term
+    * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  private def R1(term: Any): Option[PigOperator] = term match {
+    case op@RDFLoad(p, uri, None) =>
+      if (uri.getScheme == "http" || uri.getScheme == "https") {
+        Some(Load(p, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
+      } else {
+        None
+      }
+    case _ => None
+  }
+
+  /** Applies rewriting rule R2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+    *
+    * @param parent
+    * @param child
+    * @return
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  private def R2(parent: RDFLoad, child: BGPFilter): Option[PigOperator] = {
+    Some(Load(child.out, parent.uri, parent.schema, "pig.SPARQLLoader",
+    List(child.patterns.head.toString))
+    )
+  }
+
+  /** Applies rewriting rule L2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+    *
+    * @param term
+    * @return Some Load operator, if `term` was an RDFLoad operator loading a resource from hdfs
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  private def L2(term: Any): Option[PigOperator] = term match {
+    case op@RDFLoad(p, uri, grouped : Some[String]) =>
+      if (uri.getScheme == "hdfs") {
+        Some(Load(p, uri, op.schema, "BinStorage"))
+      } else {
+        None
+      }
+    case _ => None
+  }
+
+  /** Applies rewriting rule F1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+   *
+   * @return A strategy that removes BGPFilters that use only unbound variables in their single pattern
+   */
+  private def F1 = rulefs[BGPFilter] {
+    case op@BGPFilter(_, _, patterns) =>
+      if (patterns.length > 1 || patterns.isEmpty) {
+        fail
+      } else {
+        val pattern = patterns.head
+        if (!pattern.subj.isInstanceOf[Value]
+          && !pattern.pred.isInstanceOf[Value]
+          && !pattern.obj.isInstanceOf[Value]) {
+          removalStrategy(op)
+        } else {
+          fail
+        }
+      }
+    case _ => fail
+  }
 
   /** Add a new strategy for merging operators of two types.
     *
@@ -313,6 +431,39 @@ object Rewriter extends LazyLogging {
     processPlan(plan, strategyf(t => strategy(t)))
   }
 
+  /** Returns a strategy to remove `rem` from a DataflowPlan
+   *
+   * @param rem
+   * @return
+   */
+  //noinspection ScalaDocMissingParameterDescription
+  private def removalStrategy(rem: PigOperator): Strategy = {
+    strategyf((op: Any) => {
+      if (op == rem) {
+        val pigOp = op.asInstanceOf[PigOperator]
+        if (pigOp.inputs.isEmpty) {
+          Some(Empty(Pipe("")))
+        }
+        else {
+          val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
+            // Remove input pipes to `op` and replace them with `ops` input pipes
+            inOp.inputs = inOp.inputs.filterNot(_.producer == pigOp) ++ pigOp.inputs
+            inOp
+          })
+          // Replace `op` in its inputs output pipes with `ops` children
+          pigOp.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
+            if (out.consumer contains op) {
+              out.consumer = out.consumer.filterNot(_ == op) ++ newOps
+            }
+          }))
+          Some(newOps)
+        }
+      }
+      else {
+        None
+      }
+    })}
+
   /** Removes `rem` from `plan`.
     *
     * If `rem` has any child nodes in the plan, they will take its place.
@@ -322,29 +473,8 @@ object Rewriter extends LazyLogging {
     * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
     */
   //noinspection ScalaDocMissingParameterDescription
-  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan = {
-    val strategy = (op: Any) => {
-      if (op == rem) {
-        val pigOp = op.asInstanceOf[PigOperator]
-        val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
-          // Remove input pipes to `op` and replace them with `ops` input pipes
-          inOp.inputs = inOp.inputs.filterNot(_.producer == pigOp) ++ pigOp.inputs
-          inOp
-        })
-        // Replace `op` in its inputs output pipes with `ops` children
-        pigOp.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
-          if (out.consumer contains op) {
-            out.consumer = out.consumer.filterNot(_ == op) ++ newOps
-          }
-        }))
-        Some(newOps)
-      }
-      else {
-        None
-      }
-    }
-    processPlan(plan, strategyf(t => strategy(t)))
-  }
+  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan =
+    processPlan(plan, removalStrategy(rem))
 
   /** Swap the positions of `op1` and `op2` in `plan`
     *
@@ -374,13 +504,13 @@ object Rewriter extends LazyLogging {
     * @tparam T2 The second operators type.
     * @tparam T The first operators type.
     */
-  private def addBinaryPigOperatorStrategy[T2 <: PigOperator : ClassTag, T <: PigOperator : ClassTag](f: (T, T2)
+  def addBinaryPigOperatorStrategy[T2 <: PigOperator : ClassTag, T <: PigOperator : ClassTag](f: (T, T2)
     => Option[PigOperator]): Unit = {
     val strategy = buildBinaryPigOperatorStrategy(f)
     addStrategy(strategy)
   }
 
-  private def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+  def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
   (f: (T, T2) => Option[PigOperator]): Strategy = {
     strategyf(op => {
       op match {
@@ -413,7 +543,7 @@ object Rewriter extends LazyLogging {
     * @tparam T3 The type of the new operator.
     * @return
     */
-  private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
+  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                           newParent: T3): T3 = {
     newParent.inputs = oldParent.inputs
     newParent.outputs = oldChild.outputs
@@ -440,7 +570,7 @@ object Rewriter extends LazyLogging {
     * @tparam T2 The type of the old child and new parent operators.
     * @return
     */
-  private def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
+  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                        newChild: T): T2 = {
     // If oldParent == newChild (for example when this is called from `swap`, we need to save oldParent.outPipename
     // because it depends on oldParent.outputs
@@ -481,7 +611,7 @@ object Rewriter extends LazyLogging {
     }
 
     logger.debug(s"found ${materializes.size} materialize operators")
-    
+
     var newPlan = plan
 
     /* we should check here if the op is still connected to a sink
@@ -501,7 +631,7 @@ object Rewriter extends LazyLogging {
       if(data.isDefined) {
         logger.debug(s"found materialized data for materialize operator $materialize")
         
-        val loader = Load(materialize.inputs.head, data.get, materialize.constructSchema, "BinStorage")
+        val loader = Load(materialize.inputs.head, new URI(data.get), materialize.constructSchema, "BinStorage")
         val matInput = materialize.inputs.head.producer
 
         for (inPipe <- matInput.inputs) {
@@ -511,7 +641,7 @@ object Rewriter extends LazyLogging {
         newPlan = plan.replace(matInput, loader)
 
         logger.info(s"replaced materialize op with loader $loader")
-        
+
         /* TODO: do we need to remove all other nodes that get disconnected now by hand
          * or do they get removed during code generation (because there is no sink?)
          */
@@ -523,13 +653,13 @@ object Rewriter extends LazyLogging {
          * then, remove the materialize op
          */
         logger.debug(s"did not find materialized data for materialize operator $materialize")
-        
+
         val file = mm.saveMapping(materialize.lineageSignature)
-        val storer = new Store(materialize.inputs.head, file, "BinStorage")
+        val storer = new Store(materialize.inputs.head, new URI(file), "BinStorage")
 
         newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
         newPlan = newPlan.remove(materialize)
-        
+
         logger.info(s"inserted new store operator $storer")
       }
     }
@@ -673,7 +803,11 @@ object Rewriter extends LazyLogging {
   
   merge[Filter, Filter](mergeFilters)
   merge[PigOperator, Empty](mergeWithEmpty)
+  merge[RDFLoad, BGPFilter](R2)
   reorder[OrderBy, Filter]
   addStrategy(strategyf(t => splitIntoToFilters(t)))
   addStrategy(removeNonStorageSinks _)
+  addStrategy(R1 _)
+  addStrategy(L2 _)
+  addStrategy(F1)
 }

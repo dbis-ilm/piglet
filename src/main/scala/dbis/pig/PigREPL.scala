@@ -26,8 +26,8 @@ import dbis.pig.plan.PrettyPrinter._
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.FileTools
 import jline.console.ConsoleReader
-
 import scala.collection.mutable.ListBuffer
+import java.nio.file.Paths
 
 sealed trait JLineEvent
 case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
@@ -154,12 +154,16 @@ object PigREPL extends PigParser {
       case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") || s.toLowerCase.startsWith(s"socket_write "))=> {
         buf ++= parseScript(s)
         val plan = new DataflowPlan(buf.toList)
-        if (FileTools.compileToJar(plan, "script", ".", false, backend)) {
-          val jarFile = s".${File.separator}script${File.separator}script.jar"
-//          val jarFile = "script.jar"
-          val runner = FileTools.getRunner(backend)
-          runner.execute("local", "script", jarFile)
+        
+        
+        FileTools.compileToJar(plan, "script", Paths.get("."), false, backend) match {
+          case Some(jarFile) =>
+            val runner = FileTools.getRunner(backend)
+            runner.execute("local", "script", jarFile)
+          
+          case None => println("failed to build jar file for job")
         }
+
         // buf.clear()
         false
       }

@@ -23,6 +23,9 @@ import dbis.pig._
 import dbis.pig.codegen.ScalaBackendCompile
 import dbis.pig.plan.DataflowPlan
 import com.typesafe.scalalogging.LazyLogging
+import java.nio.file.Path
+import java.nio.file.Files
+import java.nio.file.Paths
 
 object FileTools extends LazyLogging {
   def copyStream(istream : InputStream, ostream : OutputStream) : Unit = {
@@ -32,7 +35,7 @@ object FileTools extends LazyLogging {
       ostream.write(bytes, 0, len)
   }
 
-  def extractJarToDir(jarName: String, outDir: String): Unit = {
+  def extractJarToDir(jarName: String, outDir: Path): Unit = {
     
     logger.debug(s"extracting jar $jarName to $outDir" )
     
@@ -47,11 +50,11 @@ object FileTools extends LazyLogging {
 
         // println("Extracting to " + outDir + "/" + entryPath)
         if (entry.isDirectory) {
-          new File(outDir, entryPath).mkdirs
+          Files.createDirectories(outDir.resolve(entryPath))
         }
         else {
           val istream = jar.getInputStream(entry)
-          val ostream = new FileOutputStream(new File(outDir, entryPath))
+          val ostream = new FileOutputStream(outDir.resolve(entryPath).toFile())
           copyStream(istream, ostream)
           ostream.close
           istream.close
@@ -60,7 +63,7 @@ object FileTools extends LazyLogging {
     }
   }
   
-  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: String, compileOnly: Boolean = false, backend: String = "spark"): Boolean = {
+  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean = false, backend: String = "spark"): Option[Path] = {
     // 4. compile it into Scala code for Spark
     val compiler = new ScalaBackendCompile(getTemplateFile(backend)) 
 
@@ -71,22 +74,26 @@ object FileTools extends LazyLogging {
     
     // 6. write it to a file
 
-    val outputDir = new File(s"$outDir${File.separator}${scriptName}")
-    if(!outputDir.exists()) {
-      outputDir.mkdirs()
+    val outputDir =  outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
+    
+    logger.debug(s"outputDir: $outputDir")
+    
+    if(!Files.exists(outputDir)) {
+      Files.createDirectories(outputDir)
     }
     
 
-    val outputDirectory = s"${outputDir.getCanonicalPath}${File.separator}out"
+    val outputDirectory = outputDir.resolve("out")  //s"${outputDir.getCanonicalPath}${File.separator}out"
+    logger.debug(s"outputDirectory: $outputDirectory")
     
     // check whether output directory exists
-    val dirFile = new File(outputDirectory)
-    // if not then create it
-    if (!dirFile.exists)
-      dirFile.mkdir()
-
-    val outputFile = s"$outputDirectory${File.separator}${scriptName}.scala" //scriptName + ".scala"
-    val writer = new FileWriter(outputFile)
+    if(!Files.exists(outputDirectory)) {
+      Files.createDirectory(outputDirectory)
+    }
+    
+    val outputFile = outputDirectory.resolve(s"$scriptName.scala")
+    logger.debug(s"outputFile: $outputFile")
+    val writer = new FileWriter(outputFile.toFile())
     writer.append(code)
     writer.close()
 
@@ -106,16 +113,17 @@ object FileTools extends LazyLogging {
 
     // 9. compile the scala code
     if (!ScalaCompiler.compile(outputDirectory, outputFile))
-      return false
+      return None
 
 
     // 10. build a jar file
-    val jarFile = s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
-    JarBuilder.apply(outputDirectory, jarFile, verbose = false)
+    val jarFile = Paths.get(outDir.toAbsolutePath().toString(), scriptName, s"$scriptName.jar") //s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
     
-    logger.info(s"created job's jar file at $jarFile")
-    
-    true
+    if(JarBuilder(outputDirectory, jarFile, verbose = false)) {
+      logger.info(s"created job's jar file at $jarFile")
+      return Some(jarFile)
+    } else 
+      return None
   }
 
   private def getTemplateFile(backend: String): String = {

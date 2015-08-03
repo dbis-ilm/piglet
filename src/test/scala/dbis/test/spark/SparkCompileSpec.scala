@@ -16,14 +16,20 @@
  */
 package dbis.test.spark
 
+import dbis.test.TestTools._
+
 import dbis.pig.PigCompiler._
 import dbis.pig.codegen.ScalaBackendGenCode
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
+import java.net.URI
 
 class SparkCompileSpec extends FlatSpec {
+  
+  
+  
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
   val templateFile = "src/main/resources/spark-template.stg"
   "The compiler output" should "contain the Spark header & footer" in {
@@ -52,28 +58,35 @@ class SparkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD" in {
-    val op = Load(Pipe("a"), "file.csv")
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
+    val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val op = Load(Pipe("a"), "file.csv", None, "PigStorage", List("""','"""))
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
+    val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with RDFFileStorage" in {
-    val op = Load(Pipe("a"), "file.n3", None, "RDFFileStorage")
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    
+    val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
   }
@@ -105,10 +118,13 @@ class SparkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for STORE" in {
-    val op = Store(Pipe("A"), "file.csv")
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
+    val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
 //    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
     val expectedCode = cleanString(s"""val A_storehelper = A.map(t => tupleAToString(t)).coalesce(1, true) PigStorage().write("$file", A_storehelper)""")
     assert(generatedCode == expectedCode)

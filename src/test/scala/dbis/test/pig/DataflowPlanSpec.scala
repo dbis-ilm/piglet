@@ -16,6 +16,8 @@
  */
 package dbis.test.pig
 
+import dbis.test.TestTools._
+
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
@@ -427,6 +429,13 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
     newPlan.sinkNodes.headOption.value.inputs should contain only Pipe("a", op1)
     newPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op3
+  }
+
+  it should "return an empty DataflowPlan when the last operator in the plan is removed" in {
+    val op1 = Load(Pipe("a"), "file.csv")
+    val plan = new DataflowPlan(List(op1))
+    val newPlan = plan.remove(op1)
+    newPlan.operators shouldBe empty
   }
 
   it should "construct pipes for SPLIT INTO" in {
