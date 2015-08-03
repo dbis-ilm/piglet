@@ -22,7 +22,7 @@ package dbis.pig.op
  * @param initialInPipeName the name of the input pipe
  * @param file the name of the output file
  */
-case class Store(in: Pipe, file: String, func: String = "PigStorage") extends PigOperator {
+case class Store(private val in: Pipe, file: String, func: String = "PigStorage") extends PigOperator {
   _outputs = List()
   _inputs = List(in)
 
