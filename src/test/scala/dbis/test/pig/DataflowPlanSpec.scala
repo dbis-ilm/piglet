@@ -16,6 +16,8 @@
  */
 package dbis.test.pig
 
+import dbis.test.TestTools._
+
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.plan.{DataflowPlan, InvalidPlanException}

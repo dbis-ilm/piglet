@@ -21,6 +21,8 @@ import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 
+import java.net.URI
+
 import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.input.CharSequenceReader
 
@@ -271,9 +273,11 @@ class PigParser extends JavaTokenParsers {
   }
 
   def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
-    case b ~ _ ~ _ ~ f ~ u ~ s => u match {
-        case Some(p) => new Load(Pipe(b), f, s, p._1, if (p._2.isEmpty) null else p._2)
-        case None => new Load(Pipe(b), f, s)
+    case b ~ _ ~ _ ~ f ~ u ~ s => 
+      val uri = new URI(f)
+      u match {
+        case Some(p) => new Load(Pipe(b), uri, s, p._1, if (p._2.isEmpty) null else p._2)
+        case None => new Load(Pipe(b), uri, s)
       }
   }
 
@@ -285,7 +289,7 @@ class PigParser extends JavaTokenParsers {
   /*
    * STORE <A> INTO "<FileName>"
    */
-  def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ^^ { case _ ~ b ~  _ ~ f => new Store(Pipe(b), f) }
+  def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ^^ { case _ ~ b ~  _ ~ f => new Store(Pipe(b), new URI(f)) }
 
   /*
    * GENERATE expr1, expr2, ...
