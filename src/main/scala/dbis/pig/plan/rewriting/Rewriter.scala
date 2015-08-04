@@ -717,6 +717,10 @@ object Rewriter extends LazyLogging {
           logger.debug(s"Rewrite Limit to WindowMode")
           o.windowMode = true
         }
+        case o: Distinct => {
+          logger.debug(s"Rewrite Distinct to WindowMode")
+          o.windowMode = true
+        }
        case o: Grouping => {
           logger.debug(s"Rewrite Grouping to WindowMode")
           o.windowMode = true

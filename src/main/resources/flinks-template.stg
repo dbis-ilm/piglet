@@ -69,7 +69,7 @@ groupBy(out,in,expr,windowMode) ::=<<
 
 // ------------------ Outputs only distinct values ----------------------------
 distinct(out,in) ::=<<
-    val <out> = <in>
+    val <out> = <in>.mapWindow(distinct _)
 >>
 
 // ------------------ Outputs only num records --------------------------------

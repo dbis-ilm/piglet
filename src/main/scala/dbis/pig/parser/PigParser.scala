@@ -371,7 +371,7 @@ class PigParser extends JavaTokenParsers {
   /*
    * <A> = DISTINCT <B>
    */
-  def distinctStmt: Parser[PigOperator] = bag ~ "=" ~ distinctKeyword ~ bag ^^ { case out ~ _ ~ _ ~ in => new Distinct(Pipe(out), Pipe(in)) }
+  def distinctStmt: Parser[PigOperator] = bag ~ "=" ~ distinctKeyword ~ bag ^^ { case out ~ _ ~ _ ~ in => new Distinct(Pipe(out), Pipe(in), false) }
 
   /*
    * <A> = LIMIT <B> <Num>

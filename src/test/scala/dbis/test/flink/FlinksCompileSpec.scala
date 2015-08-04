@@ -52,28 +52,31 @@ class FlinksCompileSpec extends FlatSpec {
 
   it should "contain code for LOAD" in {
     val file = new java.net.URI("file.csv")
+    val absolute = new java.io.File(".").getCanonicalPath + "/" + file.toString
     val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}")""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${absolute}")""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with PigStorage" in {
     val file = new java.net.URI("file.csv")
+    val absolute = new java.io.File(".").getCanonicalPath + "/" + file.toString
     val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${absolute}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with RDFFileStorage" in {
     val file = new java.net.URI("file.n3")
+    val absolute = new java.io.File(".").getCanonicalPath + "/" + file.toString
     val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
+    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${absolute}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -95,10 +98,11 @@ class FlinksCompileSpec extends FlatSpec {
 
   it should "contain code for STORE" in {
     val file = new java.net.URI("file.csv")
+    val absolute = new java.io.File(".").getCanonicalPath + "/" + file.toString
     val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${file}")""")
+    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${absolute}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -126,10 +130,10 @@ class FlinksCompileSpec extends FlatSpec {
 
 
   it should "contain code for DISTINCT" in {
-    val op = Distinct(Pipe("a"), Pipe("b"))
+    val op = Distinct(Pipe("a"), Pipe("b"), true)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b")
+    val expectedCode = cleanString("val a = b.mapWindow(distinct _)")
     assert(generatedCode == expectedCode)
   }
 
@@ -214,7 +218,7 @@ class FlinksCompileSpec extends FlatSpec {
   it should "contain code for a binary JOIN statement with simple expression" in {
     val file = new java.net.URI("file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
-   val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
     val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), "PigStorage", List("\",\"")))

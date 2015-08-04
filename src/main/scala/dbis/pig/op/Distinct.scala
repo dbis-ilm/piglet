@@ -22,7 +22,7 @@ package dbis.pig.op
  * @param initialOutPipeName the name of the output pipe (relation).
  * @param initialInPipeName the name of the input pipe.
  */
-case class Distinct(out: Pipe, in: Pipe) extends PigOperator {
+case class Distinct(out: Pipe, in: Pipe, var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 
