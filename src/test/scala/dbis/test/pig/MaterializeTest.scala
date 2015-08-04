@@ -11,22 +11,28 @@ import dbis.pig.plan.MaterializationManager
 import dbis.pig.op.Materialize
 import java.io.File
 import java.io.PrintWriter
-
-
+import java.nio.file.Paths
+import java.nio.file.Files
+import java.nio.file.Path
+import scala.collection.JavaConversions._
+import java.nio.file.SimpleFileVisitor
+import java.net.URI
+import com.typesafe.scalalogging.LazyLogging
 
 /**
  * @author hage
  */
 class MaterializeTest extends FlatSpec with Matchers with BeforeAndAfter {
   
-  val baseDir = new File("piglet_test")
-  val matFile = new File(baseDir, "mappings.txt")
+  
+  val baseDir = Files.createTempDirectory("piglet_mat_test")
+  val mapFile = Files.createFile(baseDir.resolve("mappings.txt"))
   
   before {
-    if(!baseDir.exists())
-      baseDir.mkdirs()
+    if(!Files.exists(baseDir))
+      Files.createDirectories(baseDir)
       
-    val p = new PrintWriter(matFile)      
+    val p = new PrintWriter(mapFile.toFile())      
     p.write("")
     p.close()
   }
@@ -35,14 +41,15 @@ class MaterializeTest extends FlatSpec with Matchers with BeforeAndAfter {
     recursiveRemove(baseDir)
   }
   
-  private def recursiveRemove(dir: File) {
-    if (dir.isDirectory()) {
-      for(f <- dir.listFiles()) {
-        recursiveRemove(f)
+  private def recursiveRemove(dir: Path) {
+    
+    if (Files.isDirectory(dir)) {
+      for(f <- dir.toFile().listFiles()) {
+        recursiveRemove(f.toPath())
       }
     }
     
-    dir.delete()
+    Files.deleteIfExists(dir)
   }  
   
   
@@ -54,7 +61,7 @@ class MaterializeTest extends FlatSpec with Matchers with BeforeAndAfter {
          |c = distinct b;
          |""".stripMargin))    
     
-    val mm = new MaterializationManager(matFile, baseDir)
+    val mm = new MaterializationManager(mapFile, baseDir.toUri())
     
     val plan2 = processMaterializations(plan, mm)
     
@@ -89,11 +96,11 @@ class MaterializeTest extends FlatSpec with Matchers with BeforeAndAfter {
     // empty the file
     val matResultFile = s"$baseDir${File.separator}blubb.txt"
     val lineage = mat.lineageSignature 
-    val p = new PrintWriter(matFile)      
+    val p = new PrintWriter(mapFile.toFile())      
     p.write(s"$lineage;$matResultFile\n")
     p.close()
     
-    val mm = new MaterializationManager(matFile, baseDir)
+    val mm = new MaterializationManager(mapFile, baseDir.toUri())
     
     val plan2 = processMaterializations(plan, mm)
     

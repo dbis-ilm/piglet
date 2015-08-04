@@ -621,7 +621,7 @@ object Rewriter extends LazyLogging {
         logger.debug(s"did not find materialized data for materialize operator $materialize")
 
         val file = mm.saveMapping(materialize.lineageSignature)
-        val storer = new Store(materialize.inputs.head, new URI(file), "BinStorage")
+        val storer = new Store(materialize.inputs.head, file, "BinStorage")
 
         newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
         newPlan = newPlan.remove(materialize)
