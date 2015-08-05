@@ -28,15 +28,19 @@ import dbis.pig.tools.FileTools
 import jline.console.ConsoleReader
 import scala.collection.mutable.ListBuffer
 import java.nio.file.Paths
+import jline.console.history.FileHistory
+import dbis.pig.tools.Conf
+import com.typesafe.scalalogging.LazyLogging
+import org.slf4j.Marker
 
 sealed trait JLineEvent
 case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
 case object EmptyLine extends JLineEvent
 case object EOF extends JLineEvent
 
-object PigREPL extends PigParser {
+object PigREPL extends PigParser with LazyLogging {
   val consoleReader = new ConsoleReader()
-
+  
   private def unbalancedBrackets(s: String): Boolean = {
     val leftBrackets = s.count(_ == '{')
     val rightBrackets = s.count(_ == '}')
@@ -55,9 +59,14 @@ object PigREPL extends PigParser {
     var lineBuffer = ""
     var prompt = "pigsh> "
 
+    val history = new FileHistory(Conf.replHistoryFile.getAbsoluteFile)
+    logger.debug(s"will use ${history.getFile} as history file")
+    consoleReader.setHistory(history)  
+    
     // avoid to handle "!" in special way
     consoleReader.setExpandEvents(false)
 
+    try {
     while (!finished) {
       val line = consoleReader.readLine(prompt)
       if (line == null) {
@@ -82,6 +91,10 @@ object PigREPL extends PigParser {
           lineBuffer = ""
         }
       }
+    }
+    } finally {
+      logger.debug("flushing history file")
+      consoleReader.getHistory.asInstanceOf[FileHistory].flush()
     }
   }
 
