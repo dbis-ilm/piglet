@@ -55,6 +55,9 @@ object PigREPL extends PigParser {
     var lineBuffer = ""
     var prompt = "pigsh> "
 
+    // avoid to handle "!" in special way
+    consoleReader.setExpandEvents(false)
+
     while (!finished) {
       val line = consoleReader.readLine(prompt)
       if (line == null) {
