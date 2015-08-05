@@ -205,7 +205,7 @@ object Rewriter extends LazyLogging {
   //noinspection ScalaDocMissingParameterDescription
   private def removeNonStorageSinks(node: Any): Option[PigOperator] = node match {
     // Store and Dump are ok
-    case Store(_, _, _) => None
+    case Store(_, _, _,_) => None
     case Dump(_) => None
     // To prevent recursion, empty is ok as well
     case Empty(_) => None

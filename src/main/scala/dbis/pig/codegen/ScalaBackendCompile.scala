@@ -409,14 +409,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
      * @param schema a schema describing the tuple structure
      * @return the string representation
      */
-    def genStringRepOfTuple(schema: Option[Schema]): String = schema match {
+    def genStringRepOfTuple(schema: Option[Schema], stringDelim: String = "','"): String = schema match {
       case Some(s) => (0 to s.fields.length-1).toList.map{ i => s.field(i).fType match {
           // TODO: this should be processed recursively
         case BagType(n, t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
         case TupleType(n, f) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
         case MapType(t, n) => s""".append(t(${i}).asInstanceOf[Map[String,Any]].map{case (k,v) => k + "#" + v}.mkString("[", ",", "]"))"""
         case _ => s".append(t($i))"
-      }}.mkString("\n.append(\",\")\n")
+      }}.mkString(s"\n.append($stringDelim)\n")
       case None => s".append(t(0))\n"
     }
 
@@ -431,12 +431,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
           |  def compare(that: ${cname}) = $cmpExpr
           |}""".stripMargin
       }
-      case Store(in, file,_) => { s"""
+      case Store(in, file,_,params) => { s"""
         |def tuple${in.name}ToString(t: List[Any]): String = {
         |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
         |
         |  val sb = new StringBuilder
-        |  sb${genStringRepOfTuple(node.schema)}
+        |  sb${genStringRepOfTuple(node.schema, if(params != null && params.isDefinedAt(0)) params(0) else "','")}
         |  sb.toString
         |}""".stripMargin
 
@@ -519,7 +519,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
     node match {
       case Load(out, file, schema, func, params) => emitLoader(out.name, file, func, params)
       case Dump(in) => callST("dump", Map("in"->in.name))
-      case Store(in, file,func) => {
+      case Store(in, file,func, params) => {
 //        val path = if(file.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
         callST("store", Map("in"->in.name,"file"->(file.toString()),"schema"->s"tuple${in.name}ToString(t)"/*listToTuple(node.schema)*/,"func"->func))
        }

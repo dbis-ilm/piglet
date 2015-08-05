@@ -306,7 +306,13 @@ class PigParser extends JavaTokenParsers {
   /*
    * STORE <A> INTO "<FileName>"
    */
-  def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ^^ { case _ ~ b ~  _ ~ f => new Store(Pipe(b), new URI(f)) }
+  def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ~ (usingClause?) ^^ { 
+    case _ ~ b ~  _ ~ f ~ u => 
+      u match {
+        case Some(p) => new Store(Pipe(b), new URI(f), p._1, if(p._2.isEmpty) null else p._2)
+        case None => new Store(Pipe(b), new URI(f))
+      }
+  }
 
   /*
    * GENERATE expr1, expr2, ...

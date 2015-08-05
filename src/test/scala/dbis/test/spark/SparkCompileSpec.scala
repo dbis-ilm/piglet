@@ -144,13 +144,47 @@ class SparkCompileSpec extends FlatSpec {
         |implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
         |val sb = new StringBuilder
         |sb.append(t(0))
-        |.append(",")
+        |.append(',')
         |.append(t(1).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))
         |sb.toString
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
+  
+  it should "contain code for the STORE helper function with delimiter" in {
+    val op = Store(Pipe("A"), "file.csv", "PigStorage", List("'#'"))
+    op.schema = Some(new Schema(BagType(TupleType(Array(
+      Field("f1", Types.IntType),
+      Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
+    ), "t"), "s")))
 
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitHelperClass(op))
+    val expectedCode = cleanString("""
+        |def tupleAToString(t: List[Any]): String = {
+        |implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
+        |val sb = new StringBuilder
+        |sb.append(t(0))
+        |.append('#')
+        |.append(t(1).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))
+        |sb.toString
+        |}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+  
+  it should "containt code for STORE with using clause" in {
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
+    val op = Store(Pipe("A"), file, "BinStorage")
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    
+//    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
+    val expectedCode = cleanString(s"""val A_storehelper = A.map(t => tupleAToString(t)).coalesce(1, true) BinStorage().write("$file", A_storehelper)""")
+    assert(generatedCode == expectedCode)
+  }
+
+  
   it should "contain code for GROUP BY ALL" in {
     val op = Grouping(Pipe("aa"), Pipe("bb"), GroupingExpression(List()))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
