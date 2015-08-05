@@ -32,6 +32,8 @@ import jline.console.history.FileHistory
 import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
 import org.slf4j.Marker
+import dbis.pig.plan.MaterializationManager
+import dbis.pig.plan.rewriting.Rewriter
 
 sealed trait JLineEvent
 case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
@@ -127,7 +129,12 @@ object PigREPL extends PigParser with LazyLogging {
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
       case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
       case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => {
-        val plan = new DataflowPlan(buf.toList)
+        var plan = new DataflowPlan(buf.toList)
+        
+        val mm = new MaterializationManager
+        plan = processMaterializations(plan, mm)
+        plan = processPlan(plan)
+        
         for(sink <- plan.sinkNodes) {
           println(pretty(sink))
         }
@@ -143,7 +150,11 @@ object PigREPL extends PigParser with LazyLogging {
         false
       }
       case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
-        val plan = new DataflowPlan(buf.toList)
+        var plan = new DataflowPlan(buf.toList)
+        
+        val mm = new MaterializationManager
+        plan = processMaterializations(plan, mm)
+        plan = processPlan(plan)
         
         try {
           plan.checkSchemaConformance
@@ -167,8 +178,11 @@ object PigREPL extends PigParser with LazyLogging {
       }
       case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") || s.toLowerCase.startsWith(s"socket_write "))=> {
         buf ++= parseScript(s)
-        val plan = new DataflowPlan(buf.toList)
+        var plan = new DataflowPlan(buf.toList)
         
+        val mm = new MaterializationManager
+        plan = processMaterializations(plan, mm)
+        plan = processPlan(plan)
         
         FileTools.compileToJar(plan, "script", Paths.get("."), false, backend) match {
           case Some(jarFile) =>
