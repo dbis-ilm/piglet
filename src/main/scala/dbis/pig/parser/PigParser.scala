@@ -28,8 +28,6 @@ import scala.util.parsing.input.CharSequenceReader
 import scala.language.implicitConversions
 import scala.language.postfixOps
 
-import java.net.URI
-
 /**
  * An enumeration type representing the various language sets
  * supported by the Pig compiler.
@@ -281,7 +279,7 @@ class PigParser extends JavaTokenParsers {
 
   def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
     case b ~ _ ~ _ ~ f ~ u ~ s => 
-      val uri = new URI(f)
+      val uri = new java.io.File(f).getAbsoluteFile().toURI()
       u match {
         case Some(p) => new Load(Pipe(b), uri, s, p._1, if (p._2.isEmpty) null else p._2)
         case None => new Load(Pipe(b), uri, s)
@@ -297,7 +295,9 @@ class PigParser extends JavaTokenParsers {
    */
 
   def rdfLoadStmt: Parser[PigOperator] = bag ~ "=" ~ rdfLoadKeyword ~ "(" ~ fileName ~ ")" ~ (groupedOnClause?) ^^ {
-    case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped => new RDFLoad(Pipe(b), new URI(filename), grouped)
+    case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped => 
+      val uri = new java.io.File(filename).getAbsoluteFile().toURI()
+      new RDFLoad(Pipe(b), uri, grouped)
   }
 
   /*
@@ -308,7 +308,14 @@ class PigParser extends JavaTokenParsers {
   /*
    * STORE <A> INTO "<FileName>"
    */
-  def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ^^ { case _ ~ b ~  _ ~ f => new Store(Pipe(b), new URI(f)) }
+  def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ~ (usingClause?) ^^ { 
+    case _ ~ b ~  _ ~ f ~ u => 
+      val uri = new java.io.File(f).getAbsoluteFile().toURI()
+      u match {
+        case Some(p) => new Store(Pipe(b), uri, p._1, if(p._2.isEmpty) null else p._2)
+        case None => new Store(Pipe(b), uri)
+      }
+  }
 
   /*
    * GENERATE expr1, expr2, ...

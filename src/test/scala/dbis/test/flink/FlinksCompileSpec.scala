@@ -22,6 +22,7 @@ import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
+import java.net.URI
 
 class FlinksCompileSpec extends FlatSpec {
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
@@ -52,32 +53,30 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD" in {
-    val file = new java.net.URI("file.csv")
-    val absolute = new java.io.File(".").getCanonicalPath + "/" + file.toString
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.csv")
+
     val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${absolute}")""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val file = new java.net.URI("file.csv")
-    val absolute = new java.io.File(".").getCanonicalPath + "/" + file.toString
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.csv")
     val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${absolute}", ',')""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with RDFFileStorage" in {
-    val file = new java.net.URI("file.n3")
-    val absolute = new java.io.File(".").getCanonicalPath + "/" + file.toString
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.n3")
     val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${absolute}")""")
+    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -98,12 +97,11 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for STORE" in {
-    val file = new java.net.URI("file.csv")
-    val absolute = new java.io.File(".").getCanonicalPath + "/" + file.toString
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.csv")
     val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${absolute}")""")
+    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -122,7 +120,7 @@ class FlinksCompileSpec extends FlatSpec {
       |implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
       |val sb = new StringBuilder
       |sb.append(t(0))
-      |.append(",")
+      |.append(',')
       |.append(t(1).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))
       |sb.toString
       |}""".stripMargin)

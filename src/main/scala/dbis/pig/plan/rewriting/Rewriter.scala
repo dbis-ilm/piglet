@@ -209,7 +209,7 @@ object Rewriter extends LazyLogging {
   //noinspection ScalaDocMissingParameterDescription
   private def removeNonStorageSinks(node: Any): Option[PigOperator] = node match {
     // Store and Dump are ok
-    case Store(_, _, _) => None
+    case Store(_, _, _,_) => None
     case Dump(_) => None
     // To prevent recursion, empty is ok as well
     case Empty(_) => None
@@ -655,7 +655,7 @@ object Rewriter extends LazyLogging {
         logger.debug(s"did not find materialized data for materialize operator $materialize")
 
         val file = mm.saveMapping(materialize.lineageSignature)
-        val storer = new Store(materialize.inputs.head, new URI(file), "BinStorage")
+        val storer = new Store(materialize.inputs.head, file, "BinStorage")
 
         newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
         newPlan = newPlan.remove(materialize)

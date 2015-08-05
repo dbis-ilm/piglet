@@ -365,14 +365,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
      * @param schema a schema describing the tuple structure
      * @return the string representation
      */
-    def genStringRepOfTuple(schema: Option[Schema]): String = schema match {
+    def genStringRepOfTuple(schema: Option[Schema], stringDelim: String = "','"): String = schema match {
       case Some(s) => (0 to s.fields.length-1).toList.map{ i => s.field(i).fType match {
           // TODO: this should be processed recursively
         case BagType(n, t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
         case TupleType(n, f) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
         case MapType(t, n) => s""".append(t(${i}).asInstanceOf[Map[String,Any]].map{case (k,v) => k + "#" + v}.mkString("[", ",", "]"))"""
         case _ => s".append(t($i))"
-      }}.mkString("\n    .append(\",\")\n")
+      }}.mkString(s"\n    .append($stringDelim)\n")
       case None => s".append(t(0))\n"
     }
 
@@ -392,14 +392,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
 
         callST("orderHelper", Map("params"->params))
       }
-      case Store(in, file,_) => { s"""
-        |  def tuple${node.inputs.head.name}ToString(t: List[Any]): String = {
-        |    implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
+      case Store(in, file,_,params) => { s"""
+        |def tuple${node.inputs.head.name}ToString(t: List[Any]): String = {
+        |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
         |
-        |    val sb = new StringBuilder
-        |    sb${genStringRepOfTuple(node.schema)}
-        |    sb.toString
-        |  }""".stripMargin
+        |  val sb = new StringBuilder
+        |  sb${genStringRepOfTuple(node.schema, if(params != null && params.isDefinedAt(0)) params(0) else "','")}
+        |  sb.toString
+        |}""".stripMargin
       }
       case Distinct(out, in, windowMode) => {
         //TODO: Maybe outsource as there are no variables
@@ -615,13 +615,11 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @return the Scala code implementing the LOAD operator
    */
   def emitLoad(out: String, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
-    val path = if(file.isAbsolute()) "" else new java.io.File(".").getCanonicalPath + "/"
-    
     if (loaderFunc == "")
-      callST("loader", Map("out"->out,"file"->(path + file.toString())))
+      callST("loader", Map("out"->out,"file"->file.toString()))
     else {
       val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams.mkString(",") else ""
-      callST("loader", Map("out"->out,"file"->(path + file.toString()),"func"->loaderFunc,"params"->params))
+      callST("loader", Map("out"->out,"file"->file.toString(),"func"->loaderFunc,"params"->params))
     }
   }
 
@@ -674,8 +672,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @return the Scala code implementing the STORE operator
    */
   def emitStore(in: String, file: URI, func: String): String = {
-    val path = if(file.isAbsolute()) "" else new java.io.File(".").getCanonicalPath + "/"
-    callST("store", Map("in"->in,"file"->(path + file.toString()),"schema"->s"tuple${in}ToString(t)","func"->func))
+    callST("store", Map("in"->in,"file"->file.toString(),"schema"->s"tuple${in}ToString(t)","func"->func))
   }
 
   /**
@@ -713,7 +710,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
     node match {
       case Load(out, file, schema, func, params) => emitLoad(node.outputs.head.name, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inputs.head.name))
-      case Store(in, file,func) => emitStore(node.inputs.head.name, file, func)
+      case Store(in, file, func, params) => emitStore(node.inputs.head.name, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outputs.head.name, node.inputs.head.name, pred, windowMode)
       case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outputs.head.name, node.inputs.head.name, gen, windowMode)
