@@ -36,9 +36,9 @@ dump(in) ::=<<
 
 store(in,file,schema,func) ::=<<
 	<if (schema)>
-    	val <in>_storehelper = <in>.map(t => <schema>).coalesce(1, true)
+    	val <in>_storehelper = <in>
 	<else>
-		val <in>_storehelper = <in>
+		val <in>_storehelper = <in>.map(t => <schema>).coalesce(1, true)
 	<endif>
 	
     <func>().write("<file>", <in>_storehelper)
