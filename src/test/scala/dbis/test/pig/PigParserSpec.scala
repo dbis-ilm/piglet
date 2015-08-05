@@ -437,7 +437,7 @@ class PigParserSpec extends FlatSpec {
   }
  
   it should "parse a window statement using Range for window and slider" in {
-    assert(parseScript("a = window b range 100 seconds slide range 10 seconds;", LanguageFeature.StreamingPig)
+    assert(parseScript("a = window b range 100 SECONDS slide range 10 SECONDS;", LanguageFeature.StreamingPig)
       == List(Window(Pipe("a"), Pipe("b"), (100,"SECONDS"), (10,"SECONDS"))))
   }
 
@@ -539,7 +539,7 @@ class PigParserSpec extends FlatSpec {
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
         "skip_till_next_match",
-        (0, "seconds"))))
+        (0, "SECONDS"))))
   }
 
   it should "parse a matcher  statement using skip_till_any_match mode" in {
@@ -548,54 +548,54 @@ class PigParserSpec extends FlatSpec {
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
         "skip_till_any_match",
-        (0, "seconds"))))
+        (0, "SECONDS"))))
   }
 
   it should "parse a matcher  statement using only window" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
         "skip_till_next_match",
-        (30, "seconds"))))
+        (30, "SECONDS"))))
   }
 
   it should "parse a matcher  statement using a simple event" in {
-    assert(parseScript("a = Matcher b PATTERN A EVENTS (A = x == 0) WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+    assert(parseScript("a = Matcher b PATTERN A EVENTS (A = x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SimplePattern("A"),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
         "skip_till_next_match",
-        (30, "seconds"))))
+        (30, "SECONDS"))))
   }
   it should "parse a matcher  statement using a sequence and  three events" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B, C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+    assert(parseScript("a = Matcher b PATTERN seq (A, B, C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"), SimplePattern("C"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
         "skip_till_next_match",
-        (30, "seconds"))))
+        (30, "SECONDS"))))
   }
   it should "parse a matcher  statement using a sequence event with negation" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
         "skip_till_next_match",
-        (30, "seconds"))))
+        (30, "SECONDS"))))
   }
 
   it should "parse a matcher  statement using more simple event definitions" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0, C = x == 1) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0, C = x == 1) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
           SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))))),
         "skip_till_next_match",
-        (30, "seconds"))))
+        (30, "SECONDS"))))
   }
   it should "parse a matcher  statement using composite sequence pattern" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, seq(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+    assert(parseScript("a = Matcher b PATTERN seq (A, seq(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"),
           SeqPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
@@ -603,11 +603,11 @@ class PigParserSpec extends FlatSpec {
           SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
           SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
         "skip_till_next_match",
-        (30, "seconds"))))
+        (30, "SECONDS"))))
   }
 
   it should "parse a matcher  statement using conjunction and disjunction" in {
-    assert(parseScript("a = Matcher b PATTERN conj (A, disj(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 seconds;", LanguageFeature.ComplexEventPig)
+    assert(parseScript("a = Matcher b PATTERN conj (A, disj(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         ConjPattern(List(SimplePattern("A"),
           DisjPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
@@ -615,6 +615,6 @@ class PigParserSpec extends FlatSpec {
           SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
           SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
         "skip_till_next_match",
-        (30, "seconds"))))
+        (30, "SECONDS"))))
   }
 }

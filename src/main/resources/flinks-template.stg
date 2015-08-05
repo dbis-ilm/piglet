@@ -2,6 +2,7 @@
 init_code(includes) ::= <<
 import org.apache.flink.streaming.api.scala._
 import dbis.flink._
+import dbis.flink.FlinkExtensions._
 import java.util.concurrent.TimeUnit
 import org.apache.flink.streaming.api.windowing.helper._
 import org.apache.flink.util.Collector
@@ -75,6 +76,17 @@ distinct(out,in) ::=<<
 // ------------------ Outputs only num records --------------------------------
 limit(out,in,num,windowMode) ::=<<
     val <out> = <in>.window(Count.of(<num>)).every(Time.of(5, TimeUnit.SECONDS))
+>>
+
+// ------------------ ORDERs the input BY a key -------------------------------
+orderBy(out,in,key,asc) ::=<<
+    val <out> = <in>.mapWindow(custom<out>Order _)
+>>
+
+orderHelper(params) ::=<<
+    def custom<params.out>Order(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
+      ts.toList.asInstanceOf[List[List[String]]].sortBy(t => <params.key>)<if (params.reverse)>(Ordering[String].reverse)<endif>.foreach { x => out.collect(x) }
+    }
 >>
 
 // ------------------ Passes Stream through a Window Operator -----------------

@@ -25,17 +25,18 @@ import scala.io.Source
 
 class FlinksCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
-    ("script", "result", "truth"), // only the header of the table
-    ("load.pig", "result1.out", "result1.data"),
-    ("load2.pig", "result2.out", "result2.data"),
-    ("foreach1.pig", "distances.out", "distances.data"),
-    ("construct.pig", "result3.out", "result3.data"),
-    ("windowJoin.pig", "joinedW.out", "joined.data"),
-    ("windowGrouping.pig", "grouping.out", "grouping.data"),
-    ("windowNforeach.pig", "nested.out", "nested.data"),
-    ("windowCount.pig", "marycounts.out", "marycount.data"),
-    ("windowDistinct.pig", "unique.out", "unique.data")
-    //TODO: Limit, Distinct, Filter, OrderBy
+    ("script", "result", "truth", "inOrder"), // only the header of the table
+    ("load.pig", "result1.out", "result1.data",false),
+    ("load2.pig", "result2.out", "result2.data",false),
+    ("foreach1.pig", "distances.out", "distances.data",false),
+    ("construct.pig", "result3.out", "result3.data",false),
+    ("windowJoin.pig", "joinedW.out", "joined.data", false),
+    ("windowGrouping.pig", "grouping.out", "grouping.data", false),
+    ("windowNforeach.pig", "nested.out", "nested.data", false),
+    ("windowCount.pig", "marycounts.out", "marycount.data", false),
+    ("windowDistinct.pig", "unique.out", "unique.data", false),
+    ("windowSort.pig","sorted.out","sorted.data", true)
+    //TODO: Limit, Filter
   )
 
   def cleanupResult(dir: String): Unit = {
@@ -51,7 +52,7 @@ class FlinksCompileIt extends FlatSpec with Matchers {
   }
 
   "The Pig compiler" should "compile and execute the script" in {
-    forAll(scripts) { (script: String, resultDir: String, truthFile: String) =>
+    forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean) =>
       val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
       // 1. make sure the output directory is empty
       cleanupResult(resultPath.path)
@@ -73,7 +74,10 @@ class FlinksCompileIt extends FlatSpec with Matchers {
           result++=Source.fromFile(file).getLines
       val truth = Source.fromFile(resourcePath + truthFile).getLines
       // 4. compare both files
-      result.toSeq should contain theSameElementsAs (truth.toTraversable)
+      if (inOrder)
+        result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
+      else
+        result.toSeq should contain theSameElementsAs (truth.toTraversable)
 
       // 5. delete the output directory
       cleanupResult(resultPath.path)

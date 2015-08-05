@@ -36,6 +36,7 @@ class FlinksCompileSpec extends FlatSpec {
     val expectedCode = cleanString("""
       |import org.apache.flink.streaming.api.scala._
       |import dbis.flink._
+      |import dbis.flink.FlinkExtensions._
       |import java.util.concurrent.TimeUnit
       |import org.apache.flink.streaming.api.windowing.helper._
       |import org.apache.flink.util.Collector

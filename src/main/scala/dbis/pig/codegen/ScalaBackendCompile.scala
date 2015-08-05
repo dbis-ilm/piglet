@@ -378,14 +378,19 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
 
     node match {
       case OrderBy(out, in, orderSpec) => {
-        val cname = s"custKey_${node.outputs.head.name}_${node.inputs.head.name}"
+        var params = Map[String,Any]()
+        //Spark
+        params += "cname" -> s"custKey_${node.outputs.head.name}_${node.inputs.head.name}"
         var col = 0
-        val fields = orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
-        val cmpExpr = genCmpExpr(1, orderSpec.size)
-        s"""
-        |  case class ${cname}(${fields}) extends Ordered[${cname}] {
-        |    def compare(that: ${cname}) = $cmpExpr
-        |  }""".stripMargin
+        params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
+        params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
+
+        //Flink
+        params += "out"->node.outputs.head.name
+        params += "key"->s"(${orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")})"
+        if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse"->true
+
+        callST("orderHelper", Map("params"->params))
       }
       case Store(in, file,_) => { s"""
         |  def tuple${node.inputs.head.name}ToString(t: List[Any]): String = {
