@@ -85,6 +85,8 @@ trait PigOperator extends Rewritable {
 
   def outPipeName: String = if (outputs.nonEmpty) outputs.head.name else ""
 
+  def outPipeNames: List[String] = outputs.map(p => p.name)
+
   def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 
   def preparePlan: Unit = {}
