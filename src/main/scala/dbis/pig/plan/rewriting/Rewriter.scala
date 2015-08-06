@@ -450,6 +450,7 @@ object Rewriter extends LazyLogging {
     *
     * @param plan
     * @param rem
+    * @param removePredecessors If true, predecessors of `rem` will be removed as well.
     * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
     */
   //noinspection ScalaDocMissingParameterDescription

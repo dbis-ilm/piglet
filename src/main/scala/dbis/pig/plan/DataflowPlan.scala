@@ -230,6 +230,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * Remove the given operator from the dataflow plan.
    *
    * @param op the operator to be removed from the plan
+   * @param removePredecessors If true, predecessors of `rem` will be removed as well.
    * @return the resulting dataflow plan
    */
   def remove(op: PigOperator, removePredecessors: Boolean = false) : DataflowPlan = {
