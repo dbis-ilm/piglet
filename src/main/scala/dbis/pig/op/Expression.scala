@@ -53,7 +53,7 @@ trait Expr {
   def resultType(schema: Option[Schema]): (String, PigType)
 }
 
-abstract class BinaryExpr(left: Expr, right: Expr) extends Expr {
+abstract class BinaryExpr(val left: Expr, val right: Expr) extends Expr {
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) && left.traverseAnd(schema, traverser) && right.traverseAnd(schema, traverser)
 
@@ -61,6 +61,10 @@ abstract class BinaryExpr(left: Expr, right: Expr) extends Expr {
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) || left.traverseOr(schema, traverser) || right.traverseOr(schema, traverser)
 
+}
+
+object BinaryExpr {
+  def unapply(b: BinaryExpr): Option[(Expr, Expr)] = Option(b).map {b => (b.left, b.right)}
 }
 
 object Expr {
