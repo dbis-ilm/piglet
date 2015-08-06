@@ -448,4 +448,11 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     plan.sourceNodes.headOption.value.outputs.headOption.value.consumer.headOption.value.outputs should have length 2
     assert(plan.checkConnectivity)
   }
+
+  it should "reject multiple pipes with the same name" in {
+    val op = Load(Pipe("a"), "file.csv")
+    an [InvalidPlanException] should be thrownBy {
+      op.outputs = List(Pipe("b"), Pipe("b"))
+    }
+  }
 }
