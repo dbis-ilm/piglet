@@ -18,12 +18,14 @@ package dbis.test.pig
 
 import java.net.URI
 
+import dbis.pig.schema.{Schema, TupleType, BagType}
 import dbis.test.TestTools._
 
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
+import dbis.pig.schema._
 import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FlatSpec, Matchers}
@@ -69,6 +71,35 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     pPlan.findOperatorForAlias("b").value shouldBe op3
     pPlan.sinkNodes.headOption.value shouldBe op4
     pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
+  }
+
+  it should "order Filter operations before Joins if only NamedFields are used" in {
+    val op1 = Load(Pipe("a"), "file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
+    ))))
+    val op2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
+      ("bid", Types.IntType)))
+    ))))
+    val predicate1 = Lt(RefExpr(NamedField("a")), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op3 = Join(Pipe("c"), List(Pipe("a"), Pipe("b")),
+      List(List(NamedField("aid")),
+           List(NamedField("bid"))
+      ))
+    val op4 = Filter(Pipe("d"), Pipe("c"), predicate1)
+    val op5 = Dump(Pipe("d"))
+
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4, op5)))
+    op1.outputs.headOption.value.consumer should contain only op4
+    op2.outputs.headOption.value.consumer should contain only op3
+    op4.outputs.headOption.value.consumer should contain only(op3, op5)
+
+    op1.outputs should have length 1
+    op2.outputs should have length 1
+    op3.outputs should have length 1
+    op4.outputs should have length 1
+
+    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(op4, op2)
   }
 
   it should "rewrite SplitInto operators into multiple Filter ones" in {
