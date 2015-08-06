@@ -9,6 +9,7 @@ object Conf {
   // loads the default configuration file in resources/application.conf
   private val appconf = ConfigFactory.load()
   
+  def replHistoryFile = new File(appconf.getString("repl.history"))
   
   def materializationBaseDir = new URI(appconf.getString("materialization.basedir"))
   def materializationMapFile = new File(appconf.getString("materialization.mapfile")).toPath()

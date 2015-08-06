@@ -12,6 +12,7 @@ import dbis.spark._
 // ----------------- BEGIN of code building and initializing the query --------
 query_object(name) ::= <<
 object <name> {
+
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------

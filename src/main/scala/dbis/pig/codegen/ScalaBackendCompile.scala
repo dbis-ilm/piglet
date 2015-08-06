@@ -179,7 +179,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
           if (requiresTypeCast) {
             val field = s.field(idx)
             val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
-            s"${tuplePrefix}(${idx}).to${typeCast}"
+
+            /* if we need to cast to anything else than string (i.e. int, double, etc) we have to
+             * cast to string before, because if we load from a BinStorage, we only get Any types
+             * that do not have a toInt or toDouble conversion method
+             */
+            s"${tuplePrefix}(${idx})${if(typeCast != "String") ".toString" else ""}.to${typeCast}"
           }
           else
             s"${tuplePrefix}(${idx})"
@@ -672,7 +677,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @return the Scala code implementing the STORE operator
    */
   def emitStore(in: String, file: URI, func: String): String = {
-    callST("store", Map("in"->in,"file"->file.toString(),"schema"->s"tuple${in}ToString(t)","func"->func))
+    
+    /* for BinStorage we do not convert the tuple into a string because
+     * we want to keep our fields as is
+     */
+    if(func == "BinStorage")
+      callST("store", Map("in"->in,"file"->file.toString(),"func"->func))
+    else
+      callST("store", Map("in"->in,"file"->file.toString(),"schema"->s"tuple${in}ToString(t)","func"->func))
   }
 
   /**

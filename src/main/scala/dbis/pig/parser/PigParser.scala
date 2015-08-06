@@ -165,12 +165,16 @@ class PigParser extends JavaTokenParsers {
     )
 
   def logicalExpr: Parser[Predicate] = (
-      logicalTerm ~ (andKeyword | orKeyword) ~ logicalTerm ^^ {
-        case a ~ op ~ b => op match {
-          case "AND" => And(a, b)
-          case "OR" => Or(a, b)
-        }
-      }
+      
+      logicalTerm ~ andKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => And(a, b) }
+      | logicalTerm ~ orKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => Or(a, b) }
+      
+//      logicalTerm ~ (andKeyword | orKeyword) ~ logicalTerm ^^ {
+//        case a ~ op ~ b => op match {
+//          case `andKeyword` => And(a, b)
+//          case `orKeyword` => Or(a, b)
+//        }
+//      }
       | notKeyword ~ logicalTerm ^^ { case _ ~ e => Not(e) }
       | logicalTerm ^^ { e => e }
 //      | func ^^ { f => Eq(f,RefExpr(Value(true))) }
@@ -222,6 +226,7 @@ class PigParser extends JavaTokenParsers {
   lazy val groupedOnKeyword = "grouped on".ignoreCase
   lazy val trueKeyword = "true".ignoreCase
   lazy val falseKeyword = "false".ignoreCase
+  
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }

@@ -115,7 +115,7 @@ class SparkCompileSpec extends FlatSpec {
     val op = ops(1)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val c = b.filter(t => {t(0).toDouble > 0 && (t(1).toDouble < 0 || (!(t(2).toInt == t(3).toInt)))})")
+    val expectedCode = cleanString("val c = b.filter(t => {t(0).toString.toDouble > 0 && (t(1).toString.toDouble < 0 || (!(t(2).toString.toInt == t(3).toString.toInt)))})")
     assert(generatedCode == expectedCode)
   }
 
@@ -189,8 +189,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     
-//    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
-    val expectedCode = cleanString(s"""val A_storehelper = A.map(t => tupleAToString(t)).coalesce(1, true) BinStorage().write("$file", A_storehelper)""")
+    val expectedCode = cleanString(s"""val A_storehelper = A BinStorage().write("$file", A_storehelper)""")
     assert(generatedCode == expectedCode)
   }
 
@@ -378,7 +377,7 @@ class SparkCompileSpec extends FlatSpec {
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("out").get))
 
     val expectedCode = cleanString(
-      """val out = data.map(t => List(PigFuncs.toTuple(t(0).toInt,t(1).toInt),PigFuncs.toBag(t(0).toInt,t(1).toInt),PigFuncs.toMap(t(2).toString,t(0).toInt)))""".stripMargin)
+      """val out = data.map(t => List(PigFuncs.toTuple(t(0).toString.toInt,t(1).toString.toInt),PigFuncs.toBag(t(0).toString.toInt,t(1).toString.toInt),PigFuncs.toMap(t(2).toString,t(0).toString.toInt)))""".stripMargin)
 
     assert(generatedCode == expectedCode)
   }
@@ -466,7 +465,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.keyBy(t => custKey_a_b(t(0).toString,t(2).toInt)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
+        |val a = b.keyBy(t => custKey_a_b(t(0).toString,t(2).toString.toInt)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
 
     val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(op))
