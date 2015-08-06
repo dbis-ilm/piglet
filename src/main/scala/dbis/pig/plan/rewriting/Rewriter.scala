@@ -420,6 +420,7 @@ object Rewriter extends LazyLogging {
             Some(Empty(Pipe("")))
           }
           else {
+            consumers foreach (_.inputs = List.empty)
             Some(consumers.toList)
           }
         }
