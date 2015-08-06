@@ -18,6 +18,7 @@ package dbis.pig.op
 
 import java.security.MessageDigest
 
+import dbis.pig.plan.InvalidPlanException
 import dbis.pig.schema._
 import org.kiama.rewriting.Rewritable
 import scala.collection.immutable.Seq
@@ -50,7 +51,11 @@ trait PigOperator extends Rewritable {
    */
   def outputs_=(o: List[Pipe]) = {
     _outputs = o
-    // make sure that we are producer in all pipes
+    // 1. make sure we don't have multiple pipes with the same name
+    if (_outputs.map(p => p.name).distinct.size != _outputs.size)
+      throw InvalidPlanException("duplicate pipe names")
+
+    // 2. make sure that we are producer in all pipes
     _outputs.foreach(p => {
       p.producer = this
       p.consumer.foreach(_.inputs.foreach(
@@ -79,6 +84,8 @@ trait PigOperator extends Rewritable {
   }
 
   def outPipeName: String = if (outputs.nonEmpty) outputs.head.name else ""
+
+  def outPipeNames: List[String] = outputs.map(p => p.name)
 
   def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 

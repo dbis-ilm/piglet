@@ -40,6 +40,7 @@ case class RefExpr(r: Ref) extends ArithmeticExpr {
       // TODO: handle deref of tuple, bag
       //case DerefTuple(t, c) =>
       //case DerefMap(m, k) =>
+      case _ => ("", Types.ByteArrayType)
     }
     case None => ("", Types.ByteArrayType)
   }

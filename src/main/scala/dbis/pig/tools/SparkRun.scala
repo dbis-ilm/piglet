@@ -24,9 +24,7 @@ import java.nio.file.Path
 
 class SparkRun extends Run{
   override def execute(master: String, className: String, jarFile: Path) {
-    Logger.getLogger("org").setLevel(Level.WARN)
-    Logger.getLogger("akka").setLevel(Level.WARN)
-    Logger.getLogger("Remoting").setLevel(Level.WARN)
+        
     SparkSubmit.main(Array("--master", master, "--class", className, jarFile.toString()))
   }
 }

@@ -2,16 +2,17 @@ package dbis.pig.tools
 
 import com.typesafe.config.ConfigFactory
 import java.io.File
+import java.net.URI
 
 object Conf {
   
   // loads the default configuration file in resources/application.conf
   private val appconf = ConfigFactory.load()
   
+  def replHistoryFile = new File(appconf.getString("repl.history"))
   
-  def materializationBaseDir: File = new File(appconf.getString("materialization.basedir"))
-  def materializationMapFile: File = new File(materializationBaseDir, 
-                                                appconf.getString("materialization.mapfile"))
+  def materializationBaseDir = new URI(appconf.getString("materialization.basedir"))
+  def materializationMapFile = new File(appconf.getString("materialization.mapfile")).toPath()
  
   
   def backendJar(backend: String) = appconf.getString(s"backends.$backend.jar")

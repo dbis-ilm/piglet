@@ -1,8 +1,7 @@
 // ----------------- header declaration ----------------- 
 init_code(includes) ::= <<
-import org.apache.flink.streaming.api.scala._
+import org.apache.flink.api.scala._
 import dbis.flink._
-import java.util.concurrent.TimeUnit
 
 <\n>
 >>
@@ -15,7 +14,7 @@ object <name> {
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name) ::= <<
     def main(args: Array[String]) {
-        val env = StreamExecutionEnvironment.getExecutionEnvironment<\n>
+        val env = ExecutionEnvironment.getExecutionEnvironment<\n>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
@@ -34,13 +33,7 @@ dump(in) ::=<<
 
 // ------------------ STORE Results on Disk -----------------------------------
 store(in,file,schema,func) ::=<<
-        <in>.map(_.mkString(",")).writeAsText("<file>")
-<!        
-        if (<in>.getJavaStream.getType.getTypeClass.isInstanceOf[Class[List[Any]]]) 
-            <in>.map(_.mkString(",")).writeAsText("<file>")
-        else 
-            <in>.writeAsText("<file>")
- !>
+        <in>.map(t => <schema>).writeAsText("<file>")
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -48,10 +41,16 @@ filter(out,in,pred) ::=<<
         val <out> = <in>.filter(t => {<pred>})
 >>
 
-// ------------------ Executes an expression FOR EACH input element -----------
+// ------------------ Executes an expression FOREACH input element ------------
 foreach(out,in,expr) ::=<<
         val <out> = <in>.map(t => <expr>)
 >>
+
+// ----- Executes an expression FOREACH input element requiring flatMap -------
+foreachFlatMap(out,in,expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
+>>
+
 
 // ------------------ GROUPS elements on an expression ------------------------
 groupBy(out,in,expr) ::=<<
@@ -64,38 +63,20 @@ groupBy(out,in,expr) ::=<<
 
 // ------------------ Outputs only distinct values ----------------------------
 distinct(out,in) ::=<<
-        val <out> = <in>
+        val <out> = <in>.distinct(t => t(0))
 >>
 
 // ------------------ Outputs only num records --------------------------------
 limit(out,in,num) ::=<<
-        val <out> = <in>.window(Count.of(<num>)).every(Time.of(5, TimeUnit.SECONDS))
->>
-
-// ------------------ Passes Stream through a Window Operator -----------------
-window(out,in,window,wUnit,slider,sUnit) ::=<<
-<if (wUnit)>
-    <if (sUnit)>
-        val <out> = <in>.window(Time.of(<window>, TimeUnit.<wUnit>)).every(Time.of(<slider>, TimeUnit.<sUnit>))
-    <else>
-        val <out> = <in>.window(Time.of(<window>, TimeUnit.<wUnit>)).every(Count.of(<slider>))
-    <endif>
-<else>
-    <if (sUnit)>
-        val <out> = <in>.window(Count.of(<window>)).every(Time.of(<slider>, TimeUnit.<sUnit>))
-    <else>
-        val <out> = <in>.window(Count.of(<window>)).every(Count.of(<slider>))
-    <endif>
-<endif>
+        val <out> = <in>.first(<num>)
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
 join(out,rel1,key1,rel2,key2) ::=<<
         val <out> = <rel1><rel2,key2:{ r,k |<\\>
-        .join(<r>).onWindow(5, TimeUnit.SECONDS).where(t => <key1>).equalTo(t => <k>)<\\>
+        .join(<r>).where(t => <key1>).equalTo(t => <k>)<\\>
         .map{ t => t._1 ++ t._2 \}<\\>
         }>
-
 >>
 
 // ------------------ UNIONs multiple streams to one --------------------------
@@ -103,30 +84,9 @@ union(out,in,others) ::=<<
         val <out> = <in><others:{ e | .union(<e>)}>
 >>
 
-// ------------------ Reads from a SOCKET -------------------------------------
-socketRead(out,addr,mode,func,params) ::=<<
-<if (func)>
-    <if (mode)>
-        val <out> = <func>().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
-    <else>
-        val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
-    <endif>
-<else>
-    <if (mode)>
-        val <out> = PigStream().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>", '\t')
-    <else>
-        val <out> = PigStream().connect(env, "<addr.hostname>", <addr.port>, '\t')
-    <endif>
-<endif>
->>
-
-// ------------------ Writes to a SOCKET -------------------------------------
-socketWrite(in,addr,mode) ::=<<
-<if (mode)>
-        <in>.addSink(new ZmqPublisher("<addr.protocol><addr.hostname>:<addr.port>")).setParallelism(1)
-<else>
-        <in>.writeToSocket("<addr.hostname>",<addr.port>,new UTF8StringSchema())
-<endif>
+// ------------------ ORDERs the input BY a key -------------------------------
+orderBy(out,in,key,asc) ::=<<
+        val <out> = <in>.sortPartition(t => <key>, Order.ASCENDING)
 >>
 
 

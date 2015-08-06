@@ -20,6 +20,8 @@ import dbis.pig.op.{And, BinaryExpr, Filter, Load, Materialize, OrderBy, PigOper
 import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
 import dbis.pig.plan.rewriting.Rules.registerAllRules
+import dbis.pig.tools.BreadthFirstTopDownWalker
+import scala.collection.mutable.Queue
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 import scala.collection.mutable
@@ -27,6 +29,8 @@ import scala.collection.mutable.ListBuffer
 import scala.reflect.{ClassTag, classTag}
 import com.typesafe.scalalogging.LazyLogging
 import java.net.URI
+
+case class RewriterException(msg:String)  extends Exception(msg)
 
 /** Provides various methods for rewriting [[DataflowPlan]]s by wrapping functionality provided by
   * Kiamas [[org.kiama.rewriting.Rewriter]] and [[org.kiama.rewriting.Strategy]] objects.
@@ -271,6 +275,36 @@ object Rewriter extends LazyLogging {
     }
     processPlan(plan, strategyf(t => strategy(t)))
   }
+
+  /** Insert `newOp` between `in` and `out` in `plan`.
+    *
+    * @param plan The DataflowPlan in which to insert the new operator.
+    * @param in The Operator being the input for the new operator.
+    * @param out The Operator being the output for the new operator.
+    * @param newOp The Operator getting inserted.
+    * @return The new DataflowPlan.
+    */
+  def insertBetween(plan: DataflowPlan, inOp: PigOperator, outOp: PigOperator, newOp: PigOperator): DataflowPlan = {
+    require(!newOp.isInstanceOf[Load], "Can't insert a Load operator after another operator")
+    require(inOp.outputs.map(_.consumer).flatten.contains(outOp), "The input Operator must be directly connected to the output Operator")
+    require(outOp.inputs.map(_.producer).contains(inOp), "The output Operator must be directly connected to the input Operator")
+     
+    //TODO:Outsource DISCONNECT, difficult since processPlan deletes Nodes with no output Pipe
+    val outIdx = inOp.outputs.indexWhere(_.name == newOp.inputs.head.name)
+    inOp.outputs(outIdx).consumer = inOp.outputs(outIdx).consumer.filterNot(_ == outOp)
+    outOp.inputs = outOp.inputs.filterNot(_.producer == inOp)
+
+        
+    // Add new Operator to inOp consumers & its output Pipe to outOp inputs
+    inOp.outputs(outIdx).consumer = inOp.outputs(outIdx).consumer :+ newOp
+    outOp.inputs = outOp.inputs :+ newOp.outputs(outIdx)
+
+    // Insert new Operator after inOp to Plan and append outOp
+    var newPlan = plan.insertAfter(inOp,newOp)
+    newPlan = newPlan.insertAfter(newOp,outOp)
+    newPlan
+  }
+
   /** Replace `old` with `repl` in `plan`.
     *
     * @param plan
@@ -544,7 +578,7 @@ object Rewriter extends LazyLogging {
         logger.debug(s"did not find materialized data for materialize operator $materialize")
 
         val file = mm.saveMapping(materialize.lineageSignature)
-        val storer = new Store(materialize.inputs.head, new URI(file), "BinStorage")
+        val storer = new Store(materialize.inputs.head, file, "BinStorage")
 
         newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
         newPlan = newPlan.remove(materialize)
@@ -556,5 +590,143 @@ object Rewriter extends LazyLogging {
     newPlan
   }
 
+  def processWindows(plan: DataflowPlan): DataflowPlan = {
+    require(plan != null, "Plan must not be null")
+
+    var newPlan = plan
+
+    val walker1 = new BreadthFirstTopDownWalker
+    val walker2 = new BreadthFirstBottomUpWalker
+
+    // All Window Ops: Group,Filter,Distinct,Limit,OrderBy,Foreach
+    // Two modes: Group,Filter,Limit,Foreach
+    // Terminator: Foreach, Join
+ 
+    logger.debug(s"Searching for Window Operators")
+    walker1.walk(newPlan){ op => 
+      op match {
+        case o: Window => {
+          logger.debug(s"Found Window Operator")
+          newPlan = markForWindowMode(newPlan, o)
+        }
+        case _ =>
+      }
+    }
+    
+    // Find and process Window Joins 
+    val joins = ListBuffer.empty[Join]
+    walker2.walk(newPlan){ op => 
+      op match {
+        case o: Join => joins += o
+        case _ =>
+      }
+    }
+    newPlan = processWindowJoins(newPlan, joins.toList)
+
+    newPlan
+  }
+
+  def markForWindowMode(plan: DataflowPlan, windowOp: Window): DataflowPlan = {
+    var lastOp: PigOperator =  new Empty(Pipe("empty"))
+    val littleWalker = Queue(windowOp.outputs.flatMap(_.consumer).toSeq: _*)
+    while(!littleWalker.isEmpty){
+      val operator = littleWalker.dequeue()
+      operator match {
+        case o: Filter => {
+          logger.debug(s"Rewrite Filter to WindowMode")
+          o.windowMode = true
+        }
+        case o: Limit => {
+          logger.debug(s"Rewrite Limit to WindowMode")
+          o.windowMode = true
+        }
+        case o: Distinct => {
+          logger.debug(s"Rewrite Distinct to WindowMode")
+          o.windowMode = true
+        }
+       case o: Grouping => {
+          logger.debug(s"Rewrite Grouping to WindowMode")
+          o.windowMode = true
+        }
+        case o: Foreach => {
+          logger.debug(s"Rewrite Foreach to WindowMode")
+          o.windowMode = true
+          val flatten = new WindowFlatten(Pipe("flattenNode"), o.outputs.head)
+          val newPlan = plan.insertBetween(o, o.outputs.head.consumer.head, flatten)
+          return newPlan
+        }
+        case o: Join => {
+          logger.debug(s"Found Join Node, abort")
+          return plan
+        }
+        case _ =>
+      }
+      littleWalker ++= operator.outputs.flatMap(_.consumer)
+      if (littleWalker.isEmpty) lastOp = operator
+    }
+
+    logger.debug(s"Reached End of Plan - Adding Flatten Node")
+    val before = lastOp.inputs.head
+    val flatten = new WindowFlatten(Pipe("flattenNode"), before.producer.outputs.head)
+    val newPlan = plan.insertBetween(before.producer, lastOp, flatten)
+
+    newPlan
+  }
+
+  def processWindowJoins(plan: DataflowPlan, joins: List[Join]): DataflowPlan = {
+
+    var newPlan = plan
+    
+    /*
+     * Foreach Join Operator check if Input requirements are met.
+     * Collect Window input relations and create new Join with Window 
+     * definition and window inputs as new inputs.
+     */
+    for(joinOp <- joins) {
+      var newInputs = ListBuffer.empty[Pipe]
+      var windowDef: Option[Tuple2[Int,String]] = None
+
+      for(joinInputPipe <- joinOp.inputs){
+        // Checks
+        if(!joinInputPipe.producer.isInstanceOf[Window]) 
+          throw new RewriterException("Join inputs must be Window Definitions")
+        val inputWindow = joinInputPipe.producer.asInstanceOf[Window]
+        if(inputWindow.window._2=="") 
+          throw new RewriterException("Join input windows must be defined via RANGE")
+        if (!windowDef.isDefined) 
+          windowDef = Some(inputWindow.window)
+        if(windowDef!=Some(inputWindow.window)) 
+          throw new RewriterException("Join input windows must have the same definition")
+
+        newInputs += inputWindow.in
+        
+        // Remove Window-Join relations
+        joinOp.inputs = joinOp.inputs.filterNot(_.producer == inputWindow)
+        inputWindow.outputs.foreach((out: Pipe) => {
+          if(out.consumer contains joinOp)
+            out.consumer = out.consumer.filterNot(_ == joinOp)
+        })
+      }
+
+      val newJoin = Join(joinOp.out, newInputs.toList, joinOp.fieldExprs, 
+                         windowDef.getOrElse(null.asInstanceOf[Tuple2[Int,String]]))
+      /*
+       * Replace Old Join with new Join (new Input Pipes and Window Parameter)
+       */
+      val strategy = (op: Any) => {
+        if (op == joinOp) {
+          joinOp.outputs = List.empty
+          joinOp.inputs = List.empty
+          Some(newJoin)
+        }
+        else {
+          None
+        }
+      }
+      newPlan = processPlan(newPlan, strategyf(t => strategy(t)))
+    }
+    newPlan
+  }
+  
   registerAllRules
 }

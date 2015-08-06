@@ -17,17 +17,17 @@
 package dbis.pig.op
 
 /**
- * Distinct represents the DISTINCT operator of Pig.
+ * WindowFlatten is used to transform Windows back to a single continuous Stream.
  *
- * @param initialOutPipeName the name of the output pipe (relation).
- * @param initialInPipeName the name of the input pipe.
+ * @param out the name of the output pipe.
+ * @param in the name of the input pipe.
  */
-case class Distinct(out: Pipe, in: Pipe, var windowMode: Boolean = false) extends PigOperator {
+case class WindowFlatten(out: Pipe, in: Pipe) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 
   override def lineageString: String = {
-    s"""DISTINCT%""" + super.lineageString
+    s"""WINDOWFLATTEN%""" + super.lineageString
   }
 
 }

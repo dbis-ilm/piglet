@@ -17,33 +17,70 @@
 
 package dbis.pig.tools
 
-import scala.sys.process._
-import java.security._
-import org.apache.flink.client.CliFrontend
+import org.apache.flink.client.RemoteExecutor
+import org.apache.flink.client.program.Client
+import org.apache.flink.client.program.PackagedProgram
+import org.apache.flink.client.program.ProgramInvocationException
+import org.apache.flink.configuration.Configuration
+
+import java.io.File
 import java.nio.file.Path
+import java.net.InetSocketAddress
+import java.net.URI
+import java.net.URISyntaxException
+
+import org.apache.log4j.Logger
+import org.apache.log4j.Level
 
 
 class FlinkRun extends Run{
   override def execute(master: String, className: String, jarFile: Path){
+    Logger.getLogger("org").setLevel(Level.WARN)
+    Logger.getLogger("akka").setLevel(Level.WARN)
+    Logger.getLogger("Remoting").setLevel(Level.WARN)
+
     if (master.startsWith("local") && !master.startsWith("localhost")){
-      //      val zmqJar = "/home/blaze/.ivy2/cache/org.zeromq/zeromq-scala-binding_2.11.0-M3/jars/zeromq-scala-binding_2.11.0-M3-0.0.7.jar"
-      //      val pigJar = "/home/blaze/Masterthesis/projects/pigspark/target/scala-2.11/PigCompiler.jar"
-      /*      
-       val flinkJar = sys.env.get("FLINK_JAR") match {
-         case Some(n) => n
-         case None => throw new Exception(s"Please set FLINK_JAR to your flink-dist jar file")
-       }
-       val run = s"java -Dscala.usejavacp=true -cp ${flinkJar}:${pigJar}:${jarFile} ${className}"
-       println(run)
-       run !
-       */
-      val cli = new CliFrontend
-      val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
+//      val cli = new CliFrontend
+//      val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
+      submitJar("localhost:6123", jarFile, className)
     }
     else {
-      val cli = new CliFrontend
-      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
+//      val cli = new CliFrontend
+//      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
+      submitJar(master, jarFile, className)
     }
+  }
+
+  def submitJar(master: String, path: Path, className: String, args: String*) = { 
+    val file = new File(path.toString())
+    val parallelism = 1 
+    val wait = true
+    try { 
+      val program = new PackagedProgram(file, className, args:_*)
+      val jobManagerAddress = getInetFromHostport(master)
+      val client = new Client(jobManagerAddress, new Configuration(), program.getUserCodeClassLoader(), 1)  
+      println("Executing " + path.toString()); 
+      client.run(program, parallelism, wait); 
+    } catch {
+      case e: ProgramInvocationException => e.printStackTrace()
+    }   
+  }
+
+  def getInetFromHostport(hostport: String) = {
+    // from http://stackoverflow.com/questions/2345063/java-common-way-to-validate-and-convert-       hostport-to-inetsocketaddress
+    var uri = null.asInstanceOf[URI]
+    try {
+      uri = new URI("my://" + hostport)
+    } catch {
+      case e: URISyntaxException =>
+        throw new RuntimeException("Could not identify hostname and port in '" + hostport + "'.", e)
+    }       
+    val host = uri.getHost()
+    val port = uri.getPort()
+    if (host == null || port == -1) {
+      throw new RuntimeException("Could not identify hostname and port in '" + hostport + "'.")
+    }
+    new InetSocketAddress(host, port)
 
   }
 }
