@@ -68,6 +68,16 @@ class SparkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for LOAD with renamed pipe" in {
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val op = Load(Pipe("a"), file)
+    op.outputs = List(Pipe("b"))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(s"""val b = PigStorage().load(sc, "${file}")""")
+    assert(generatedCode == expectedCode)
+  }
+
   it should "contain code for LOAD with PigStorage" in {
     
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"

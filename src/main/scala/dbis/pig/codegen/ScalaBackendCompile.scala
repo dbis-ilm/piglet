@@ -708,24 +708,28 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   def emitNode(node: PigOperator): String = {
     val group = STGroupFile(templateFile)
     node match {
-      case Load(out, file, schema, func, params) => emitLoad(node.outputs.head.name, file, func, params)
+        /*
+         * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
+         *       after changing the pipe name. Instead, use node.outPipeName
+         */
+      case Load(out, file, schema, func, params) => emitLoad(node.outPipeName, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inputs.head.name))
       case Store(in, file, func, params) => emitStore(node.inputs.head.name, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""
-      case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outputs.head.name, node.inputs.head.name, pred, windowMode)
-      case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outputs.head.name, node.inputs.head.name, gen, windowMode)
-      case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outputs.head.name, node.inputs.head.name, groupExpr, windowMode)
-      case Distinct(out, in, windowMode) => emitDistinct(node.outputs.head.name, node.inputs.head.name, windowMode)
-      case Limit(out, in, num, windowMode) => emitLimit(node.outputs.head.name, node.inputs.head.name, num, windowMode)
-      case Join(out, rels, exprs, window) => emitJoin(node, node.outputs.head.name, rels, exprs, window)
-      case Union(out, rels) => callST("union", Map("out"->node.outputs.head.name,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
-      case Sample(out, in, expr) => callST("sample", Map("out"->node.outputs.head.name,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
-      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outputs.head.name,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outputs.head.name, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
-      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outputs.head.name,"op"->op,"in"->node.inputs.head.name,"params"->emitParamList(node.schema, params)))
-      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outputs.head.name, address, mode, func, params)
+      case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outPipeName, node.inputs.head.name, pred, windowMode)
+      case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outPipeName, node.inputs.head.name, gen, windowMode)
+      case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outPipeName, node.inputs.head.name, groupExpr, windowMode)
+      case Distinct(out, in, windowMode) => emitDistinct(node.outPipeName, node.inputs.head.name, windowMode)
+      case Limit(out, in, num, windowMode) => emitLimit(node.outPipeName, node.inputs.head.name, num, windowMode)
+      case Join(out, rels, exprs, window) => emitJoin(node, node.outPipeName, rels, exprs, window)
+      case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
+      case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
+      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outputs.head.name, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
+      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inputs.head.name,"params"->emitParamList(node.schema, params)))
+      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outPipeName, address, mode, func, params)
       case SocketWrite(in, address, mode) => emitSocketWrite(node.inputs.head.name, address, mode)
-      case Window(out, in, window, slide) => emitWindow(node.outputs.head.name,node.inputs.head.name,window,slide)
-      case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outputs.head.name,"in"->node.inputs.head.name))
+      case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inputs.head.name,window,slide)
+      case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inputs.head.name))
       case Empty(_) => ""
       /*     
        case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
