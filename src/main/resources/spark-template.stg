@@ -12,6 +12,7 @@ import dbis.spark._
 // ----------------- BEGIN of code building and initializing the query --------
 query_object(name) ::= <<
 object <name> {
+
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
@@ -36,9 +37,9 @@ dump(in) ::=<<
 
 store(in,file,schema,func) ::=<<
 	<if (schema)>
-    	val <in>_storehelper = <in>
+    	val <in>_storehelper = <in>.map(t => <schema>).coalesce(1, true)
 	<else>
-		val <in>_storehelper = <in>.map(t => <schema>).coalesce(1, true)
+		val <in>_storehelper = <in>
 	<endif>
 	
     <func>().write("<file>", <in>_storehelper)
