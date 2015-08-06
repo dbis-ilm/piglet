@@ -101,7 +101,7 @@ object Rewriter extends LazyLogging {
     * @param sink The sink node to rewrite.
     * @return The rewritten sink node.
     */
-  def processPigOperator(sink: PigOperator): PigOperator = {
+  def processPigOperator(sink: PigOperator): Any = {
     processPigOperator(sink, ourStrategy)
   }
 
@@ -111,7 +111,7 @@ object Rewriter extends LazyLogging {
     * @param strategy The strategy to apply.
     * @return
     */
-  private def processPigOperator(sink: PigOperator, strategy: Strategy): PigOperator = {
+  private def processPigOperator(sink: PigOperator, strategy: Strategy): Any = {
     val rewriter = bottomup(attempt(strategy))
     rewrite(rewriter)(sink)
   }
@@ -125,7 +125,14 @@ object Rewriter extends LazyLogging {
 
   def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
     // This looks innocent, but this is where the rewriting happens.
-    val newSources = plan.sourceNodes.map(processPigOperator(_, strategy)).filterNot(_.isInstanceOf[Empty])
+    val newSources = plan.sourceNodes.flatMap(
+      processPigOperator(_, strategy) match {
+        case op : PigOperator => List(op)
+        case ops : Seq[PigOperator] => ops
+        case _ => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
+          "PigOperator or " +
+          "Sequence of them")
+      }).filterNot(_.isInstanceOf[Empty]).toList
 
     var newPlanNodes = mutable.LinkedHashSet[PigOperator]() ++= newSources
     var nodesToProcess = newSources.toList

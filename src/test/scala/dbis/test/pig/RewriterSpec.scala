@@ -45,7 +45,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val sourceMerged = planMerged.sourceNodes.head
 
     val rewrittenSink = processPigOperator(source)
-    rewrittenSink.outputs should equal(sourceMerged.outputs)
+    rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
 
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be(opMerged)
@@ -134,7 +134,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val source = plan.sourceNodes.head
 
     val rewrittenSource = processPigOperator(source)
-    rewrittenSource.outputs should contain only Pipe("a", op1, List(op2))
+    rewrittenSource.asInstanceOf[PigOperator].outputs should contain only Pipe("a", op1, List(op2))
   }
 
   it should "remove sink nodes that don't store a relation" in {
