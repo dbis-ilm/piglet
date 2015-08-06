@@ -58,7 +58,7 @@ case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
  * @param initialInPipeName the name of the input pipe
  * @param generator the generator (a list of expressions or a subplan)
  */
-case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator) extends PigOperator {
+case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator, var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 
@@ -364,6 +364,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
           case DerefTuple(t, r) => t match {
             case NamedField(n) => s.field(n)
             case PositionalField(p) => s.field(p)
+            case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
           }
           case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
         }
@@ -376,6 +377,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
           case DerefTuple(t, r) => r match {
             case NamedField(n) => fieldType.typeOfComponent(n)
             case PositionalField(p) => fieldType.typeOfComponent(p)
+            case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
           }
           case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
         }

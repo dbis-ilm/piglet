@@ -119,8 +119,10 @@ object PigREPL extends PigParser with LazyLogging {
     val backend = if(args.length==0) BuildSettings.backends.get("default").get("name")
                   else { 
                     args(0) match{
-                      case "flink" => "flink"
-                      case "spark" => "spark"
+                      case "flink"  => "flink"
+                      case "flinks" => "flinks"
+                      case "spark"  => "spark"
+                      case "sparks" => "sparks"
                       case _ => throw new Exception("Unknown Backend $_")
                     }
                   }

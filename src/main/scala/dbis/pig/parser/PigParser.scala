@@ -25,8 +25,8 @@ import java.net.URI
 
 import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.input.CharSequenceReader
-
-import java.net.URI
+import scala.language.implicitConversions
+import scala.language.postfixOps
 
 /**
  * An enumeration type representing the various language sets
@@ -284,7 +284,7 @@ class PigParser extends JavaTokenParsers {
 
   def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
     case b ~ _ ~ _ ~ f ~ u ~ s => 
-      val uri = new URI(f)
+      val uri = new java.io.File(f).getAbsoluteFile().toURI()
       u match {
         case Some(p) => new Load(Pipe(b), uri, s, p._1, if (p._2.isEmpty) null else p._2)
         case None => new Load(Pipe(b), uri, s)
@@ -300,7 +300,9 @@ class PigParser extends JavaTokenParsers {
    */
 
   def rdfLoadStmt: Parser[PigOperator] = bag ~ "=" ~ rdfLoadKeyword ~ "(" ~ fileName ~ ")" ~ (groupedOnClause?) ^^ {
-    case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped => new RDFLoad(Pipe(b), new URI(filename), grouped)
+    case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped => 
+      val uri = new java.io.File(filename).getAbsoluteFile().toURI()
+      new RDFLoad(Pipe(b), uri, grouped)
   }
 
   /*
@@ -313,9 +315,10 @@ class PigParser extends JavaTokenParsers {
    */
   def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ~ (usingClause?) ^^ { 
     case _ ~ b ~  _ ~ f ~ u => 
+      val uri = new java.io.File(f).getAbsoluteFile().toURI()
       u match {
-        case Some(p) => new Store(Pipe(b), new URI(f), p._1, if(p._2.isEmpty) null else p._2)
-        case None => new Store(Pipe(b), new URI(f))
+        case Some(p) => new Store(Pipe(b), uri, p._1, if(p._2.isEmpty) null else p._2)
+        case None => new Store(Pipe(b), uri)
       }
   }
 
@@ -380,7 +383,7 @@ class PigParser extends JavaTokenParsers {
   /*
    * <A> = DISTINCT <B>
    */
-  def distinctStmt: Parser[PigOperator] = bag ~ "=" ~ distinctKeyword ~ bag ^^ { case out ~ _ ~ _ ~ in => new Distinct(Pipe(out), Pipe(in)) }
+  def distinctStmt: Parser[PigOperator] = bag ~ "=" ~ distinctKeyword ~ bag ^^ { case out ~ _ ~ _ ~ in => new Distinct(Pipe(out), Pipe(in), false) }
 
   /*
    * <A> = LIMIT <B> <Num>
@@ -393,7 +396,7 @@ class PigParser extends JavaTokenParsers {
    * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE ROWS <Num>
    * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE RANGE <Num> <Unit>
    */
-  def timeUnit: Parser[String] = ("seconds".ignoreCase | "minutes".ignoreCase)
+  def timeUnit: Parser[String] = ("seconds".ignoreCase | "minutes".ignoreCase) ^^ { _.toUpperCase }
   def rangeParam: Parser[Tuple2[Int,String]] = rangeKeyword ~ num ~ timeUnit ^^ {case _ ~ n ~ u => (n,u)}
   def rowsParam: Parser[Tuple2[Int,String]] = rowsKeyword ~ num ^^ {case _ ~ n => (n, "")}
   def windowParam: Parser[Tuple2[Int,String]] = (rangeParam | rowsParam)
