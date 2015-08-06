@@ -415,7 +415,13 @@ object Rewriter extends LazyLogging {
       if (op == rem) {
         val pigOp = op.asInstanceOf[PigOperator]
         if (pigOp.inputs.isEmpty) {
-          Some(Empty(Pipe("")))
+          val consumers = pigOp.outputs.flatMap(_.consumer)
+          if (consumers.isEmpty) {
+            Some(Empty(Pipe("")))
+          }
+          else {
+            Some(consumers.toList)
+          }
         }
         else {
           val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
@@ -446,8 +452,27 @@ object Rewriter extends LazyLogging {
     * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
     */
   //noinspection ScalaDocMissingParameterDescription
-  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan =
-    processPlan(plan, removalStrategy(rem))
+  def remove(plan: DataflowPlan, rem: PigOperator, removePredecessors: Boolean = false): DataflowPlan = {
+    var strat = removalStrategy(rem)
+
+    if (removePredecessors) {
+      var nodes = Set[PigOperator]()
+      var nodesToProcess = rem.inputs.map(_.producer).toSet
+
+      while (nodesToProcess.nonEmpty) {
+        val iter = nodesToProcess.iterator
+        nodesToProcess = Set[PigOperator]()
+        for (node <- iter) {
+          nodes += node
+          nodesToProcess ++= node.inputs.map(_.producer).toSet
+        }
+      }
+
+      strat = nodes.foldLeft(strat) ((s: Strategy, p: PigOperator) => ior(s, removalStrategy(p)))
+    }
+
+    processPlan(plan, strat)
+  }
 
   /** Swap the positions of `op1` and `op2` in `plan`
     *

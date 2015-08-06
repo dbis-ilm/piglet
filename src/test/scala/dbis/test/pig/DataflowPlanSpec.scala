@@ -431,6 +431,18 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     newPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op3
   }
 
+  it should "allow removing a node and its predecessors" in {
+    val op1 = Load(Pipe("a"), "blablabla.csv")
+    val spec1 = OrderBySpec(PositionalField(1), OrderByDirection.AscendingOrder)
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List(spec1))
+    val spec2 = OrderBySpec(NamedField("a"), OrderByDirection.DescendingOrder)
+    val op3 = OrderBy(Pipe("lalala"), Pipe("b"), List(spec2))
+    val op4 = Dump(Pipe("lalala"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4)).remove(op3, removePredecessors = true)
+    plan.operators should contain only(op4)
+  }
+
   it should "return an empty DataflowPlan when the last operator in the plan is removed" in {
     val op1 = Load(Pipe("a"), "file.csv")
     val plan = new DataflowPlan(List(op1))
