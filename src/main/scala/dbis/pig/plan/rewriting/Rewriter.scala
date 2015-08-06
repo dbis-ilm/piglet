@@ -330,6 +330,27 @@ object Rewriter extends LazyLogging {
 
   /** Add a new strategy for reordering two operators.
     *
+    * An additional function `f` can be supplied that performs the reordering. This is useful if the reordering can
+    * only be performed in some cases that can't be expressed by just the types.
+    *
+    * A new reordering strategy can be added to the rewriter via
+    * {{{
+    *  reorder[OrderBy, Filter](f _)
+    * }}}
+    *
+    * @param f
+    * @tparam T The type of the parent operator.
+    * @tparam T2 The type of the child operator.
+    */
+  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[Tuple2[T2, T]]):
+  Unit = {
+    val strategy = (parent: T, child: T2) =>
+      f(parent, child).map(tup => fixInputsAndOutputs(tup._2, tup._1, tup._1, tup._2))
+    addBinaryPigOperatorStrategy(strategy)
+  }
+
+  /** Add a new strategy for reordering two operators.
+    *
     * A new reordering strategy can be added to the rewriter via
     * {{{
     *  reorder[OrderBy, Filter]
