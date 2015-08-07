@@ -285,7 +285,7 @@ object Rules {
     * @return Some Filter operator, if `term` was an BGPFilter operator with only one bound variable
     */
   def F2(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(in, out, patterns) =>
+    case op @ BGPFilter(out, in, patterns) =>
       if (op.inputSchema != plainSchema) {
         return None
       }
@@ -298,15 +298,15 @@ object Rules {
       if (pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]) {
-        return Some(Filter(in, out, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+        return Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]) {
-        return Some(Filter(in, out, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+        return Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && pattern.obj.isInstanceOf[Value]) {
-        return Some(Filter(in, out, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+        return Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
       }
 
       return None
