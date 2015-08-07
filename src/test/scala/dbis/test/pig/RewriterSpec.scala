@@ -285,4 +285,55 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       }
     }
   }
+
+  it should "apply rewriting rule F3" in {
+    val patterns = Table(
+      ("Pattern"),
+      // s p o bound
+      (TriplePattern(Value("subject"), Value("predicate"), Value("object")),
+        Filter(Pipe("b"), Pipe("a"), And(
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+          And(
+            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))),
+      // s p bound
+      (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
+        Filter(Pipe("b"), Pipe("a"), And(
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))))),
+      // s o bound
+      (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
+        Filter(Pipe("b"), Pipe("a"), And(
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+          Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))),
+      // p o bound
+      (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
+        Filter(Pipe("b"), Pipe("a"), And(
+          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
+          Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))))
+
+    forAll (patterns) { (p: (TriplePattern, Filter)) =>
+      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
+      val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
+      val op3 = Dump(Pipe("b"))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
+      plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only p._2
+      plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
+    }
+
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+
+    forAll (possibleGroupers) { (g: String) =>
+      forAll(patterns) { (p: (TriplePattern, Filter)) =>
+        val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+        val op2 = Distinct(Pipe("b"), Pipe("a"))
+        val op3 = BGPFilter(Pipe("c"), Pipe("b"), List(p._1))
+        val op4 = Dump(Pipe("c"))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
+
+        val source = plan.sourceNodes.headOption.value
+        source.outputs.flatMap(_.consumer) should contain only op2
+      }
+    }
+  }
 }

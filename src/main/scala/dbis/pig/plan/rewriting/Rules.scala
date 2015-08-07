@@ -313,6 +313,45 @@ object Rules {
     case _ => None
   }
 
+  /** Applies rewriting rule F3 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+    *
+    * @param term
+    * @return Some Filter operator, if `term` was an BGPFilter operator with multiple bound variables
+    */
+  def F3(term: Any): Option[Filter] = term match {
+    case op @ BGPFilter(out, in, patterns) =>
+      if (op.inputSchema != plainSchema) {
+        return None
+      }
+
+      if (patterns.length != 1) {
+        return None
+      }
+
+      patterns.head match {
+        case TriplePattern(s@Value(_), p@Value(_), o@Value(_)) => Some(
+          Filter(out, in, And(
+            Eq(RefExpr(NamedField("subject")), RefExpr(s)),
+            And(
+              Eq(RefExpr(NamedField("predicate")), RefExpr(p)),
+              Eq(RefExpr(NamedField("object")), RefExpr(o))))))
+        case TriplePattern(s@Value(_), p@Value(_), _) => Some(
+          Filter(out, in, And(
+            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))))
+        case TriplePattern(s@Value(_), _, o@Value(_)) => Some(
+          Filter(out, in, And(
+            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+        case TriplePattern(_, p@Value(_), o@Value(_)) => Some(
+          Filter(out, in, And(
+            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+        case _ => None
+      }
+    case _ => None
+  }
+
   def registerAllRules = {
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
@@ -325,5 +364,6 @@ object Rules {
     addOperatorReplacementStrategy(L2 _)
     addStrategy(F1)
     addOperatorReplacementStrategy(F2 _)
+    addOperatorReplacementStrategy(F3 _)
   }
 }
