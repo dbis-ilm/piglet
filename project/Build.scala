@@ -1,8 +1,5 @@
 import sbt._
 import Keys._
-import sbtbuildinfo._
-import sbtbuildinfo.BuildInfoPlugin
-import sbtbuildinfo.BuildInfoKeys._
 
 object PigBuild extends AutoPlugin with Build {
 
@@ -22,11 +19,10 @@ object PigBuild extends AutoPlugin with Build {
     configs(IntegrationTest).
     settings(commonSettings: _*).
     settings(Defaults.itSettings: _*).
-    //settings(excludes(backendEnv): _*).
-    //aggregate(backendlib(backendEnv).map(a => a.project): _*).
-    //dependsOn(backendlib(backendEnv): _*)
     dependsOn(common).
-    aggregate(common, sparklib, flinklib)
+    dependsOn(sparklib % "test;it").
+    dependsOn(flinklib % "test;it"). 
+    aggregate(common, sparklib, flinklib) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -39,52 +35,14 @@ object PigBuild extends AutoPlugin with Build {
     settings(commonSettings: _*).
     dependsOn(common)
 
+    
+    
 
-  /*
-   * Values *******************************************************************
-   */
-/*
   /*
    * define the backend for the compiler: currently we support spark and flink
    */
-  val backendEnv = sys.props.getOrElse("backend", default="spark")
-
-  /*
-   * Methods ******************************************************************
-   */
-  def backendlib(backend: String): List[ClasspathDep[ProjectReference]] = backend match {
-    case "flink" => List(common, flinklib)
-    case "spark" => List(common, sparklib)
-    case _ => throw new Exception(s"Backend $backend not available")
-  }
-
-  def excludes(backend: String): Seq[sbt.Def.SettingsDefinition] = backend match{
-    case "flink" => { Seq(
-      excludeFilter in unmanagedSources :=
-      HiddenFileFilter            ||
-      "*SparkRun.scala"           ||
-      "*SparkCompile.scala"       ||
-      "*SparkCompileIt.scala"     ||
-      "*SparkCompileSpec.scala",
-      excludeFilter in unmanagedResources :=
-      HiddenFileFilter ||
-      "spark-template.stg"
-    )}
-    case "spark" =>{ Seq(
-      excludeFilter in unmanagedSources :=
-      HiddenFileFilter            ||
-      "*FlinkRun.scala"           ||
-      "*FlinkCompile.scala"       ||
-      "*FlinkCompileIt.scala"     ||
-      "*FlinkCompileSpec.scala",
-      excludeFilter in unmanagedResources :=
-      HiddenFileFilter ||
-      "flink-template.stg"
-    )}
-    case _ => throw new Exception(s"Backend $backend not available")
-  }
-  
-  */
+//  val backend = sys.props.getOrElse("backend", default="spark")
+ 
 }
 
 /*
@@ -112,7 +70,7 @@ object Dependencies {
   // Projects
   val rootDeps = Seq(
     jline,
-    scalaTest % "test,it" withSources(),
+    scalaTest % "test;it" withSources(),
     scalaParserCombinators withSources(),
     scalaCompiler,
     scopt,
@@ -121,6 +79,11 @@ object Dependencies {
     kiama,
     typesafe,
     scalaLogging,
-    log4j
+    log4j,
+    
+    sparkCore % "test;it",
+    sparkSql % "test;it",
+    
+    flinkDist % "test;it"  from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
   )
 }
