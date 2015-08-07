@@ -119,6 +119,16 @@ class SparkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for a filter with a function expression" in {
+    val op = Filter(Pipe("a"), Pipe("b"), Gt(
+        Func("aFunc", List(RefExpr(PositionalField(0)), RefExpr(PositionalField(1)))),
+        RefExpr(Value("0"))))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.filter(t => {aFunc(t(0),t(1)) > 0})")
+    assert(generatedCode == expectedCode)
+  }
+
   it should "contain code for DUMP" in {
     val op = Dump(Pipe("a"))
     val codeGenerator = new ScalaBackendGenCode(templateFile)

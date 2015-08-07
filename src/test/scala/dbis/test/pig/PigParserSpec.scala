@@ -154,6 +154,13 @@ class PigParserSpec extends FlatSpec {
         PPredicate(Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))))))))))
   }
 
+  it should "parse a filter with a function expression" in {
+    assert(parseScript("a = FILTER b BY aFunc(x, y) > 0;") ==
+      List(Filter(Pipe("a"), Pipe("b"), Gt(
+                                          Func("aFunc", List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),
+                                          RefExpr(Value("0"))))))
+  }
+
   it should "parse a simple foreach statement" in {
     assert(parseScript("a = foreach b generate x, y, z;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
