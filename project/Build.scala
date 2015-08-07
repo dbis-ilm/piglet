@@ -41,7 +41,13 @@ object PigBuild extends Build {
   /*
    * define the backend for the compiler: currently we support spark and flink
    */
-//  val backend = sys.props.getOrElse("backend", default="spark")
+  val backend = sys.props.getOrElse("backend", default="spark")
+    
+  val itTests = backend match{
+    case "flink" => Seq("dbis.test.flink.FlinkCompileIt","dbis.test.flink.FlinksCompileIt")
+    case "spark" => Seq("dbis.test.spark.SparkCompileIt")
+    case _ => println(s"Unsupported backend: $backend"); Seq.empty[String]
+  }
  
 }
 

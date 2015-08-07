@@ -15,3 +15,6 @@ test in assembly := {}
 testOptions in IntegrationTest += Tests.Argument("-oDF")
 
 // scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
+
+//excludeFilter in (IntegrationTest, unmanagedSources) := HiddenFileFilter || itExludes
+testOptions in IntegrationTest := Seq(Tests.Filter(s => {println(s); itTests.contains(s)}))
