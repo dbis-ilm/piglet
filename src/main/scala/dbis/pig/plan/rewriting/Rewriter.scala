@@ -134,9 +134,9 @@ object Rewriter extends LazyLogging {
       processPigOperator(_, strategy) match {
         case op : PigOperator => List(op)
         case ops : Seq[PigOperator] => ops
-        case _ => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
+        case e => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
           "PigOperator or " +
-          "Sequence of them")
+          "Sequence of them, namely" + e)
       }).filterNot(_.isInstanceOf[Empty]).toList
 
     var newPlanNodes = mutable.LinkedHashSet[PigOperator]() ++= newSources
