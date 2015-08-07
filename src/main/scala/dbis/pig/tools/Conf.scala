@@ -14,6 +14,8 @@ import java.nio.file.StandardCopyOption
  */
 object Conf extends LazyLogging {
   
+	val programHome = Paths.get(System.getProperty("user.home"), ".piglet")
+  
   /**
    * The path to the config file. It will resolve to $USER_HOME/.piglet/application.conf
    */
@@ -55,8 +57,6 @@ object Conf extends LazyLogging {
   
   // loads the configuration file 
   private val appconf = loadConf
-  
-  def programHome = Paths.get(System.getProperty("user.home"), ".piglet")
   
   def replHistoryFile = programHome.resolve(appconf.getString("repl.history"))  
 
