@@ -15,30 +15,28 @@
  * limitations under the License.
  */
 
-package dbis.pig.tools
+package dbis.flink
 
-import org.apache.flink.client.RemoteExecutor
-import org.apache.flink.client.program.Client
-import org.apache.flink.client.program.PackagedProgram
-import org.apache.flink.client.program.ProgramInvocationException
-import org.apache.flink.configuration.Configuration
-
-import java.io.File
+import scala.sys.process._
+import java.security._
+import org.apache.flink.client.CliFrontend
+import dbis.pig.backends.PigletBackend
+import com.typesafe.config.ConfigFactory
+import dbis.pig.backends.BackendConf
 import java.nio.file.Path
-import java.net.InetSocketAddress
+import java.io.File
+import org.apache.flink.client.program.PackagedProgram
+import org.apache.flink.configuration.Configuration
+import org.apache.flink.client.program.Client
+import org.apache.flink.client.program.ProgramInvocationException
 import java.net.URI
 import java.net.URISyntaxException
-
-import org.apache.log4j.Logger
-import org.apache.log4j.Level
+import java.net.InetSocketAddress
 
 
-class FlinkRun extends Run{
+class FlinkRun extends PigletBackend {
+  
   override def execute(master: String, className: String, jarFile: Path){
-    Logger.getLogger("org").setLevel(Level.WARN)
-    Logger.getLogger("akka").setLevel(Level.WARN)
-    Logger.getLogger("Remoting").setLevel(Level.WARN)
-
     if (master.startsWith("local") && !master.startsWith("localhost")){
 //      val cli = new CliFrontend
 //      val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))

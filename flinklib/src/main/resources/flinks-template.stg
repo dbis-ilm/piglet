@@ -23,7 +23,7 @@ begin_query(name) ::= <<<\n>
 
 // ----------------- LOAD text file -------------------------------------------
 loader(out,file,func,params) ::=<<
-    val <out> = <func>().load(env, "<file>"<params>)
+    val <out> = dbis.flink.streaming.<func>().load(env, "<file>"<params>)
 >>
 
 // ------------------ DUMP Results --------------------------------------------

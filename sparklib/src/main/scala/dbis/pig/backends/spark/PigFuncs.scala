@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.spark
+package dbis.pig.backends.spark
 
 import scala.Numeric.Implicits._
 import scala.collection.mutable.ListBuffer

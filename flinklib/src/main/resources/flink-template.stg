@@ -77,6 +77,7 @@ join(out,rel1,key1,rel2,key2) ::=<<
         .join(<r>).where(t => <key1>).equalTo(t => <k>)<\\>
         .map{ t => t._1 ++ t._2 \}<\\>
         }>
+
 >>
 
 // ------------------ UNIONs multiple streams to one --------------------------

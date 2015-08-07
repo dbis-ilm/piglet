@@ -15,13 +15,21 @@
  * limitations under the License.
  */
 
-package dbis.pig.tools
+package dbis.pig.backends
 
 import java.nio.file.Path
 
 /**
-  * Defines the interface to the backend execution.
-  */
-trait Run {
+ * Defines the interface to the backend execution.
+ */
+trait PigletBackend {
+  
+  /**
+   * Execute the job using this backend
+   * 
+   * @param master The master information (execution mode)
+   * @param className The className of the main class in the job
+   * @param jarFile The path to the jar file representing the job
+   */
   def execute(master: String, className: String, jarFile: Path): Unit
 }

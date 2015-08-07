@@ -25,15 +25,17 @@ import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.PrettyPrinter._
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.FileTools
+import dbis.pig.backends.BackendManager
+import dbis.pig.plan.MaterializationManager
+import dbis.pig.plan.rewriting.Rewriter
+
 import jline.console.ConsoleReader
+
 import scala.collection.mutable.ListBuffer
 import java.nio.file.Paths
 import jline.console.history.FileHistory
 import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
-import org.slf4j.Marker
-import dbis.pig.plan.MaterializationManager
-import dbis.pig.plan.rewriting.Rewriter
 
 sealed trait JLineEvent
 case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
@@ -42,7 +44,7 @@ case object EOF extends JLineEvent
 
 object PigREPL extends PigParser with LazyLogging {
   val consoleReader = new ConsoleReader()
-  
+
   private def unbalancedBrackets(s: String): Boolean = {
     val leftBrackets = s.count(_ == '{')
     val rightBrackets = s.count(_ == '}')
@@ -116,7 +118,7 @@ object PigREPL extends PigParser with LazyLogging {
   }
 
   def main(args: Array[String]): Unit = {
-    val backend = if(args.length==0) BuildSettings.backends.get("default").get("name")
+    val backend = if(args.length==0) Conf.defaultBackend
                   else { 
                     args(0) match{
                       case "flink"  => "flink"
@@ -182,16 +184,20 @@ object PigREPL extends PigParser with LazyLogging {
         buf ++= parseScript(s)
         var plan = new DataflowPlan(buf.toList)
         
-        val mm = new MaterializationManager
+	val mm = new MaterializationManager
         plan = processMaterializations(plan, mm)
         plan = processPlan(plan)
+
+        val jobJar = Conf.backendJar(backend)
         
-        FileTools.compileToJar(plan, "script", Paths.get("."), false, backend) match {
+        val backendConf = BackendManager.backend(backend)
+        val templateFile = backendConf.templateFile
+        
+        FileTools.compileToJar(plan, "script", Paths.get("."), false, jobJar, templateFile) match {
           case Some(jarFile) =>
-            val runner = FileTools.getRunner(backend)
+            val runner = backendConf.runnerClass
             runner.execute("local", "script", jarFile)
           
-          case None => println("failed to build jar file for job")
         }
 
         // buf.clear()

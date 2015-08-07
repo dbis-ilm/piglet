@@ -15,16 +15,40 @@
  * limitations under the License.
  */
 
-package dbis.pig.tools
+package dbis.pig.backends.spark
 
 import org.apache.spark.deploy.SparkSubmit
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
+import dbis.pig.backends.PigletBackend
+import com.typesafe.config.ConfigFactory
+import com.typesafe.config.Config
+import scala.collection.JavaConversions._
+import dbis.pig.backends.BackendConf
 import java.nio.file.Path
 
-class SparkRun extends Run{
+class SparkRun extends PigletBackend with BackendConf {
+
+  // loads the default configuration file in resources/sparkbackend.conf
+  private val appconf = ConfigFactory.load() 
+  
   override def execute(master: String, className: String, jarFile: Path) {
-        
-    SparkSubmit.main(Array("--master", master, "--class", className, jarFile.toString()))
+    SparkSubmit.main(Array("--master", master, "--class", className, jarFile.toAbsolutePath().toString()))
   }
+  
+  /**
+   * Get the name of this backend
+   * 
+   * @return Returns the name of this backend
+   */
+  override def name: String = appconf.getString("backends.spark.name")
+  
+  /**
+   * Get the path to the runner class that implements the PigletBackend interface
+   */
+  override def runnerClass: PigletBackend = {
+    this
+  } 
+  
+  override def templateFile = appconf.getString("backends.spark.template")
 }

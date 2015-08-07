@@ -23,10 +23,15 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
 import java.net.URI
+import dbis.pig.tools.Conf
+import dbis.pig.backends.BackendManager
+import com.typesafe.scalalogging.LazyLogging
 
-class FlinksCompileSpec extends FlatSpec {
+class FlinksCompileSpec extends FlatSpec with LazyLogging {
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = "src/main/resources/flinks-template.stg"
+  val templateFile = BackendManager.backend("flinks").templateFile
+  
+  logger.debug(s"template file: $templateFile")
 
   "The compiler output" should "contain the Flink header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -58,7 +63,7 @@ class FlinksCompileSpec extends FlatSpec {
     val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}")""")
+    val expectedCode = cleanString(s"""val a = dbis.flink.streaming.PigStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -67,7 +72,7 @@ class FlinksCompileSpec extends FlatSpec {
     val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
+    val expectedCode = cleanString(s"""val a = dbis.flink.streaming.PigStorage().load(env, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
@@ -76,7 +81,7 @@ class FlinksCompileSpec extends FlatSpec {
     val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
+    val expectedCode = cleanString(s"""val a = dbis.flink.streaming.RDFFileStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 

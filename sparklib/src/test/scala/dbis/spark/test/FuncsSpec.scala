@@ -17,7 +17,7 @@
 
 package dbis.spark.test
 
-import dbis.spark.PigFuncs
+import dbis.pig.backends.spark.PigFuncs
 import org.scalatest._
 
 class FuncsSpec extends FlatSpec with Matchers {

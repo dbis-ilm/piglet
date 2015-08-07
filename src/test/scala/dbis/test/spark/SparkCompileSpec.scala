@@ -24,6 +24,8 @@ import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
+import dbis.pig.backends.BackendManager
+
 import java.net.URI
 
 class SparkCompileSpec extends FlatSpec {
@@ -31,7 +33,7 @@ class SparkCompileSpec extends FlatSpec {
   
   
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = "src/main/resources/spark-template.stg"
+  val templateFile = BackendManager.backend("spark").templateFile
   "The compiler output" should "contain the Spark header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport
@@ -44,7 +46,7 @@ class SparkCompileSpec extends FlatSpec {
         |import org.apache.spark.SparkContext._
         |import org.apache.spark.SparkConf
         |import org.apache.spark.rdd._
-        |import dbis.spark._
+        |import dbis.pig.backends.spark._
         |
         |object test {
         |    def main(args: Array[String]) {
@@ -96,7 +98,6 @@ class SparkCompileSpec extends FlatSpec {
     val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
   }
@@ -134,7 +135,6 @@ class SparkCompileSpec extends FlatSpec {
     val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    
 //    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
     val expectedCode = cleanString(s"""val A_storehelper = A.map(t => tupleAToString(t)).coalesce(1, true) PigStorage().write("$file", A_storehelper)""")
     assert(generatedCode == expectedCode)

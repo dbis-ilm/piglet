@@ -31,17 +31,20 @@ import scala.io.Source
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.backends.BackendManager
 import java.nio.file.Path
 import java.nio.file.Paths
 
+
 object PigCompiler extends PigParser with LazyLogging {
+  
   case class CompilerConfig(master: String = "local",
                             input: String = "",
                             compile: Boolean = false,
                             outDir: String = ".",
                             params: Map[String,String] = Map(),
-                            backend: String = BuildSettings.backends.get("default").get("name"),
-                            updateConfig: Boolean = false)
+                            backend: String = Conf.defaultBackend,
+                            updateConfig: Boolean = false) // XXX: does this work?
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
@@ -59,7 +62,7 @@ object PigCompiler extends PigParser with LazyLogging {
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
-      opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text("update config file in $USER_HOME/.piglet") 
+      opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in ${Conf.programHome}") 
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
       arg[String]("<file>") required() action { (x, c) => c.copy(input = x) } text ("Pig file")
@@ -129,13 +132,18 @@ object PigCompiler extends PigParser with LazyLogging {
     plan = processPlan(plan)
     
     logger.debug("finished optimizations")
+    
+    
+    val backendConf = BackendManager.backend(backend)
+    val templateFile = backendConf.templateFile
+    val jarFile = Conf.backendJar(backend)
 
-    FileTools.compileToJar(plan, scriptName, outDir, compileOnly, backend) match {
+    FileTools.compileToJar(plan, scriptName, outDir, compileOnly, jarFile, templateFile) match {
       // the file was created --> execute it
       case Some(jarFile) =>  
         if (!compileOnly) {
         // 4. and finally deploy/submit          
-        val runner = FileTools.getRunner(backend)
+        val runner = backendConf.runnerClass //FileTools.getRunner(backend)
         logger.debug(s"using runner class ${runner.getClass.toString()}")
         
         logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
