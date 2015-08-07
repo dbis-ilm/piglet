@@ -101,19 +101,19 @@ case class MSign(a: ArithmeticExpr) extends ArithmeticExpr {
   override def resultType(schema: Option[Schema]): (String, PigType) = a.resultType(schema)
 }
 
-case class Add(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
+case class Add(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.DoubleType)
 }
 
-case class Minus(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
+case class Minus(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.DoubleType)
 }
 
-case class Mult(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
+case class Mult(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.DoubleType)
 }
 
-case class Div(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
+case class Div(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.DoubleType)
 }
 
