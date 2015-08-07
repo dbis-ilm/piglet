@@ -742,6 +742,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case SocketWrite(in, address, mode) => emitSocketWrite(node.inputs.head.name, address, mode)
       case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inputs.head.name,window,slide)
       case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inputs.head.name))
+      case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case Empty(_) => ""
       /*     
        case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }

@@ -32,6 +32,7 @@ case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator {
     case "rm" => true
     case "rmdir" => true
     case "ls" => true
+    case "mkdir" => true
     case _ => false
   }
 }

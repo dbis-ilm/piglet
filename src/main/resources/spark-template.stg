@@ -114,6 +114,11 @@ streamOp(out,in,op,params) ::=<<
         val <out> = <op>(sc, <in><params>)
 >>
 
+// ----------------------- FS commands ----------------------------------------
+fs(cmd,params) ::=<<
+    HDFSService.process(<cmd>, <params>)
+>>
+
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
     
