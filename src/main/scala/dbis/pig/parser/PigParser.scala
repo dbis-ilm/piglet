@@ -226,7 +226,7 @@ class PigParser extends JavaTokenParsers {
   lazy val groupedOnKeyword = "grouped on".ignoreCase
   lazy val trueKeyword = "true".ignoreCase
   lazy val falseKeyword = "false".ignoreCase
-  
+  lazy val fsKeyword = "fs".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -485,13 +485,20 @@ class PigParser extends JavaTokenParsers {
   }
 
   def materializeStmt: Parser[PigOperator] = materializeKeyword ~ bag ^^ { case _ ~ b => Materialize(Pipe(b))}
-  
+
+  /*
+   * fs -cmd params
+   */
+  def fsCmd: Parser[String] = ("""-[a-zA-Z]*""").r ^^ { s => s.substring(1) }
+  def fsParam: Parser[String] = ("""[^;][/\w\.\-]*""").r
+
+  def fsStmt: Parser[PigOperator] = fsKeyword ~ fsCmd ~ rep(fsParam) ^^ { case _ ~ cmd ~ params => HdfsCmd(cmd, params)}
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | fsStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*
