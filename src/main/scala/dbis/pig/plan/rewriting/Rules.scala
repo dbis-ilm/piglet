@@ -266,19 +266,6 @@ object Rules {
     case _ => fail
   }
 
-
-  /** The schema for plain RDF data
-    *
-    */
-  private final val plainSchema = Some(
-    Schema(
-      BagType(
-        TupleType(
-          Array(
-            Field("subject", Types.CharArrayType),
-            Field("predicate", Types.CharArrayType),
-            Field("object", Types.CharArrayType))))))
-
   /** Applies rewriting rule F2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
     *
     * @param term
@@ -286,7 +273,7 @@ object Rules {
     */
   def F2(term: Any): Option[Filter] = term match {
     case op @ BGPFilter(out, in, patterns) =>
-      if (op.inputSchema != plainSchema) {
+      if (op.inputSchema != RDFLoad.plainSchema) {
         return None
       }
 
@@ -320,7 +307,7 @@ object Rules {
     */
   def F3(term: Any): Option[Filter] = term match {
     case op @ BGPFilter(out, in, patterns) =>
-      if (op.inputSchema != plainSchema) {
+      if (op.inputSchema != RDFLoad.plainSchema) {
         return None
       }
 
