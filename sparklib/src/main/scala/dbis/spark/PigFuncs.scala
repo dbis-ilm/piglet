@@ -31,8 +31,13 @@ object PigFuncs {
 
   def max[T: Ordering](bag: Iterable[T]): T = bag.max
 
+  // STRING functions
   def tokenize(s: String, delim: String = """[, "]""") = s.split(delim)
-
+  
+  def startswith(haystack: String, prefix: String) = haystack.startsWith(prefix)
+  
+  def strlen(s: String) = s.length()
+  
   def toMap(pList: Any*): Map[String, Any] = {
     var m = Map[String, Any]()
     for (i <- 0 to pList.length-1 by 2) { m += (pList(i).toString -> pList(i+1)) }

@@ -24,7 +24,7 @@ package dbis.pig.op
  * @param initialInPipeName the name of the input pipe
  * @param pred the predicate used for filtering tuples from the input pipe
  */
-case class Filter(out: Pipe, in: Pipe, pred: Predicate) extends PigOperator {
+case class Filter(out: Pipe, in: Pipe, pred: Predicate, var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 

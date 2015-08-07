@@ -23,7 +23,7 @@ package dbis.pig.op
  * @param initialInPipeName the name of the input pipe.
  * @param num
  */
-case class Limit(out: Pipe, in: Pipe, num: Int) extends PigOperator {
+case class Limit(out: Pipe, in: Pipe, num: Int, var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 

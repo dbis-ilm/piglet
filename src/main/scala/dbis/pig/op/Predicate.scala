@@ -21,6 +21,7 @@ import dbis.pig.schema.{Types, PigType, Schema}
 trait Predicate extends Expr
 
 case class Eq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
+  
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =

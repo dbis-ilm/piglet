@@ -16,6 +16,8 @@
  */
 package dbis.test.flink
 
+import dbis.test.TestTools._
+
 import dbis.pig.PigCompiler._
 import dbis.pig.codegen.ScalaBackendGenCode
 import dbis.pig.op._
@@ -34,13 +36,12 @@ class FlinkCompileSpec extends FlatSpec {
       + codeGenerator.emitHeader2("test") 
       + codeGenerator.emitFooter)
     val expectedCode = cleanString("""
-      |import org.apache.flink.streaming.api.scala._
+      |import org.apache.flink.api.scala._
       |import dbis.flink._
-      |import java.util.concurrent.TimeUnit
       |
       |object test {
       |    def main(args: Array[String]) {
-      |        val env = StreamExecutionEnvironment.getExecutionEnvironment
+      |        val env = ExecutionEnvironment.getExecutionEnvironment
       |        env.execute("Starting Query")
       |    }
       |}
@@ -49,28 +50,35 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD" in {
-    val op = Load(Pipe("a"), "file.csv")
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
+    val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", '\\t')""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val op = Load(Pipe("a"), "file.csv", None, "PigStorage", List("""','"""))
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
+    val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
+        val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with RDFFileStorage" in {
-    val op = Load(Pipe("a"), "file.n3", None, "RDFFileStorage")
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    
+    val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
@@ -92,11 +100,11 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for STORE" in {
-    val op = Store(Pipe("A"), "file.csv")
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
-    val expectedCode = cleanString(s"""A.map(_.mkString(",")).writeAsText("${file}")""")
+    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -104,7 +112,7 @@ class FlinkCompileSpec extends FlatSpec {
     val op = Distinct(Pipe("a"), Pipe("b"))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b")
+    val expectedCode = cleanString("val a = b.distinct(t => t(0))")
     assert(generatedCode == expectedCode)
   }
 
@@ -112,7 +120,7 @@ class FlinkCompileSpec extends FlatSpec {
     val op = Limit(Pipe("a"), Pipe("b"), 10)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b.window(Count.of(10)).every(Time.of(5, TimeUnit.SECONDS))")
+    val expectedCode = cleanString("val a = b.first(10)")
     assert(generatedCode == expectedCode)
   }
 
@@ -197,7 +205,7 @@ class FlinkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
+        |val a = b.join(c).where(t => t(0)).equalTo(t => t(0)).map{
         |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
@@ -215,7 +223,7 @@ class FlinkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => Array(t(0),t(1)).mkString).equalTo(t => Array(t(1),t(2)).mkString).map{
+        |val a = b.join(c).where(t => Array(t(0),t(1)).mkString).equalTo(t => Array(t(1),t(2)).mkString).map{
         |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
@@ -234,9 +242,9 @@ class FlinkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{ 
+      |val a = b.join(c).where(t => t(0)).equalTo(t => t(0)).map{ 
         |t => t._1 ++ t._2
-        |}.join(d).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
+        |}.join(d).where(t => t(0)).equalTo(t => t(0)).map{
         |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
@@ -261,39 +269,6 @@ class FlinkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.groupBy(t => t(0))")
-    assert(generatedCode == expectedCode)
-  }
-
-
-  it should "contain code for SOCKET_READ" in {
-    val op = SocketRead(Pipe("a"), SocketAddress("", "localhost", "9999"), "")
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStream().connect(env, "localhost", 9999, '\t')""")
-    assert(generatedCode == expectedCode)
-  }
-
-  it should "contain code for SOCKET_READ with PigStream" in {
-    val op = SocketRead(Pipe("a"), SocketAddress("", "localhost", "9999"), "", None, "PigStream", List("""','"""))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = PigStream().connect(env, "localhost", 9999, ',')""")
-    assert(generatedCode == expectedCode)
-  }
-
-  it should "contain code for SOCKET_READ with RDFStream" in {
-    val op = SocketRead(Pipe("a"), SocketAddress("", "localhost", "9999"), "", None, "RDFStream")
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = RDFStream().connect(env, "localhost", 9999)""")
-    assert(generatedCode == expectedCode)
-  }
-
-  it should "contain code for SOCKET_READ in ZMQ mode" in {
-    val op = SocketRead(Pipe("a"), SocketAddress("tcp://", "localhost", "9999"), "zmq")
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStream().zmqSubscribe(env, "tcp://localhost:9999", '\t')""")
     assert(generatedCode == expectedCode)
   }
 

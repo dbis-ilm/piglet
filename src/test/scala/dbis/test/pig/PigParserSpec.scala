@@ -17,6 +17,10 @@
 
 package dbis.test.pig
 
+import java.net.URI
+
+import dbis.test.TestTools._
+
 import dbis.pig._
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
@@ -26,63 +30,73 @@ import org.scalatest.FlatSpec
 
 class PigParserSpec extends FlatSpec {
   "The parser" should "parse a simple load statement" in  {
-    assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), "file.csv")))
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
+    assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), s"${uri}")))
   }
 
   it should "parse also a case insensitive load statement" in  {
-    assert(parseScript("""a = LOAD 'file.csv';""") == List(Load(Pipe("a"), "file.csv")))
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
+    assert(parseScript("""a = LOAD 'file.csv';""") == List(Load(Pipe("a"), s"${uri}")))
   }
 
   it should "parse also a load statement with a path" in  {
-    assert(parseScript("""a = LOAD 'dir1/dir2/file.csv';""") == List(Load(Pipe("a"), "dir1/dir2/file.csv")))
+    val uri = new java.io.File("dir1/dir2/file.csv").getAbsoluteFile().toURI()
+    assert(parseScript("""a = LOAD 'dir1/dir2/file.csv';""") == List(Load(Pipe("a"), s"${uri}")))
   }
 
   it should "parse also a load statement with the using clause" in  {
+    val uri1 = new java.io.File("file.data").getAbsoluteFile().toURI()
+    val uri2 = new java.io.File("file.n3").getAbsoluteFile().toURI()
     assert(parseScript("""a = LOAD 'file.data' using PigStorage(',');""") ==
-      List(Load(Pipe("a"), "file.data", None, "PigStorage", List("""','"""))))
+      List(Load(Pipe("a"), s"${uri1}", None, "PigStorage", List("""','"""))))
     assert(parseScript("""a = LOAD 'file.n3' using RDFFileStorage();""") ==
-      List(Load(Pipe("a"), "file.n3", None, "RDFFileStorage")))
+      List(Load(Pipe("a"), s"${uri2}", None, "RDFFileStorage")))
   }
 
   it should "parse a load statement with typed schema specification" in {
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
                                                 Field("b", Types.CharArrayType),
                                                 Field("c", Types.DoubleType))))
     assert(parseScript("""a = load 'file.csv' as (a:int, b:chararray, c:double); """) ==
-      List(Load(Pipe("a"), "file.csv", Some(Schema(schema)))))
+      List(Load(Pipe("a"), s"${uri}", Some(Schema(schema)))))
   }
 
   it should "parse a load statement with complex typed schema specification" in {
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
       Field("t", TupleType(Array(Field("f1", Types.IntType), Field("f2", Types.IntType)))),
       Field("b", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType)), "t2"))))))
     assert(parseScript("""a = load 'file.csv' as (a:int, t:tuple(f1: int, f2:int), b:{t2:tuple(f3:double, f4:double)}); """) ==
-      List(Load(Pipe("a"), "file.csv", Some(Schema(schema)))))
+      List(Load(Pipe("a"), s"${uri}", Some(Schema(schema)))))
   }
 
   it should "parse another load statement with complex typed schema specification" in {
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
       Field("m1", MapType(Types.CharArrayType)),
       Field("m2", MapType(TupleType(Array(Field("f1", Types.IntType), Field("f2", Types.IntType))))),
       Field("m3", MapType(Types.ByteArrayType)))))
     assert(parseScript("""a = load 'file.csv' as (a:int, m1:map[chararray], m2:[(f1: int, f2:int)], m3:[]); """) ==
-      List(Load(Pipe("a"), "file.csv", Some(Schema(schema)))))
+      List(Load(Pipe("a"), s"${uri}", Some(Schema(schema)))))
   }
 
   it should "parse a load statement with typed schema specification and using clause" in {
+    val uri = new java.io.File("file.data").getAbsoluteFile().toURI()
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
       Field("b", Types.CharArrayType),
       Field("c", Types.DoubleType))))
     assert(parseScript("""a = load 'file.data' using PigStorage() as (a:int, b:chararray, c:double); """) ==
-      List(Load(Pipe("a"), "file.data", Some(Schema(schema)), "PigStorage")))
+      List(Load(Pipe("a"), s"${uri}", Some(Schema(schema)), "PigStorage")))
   }
 
   it should "parse a load statement with untyped schema specification" in {
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     val schema = BagType(TupleType(Array(Field("a", Types.ByteArrayType),
       Field("b", Types.ByteArrayType),
       Field("c", Types.ByteArrayType))))
     assert(parseScript("""a = load 'file.csv' as (a, b, c); """) ==
-      List(Load(Pipe("a"), "file.csv", Some(Schema(schema)))))
+      List(Load(Pipe("a"), s"${uri}", Some(Schema(schema)))))
   }
 
   it should "ignore comments" in {
@@ -102,7 +116,8 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse the store statement" in {
-    assert(parseScript("""store b into 'file.csv';""") == List(Store(Pipe("b"), "file.csv")))
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
+    assert(parseScript("""store b into 'file.csv';""") == List(Store(Pipe("b"), s"${uri}")))
   }
 
   it should "parse a simple filter with a eq expression on named fields" in {
@@ -137,6 +152,13 @@ class PigParserSpec extends FlatSpec {
       List(Filter(Pipe("a"), Pipe("b"), And(Gt(RefExpr(NamedField("x")), RefExpr(Value("0"))),
       PPredicate(Or(Lt(RefExpr(NamedField("y")), RefExpr(Value("0"))),
         PPredicate(Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))))))))))
+  }
+
+  it should "parse a filter with a function expression" in {
+    assert(parseScript("a = FILTER b BY aFunc(x, y) > 0;") ==
+      List(Filter(Pipe("a"), Pipe("b"), Gt(
+                                          Func("aFunc", List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),
+                                          RefExpr(Value("0"))))))
   }
 
   it should "parse a simple foreach statement" in {
@@ -261,12 +283,14 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a list of statements" in {
-    assert(parseScript("a = load 'file.csv';\ndump b;") == List(Load(Pipe("a"), "file.csv"), Dump(Pipe("b"))))
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
+    assert(parseScript("a = load 'file.csv';\ndump b;") == List(Load(Pipe("a"), s"${uri}"), Dump(Pipe("b"))))
   }
 
   it should "parse a list of statements while ignoring comments" in {
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     assert(parseScript("-- A comment\na = load 'file.csv';-- Another comment\ndump b;") ==
-      List(Load(Pipe("a"), "file.csv"), Dump(Pipe("b"))))
+      List(Load(Pipe("a"), s"${uri}"), Dump(Pipe("b"))))
   }
 
   it should "parse a describe statement" in {
@@ -317,14 +341,14 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse expressions with deref operators for map" in {
     assert(parseScript("""a = foreach b generate m1#"k1", m1#"k2";""") ==
-      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), """"k1""""))),
-        GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), """"k2""""))))))))
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), "\"k1\""))),
+        GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), "\"k2\""))))))))
   }
 
   it should "parse expressions with deref operators on positional fields for map" in {
     assert(parseScript("""a = foreach b generate $0#"k1", $1#"k2";""") ==
-      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), """"k1""""))),
-        GeneratorExpr(RefExpr(DerefMap(PositionalField(1), """"k2""""))))))))
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
+        GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\""))))))))
   }
 
   it should "parse expressions with deref operators for tuple and bag" in {
@@ -433,8 +457,8 @@ class PigParserSpec extends FlatSpec {
   }
  
   it should "parse a window statement using Range for window and slider" in {
-    assert(parseScript("a = window b range 100 seconds slide range 10 seconds;", LanguageFeature.StreamingPig)
-      == List(Window(Pipe("a"), Pipe("b"), (100,"seconds"), (10,"seconds"))))
+    assert(parseScript("a = window b range 100 SECONDS slide range 10 SECONDS;", LanguageFeature.StreamingPig)
+      == List(Window(Pipe("a"), Pipe("b"), (100,"SECONDS"), (10,"SECONDS"))))
   }
 
   it should "parse a SPLIT INTO statement" in {
@@ -458,14 +482,174 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse BGP_FILTER in SparqlPig" in {
-    assert(parseScript("""a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
+    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
       List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\""))))))
   }
 
   it should "parse BGP_FILTER with a complex pattern" in {
-    assert(parseScript("""a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""",
+    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""",
       LanguageFeature.SparqlPig) ==
-    List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
-      TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
+      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
+        TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
+  }
+
+  it should "parse RDFLoad operators for plain triples" in {
+    val uri = new java.io.File("rdftest.rdf").getAbsoluteFile().toURI()
+    val ungrouped = parseScript( """a = RDFLoad('rdftest.rdf');""", LanguageFeature.SparqlPig)
+    assert(ungrouped == List(RDFLoad(Pipe("a"), s"${uri}", None)))
+    assert(ungrouped.head.schema == Some(Schema(BagType(TupleType(Array(
+      Field("subject", Types.CharArrayType),
+      Field("predicate", Types.CharArrayType),
+      Field("object", Types.CharArrayType)))))))
+  }
+
+  it should "parse RDFLoad operators for triple groups" in {
+    val uri = new java.io.File("rdftest.rdf").getAbsoluteFile().toURI()
+    val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on subject;""", LanguageFeature.SparqlPig)
+    val grouped_on_pred = parseScript( """a = RDFLoad('rdftest.rdf') grouped on predicate;""", LanguageFeature.SparqlPig)
+    val grouped_on_obj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on object;""", LanguageFeature.SparqlPig)
+    assert(grouped_on_subj == List(RDFLoad(Pipe("a"), s"${uri}", Some("subject"))))
+    assert(grouped_on_pred == List(RDFLoad(Pipe("a"), s"${uri}", Some("predicate"))))
+    assert(grouped_on_obj == List(RDFLoad(Pipe("a"), s"${uri}", Some("object"))))
+
+    val grouped_on_subj_schema = Some(
+      Schema(
+        BagType(
+          TupleType(
+            Array(
+              Field("subject", Types.CharArrayType),
+              Field("stmts",
+                BagType(
+                  TupleType(
+                    Array(
+                      Field("predicate", Types.CharArrayType),
+                      Field("object", Types.CharArrayType))))))))))
+    assert(grouped_on_subj.head.schema == grouped_on_subj_schema)
+
+    val grouped_on_pred_schema = Some(
+      Schema(
+        BagType(
+          TupleType(
+            Array(
+              Field("predicate", Types.CharArrayType),
+              Field("stmts",
+                BagType(
+                  TupleType(
+                    Array(
+                      Field("subject", Types.CharArrayType),
+                      Field("object", Types.CharArrayType))))))))))
+    assert(grouped_on_pred.head.schema == grouped_on_pred_schema)
+
+    val grouped_on_obj_schema = Some(
+      Schema(
+        BagType(
+          TupleType(
+            Array(
+              Field("object", Types.CharArrayType),
+              Field("stmts",
+                BagType(
+                  TupleType(
+                    Array(
+                      Field("subject", Types.CharArrayType),
+                      Field("predicate", Types.CharArrayType))))))))))
+    assert(grouped_on_obj.head.schema == grouped_on_obj_schema)
+  }
+
+  it should "parse a matcher  statement using only mode" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_next_match;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (0, "SECONDS"))))
+  }
+
+  it should "parse a matcher  statement using skip_till_any_match mode" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_any_match;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_any_match",
+        (0, "SECONDS"))))
+  }
+
+  it should "parse a matcher  statement using only window" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (30, "SECONDS"))))
+  }
+
+  it should "parse a matcher  statement using a simple event" in {
+    assert(parseScript("a = Matcher b PATTERN A EVENTS (A = x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SimplePattern("A"),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (30, "SECONDS"))))
+  }
+  it should "parse a matcher  statement using a sequence and  three events" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, B, C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), SimplePattern("B"), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (30, "SECONDS"))))
+  }
+  it should "parse a matcher  statement using a sequence event with negation" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        "skip_till_next_match",
+        (30, "SECONDS"))))
+  }
+
+  it should "parse a matcher  statement using more simple event definitions" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0, C = x == 1) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
+          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))))),
+        "skip_till_next_match",
+        (30, "SECONDS"))))
+  }
+  it should "parse a matcher  statement using composite sequence pattern" in {
+    assert(parseScript("a = Matcher b PATTERN seq (A, seq(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        SeqPattern(List(SimplePattern("A"),
+          SeqPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
+          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
+          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
+        "skip_till_next_match",
+        (30, "SECONDS"))))
+  }
+
+  it should "parse a matcher  statement using conjunction and disjunction" in {
+    assert(parseScript("a = Matcher b PATTERN conj (A, disj(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+      == List(Matcher(Pipe("a"), Pipe("b"),
+        ConjPattern(List(SimplePattern("A"),
+          DisjPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
+          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
+          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
+        "skip_till_next_match",
+        (30, "SECONDS"))))
+  }
+
+  it should "parse HDFS commands" in {
+    assert(parseScript("fs -copyToRemote /usr/local/file /hdfs/data/file;")
+      == List(HdfsCmd("copyToRemote", List("/usr/local/file", "/hdfs/data/file"))))
+    assert(parseScript("fs -copyFromLocal /hdfs/data/file /usr/local/file;")
+      == List(HdfsCmd("copyFromLocal", List("/hdfs/data/file", "/usr/local/file"))))
+    assert(parseScript("fs -rmdir /hdfs/data;")
+      == List(HdfsCmd("rmdir", List("/hdfs/data"))))
+
+    intercept[java.lang.IllegalArgumentException] {
+      parseScript("fs -unknownCmd something;")
+    }
   }
 }

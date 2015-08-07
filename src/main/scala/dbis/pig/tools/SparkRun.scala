@@ -20,12 +20,11 @@ package dbis.pig.tools
 import org.apache.spark.deploy.SparkSubmit
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
+import java.nio.file.Path
 
 class SparkRun extends Run{
-  override def execute(master: String, className: String, jarFile: String) {
-    Logger.getLogger("org").setLevel(Level.WARN)
-    Logger.getLogger("akka").setLevel(Level.WARN)
-    Logger.getLogger("Remoting").setLevel(Level.WARN)
-    SparkSubmit.main(Array("--master", master, "--class", className, jarFile))
+  override def execute(master: String, className: String, jarFile: Path) {
+        
+    SparkSubmit.main(Array("--master", master, "--class", className, jarFile.toString()))
   }
 }

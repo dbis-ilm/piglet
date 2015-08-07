@@ -25,11 +25,16 @@ import scala.io.Source
 
 class FlinkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
-    ("script", "result", "truth"), // only the header of the table
-    ("load.pig", "result1.out", "result1.data"),
-    ("load2.pig", "result2.out", "result2.data"),
-    ("selfjoin.pig", "joined.out", "joined.data")
- //  ,("foreach1.pig", "distances.out", "distances.data")
+    ("script", "result", "truth", "inOrder"), // only the header of the table
+    ("load.pig", "result1.out", "result1.data", true),
+    ("load2.pig", "result2.out", "result2.data", true),
+    ("selfjoin.pig", "joined.out", "joined.data", false),
+//    ("sort.pig", "sorted.out", "sorted.data", true),
+    ("foreach1.pig", "distances.out", "distances.data", true),
+//    ("nforeach.pig", "nested.out", "nested.data", true),
+//    ("grouping.pig", "grouping.out", "grouping.data", false),
+//    ("wordcount.pig", "marycounts.out", "marycount.data", false),
+    ("construct.pig", "result3.out", "result3.data", true)
   )
 
   def cleanupResult(dir: String): Unit = {
@@ -45,16 +50,15 @@ class FlinkCompileIt extends FlatSpec with Matchers {
   }
 
   "The Pig compiler" should "compile and execute the script" in {
-    forAll(scripts) { (script: String, resultDir: String, truthFile: String) =>
-      val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
-      // 1. make sure the output directory is empty
-      cleanupResult(resultPath.path)
-      cleanupResult(script.replace(".pig",""))
+    forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean) =>
+    val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
+    // 1. make sure the output directory is empty
+    cleanupResult(resultPath.path)
+    cleanupResult(script.replace(".pig",""))
 
-      // 2. compile and execute Pig script
-      val resourcePath = getClass.getResource("").getPath + "../../../"
+    // 2. compile and execute Pig script
+    val resourcePath = getClass.getResource("").getPath + "../../../"
       println("execute: " + script)
-      //println("resultPath: " + resultPath.path)
       PigCompiler.main(Array("--backend", "flink", "--outdir", resultPath.parent.get.path, resourcePath + script))
 
       // 3. load the output file[s] and the truth file
@@ -64,10 +68,13 @@ class FlinkCompileIt extends FlatSpec with Matchers {
         result ++= Source.fromFile(resultFile).getLines
       else 
         for (file <- resultFile.listFiles) 
-          result++=Source.fromFile(file).getLines
+        result++=Source.fromFile(file).getLines
       val truth = Source.fromFile(resourcePath + truthFile).getLines
       // 4. compare both files
-      result.toSeq should contain theSameElementsAs (truth.toTraversable)
+      if (inOrder)
+        result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
+      else
+        result.toSeq should contain theSameElementsAs (truth.toTraversable)
 
       // 5. delete the output directory
       cleanupResult(resultPath.path)
