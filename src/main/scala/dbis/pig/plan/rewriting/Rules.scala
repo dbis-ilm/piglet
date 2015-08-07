@@ -205,7 +205,7 @@ object Rules {
     * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
     */
   //noinspection ScalaDocMissingParameterDescription
-  def R1(term: Any): Option[PigOperator] = term match {
+  def R1(term: Any): Option[Load] = term match {
     case op@RDFLoad(p, uri, None) =>
       if (uri.getScheme == "http" || uri.getScheme == "https") {
         Some(Load(p, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
@@ -222,7 +222,7 @@ object Rules {
     * @return
     */
   //noinspection ScalaDocMissingParameterDescription
-  def R2(parent: RDFLoad, child: BGPFilter): Option[PigOperator] = {
+  def R2(parent: RDFLoad, child: BGPFilter): Option[Load] = {
     Some(Load(child.out, parent.uri, parent.schema, "pig.SPARQLLoader",
       List(child.patterns.head.toString))
     )
@@ -234,7 +234,7 @@ object Rules {
     * @return Some Load operator, if `term` was an RDFLoad operator loading a resource from hdfs
     */
   //noinspection ScalaDocMissingParameterDescription
-  def L2(term: Any): Option[PigOperator] = term match {
+  def L2(term: Any): Option[Load] = term match {
     case op@RDFLoad(p, uri, grouped : Some[String]) =>
       if (uri.getScheme == "hdfs") {
         Some(Load(p, uri, op.schema, "BinStorage"))
