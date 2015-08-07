@@ -280,8 +280,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
         val op4 = Dump(Pipe("c"))
         val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
 
-        val source = plan.sourceNodes.headOption.value
-        source.outputs.flatMap(_.consumer) should contain only op2
+        plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
       }
     }
   }
@@ -331,8 +330,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
         val op4 = Dump(Pipe("c"))
         val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
 
-        val source = plan.sourceNodes.headOption.value
-        source.outputs.flatMap(_.consumer) should contain only op2
+        plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
       }
     }
   }
