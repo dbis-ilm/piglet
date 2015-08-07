@@ -303,9 +303,9 @@ object Rules {
     addStrategy(buildBinaryPigOperatorStrategy(filterBeforeJoin))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
-    addStrategy(R1 _)
-    addStrategy(L2 _)
+    addOperatorReplacementStrategy(R1 _)
+    addOperatorReplacementStrategy(L2 _)
     addStrategy(F1)
-    addStrategy(F2 _)
+    addOperatorReplacementStrategy(F2 _)
   }
 }

@@ -60,6 +60,9 @@ case class RewriterException(msg:String)  extends Exception(msg)
   *
   *  - [[addStrategy]] for easily adding any method with a signature of `Any => Option[PigOperator]` as a strategy
   *
+  *  - [[addOperatorReplacementStrategy]] is similar to [[addStrategy]] but has some special behaviour that's useful
+  *    when all the function passed to it does is replacing one operator with another one.
+  *
   *  - [[merge]] for merging two operators
   *
   *  - [[reorder]] for reordering two operators
@@ -98,7 +101,44 @@ object Rewriter extends LazyLogging {
     ourStrategy = ior(ourStrategy, s)
   }
 
+  /** Adds a function `f` as a [[org.kiama.rewriting.Strategy]] to this object.
+    *
+    * If you're only intending to replace a single PigOperator with another one, use
+    * [[addOperatorReplacementStrategy]] instead.
+    *
+    * @param f
+    */
+  //noinspection ScalaDocMissingParameterDescription
   def addStrategy(f: Any => Option[PigOperator]): Unit = addStrategy(strategyf(t => f(t)))
+
+  /** Adds a function `f` that replaces a single [[PigOperator]] with another one as a [[org.kiama.rewriting.Strategy]]
+    *  to this object.
+    *
+    * If applying `f` to a term succeeded (Some(_)) was returned, the input term will be replaced by the new term in
+    * the input pipes of the new terms successors (the consumers of its output pipes).
+    *
+    * @param f
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  def addOperatorReplacementStrategy(f: Any => Option[PigOperator]): Unit = {
+    val strat = (t: Any) => f(t) map { op: PigOperator =>
+      op.outputs foreach { output =>
+        output.consumer foreach { consumer =>
+          consumer.inputs foreach { input =>
+            // If `t` (the old term) is the producer of any of the input pipes of `op` (the new terms) successors,
+            // replace it with `op` in that attribute. Replacing `t` with `op` in the pipes on `op` itself is not
+            // necessary because the setters of `inputs` and `outputs` do that.
+            if (input.producer == t) {
+              input.producer = op
+            }
+          }
+        }
+      }
+      op
+    }
+
+    addStrategy(strategyf(t => strat(t)))
+  }
 
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
     * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
@@ -214,6 +254,7 @@ object Rewriter extends LazyLogging {
     * @tparam T The type of the parent operator.
     * @tparam T2 The type of the child operator.
     */
+  //noinspection ScalaDocMissingParameterDescription
   def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[Tuple2[T2, T]]):
   Unit = {
     val strategy = (parent: T, child: T2) =>
