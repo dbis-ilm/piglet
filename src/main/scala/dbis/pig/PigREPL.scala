@@ -24,12 +24,11 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.PrettyPrinter._
 import dbis.pig.schema.SchemaException
-import dbis.pig.tools.FileTools
+import dbis.pig.tools.{HDFSService, FileTools, Conf}
 import jline.console.ConsoleReader
 import scala.collection.mutable.ListBuffer
 import java.nio.file.Paths
 import jline.console.history.FileHistory
-import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
 import org.slf4j.Marker
 import dbis.pig.plan.MaterializationManager
@@ -50,9 +49,27 @@ object PigREPL extends PigParser with LazyLogging {
   }
 
   private def isCommand(s: String): Boolean = {
-    val cmdList = List("help", "describe", "dump", "prettyprint", "rewrite", "quit")
+    val cmdList = List("help", "describe", "dump", "prettyprint", "rewrite", "quit", "fs")
     val line = s.toLowerCase
     cmdList.exists(cmd => line.startsWith(cmd))
+  }
+
+  private def processFsCmd(s: String): Boolean = {
+    val sList = s.split(" ")
+    val cmdList = sList.slice(1, sList.length)
+    if (cmdList.head.startsWith("-")) {
+      val paramList =
+        if (cmdList.length == 1)
+          List()
+        else {
+          val last = cmdList.last
+          cmdList.slice(1, cmdList.length - 1).toList ::: List(if (last.endsWith(";")) last.substring(0, last.length - 1) else last)
+        }
+      HDFSService.process(cmdList.head.substring(1), paramList)
+    }
+    else
+      println(s"invalid fs command '${cmdList.head}'")
+    false
   }
 
   def console(handler: JLineEvent => Boolean) {
@@ -107,8 +124,8 @@ object PigREPL extends PigParser with LazyLogging {
         |Diagnostic commands:
         |    describe <alias> - Show the schema for the alias.
         |    dump <alias> - Compute the alias and writes the results to stdout.
-        |    prettyprint - Prints the dataflowplans operator list
-        |    rewrite - Rewrites the current DataflowPlan
+        |    prettyprint - Prints the dataflow plan operator list.
+        |    rewrite - Rewrites the current dataflow plan.
         |Utility Commands:
         |    help - Display this message.
         |    quit - Quit the Pig shell.
@@ -178,7 +195,9 @@ object PigREPL extends PigParser with LazyLogging {
         
         false
       }
-      case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") || s.toLowerCase.startsWith(s"socket_write "))=> {
+      case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") ||
+                            s.toLowerCase().startsWith(s"store ") ||
+                            s.toLowerCase.startsWith(s"socket_write "))=> {
         buf ++= parseScript(s)
         var plan = new DataflowPlan(buf.toList)
         
@@ -196,6 +215,11 @@ object PigREPL extends PigParser with LazyLogging {
 
         // buf.clear()
         false
+      }
+      case Line(s, buf) if (s.toLowerCase().startsWith(s"fs ")) => {
+        // TODO: handle fs command directly
+        println("fs ---> " + s)
+        processFsCmd(s)
       }
       case Line(s, buf) => try {
         buf ++= parseScript(s);
