@@ -22,6 +22,15 @@ object HDFSService {
 
   def isInitialized: Boolean = fileSystem.isInstanceOf[DistributedFileSystem]
 
+  def process(cmd: String, params: List[String]): Unit = cmd match {
+    case "copyToLocal" => copyToLocal(params(0), params(1))
+    case "copyToRemote" => copyToRemote(params(0), params(1))
+    case "rm" => if (params.head == "-r") removeDirectory(params(1), true) else removeFile(params.head)
+    case "rmdir" => removeDirectory(params.head)
+    case "mkdir" => createDirectory(params.head)
+    case _ => throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
+  }
+
   def copyToLocal(fromName: String, toName: String): Boolean = {
     val fromPath = new Path(fromName)
     val toPath = new Path(toName)
