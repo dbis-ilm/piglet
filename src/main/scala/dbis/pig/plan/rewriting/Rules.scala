@@ -18,6 +18,7 @@ package dbis.pig.plan.rewriting
 
 import dbis.pig.op._
 import dbis.pig.plan.rewriting.Rewriter._
+import dbis.pig.schema._
 import org.kiama.rewriting.Rewriter._
 
 
@@ -265,6 +266,19 @@ object Rules {
     case _ => fail
   }
 
+
+  /** The schema for plain RDF data
+    *
+    */
+  private final val plainSchema = Some(
+    Schema(
+      BagType(
+        TupleType(
+          Array(
+            Field("subject", Types.CharArrayType),
+            Field("predicate", Types.CharArrayType),
+            Field("object", Types.CharArrayType))))))
+
   /** Applies rewriting rule F2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
     *
     * @param term
@@ -272,6 +286,10 @@ object Rules {
     */
   def F2(term: Any): Option[Filter] = term match {
     case op @ BGPFilter(in, out, patterns) =>
+      if (op.inputSchema != plainSchema) {
+        return None
+      }
+
       if (patterns.length != 1) {
         return None
       }

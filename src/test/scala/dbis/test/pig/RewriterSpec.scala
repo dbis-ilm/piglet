@@ -18,14 +18,12 @@ package dbis.test.pig
 
 import java.net.URI
 
-import dbis.pig.schema.{Schema, TupleType, BagType}
-import dbis.test.TestTools._
-
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.schema._
+import dbis.pig.schema.{BagType, Schema, TupleType, _}
+import dbis.test.TestTools._
 import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FlatSpec, Matchers}
@@ -268,8 +266,23 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
       val op3 = Dump(Pipe("b"))
       val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
-      val source = plan.sourceNodes.headOption.value
-      source.outputs.flatMap(_.consumer) should contain only p._2
+      plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only p._2
+      plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
+    }
+
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+
+    forAll (possibleGroupers) { (g: String) =>
+      forAll(patterns) { (p: (TriplePattern, Filter)) =>
+        val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+        val op2 = Distinct(Pipe("b"), Pipe("a"))
+        val op3 = BGPFilter(Pipe("c"), Pipe("b"), List(p._1))
+        val op4 = Dump(Pipe("c"))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
+
+        val source = plan.sourceNodes.headOption.value
+        source.outputs.flatMap(_.consumer) should contain only op2
+      }
     }
   }
 }
