@@ -40,7 +40,8 @@ object PigCompiler extends PigParser with LazyLogging {
                             compile: Boolean = false,
                             outDir: String = ".",
                             params: Map[String,String] = Map(),
-                            backend: String = BuildSettings.backends.get("default").get("name"))
+                            backend: String = BuildSettings.backends.get("default").get("name"),
+                            updateConfig: Boolean = false)
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
@@ -49,6 +50,7 @@ object PigCompiler extends PigParser with LazyLogging {
     var outDir: Path = null
     var params: Map[String,String] = null
     var backend: String = null
+    var updateConfig = false
 
     val parser = new OptionParser[CompilerConfig]("PigCompiler") {
       head("PigCompiler", "0.2")
@@ -57,6 +59,7 @@ object PigCompiler extends PigParser with LazyLogging {
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
+      opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text("update config file in $USER_HOME/.piglet") 
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
       arg[String]("<file>") required() action { (x, c) => c.copy(input = x) } text ("Pig file")
@@ -71,11 +74,15 @@ object PigCompiler extends PigParser with LazyLogging {
         outDir = Paths.get(config.outDir)
         params = config.params
         backend = config.backend
+        updateConfig = config.updateConfig
       }
       case None =>
         // arguments are bad, error message will have been displayed
         return
     }
+    
+    if(updateConfig)
+    	Conf.copyConfigFile()
     
     // start processing
     run(inputFile, outDir, compileOnly, master, backend, params)

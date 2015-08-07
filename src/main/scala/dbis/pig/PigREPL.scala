@@ -61,7 +61,7 @@ object PigREPL extends PigParser with LazyLogging {
     var lineBuffer = ""
     var prompt = "pigsh> "
 
-    val history = new FileHistory(Conf.replHistoryFile.getAbsoluteFile)
+    val history = new FileHistory(Conf.replHistoryFile.toFile().getAbsoluteFile)
     logger.debug(s"will use ${history.getFile} as history file")
     consoleReader.setHistory(history)  
     
