@@ -224,7 +224,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule L2" in {
-    val possibleGroupers = Table(("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
     forAll (possibleGroupers) { (g: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = Dump(Pipe("a"))
