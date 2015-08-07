@@ -46,4 +46,25 @@ class HDFSSpec extends FlatSpec with Matchers {
     else
       assume(false, "HDFS not enabled, no test performed")
   }
+
+  it should "process HDFS commands" in {
+    if (HDFSService.isInitialized) {
+      HDFSService.process("mkdir", List("/data/blubs"))
+      HDFSService.exists("/data/blubs") should be(true)
+
+      HDFSService.process("copyToRemote", List("LICENSE", "/data/blubs/LICENSE"))
+      HDFSService.exists("/data/blubs/LICENSE") should be(true)
+
+      HDFSService.process("copyToLocal", List("/data/blubs/LICENSE", "LICENSE-COPY"))
+      val localFile = new File("LICENSE-COPY")
+      localFile.exists() should be(true)
+      HDFSService.process("rm", List("-r", "/data/blubs"))
+      localFile.delete()
+      HDFSService.exists("/data/blubs") should be(false)
+
+    }
+    else
+      assume(false, "HDFS not enabled, no test performed")
+
+  }
 }
