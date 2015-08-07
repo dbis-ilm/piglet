@@ -253,4 +253,23 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     sink shouldBe op4
     sink.inputs.map(_.producer) should contain only(op2)
   }
+
+  it should "apply rewriting rule F2" in {
+    val patterns = Table(
+      ("Pattern"),
+      (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
+        Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))))),
+      (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
+      Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))),
+      (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
+      Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+    forAll (patterns) { (p: (TriplePattern, Filter)) =>
+      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
+      val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
+      val op3 = Dump(Pipe("b"))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
+      val source = plan.sourceNodes.headOption.value
+      source.outputs.flatMap(_.consumer) should contain only p._2
+    }
+  }
 }

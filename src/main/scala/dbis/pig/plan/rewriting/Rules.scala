@@ -265,6 +265,36 @@ object Rules {
     case _ => fail
   }
 
+  /** Applies rewriting rule F2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+    *
+    * @param term
+    * @return Some Filter operator, if `term` was an BGPFilter operator with only one bound variable
+    */
+  def F2(term: Any): Option[Filter] = term match {
+    case op @ BGPFilter(in, out, patterns) =>
+      if (patterns.length != 1) {
+        return None
+      }
+
+      val pattern = patterns.head
+      if (pattern.subj.isInstanceOf[Value]
+        && !pattern.pred.isInstanceOf[Value]
+        && !pattern.obj.isInstanceOf[Value]) {
+        return Some(Filter(in, out, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+      } else if (!pattern.subj.isInstanceOf[Value]
+        && pattern.pred.isInstanceOf[Value]
+        && !pattern.obj.isInstanceOf[Value]) {
+        return Some(Filter(in, out, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+      } else if (!pattern.subj.isInstanceOf[Value]
+        && !pattern.pred.isInstanceOf[Value]
+        && pattern.obj.isInstanceOf[Value]) {
+        return Some(Filter(in, out, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+      }
+
+      return None
+    case _ => None
+  }
+
   def registerAllRules = {
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
@@ -276,5 +306,6 @@ object Rules {
     addStrategy(R1 _)
     addStrategy(L2 _)
     addStrategy(F1)
+    addStrategy(F2 _)
   }
 }
