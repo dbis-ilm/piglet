@@ -80,3 +80,5 @@ assemblyJarName in assembly := "PigCompiler.jar"
 test in assembly := {}
 
 mainClass in assembly := Some("dbis.pig.PigCompiler")
+
+EclipseKeys.skipParents in ThisBuild := false
