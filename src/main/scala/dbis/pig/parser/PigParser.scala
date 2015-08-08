@@ -76,7 +76,7 @@ class PigParser extends JavaTokenParsers {
    * A reference can be a named field, a positional field (e.g $0, $1, ...) or a literal.
    */
   def posField: Parser[Ref] = """\$[0-9]*""".r ^^ { p => PositionalField(p.substring(1, p.length).toInt) }
-  def namedField: Parser[Ref] = ident ^^ { i => NamedField(i) }
+  def namedField: Parser[Ref] = not(boolean) ~> ident ^^ { i => NamedField(i) }
   def literalField: Parser[Ref] = (floatingPointNumber ^^ { n => Value(n) } | stringLiteral ^^ { s => Value(s) } | boolean ^^ { b => Value(b) })
   def fieldSpec: Parser[Ref] = (posField | namedField | literalField)
   /*
