@@ -138,6 +138,10 @@ object Dependencies {
   lazy val scalastiVersion =    "2.0.0"
   lazy val jeromqVersion =      "0.3.4"
   lazy val kiamaVersion =       "1.8.0"
+  lazy val typesafeVersion =    "1.3.0"
+  lazy val scalaLogVersion =    "3.1.0"
+  lazy val log4jVersion =       "1.2.17"
+  lazy val slf4jVersion =       "1.6.4"
 
   // Libraries
   val scalaCompiler = "org.scala-lang" % "scala-compiler" % scalaVersion
@@ -152,9 +156,10 @@ object Dependencies {
   val scalasti = "org.clapper" %% "scalasti" % scalastiVersion
   val jeromq = "org.zeromq" % "jeromq" % jeromqVersion
   val kiama = "com.googlecode.kiama" %% "kiama" % kiamaVersion
-  val typesafe = "com.typesafe" % "config" % "1.3.0"
-  val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0" 
-  val log4j = "log4j" % "log4j" % "1.2.17"
+  val typesafe = "com.typesafe" % "config" % typesafeVersion
+  val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % scalaLogVersion 
+  val log4j = "log4j" % "log4j" % log4jVersion
+  val slf4j= "org.slf4j" % "slf4j-simple" % slf4jVersion
 
   // Projects
   val rootDeps = Seq(
@@ -168,7 +173,8 @@ object Dependencies {
     kiama,
     typesafe,
     scalaLogging,
-    log4j
+    log4j,
+    slf4j
   )
   val sparkDeps = Seq(
     scalaTest % "test" withSources(),
