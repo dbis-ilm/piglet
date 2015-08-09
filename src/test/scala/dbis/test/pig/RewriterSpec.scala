@@ -18,12 +18,12 @@ package dbis.test.pig
 
 import java.net.URI
 
-import dbis.test.TestTools._
-
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
+import dbis.pig.schema.{BagType, Schema, TupleType, _}
+import dbis.test.TestTools._
 import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FlatSpec, Matchers}
@@ -45,7 +45,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val sourceMerged = planMerged.sourceNodes.head
 
     val rewrittenSink = processPigOperator(source)
-    rewrittenSink.outputs should equal(sourceMerged.outputs)
+    rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
 
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be(opMerged)
@@ -69,6 +69,35 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     pPlan.findOperatorForAlias("b").value shouldBe op3
     pPlan.sinkNodes.headOption.value shouldBe op4
     pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
+  }
+
+  it should "order Filter operations before Joins if only NamedFields are used" in {
+    val op1 = Load(Pipe("a"), "file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
+    ))))
+    val op2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
+      ("bid", Types.IntType)))
+    ))))
+    val predicate1 = Lt(RefExpr(NamedField("a")), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op3 = Join(Pipe("c"), List(Pipe("a"), Pipe("b")),
+      List(List(NamedField("aid")),
+           List(NamedField("bid"))
+      ))
+    val op4 = Filter(Pipe("d"), Pipe("c"), predicate1)
+    val op5 = Dump(Pipe("d"))
+
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4, op5)))
+    op1.outputs.headOption.value.consumer should contain only op4
+    op2.outputs.headOption.value.consumer should contain only op3
+    op4.outputs.headOption.value.consumer should contain only(op3, op5)
+
+    op1.outputs should have length 1
+    op2.outputs should have length 1
+    op3.outputs should have length 1
+    op4.outputs should have length 1
+
+    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(op4, op2)
   }
 
   it should "rewrite SplitInto operators into multiple Filter ones" in {
@@ -134,7 +163,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val source = plan.sourceNodes.head
 
     val rewrittenSource = processPigOperator(source)
-    rewrittenSource.outputs should contain only Pipe("a", op1, List(op2))
+    rewrittenSource.asInstanceOf[PigOperator].outputs should contain only Pipe("a", op1, List(op2))
   }
 
   it should "remove sink nodes that don't store a relation" in {
@@ -193,7 +222,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule L2" in {
-    val possibleGroupers = Table(("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
     forAll (possibleGroupers) { (g: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = Dump(Pipe("a"))
@@ -221,5 +250,88 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val sink = plan.sinkNodes.headOption.value
     sink shouldBe op4
     sink.inputs.map(_.producer) should contain only(op2)
+  }
+
+  it should "apply rewriting rule F2" in {
+    val patterns = Table(
+      ("Pattern"),
+      (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
+        Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))))),
+      (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
+      Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))),
+      (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
+      Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+    forAll (patterns) { (p: (TriplePattern, Filter)) =>
+      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
+      val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
+      val op3 = Dump(Pipe("b"))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
+      plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only p._2
+      plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
+    }
+
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+
+    forAll (possibleGroupers) { (g: String) =>
+      forAll(patterns) { (p: (TriplePattern, Filter)) =>
+        val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+        val op2 = Distinct(Pipe("b"), Pipe("a"))
+        val op3 = BGPFilter(Pipe("c"), Pipe("b"), List(p._1))
+        val op4 = Dump(Pipe("c"))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
+
+        plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+      }
+    }
+  }
+
+  it should "apply rewriting rule F3" in {
+    val patterns = Table(
+      ("Pattern"),
+      // s p o bound
+      (TriplePattern(Value("subject"), Value("predicate"), Value("object")),
+        Filter(Pipe("b"), Pipe("a"), And(
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+          And(
+            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))),
+      // s p bound
+      (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
+        Filter(Pipe("b"), Pipe("a"), And(
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))))),
+      // s o bound
+      (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
+        Filter(Pipe("b"), Pipe("a"), And(
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+          Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))),
+      // p o bound
+      (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
+        Filter(Pipe("b"), Pipe("a"), And(
+          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
+          Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))))
+
+    forAll (patterns) { (p: (TriplePattern, Filter)) =>
+      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
+      val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
+      val op3 = Dump(Pipe("b"))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
+      plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only p._2
+      plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
+    }
+
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+
+    forAll (possibleGroupers) { (g: String) =>
+      forAll(patterns) { (p: (TriplePattern, Filter)) =>
+        val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+        val op2 = Distinct(Pipe("b"), Pipe("a"))
+        val op3 = BGPFilter(Pipe("c"), Pipe("b"), List(p._1))
+        val op4 = Dump(Pipe("c"))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
+
+        plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+      }
+    }
   }
 }

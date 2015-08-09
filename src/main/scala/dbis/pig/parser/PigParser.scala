@@ -76,7 +76,7 @@ class PigParser extends JavaTokenParsers {
    * A reference can be a named field, a positional field (e.g $0, $1, ...) or a literal.
    */
   def posField: Parser[Ref] = """\$[0-9]*""".r ^^ { p => PositionalField(p.substring(1, p.length).toInt) }
-  def namedField: Parser[Ref] = ident ^^ { i => NamedField(i) }
+  def namedField: Parser[Ref] = not(boolean) ~> ident ^^ { i => NamedField(i) }
   def literalField: Parser[Ref] = (floatingPointNumber ^^ { n => Value(n) } | stringLiteral ^^ { s => Value(s) } | boolean ^^ { b => Value(b) })
   def fieldSpec: Parser[Ref] = (posField | namedField | literalField)
   /*
@@ -162,22 +162,15 @@ class PigParser extends JavaTokenParsers {
   def logicalTerm: Parser[Predicate] = (
     comparisonExpr ^^ { e => e }
      | "(" ~ logicalExpr ~ ")" ^^ { case _ ~ e ~ _ => PPredicate(e) }
+          | func ^^ { f => Eq(f,RefExpr(Value(true))) }
     )
 
   def logicalExpr: Parser[Predicate] = (
       
       logicalTerm ~ andKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => And(a, b) }
       | logicalTerm ~ orKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => Or(a, b) }
-      
-//      logicalTerm ~ (andKeyword | orKeyword) ~ logicalTerm ^^ {
-//        case a ~ op ~ b => op match {
-//          case `andKeyword` => And(a, b)
-//          case `orKeyword` => Or(a, b)
-//        }
-//      }
       | notKeyword ~ logicalTerm ^^ { case _ ~ e => Not(e) }
       | logicalTerm ^^ { e => e }
-//      | func ^^ { f => Eq(f,RefExpr(Value(true))) }
      )
 
   /*
