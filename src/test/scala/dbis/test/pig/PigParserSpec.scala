@@ -155,10 +155,23 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a filter with a function expression" in {
+    assert(parseScript("a = FILTER b BY STARTSWITH($0,\"test\") == true;") ==
+      List(Filter(Pipe("a"), Pipe("b"), Eq(
+                                          Func("STARTSWITH", List(RefExpr(PositionalField(0)), RefExpr(Value("\"test\"")))),
+                                          RefExpr(Value("true"))))))
+  }
+
+  it should "parse a filter with another function expression" in {
     assert(parseScript("a = FILTER b BY aFunc(x, y) > 0;") ==
       List(Filter(Pipe("a"), Pipe("b"), Gt(
-                                          Func("aFunc", List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),
-                                          RefExpr(Value("0"))))))
+        Func("aFunc", List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),
+        RefExpr(Value("0"))))))
+  }
+
+  it should "parse a filter with a boolean function expression" in {
+    assert(parseScript("a = FILTER b BY STARTSWITH($0,\"test\");") ==
+      List(Filter(Pipe("a"), Pipe("b"),
+        Func("STARTSWITH", List(RefExpr(PositionalField(0)), RefExpr(Value("\"test\"")))))))
   }
 
   it should "parse a simple foreach statement" in {
