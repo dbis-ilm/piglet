@@ -17,14 +17,13 @@ fi
 
 # the directory to include in classpath to enable backends
 # this should actually be set by the user using external variables
-BACKEND_DIR=`dirname $0`/../sparklib/target/scala-2.11/*
-
 if [ -z "$BACKEND_DIR" ]; then # if BACKEND_DIR does not exist, use our default one
-    BACKEND_DIR=`dirname $0`/../backends/*
+    BACKEND_DIR=`dirname $0`/../sparklib/target/scala-2.11/*
+    echo "No backend direcory (BACKEND_DIR) specified!"
 else
     if [[ "$BACKEND_DIR" == */ ]]; then # if it ends with / it's a directory - include all files using the wildcard *
         BACKEND_DIR=$BACKEND_DIR*
-    elif [[ "$BACKEND_DIR" != */\* && "$BACKEND_DIR" != *.jar ]]; then  #if it ends not with / or .jar we assume it's a dir - append /*
+    elif [[ "$BACKEND_DIR" != */\* && "$BACKEND_DIR" != *.jar ]]; then  #if it ends not with /* or .jar we assume it's a dir - append /*
         BACKEND_DIR=$BACKEND_DIR/*
     fi
 fi
