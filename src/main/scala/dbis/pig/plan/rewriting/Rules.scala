@@ -200,7 +200,7 @@ object Rules {
   //noinspection ScalaDocMissingParameterDescription
   def mergeWithEmpty(parent: PigOperator, child: Empty): Option[PigOperator] = Some(child)
 
-  /** Applies rewriting rule R1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+  /** Applies rewriting rule R1 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
     * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
@@ -216,7 +216,7 @@ object Rules {
     case _ => None
   }
 
-  /** Applies rewriting rule R2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+  /** Applies rewriting rule R2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param parent
     * @param child
@@ -229,7 +229,7 @@ object Rules {
     )
   }
 
-  /** Applies rewriting rule L2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+  /** Applies rewriting rule L2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
     * @return Some Load operator, if `term` was an RDFLoad operator loading a resource from hdfs
@@ -245,7 +245,7 @@ object Rules {
     case _ => None
   }
 
-  /** Applies rewriting rule F1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+  /** Applies rewriting rule F1 of the paper [[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @return A strategy that removes BGPFilters that use only unbound variables in their single pattern
     */
@@ -266,7 +266,7 @@ object Rules {
     case _ => fail
   }
 
-  /** Applies rewriting rule F2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+  /** Applies rewriting rule F2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
     * @return Some Filter operator, if `term` was an BGPFilter operator with only one bound variable
@@ -300,7 +300,7 @@ object Rules {
     case _ => None
   }
 
-  /** Applies rewriting rule F3 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+  /** Applies rewriting rule F3 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
     * @return Some Filter operator, if `term` was an BGPFilter operator with multiple bound variables
@@ -339,7 +339,7 @@ object Rules {
     case _ => None
   }
 
-  /** Applies rewriting rule F4 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+  /** Applies rewriting rule F4 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
     * @return Some Filter operator if `term` was a BGPFilter with a single Pattern filtering on the grouping column
