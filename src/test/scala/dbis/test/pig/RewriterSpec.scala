@@ -198,12 +198,19 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule R1" in {
-    val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
-    val op2 = Dump(Pipe("a"))
-    val plan = processPlan(new DataflowPlan(List(op1, op2)))
-    val source = plan.sourceNodes.headOption.value
-    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, "pig.SPARQLLoader",
-      List("SELECT * WHERE { ?s ?p ?o }"))
+    val URLs = Table(
+      ("url"),
+      ("http://www.example.com"),
+      ("https://www.example.com")
+    )
+    forAll(URLs) { (url: String) =>
+      val op1 = RDFLoad(Pipe("a"), new URI(url), None)
+      val op2 = Dump(Pipe("a"))
+      val plan = processPlan(new DataflowPlan(List(op1, op2)))
+      val source = plan.sourceNodes.headOption.value
+      source shouldBe Load(Pipe("a"), url, op1.schema, "pig.SPARQLLoader",
+        List("SELECT * WHERE { ?s ?p ?o }"))
+    }
   }
 
   it should "apply rewriting rule R2" in {
