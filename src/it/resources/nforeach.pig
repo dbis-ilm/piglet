@@ -1,4 +1,4 @@
-daily = load 'src/it/resources/nested.csv' using PigStorage(',') as (exchange, symbol);
+daily = load 'src/it/resources/input/nested.csv' using PigStorage(',') as (exchange, symbol);
 grpd  = group daily by exchange;
 uniqcnt  = foreach grpd {
            sym      = daily.symbol;

@@ -117,7 +117,7 @@ class MaterializeTest extends FlatSpec with Matchers with BeforeAndAfter {
      */
     for(op <- plan2.operators) {
       op match {
-        case f : Load if f.file != "file.csv" => loadOp = Some(f) // bad workaround for the aforementioned issue 
+        case f : Load if f.file != "input/file.csv" => loadOp = Some(f) // bad workaround for the aforementioned issue
         case _ => 
       }
     }

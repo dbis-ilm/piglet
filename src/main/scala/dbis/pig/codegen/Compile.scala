@@ -18,8 +18,11 @@ package dbis.pig.codegen
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.DataflowPlan
+import scala.collection.immutable.Map
 
 trait GenCodeBase {
+  var udfAliases: Option[Map[String, (String, List[dbis.pig.op.Value])]] = None
+
   /**
    * Generate code for the given Pig operator.
    *
@@ -91,6 +94,11 @@ trait Compile {
    */
   def compile(scriptName: String, plan: DataflowPlan): String = {
     require(codeGen != null, "code generator undefined")
+
+    if (plan.udfAliases != null) {
+      codeGen.udfAliases = Some(plan.udfAliases.toMap)
+    }
+
     // generate import statements
     var code = codeGen.emitImport
 
