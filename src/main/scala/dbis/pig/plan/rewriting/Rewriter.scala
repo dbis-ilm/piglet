@@ -16,9 +16,10 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{And, Filter, Load, Materialize, OrderBy, PigOperator, Pipe, Store, _}
+import dbis.pig.op.{And, BinaryExpr, Filter, Load, Materialize, OrderBy, PigOperator, Pipe, Store, _}
 import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
+import dbis.pig.plan.rewriting.Rules.registerAllRules
 import dbis.pig.tools.BreadthFirstTopDownWalker
 import scala.collection.mutable.Queue
 import org.kiama.rewriting.Rewriter._
@@ -59,6 +60,9 @@ case class RewriterException(msg:String)  extends Exception(msg)
   *
   *  - [[addStrategy]] for easily adding any method with a signature of `Any => Option[PigOperator]` as a strategy
   *
+  *  - [[addOperatorReplacementStrategy]] is similar to [[addStrategy]] but has some special behaviour that's useful
+  *    when all the function passed to it does is replacing one operator with another one.
+  *
   *  - [[merge]] for merging two operators
   *
   *  - [[reorder]] for reordering two operators
@@ -97,7 +101,44 @@ object Rewriter extends LazyLogging {
     ourStrategy = ior(ourStrategy, s)
   }
 
+  /** Adds a function `f` as a [[org.kiama.rewriting.Strategy]] to this object.
+    *
+    * If you're only intending to replace a single PigOperator with another one, use
+    * [[addOperatorReplacementStrategy]] instead.
+    *
+    * @param f
+    */
+  //noinspection ScalaDocMissingParameterDescription
   def addStrategy(f: Any => Option[PigOperator]): Unit = addStrategy(strategyf(t => f(t)))
+
+  /** Adds a function `f` that replaces a single [[PigOperator]] with another one as a [[org.kiama.rewriting.Strategy]]
+    *  to this object.
+    *
+    * If applying `f` to a term succeeded (Some(_)) was returned, the input term will be replaced by the new term in
+    * the input pipes of the new terms successors (the consumers of its output pipes).
+    *
+    * @param f
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  def addOperatorReplacementStrategy(f: Any => Option[PigOperator]): Unit = {
+    val strat = (t: Any) => f(t) map { op: PigOperator =>
+      op.outputs foreach { output =>
+        output.consumer foreach { consumer =>
+          consumer.inputs foreach { input =>
+            // If `t` (the old term) is the producer of any of the input pipes of `op` (the new terms) successors,
+            // replace it with `op` in that attribute. Replacing `t` with `op` in the pipes on `op` itself is not
+            // necessary because the setters of `inputs` and `outputs` do that.
+            if (input.producer == t) {
+              input.producer = op
+            }
+          }
+        }
+      }
+      op
+    }
+
+    addStrategy(strategyf(t => strat(t)))
+  }
 
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
     * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
@@ -105,7 +146,7 @@ object Rewriter extends LazyLogging {
     * @param sink The sink node to rewrite.
     * @return The rewritten sink node.
     */
-  def processPigOperator(sink: PigOperator): PigOperator = {
+  def processPigOperator(sink: PigOperator): Any = {
     processPigOperator(sink, ourStrategy)
   }
 
@@ -115,7 +156,7 @@ object Rewriter extends LazyLogging {
     * @param strategy The strategy to apply.
     * @return
     */
-  private def processPigOperator(sink: PigOperator, strategy: Strategy): PigOperator = {
+  private def processPigOperator(sink: PigOperator, strategy: Strategy): Any = {
     val rewriter = bottomup(attempt(strategy))
     rewrite(rewriter)(sink)
   }
@@ -129,7 +170,14 @@ object Rewriter extends LazyLogging {
 
   def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
     // This looks innocent, but this is where the rewriting happens.
-    val newSources = plan.sourceNodes.map(processPigOperator(_, strategy)).filterNot(_.isInstanceOf[Empty])
+    val newSources = plan.sourceNodes.flatMap(
+      processPigOperator(_, strategy) match {
+        case op : PigOperator => List(op)
+        case ops : Seq[PigOperator] => ops
+        case e => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
+          "PigOperator or " +
+          "Sequence of them, namely" + e)
+      }).filterNot(_.isInstanceOf[Empty]).toList
 
     var newPlanNodes = mutable.LinkedHashSet[PigOperator]() ++= newSources
     var nodesToProcess = newSources.toList
@@ -166,139 +214,6 @@ object Rewriter extends LazyLogging {
     newPlan
   }
 
-  /** Merges two [[dbis.pig.op.Filter]] operations if one is the only input of the other.
-    *
-    * @param parent The parent filter.
-    * @param child The child filter.
-    * @return On success, an Option containing a new [[dbis.pig.op.Filter]] operator with the predicates of both input
-    *         Filters, None otherwise.
-    */
-  private def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] =
-    Some(Filter(child.out, parent.in, And(parent.pred, child.pred)))
-
-  private def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
-    case node@SplitInto(inPipeName, splits) =>
-      val filters = (for (branch <- splits) yield branch.output.name -> Filter(branch.output, inPipeName, branch
-        .expr)).toMap
-      node.inputs = node.inputs.map(p => {
-        p.consumer = p.consumer.filterNot(_ == node)
-        p
-      })
-      // For all outputs
-      node.outputs.iterator foreach (_.consumer.foreach(output => {
-        // Iterate over their inputs
-        output.inputs foreach (input => {
-          // Check if the relation name is one of the names our SplitBranches write
-          if (filters contains input.name) {
-            // Replace SplitInto with the appropriate Filter
-            output.inputs = output.inputs.filter(_.producer != node) :+ Pipe(input.name, filters(input.name))
-            filters(input.name).inputs = node.inputs
-          }
-        })
-      }
-      ))
-      Some(filters.values.toList)
-    case _ => None
-  }
-
-  /** Replaces sink nodes that are not [[dbis.pig.op.Store]] operators with [[dbis.pig.op.Empty]] ones.
-    *
-    * @param node
-    * @return
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  private def removeNonStorageSinks(node: Any): Option[PigOperator] = node match {
-    // Store and Dump are ok
-    case Store(_, _, _,_) => None
-    case Dump(_) => None
-    // To prevent recursion, empty is ok as well
-    case Empty(_) => None
-    case op: PigOperator =>
-      op.outputs match {
-      case Pipe(_, _, Nil) :: Nil | Nil =>
-        val newNode = Empty(Pipe(""))
-        newNode.inputs = op.inputs
-        Some(newNode)
-      case _ => None
-    }
-    case _ => None
-  }
-
-  /** If an operator is followed by an Empty node, replace it with the Empty node
-    *
-    * @param parent
-    * @param child
-    * @return
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  private def mergeWithEmpty(parent: PigOperator, child: Empty): Option[PigOperator] = Some(child)
-
-  /** Applies rewriting rule R1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
-    *
-    * @param term
-    * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  private def R1(term: Any): Option[PigOperator] = term match {
-    case op@RDFLoad(p, uri, None) =>
-      if (uri.getScheme == "http" || uri.getScheme == "https") {
-        Some(Load(p, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
-      } else {
-        None
-      }
-    case _ => None
-  }
-
-  /** Applies rewriting rule R2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
-    *
-    * @param parent
-    * @param child
-    * @return
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  private def R2(parent: RDFLoad, child: BGPFilter): Option[PigOperator] = {
-    Some(Load(child.out, parent.uri, parent.schema, "pig.SPARQLLoader",
-    List(child.patterns.head.toString))
-    )
-  }
-
-  /** Applies rewriting rule L2 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
-    *
-    * @param term
-    * @return Some Load operator, if `term` was an RDFLoad operator loading a resource from hdfs
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  private def L2(term: Any): Option[PigOperator] = term match {
-    case op@RDFLoad(p, uri, grouped : Some[String]) =>
-      if (uri.getScheme == "hdfs") {
-        Some(Load(p, uri, op.schema, "BinStorage"))
-      } else {
-        None
-      }
-    case _ => None
-  }
-
-  /** Applies rewriting rule F1 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
-   *
-   * @return A strategy that removes BGPFilters that use only unbound variables in their single pattern
-   */
-  private def F1 = rulefs[BGPFilter] {
-    case op@BGPFilter(_, _, patterns) =>
-      if (patterns.length > 1 || patterns.isEmpty) {
-        fail
-      } else {
-        val pattern = patterns.head
-        if (!pattern.subj.isInstanceOf[Value]
-          && !pattern.pred.isInstanceOf[Value]
-          && !pattern.obj.isInstanceOf[Value]) {
-          removalStrategy(op)
-        } else {
-          fail
-        }
-      }
-    case _ => fail
-  }
-
   /** Add a new strategy for merging operators of two types.
     *
     * An example method to merge Filter operators is
@@ -322,6 +237,28 @@ object Rewriter extends LazyLogging {
   Unit = {
     val strategy = (parent: T, child: T2) =>
       f(parent, child).map(fixInputsAndOutputs(parent, child, _))
+    addBinaryPigOperatorStrategy(strategy)
+  }
+
+  /** Add a new strategy for reordering two operators.
+    *
+    * An additional function `f` can be supplied that performs the reordering. This is useful if the reordering can
+    * only be performed in some cases that can't be expressed by just the types.
+    *
+    * A new reordering strategy can be added to the rewriter via
+    * {{{
+    *  reorder[OrderBy, Filter](f _)
+    * }}}
+    *
+    * @param f
+    * @tparam T The type of the parent operator.
+    * @tparam T2 The type of the child operator.
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[Tuple2[T2, T]]):
+  Unit = {
+    val strategy = (parent: T, child: T2) =>
+      f(parent, child).map(tup => fixInputsAndOutputs(tup._2, tup._1, tup._1, tup._2))
     addBinaryPigOperatorStrategy(strategy)
   }
 
@@ -437,12 +374,19 @@ object Rewriter extends LazyLogging {
    * @return
    */
   //noinspection ScalaDocMissingParameterDescription
-  private def removalStrategy(rem: PigOperator): Strategy = {
+  def removalStrategy(rem: PigOperator): Strategy = {
     strategyf((op: Any) => {
       if (op == rem) {
         val pigOp = op.asInstanceOf[PigOperator]
         if (pigOp.inputs.isEmpty) {
-          Some(Empty(Pipe("")))
+          val consumers = pigOp.outputs.flatMap(_.consumer)
+          if (consumers.isEmpty) {
+            Some(Empty(Pipe("")))
+          }
+          else {
+            consumers foreach (_.inputs = List.empty)
+            Some(consumers.toList)
+          }
         }
         else {
           val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
@@ -470,11 +414,31 @@ object Rewriter extends LazyLogging {
     *
     * @param plan
     * @param rem
+    * @param removePredecessors If true, predecessors of `rem` will be removed as well.
     * @return A new [[dbis.pig.plan.DataflowPlan]] without `rem`.
     */
   //noinspection ScalaDocMissingParameterDescription
-  def remove(plan: DataflowPlan, rem: PigOperator): DataflowPlan =
-    processPlan(plan, removalStrategy(rem))
+  def remove(plan: DataflowPlan, rem: PigOperator, removePredecessors: Boolean = false): DataflowPlan = {
+    var strat = removalStrategy(rem)
+
+    if (removePredecessors) {
+      var nodes = Set[PigOperator]()
+      var nodesToProcess = rem.inputs.map(_.producer).toSet
+
+      while (nodesToProcess.nonEmpty) {
+        val iter = nodesToProcess.iterator
+        nodesToProcess = Set[PigOperator]()
+        for (node <- iter) {
+          nodes += node
+          nodesToProcess ++= node.inputs.map(_.producer).toSet
+        }
+      }
+
+      strat = nodes.foldLeft(strat) ((s: Strategy, p: PigOperator) => ior(s, removalStrategy(p)))
+    }
+
+    processPlan(plan, strat)
+  }
 
   /** Swap the positions of `op1` and `op2` in `plan`
     *
@@ -805,13 +769,5 @@ object Rewriter extends LazyLogging {
     newPlan
   }
   
-  merge[Filter, Filter](mergeFilters)
-  merge[PigOperator, Empty](mergeWithEmpty)
-  merge[RDFLoad, BGPFilter](R2)
-  reorder[OrderBy, Filter]
-  addStrategy(strategyf(t => splitIntoToFilters(t)))
-  addStrategy(removeNonStorageSinks _)
-  addStrategy(R1 _)
-  addStrategy(L2 _)
-  addStrategy(F1)
+  registerAllRules
 }

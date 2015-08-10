@@ -20,7 +20,7 @@ import dbis.pig.schema.{Types, PigType, Schema}
 
 trait Predicate extends Expr
 
-case class Eq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
+case class Eq(override val left: ArithmeticExpr, override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 
@@ -32,7 +32,7 @@ case class Eq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(le
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
-case class Neq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
+case class Neq(override val left: ArithmeticExpr, override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
@@ -43,7 +43,7 @@ case class Neq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(l
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
-case class Geq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
+case class Geq(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
@@ -54,7 +54,7 @@ case class Geq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(l
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
-case class Leq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
+case class Leq(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
@@ -65,7 +65,7 @@ case class Leq(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(l
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
-case class Gt(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
+case class Gt(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
@@ -76,7 +76,7 @@ case class Gt(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(le
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
 }
 
-case class Lt(left: ArithmeticExpr, right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
+case class Lt(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   override def resultType(schema: Option[Schema]): (String, PigType) = ("", Types.BooleanType)
 
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =

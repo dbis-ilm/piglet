@@ -120,6 +120,31 @@ class SparkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for a filter with a function expression" in {
+    val op = Filter(Pipe("a"), Pipe("b"), Gt(
+        Func("aFunc", List(RefExpr(PositionalField(0)), RefExpr(PositionalField(1)))),
+        RefExpr(Value("0"))))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.filter(t => {aFunc(t(0),t(1)) > 0})")
+    assert(generatedCode == expectedCode)
+  }
+  
+  it should "contain code for a filter with a function expression and boolean" in {
+    val op =  Filter(Pipe("a"),Pipe("b"),And(
+            Eq(Func("aFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(Value(true))),
+            Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),false)
+    op.schema = Some(new Schema(BagType(TupleType(Array(Field("x", Types.IntType),
+                                                        Field("y", Types.DoubleType)), "t"), "s")))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val a = b.filter(t => {aFunc(t(0).toString.toInt,t(1).toString.toDouble) == true && 
+      |cFunc(t(0).toString.toInt,t(1).toString.toDouble) >= t(0).toString.toInt})
+      |""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+  
   it should "contain code for DUMP" in {
     val op = Dump(Pipe("a"))
     val codeGenerator = new ScalaBackendGenCode(templateFile)

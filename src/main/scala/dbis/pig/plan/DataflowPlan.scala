@@ -243,11 +243,12 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * Remove the given operator from the dataflow plan.
    *
    * @param op the operator to be removed from the plan
+   * @param removePredecessors If true, predecessors of `rem` will be removed as well.
    * @return the resulting dataflow plan
    */
-  def remove(op: PigOperator) : DataflowPlan = {
+  def remove(op: PigOperator, removePredecessors: Boolean = false) : DataflowPlan = {
     require(operators.contains(op), "operator to remove is not member of the plan")
-    Rewriter.remove(this, op)
+    Rewriter.remove(this, op, removePredecessors)
   }
 
   /**

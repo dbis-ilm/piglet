@@ -12,43 +12,12 @@ object PigBuild extends Build {
     organization := "dbis"
   )
 
-  /*
-   * Projects *****************************************************************
-   */
-  lazy val root = (project in file(".")).
-    configs(IntegrationTest).
-    settings(commonSettings: _*).
-    settings(Defaults.itSettings: _*).
-    dependsOn(common).
-    dependsOn(sparklib % "test;it").
-    dependsOn(flinklib % "test;it"). 
-    aggregate(common, sparklib, flinklib) // remove this if you don't want to automatically build these projects when building piglet 
 
-  lazy val common = (project in file("common")).
-    settings(commonSettings: _*)
 
-  lazy val sparklib = (project in file("sparklib")).
-    settings(commonSettings: _*).
-    dependsOn(common)
 
-  lazy val flinklib = (project in file("flinklib")).
-    settings(commonSettings: _*).
-    dependsOn(common)
 
-    
-    
 
-  /*
-   * define the backend for the compiler: currently we support spark and flink
-   */
-  val backend = sys.props.getOrElse("backend", default="spark")
-    
-  val itTests = backend match{
-    case "flink" => Seq("dbis.test.flink.FlinkCompileIt","dbis.test.flink.FlinksCompileIt")
-    case "spark" => Seq("dbis.test.spark.SparkCompileIt")
-    case _ => println(s"Unsupported backend: $backend"); Seq.empty[String]
   }
- 
 }
 
 /*
@@ -70,7 +39,7 @@ object Dependencies {
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
   val kiama = "com.googlecode.kiama" %% "kiama" % "1.8.0"
   val typesafe = "com.typesafe" % "config" % "1.3.0"
-  val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0"
+  val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0" 
   val log4j = "log4j" % "log4j" % "1.2.17"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
 

@@ -8,9 +8,9 @@ mainClass in (Compile, run) := Some("dbis.pig.PigCompiler")
 
 assemblyJarName in assembly := "PigCompiler.jar"
 
-mainClass in assembly := Some("dbis.pig.PigCompiler")
-
 test in assembly := {}
+
+mainClass in assembly := Some("dbis.pig.PigCompiler")
 
 testOptions in IntegrationTest += Tests.Argument("-oDF")
 
