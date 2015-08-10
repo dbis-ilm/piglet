@@ -266,12 +266,39 @@ class FlinksCompileSpec extends FlatSpec {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{ 
-        |t => t._1 ++ t._2
-        |}.join(d).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
-        |t => t._1 ++ t._2
-        |}""".stripMargin)
+      |t => t._1 ++ t._2
+      |}.join(d).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
+      |t => t._1 ++ t._2
+      |}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
+ 
+  it should "contain code for a CROSS operator on two relations" in {
+    // a = Cross b, c;
+    val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c")),(10, "SECONDS"))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val a = b.cross(c).onWindow(10, TimeUnit.SECONDS).map{
+      |t => t._1 ++ t._2
+      |}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a CROSS operator on more than two relations" in {
+    // a = Cross b, c, d;
+    val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")),(10, "SECONDS"))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val a = b.cross(c).onWindow(10, TimeUnit.SECONDS).map{
+      |t => t._1 ++ t._2
+      |}.cross(d).onWindow(10, TimeUnit.SECONDS).map{
+      |t => t._1 ++ t._2
+      |}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
 
   it should "contain code for GROUP BY ALL" in {
     val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List()))

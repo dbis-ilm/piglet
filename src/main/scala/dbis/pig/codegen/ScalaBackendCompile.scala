@@ -450,14 +450,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
         }
         case _ => "" // should not happen
       }
-    case n@Distinct(out, in, windowMode) => {
+      case n@Distinct(out, in, windowMode) => {
         if (templateFile.contains("flinks"))
           s"""val ${n.outputs.head.name} = ${n.inputs.head.name}.distinct"""
         else
           callST("distinct", Map("out"->n.outputs.head.name,"in"->n.inputs.head.name))  
-    }
-    case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
-    case n@Limit(out, in, num, windowMode) => callST("limit", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "num" -> num,"windowMode"->windowMode))
+      }
+      case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
+      case n@Limit(out, in, num, windowMode) => callST("limit", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "num" -> num,"windowMode"->windowMode))
       case OrderBy(out, in, orderSpec) => "" // TODO!!!!
       case _ => ""
     }.mkString("\n") + "}"
@@ -488,9 +488,25 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   /*------------------------------------------------------------------------------------------------- */
  
   /**
+   * Generates code for the CROSS operator.
+   *
+   * @param node the Cross Operator node
+   * @param out name of the output bag
+   * @param rels list of Pipes to cross
+   * @param window window information for Cross' on streams
+   * @return the Scala code implementing the CROSS operator
+   */
+  def emitCross(node: PigOperator, out: String, rels: List[Pipe], window: Tuple2[Int,String]): String = {
+    if(window!=null)
+      callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name),"window"->window._1,"wUnit"->window._2))
+    else
+      callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name)))
+  }
+
+  /**
    * Generates code for the DISTINCT Operator
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param windowMode true if operator is called within a window environment
    * @return the Scala code implementing the DISTINCT operator
@@ -507,7 +523,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * Generates code for the FILTER Operator
    *
    * @param schema the nodes schema
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param pred the filter predicate
    * @param windowMode true if operator is called within a window environment
@@ -524,7 +540,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * Generates code for the FOREACH Operator
    *
    * @param node the FOREACH Operator node
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param gen the generate expression
    * @param windowMode true if operator is called within a window environment
@@ -549,7 +565,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * Generates code for the GROUPING Operator
    *
    * @param schema the nodes input schema
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param groupExpr the grouping expression
    * @param windowMode true if operator is called within a window environment
@@ -572,14 +588,13 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * Generates code for the JOIN operator.
    *
    * @param node the Join Operator node
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param rels list of Pipes to join
    * @param exprs list of join keys
    * @param window window information for Joins on streams
    * @return the Scala code implementing the JOIN operator
    */
-  def emitJoin(node: PigOperator, out: String, rels: List[Pipe], 
-               exprs: List[List[Ref]], window: Tuple2[Int,String]): String = {
+  def emitJoin(node: PigOperator, out: String, rels: List[Pipe], exprs: List[List[Ref]], window: Tuple2[Int,String]): String = {
     val res = node.inputs.zip(exprs)
     val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
     if(window!=null)
@@ -591,7 +606,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   /**
    * Generates code for the LIMIT Operator
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param num amount of retruned records
    * @param windowMode true if operator is called within a window environment
@@ -608,7 +623,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   /**
    * Generates code for the LOAD operator.
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param file the name of the file to be loaded
    * @param loaderFunc an optional loader function (we assume a corresponding Scala function is available)
    * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
@@ -626,7 +641,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   /**
    * Generates code for the SOCKET_READ Operator
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param addr the socket address to connect to
    * @param mode the connection mode, e.g. zmq or empty for standard sockets
    * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
@@ -678,7 +693,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   /**
    * Generates code for the WINDOW Operator
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param window window size information (Num, Unit)
    * @param slide window slider information (Num, Unit)
@@ -717,7 +732,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outputs.head.name, node.inputs.head.name, groupExpr, windowMode)
       case Distinct(out, in, windowMode) => emitDistinct(node.outputs.head.name, node.inputs.head.name, windowMode)
       case Limit(out, in, num, windowMode) => emitLimit(node.outputs.head.name, node.inputs.head.name, num, windowMode)
-      case Join(out, rels, exprs, window) => emitJoin(node, node.outputs.head.name, rels, exprs, window)
+      case Join(out, rels, exprs, window) => emitJoin(node, node.outputs.head.name, node.inputs, exprs, window)
+      case Cross(out, rels, window) => emitCross(node, node.outputs.head.name, node.inputs, window) 
       case Union(out, rels) => callST("union", Map("out"->node.outputs.head.name,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outputs.head.name,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
       case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outputs.head.name,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outputs.head.name, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
@@ -727,8 +743,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case Window(out, in, window, slide) => emitWindow(node.outputs.head.name,node.inputs.head.name,window,slide)
       case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outputs.head.name,"in"->node.inputs.head.name))
       case Empty(_) => ""
-      /*     
-       case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
+           
+      /*
        case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
        val s1 = s"""
        |val split = ${rels.head}.split(${emitExpr(node.schema, expr)} match {
