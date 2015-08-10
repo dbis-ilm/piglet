@@ -27,6 +27,8 @@ import java.net.URI
 
 import org.clapper.scalasti._
 
+// import scala.collection.mutable.Map
+
 /**
  * Implements a code generator for Scala-based backends such as Spark or Flink which use
  * a template file for the backend-specific code.
@@ -277,8 +279,15 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
                             else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
         }
         case None => {
-          // TODO: we don't know the function yet, let's assume there is a corresponding Scala function
-          s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+          // check if we have have an alias in DataflowPlan
+          if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
+            val alias = udfAliases.get(f)
+            s"$alias._1(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+          }
+          else {
+            // TODO: we don't know the function yet, let's assume there is a corresponding Scala function
+            s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+          }
         }
       }
     }

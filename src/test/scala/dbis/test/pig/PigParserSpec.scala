@@ -392,7 +392,16 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a register statement" in {
-    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(Register("\"/usr/local/share/myfile.jar\"")))
+    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(RegisterCmd("\"/usr/local/share/myfile.jar\"")))
+  }
+
+  it should "parse a define (function alias) statement" in {
+    assert(parseScript("""define myFunc class.func();""") == List(DefineCmd("myFunc", "class.func", List())))
+  }
+
+  it should "parse a define (function alias) statement with constructor parameters" in {
+    assert(parseScript("""define myFunc class.func(42, "Hallo");""") ==
+      List(DefineCmd("myFunc", "class.func", List(Value("42"), Value("\"Hallo\"")))))
   }
 
   it should "parse a stream statement without schema" in {

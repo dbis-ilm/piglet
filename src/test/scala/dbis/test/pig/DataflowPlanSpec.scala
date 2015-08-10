@@ -106,7 +106,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
          |""".stripMargin))
     plan.additionalJars.toList should equal (List("myfile.jar"))
     plan.operators.length should equal (2)
-    plan.operators.filter(_.isInstanceOf[Register]).length should equal (0)
+    plan.operators.filter(_.isInstanceOf[RegisterCmd]).length should equal (0)
   }
 
   it should "compute identical lineage signatures for two operators with the same plans" in {
