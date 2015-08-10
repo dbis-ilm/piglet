@@ -45,6 +45,7 @@ object PigBuild extends Build {
     
   val itTests = backend match{
     case "flink" => Seq("dbis.test.flink.FlinkCompileIt","dbis.test.flink.FlinksCompileIt")
+    case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
     case _ => println(s"Unsupported backend: $backend - Will execute no tests"); Seq.empty[String]
   }
@@ -71,6 +72,7 @@ object Dependencies {
   val typesafe = "com.typesafe" % "config" % "1.3.0"
   val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0" 
   val log4j = "log4j" % "log4j" % "1.2.17"
+  val slf4j= "org.slf4j" % "slf4j-simple" % "1.6.4"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
 
   // Projects
@@ -86,6 +88,7 @@ object Dependencies {
     typesafe,
     scalaLogging,
     log4j,
+    slf4j,
     hadoop % "provided",
     
     sparkCore % "test;it",
