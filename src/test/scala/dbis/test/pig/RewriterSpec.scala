@@ -30,7 +30,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks {
   "The rewriter" should "merge two Filter operations" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
@@ -53,7 +53,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "order Filter operations before Order By ones" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
 
     // ops before reordering
@@ -72,7 +72,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "order Filter operations before Joins if only NamedFields are used" in {
-    val op1 = Load(Pipe("a"), "file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
+    val op1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
     ))))
     val op2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
       ("bid", Types.IntType)))
@@ -128,7 +128,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val op2 = Filter(Pipe("b"), Pipe("a"), predicate)
     val op3 = Dump(Pipe("b"))
@@ -150,7 +150,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "not reorder operators if the first one has more than one output" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
 
     // ops before reordering
@@ -167,7 +167,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "remove sink nodes that don't store a relation" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
     val newPlan = processPlan(plan)
 
@@ -175,7 +175,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "remove sink nodes that don't store a relation and have an empty outputs list" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
 
     op1.outputs = List.empty
@@ -185,7 +185,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "pull up Empty nodes" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
     val plan = new DataflowPlan(List(op1, op2))
     plan.operators should have length 2

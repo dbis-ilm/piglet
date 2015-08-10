@@ -95,8 +95,9 @@ trait Compile {
   def compile(scriptName: String, plan: DataflowPlan): String = {
     require(codeGen != null, "code generator undefined")
 
-    if (plan.udfAliases != null)
+    if (plan.udfAliases != null) {
       codeGen.udfAliases = Some(plan.udfAliases.toMap)
+    }
 
     // generate import statements
     var code = codeGen.emitImport

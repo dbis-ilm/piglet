@@ -53,7 +53,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD" in {
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.csv")
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
 
     val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -63,7 +63,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.csv")
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
     val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -97,7 +97,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for STORE" in {
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.csv")
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
     val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -106,7 +106,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for the STORE helper function" in {
-    val file = new java.net.URI("file.csv")
+    val file = new java.net.URI("input/file.csv")
     val op = Store(Pipe("A"), file)
     op.schema = Some(new Schema(BagType(TupleType(Array(
         Field("f1", Types.IntType),
@@ -215,7 +215,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for a binary JOIN statement with simple expression" in {
-    val file = new java.net.URI("file.csv")
+    val file = new java.net.URI("input/file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
@@ -233,7 +233,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for a binary JOIN statement with expression lists" in {
-    val file = new java.net.URI("file.csv")
+    val file = new java.net.URI("input/file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
       List(PositionalField(1), PositionalField(2))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
@@ -252,7 +252,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for a multiway JOIN statement" in {
-    val file = new java.net.URI("file.csv")
+    val file = new java.net.URI("input/file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
       List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),

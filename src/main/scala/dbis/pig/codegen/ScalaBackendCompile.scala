@@ -282,10 +282,11 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
           // check if we have have an alias in DataflowPlan
           if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
             val alias = udfAliases.get(f)
-            s"$alias._1(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+            val paramList = alias._2 ::: params.map(e => emitExpr(schema, e))
+            s"${alias._1}(${paramList.mkString(",")})"
           }
           else {
-            // TODO: we don't know the function yet, let's assume there is a corresponding Scala function
+            // we don't know the function yet, let's assume there is a corresponding Scala function
             s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
           }
         }
