@@ -24,6 +24,8 @@ import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
+import dbis.pig.backends.BackendManager
+
 import java.net.URI
 
 class SparkCompileSpec extends FlatSpec {
@@ -31,7 +33,7 @@ class SparkCompileSpec extends FlatSpec {
   
   
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = "src/main/resources/spark-template.stg"
+  val templateFile = BackendManager.backend("spark").templateFile
   "The compiler output" should "contain the Spark header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport
@@ -44,7 +46,7 @@ class SparkCompileSpec extends FlatSpec {
         |import org.apache.spark.SparkContext._
         |import org.apache.spark.SparkConf
         |import org.apache.spark.rdd._
-        |import dbis.spark._
+        |import dbis.pig.backends.spark._
         |
         |object test {
         |    def main(args: Array[String]) {
@@ -59,7 +61,7 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for LOAD" in {
     
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -69,7 +71,7 @@ class SparkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD with renamed pipe" in {
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     val op = Load(Pipe("a"), file)
     op.outputs = List(Pipe("b"))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -80,7 +82,7 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for LOAD with PigStorage" in {
     
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -96,7 +98,6 @@ class SparkCompileSpec extends FlatSpec {
     val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
   }
@@ -128,7 +129,22 @@ class SparkCompileSpec extends FlatSpec {
     val expectedCode = cleanString("val a = b.filter(t => {aFunc(t(0),t(1)) > 0})")
     assert(generatedCode == expectedCode)
   }
-
+  
+  it should "contain code for a filter with a function expression and boolean" in {
+    val op =  Filter(Pipe("a"),Pipe("b"),And(
+            Eq(Func("aFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(Value(true))),
+            Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),false)
+    op.schema = Some(new Schema(BagType(TupleType(Array(Field("x", Types.IntType),
+                                                        Field("y", Types.DoubleType)), "t"), "s")))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val a = b.filter(t => {aFunc(t(0).toString.toInt,t(1).toString.toDouble) == true && 
+      |cFunc(t(0).toString.toInt,t(1).toString.toDouble) >= t(0).toString.toInt})
+      |""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+  
   it should "contain code for DUMP" in {
     val op = Dump(Pipe("a"))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -139,19 +155,18 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for STORE" in {
     
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    
 //    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
     val expectedCode = cleanString(s"""val A_storehelper = A.map(t => tupleAToString(t)).coalesce(1, true) PigStorage().write("$file", A_storehelper)""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for the STORE helper function" in {
-    val op = Store(Pipe("A"), "file.csv")
+    val op = Store(Pipe("A"), "input/file.csv")
     op.schema = Some(new Schema(BagType(TupleType(Array(
       Field("f1", Types.IntType),
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
@@ -172,7 +187,7 @@ class SparkCompileSpec extends FlatSpec {
   }
   
   it should "contain code for the STORE helper function with delimiter" in {
-    val op = Store(Pipe("A"), "file.csv", "PigStorage", List("'#'"))
+    val op = Store(Pipe("A"), "input/file.csv", "PigStorage", List("'#'"))
     op.schema = Some(new Schema(BagType(TupleType(Array(
       Field("f1", Types.IntType),
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
@@ -193,7 +208,7 @@ class SparkCompileSpec extends FlatSpec {
   }
   
   it should "containt code for STORE with using clause" in {
-    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Store(Pipe("A"), file, "BinStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -249,8 +264,8 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)), "t"), "s"))
-    val input1 = Pipe("bb",Load(Pipe("bb"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("cc",Load(Pipe("cc"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("bb",Load(Pipe("bb"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input2 = Pipe("cc",Load(Pipe("cc"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs = List(input1,input2)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -267,8 +282,8 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)), "t"), "s"))
-    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -285,9 +300,9 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)), "t"), "s"))
-    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input3 = Pipe("d",Load(Pipe("d"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2,input3)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -332,6 +347,23 @@ class SparkCompileSpec extends FlatSpec {
     val op = plan.head
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val aa = bb.map(t => List(t(0),Distances.spatialDistance(t(1),t(2),1.0,2.0)))")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a foreach statement with a UDF alias expression" in {
+    // aa = FOREACH bb GENERATE $0, distance($1, $2, 1.0, 2.0) AS dist;
+    val ops = parseScript(
+      """bb = LOAD 'data.csv';
+        |DEFINE distance Distances.spatialDistance();
+        |aa = FOREACH bb GENERATE $0, distance($1, $2, 1.0, 2.0) AS dist;
+        |""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("aa")
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    // this is just a hack for this test: normally, the udfAliases map is set in compile
+    codeGenerator.udfAliases = Some(plan.udfAliases.toMap)
+    val generatedCode = cleanString(codeGenerator.emitNode(op.get))
     val expectedCode = cleanString("val aa = bb.map(t => List(t(0),Distances.spatialDistance(t(1),t(2),1.0,2.0)))")
     assert(generatedCode == expectedCode)
   }

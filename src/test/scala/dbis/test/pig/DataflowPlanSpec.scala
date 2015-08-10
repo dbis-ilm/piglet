@@ -37,7 +37,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   */
 
   "The plan" should "not contain duplicate pipes" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op3 = Dump(Pipe("b"))
     val op4 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
@@ -47,7 +47,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "check connectivity" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op3 = Dump(Pipe("b"))
     val op4 = Filter(Pipe("c"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
@@ -57,39 +57,39 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "find disconnected operators" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op3 = Dump(Pipe("b"))
-    val op4 = Load(Pipe("c"), "file.csv")
+    val op4 = Load(Pipe("c"), "input/file.csv")
     // val op5 = Dump(Pipe("c"))
     val plan = new DataflowPlan(List(op1, op2, op3, op4))
     assert(!plan.checkConnectivity)
   }
 
   it should "find sink operators" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op3 = Dump(Pipe("b"))
-    val op4 = Load(Pipe("c"), "file.csv")
+    val op4 = Load(Pipe("c"), "input/file.csv")
     val op5 = Dump(Pipe("c"))
     val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
     assert(plan.sinkNodes == Set(op3, op5))
   }
   
   it should "find source operators" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op3 = Dump(Pipe("b"))
-    val op4 = Load(Pipe("c"), "file.csv")
+    val op4 = Load(Pipe("c"), "input/file.csv")
     val op5 = Dump(Pipe("c"))
     val plan = new DataflowPlan(List(op1, op2, op3, op4, op5))
     assert(plan.sourceNodes == Set(op1, op4))
   }
 
   it should "return the operator producing the given relation" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
-    val op3 = Load(Pipe("c"), "file.csv")
+    val op3 = Load(Pipe("c"), "input/file.csv")
     val op4 = Filter(Pipe("d"), Pipe("c"), Lt(RefExpr(PositionalField(0)), RefExpr(Value("42"))))
     val plan = new DataflowPlan(List(op1, op2, op3, op4))
     plan.findOperatorForAlias("d") should equal (Some(op4))
@@ -106,16 +106,16 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
          |""".stripMargin))
     plan.additionalJars.toList should equal (List("myfile.jar"))
     plan.operators.length should equal (2)
-    plan.operators.filter(_.isInstanceOf[Register]).length should equal (0)
+    plan.operators.filter(_.isInstanceOf[RegisterCmd]).length should equal (0)
   }
 
   it should "compute identical lineage signatures for two operators with the same plans" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op3 = Grouping(Pipe("c"), Pipe("b"), GroupingExpression(List(PositionalField(0))))
     val plan1 = new DataflowPlan(List(op1, op2, op3))
 
-    val op4 = Load(Pipe("a"), "file.csv")
+    val op4 = Load(Pipe("a"), "input/file.csv")
     val op5 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op6 = Grouping(Pipe("c"), Pipe("b"), GroupingExpression(List(PositionalField(0))))
     val plan2 = new DataflowPlan(List(op4, op5, op6))
@@ -402,7 +402,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "be consistent after exchanging two operators" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val spec1 = OrderBySpec(PositionalField(1), OrderByDirection.AscendingOrder)
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List(spec1))
     val spec2 = OrderBySpec(NamedField("a"), OrderByDirection.DescendingOrder)
@@ -419,7 +419,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "be consistent after removing an operator" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val op2 = Filter(Pipe("b"), Pipe("a"), predicate)
     val op3 = Dump(Pipe("b"))
@@ -431,8 +431,20 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     newPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op3
   }
 
+  it should "allow removing a node and its predecessors" in {
+    val op1 = Load(Pipe("a"), "blablabla.csv")
+    val spec1 = OrderBySpec(PositionalField(1), OrderByDirection.AscendingOrder)
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List(spec1))
+    val spec2 = OrderBySpec(NamedField("a"), OrderByDirection.DescendingOrder)
+    val op3 = OrderBy(Pipe("lalala"), Pipe("b"), List(spec2))
+    val op4 = Dump(Pipe("lalala"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4)).remove(op3, removePredecessors = true)
+    plan.operators should contain only(op4)
+  }
+
   it should "return an empty DataflowPlan when the last operator in the plan is removed" in {
-    val op1 = Load(Pipe("a"), "file.csv")
+    val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
     val newPlan = plan.remove(op1)
     newPlan.operators shouldBe empty
@@ -450,7 +462,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
   }
 
   it should "reject multiple pipes with the same name" in {
-    val op = Load(Pipe("a"), "file.csv")
+    val op = Load(Pipe("a"), "input/file.csv")
     an [InvalidPlanException] should be thrownBy {
       op.outputs = List(Pipe("b"), Pipe("b"))
     }

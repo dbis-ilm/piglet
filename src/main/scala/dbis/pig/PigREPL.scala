@@ -25,12 +25,18 @@ import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.PrettyPrinter._
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.{HDFSService, FileTools, Conf}
+import dbis.pig.backends.BackendManager
+import dbis.pig.plan.MaterializationManager
+import dbis.pig.plan.rewriting.Rewriter
+
 import jline.console.ConsoleReader
+
 import scala.collection.mutable.ListBuffer
 import java.nio.file.Paths
 import jline.console.history.FileHistory
+import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
-import org.slf4j.Marker
+
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
 
@@ -133,7 +139,7 @@ object PigREPL extends PigParser with LazyLogging {
   }
 
   def main(args: Array[String]): Unit = {
-    val backend = if(args.length==0) BuildSettings.backends.get("default").get("name")
+    val backend = if(args.length==0) Conf.defaultBackend
                   else { 
                     args(0) match{
                       case "flink"  => "flink"
@@ -204,10 +210,15 @@ object PigREPL extends PigParser with LazyLogging {
         val mm = new MaterializationManager
         plan = processMaterializations(plan, mm)
         plan = processPlan(plan)
+
+        val jobJar = Conf.backendJar(backend)
         
-        FileTools.compileToJar(plan, "script", Paths.get("."), false, backend) match {
+        val backendConf = BackendManager.backend(backend)
+        val templateFile = backendConf.templateFile
+        
+        FileTools.compileToJar(plan, "script", Paths.get("."), false, jobJar, templateFile) match {
           case Some(jarFile) =>
-            val runner = FileTools.getRunner(backend)
+            val runner = backendConf.runnerClass
             runner.execute("local", "script", jarFile)
           
           case None => println("failed to build jar file for job")

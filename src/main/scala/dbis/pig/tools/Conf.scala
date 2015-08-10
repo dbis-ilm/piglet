@@ -8,6 +8,7 @@ import java.nio.file.Paths
 import com.typesafe.config.Config
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.nio.file.Path
 
 /**
  * This is the global configuration object that contains all user-defined values
@@ -64,5 +65,9 @@ object Conf extends LazyLogging {
   def materializationMapFile = Paths.get(appconf.getString("materialization.mapfile")).toAbsolutePath()
  
   
-  def backendJar(backend: String) = appconf.getString(s"backends.$backend.jar")
+  def defaultBackend = appconf.getString("backends.default")
+  
+  def backendJar(backend: String): Path = Paths.get(appconf.getString(s"backends.$backend.jar")) 
+  
+  def backendConf(backend: String) = appconf.getString(s"backends.$backend.conf")
 }

@@ -26,16 +26,16 @@ import scala.io.Source
 class SparkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
     ("script", "result", "truth", "inOrder"), // only the header of the table
-    ("load.pig", "result1.out", "result1.data", true),
-    ("load2.pig", "result2.out", "result2.data", true),
-    ("selfjoin.pig", "joined.out", "joined.data", true),
-    ("sort.pig", "sorted.out", "sorted.data", true),
-    ("foreach1.pig", "distances.out", "distances.data", true),
-    ("nforeach.pig", "nested.out", "nested.data", true),
-    ("grouping.pig", "grouping.out", "grouping.data", false),
-    ("wordcount.pig", "marycounts.out", "marycount.data", false),
-    ("construct.pig", "result3.out", "result3.data", true),
-    ("rscript.pig", "cluster.out", "cluster.data", true)
+    ("load.pig", "result1.out", "truth/result1.data", true),
+    ("load2.pig", "result2.out", "truth/result2.data", true),
+    ("selfjoin.pig", "joined.out", "truth/joined.data", true),
+    ("sort.pig", "sorted.out", "truth/sorted.data", true),
+    ("foreach1.pig", "distances.out", "truth/distances.data", true),
+    ("nforeach.pig", "nested.out", "truth/nested.data", true),
+    ("grouping.pig", "grouping.out", "truth/grouping.data", false),
+    ("wordcount.pig", "marycounts.out", "truth/marycount.data", false),
+    ("construct.pig", "result3.out", "truth/result3.data", true),
+    ("rscript.pig", "cluster.out", "truth/cluster.data", true)
     // ("json.pig", "json.out", "json.data", true)
   )
 

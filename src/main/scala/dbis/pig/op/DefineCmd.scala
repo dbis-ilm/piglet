@@ -15,13 +15,15 @@
  * limitations under the License.
  */
 
-package dbis.pig.tools
+package dbis.pig.op
 
-import java.nio.file.Path
 
 /**
-  * Defines the interface to the backend execution.
-  */
-trait Run {
-  def execute(master: String, className: String, jarFile: Path): Unit
-}
+ * DefineCmd represents a pseudo operator for the DEFINE statement. This "operator" will
+ * be eliminated during building the dataflow plan.
+ *
+ * @param jarFile the URI of the Jar file to be registered
+ */
+case class DefineCmd(alias: String, scalaName: String, paramList: List[Value]) extends PigOperator
+
+

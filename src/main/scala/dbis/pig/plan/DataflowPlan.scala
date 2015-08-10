@@ -37,6 +37,11 @@ class DataflowPlan(var operators: List[PigOperator]) {
    */
   val additionalJars = ListBuffer[String]()
 
+  /**
+   * A map for UDF aliases + constructor arguments.
+   */
+  val udfAliases = Map[String,(String,  List[dbis.pig.op.Value])]()
+
   constructPlan(operators)
 
   /**
@@ -54,11 +59,16 @@ class DataflowPlan(var operators: List[PigOperator]) {
     val pipes: Map[String, Pipe] = Map[String, Pipe]()
 
     /*
-     * 0. We remove all Register operators: they are just pseudo-operators.
-     *    Instead, we add their arguments to the additionalJars list
+     * 0. We remove all REGISTER and DEFINE operators: they are just pseudo-operators.
+     *    Instead, we add their arguments to the additionalJars list and udfAliases map
      */
-    ops.filter(_.isInstanceOf[Register]).foreach(op => additionalJars += unquote(op.asInstanceOf[Register].jarFile))
-    val planOps = ops.filterNot(_.isInstanceOf[Register])
+    ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
+    ops.filter(_.isInstanceOf[DefineCmd]).foreach { op =>
+      val defineOp = op.asInstanceOf[DefineCmd]
+      udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
+    }
+
+    val planOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd])
 
     /*
      * 1. We create a Map from names to the pipes that *write* them.
@@ -243,11 +253,12 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * Remove the given operator from the dataflow plan.
    *
    * @param op the operator to be removed from the plan
+   * @param removePredecessors If true, predecessors of `rem` will be removed as well.
    * @return the resulting dataflow plan
    */
-  def remove(op: PigOperator) : DataflowPlan = {
+  def remove(op: PigOperator, removePredecessors: Boolean = false) : DataflowPlan = {
     require(operators.contains(op), "operator to remove is not member of the plan")
-    Rewriter.remove(this, op)
+    Rewriter.remove(this, op, removePredecessors)
   }
 
   /**
