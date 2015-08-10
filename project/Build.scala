@@ -10,7 +10,7 @@ object PigBuild extends Build {
     version := "1.0",
     scalaVersion := "2.11.7",
     organization := "dbis",
-    unmanagedJars in Compile += file("lib/jvmr_2.11-2.11.2.1.jar")
+    unmanagedJars in Compile += file("lib_unmanaged/jvmr_2.11-2.11.2.1.jar")
   )
   
   /*
