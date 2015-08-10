@@ -30,12 +30,12 @@ import org.scalatest.FlatSpec
 
 class PigParserSpec extends FlatSpec {
   "The parser" should "parse a simple load statement" in  {
-    val uri = new java.io.File("input/file.csv").getAbsoluteFile().toURI()
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), s"${uri}")))
   }
 
   it should "parse also a case insensitive load statement" in  {
-    val uri = new java.io.File("input/file.csv").getAbsoluteFile().toURI()
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     assert(parseScript("""a = LOAD 'file.csv';""") == List(Load(Pipe("a"), s"${uri}")))
   }
 
@@ -54,7 +54,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a load statement with typed schema specification" in {
-    val uri = new java.io.File("input/file.csv").getAbsoluteFile().toURI()
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
                                                 Field("b", Types.CharArrayType),
                                                 Field("c", Types.DoubleType))))
@@ -63,7 +63,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a load statement with complex typed schema specification" in {
-    val uri = new java.io.File("input/file.csv").getAbsoluteFile().toURI()
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
       Field("t", TupleType(Array(Field("f1", Types.IntType), Field("f2", Types.IntType)))),
       Field("b", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType)), "t2"))))))
@@ -72,7 +72,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse another load statement with complex typed schema specification" in {
-    val uri = new java.io.File("input/file.csv").getAbsoluteFile().toURI()
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
       Field("m1", MapType(Types.CharArrayType)),
       Field("m2", MapType(TupleType(Array(Field("f1", Types.IntType), Field("f2", Types.IntType))))),
@@ -91,7 +91,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a load statement with untyped schema specification" in {
-    val uri = new java.io.File("input/file.csv").getAbsoluteFile().toURI()
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     val schema = BagType(TupleType(Array(Field("a", Types.ByteArrayType),
       Field("b", Types.ByteArrayType),
       Field("c", Types.ByteArrayType))))
@@ -116,7 +116,7 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse the store statement" in {
-    val uri = new java.io.File("input/file.csv").getAbsoluteFile().toURI()
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     assert(parseScript("""store b into 'file.csv';""") == List(Store(Pipe("b"), s"${uri}")))
   }
 
@@ -303,12 +303,12 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a list of statements" in {
-    val uri = new java.io.File("input/file.csv").getAbsoluteFile().toURI()
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     assert(parseScript("a = load 'file.csv';\ndump b;") == List(Load(Pipe("a"), s"${uri}"), Dump(Pipe("b"))))
   }
 
   it should "parse a list of statements while ignoring comments" in {
-    val uri = new java.io.File("input/file.csv").getAbsoluteFile().toURI()
+    val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
     assert(parseScript("-- A comment\na = load 'file.csv';-- Another comment\ndump b;") ==
       List(Load(Pipe("a"), s"${uri}"), Dump(Pipe("b"))))
   }
