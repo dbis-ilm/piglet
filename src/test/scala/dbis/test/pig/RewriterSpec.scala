@@ -334,4 +334,44 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       }
     }
   }
+
+  it should "apply rewriting rule F4" in {
+    val patterns = Table(
+      ("Pattern", "grouping column", "Filter"),
+      (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
+        "subject",
+        Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))))),
+      (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
+        "predicate",
+        Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))),
+      (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
+        "object",
+        Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+
+    forAll (patterns) { (p: TriplePattern, g: String, f: Filter) =>
+      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+      val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
+      val op3 = Dump(Pipe("b"))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F4))
+      plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only f
+      plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only f
+    }
+
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+
+    // Test that F4 is only applied if the BGP filters by the grouping column
+    forAll (possibleGroupers) { (g: String) =>
+      forAll(patterns) { (p: TriplePattern, grouped_by: String, f: Filter) =>
+        whenever(g != grouped_by) {
+          val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+          val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
+          val op3 = Dump(Pipe("b"))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F4))
+
+          plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+          plan.operators should contain only(op1, op2, op3)
+        }
+      }
+    }
+  }
 }

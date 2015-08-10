@@ -339,6 +339,47 @@ object Rules {
     case _ => None
   }
 
+  /** Applies rewriting rule F4 of the paper "SPARQling Pig - Processing Linked Data with Pig latin".
+    *
+    * @param term
+    * @return Some Filter operator if `term` was a BGPFilter with a single Pattern filtering on the grouping column
+    *         of data in the triple group format
+    */
+  def F4(term: Any): Option[Filter] = term match {
+    case op @ BGPFilter(out, in, patterns) =>
+      if (op.inputSchema == RDFLoad.plainSchema) {
+        return None
+      }
+
+      if (patterns.length != 1) {
+        return None
+      }
+
+      // TODO we make a lot of assumptions about Options and Array lengths here
+      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+
+      val pattern = patterns.head
+      if (pattern.subj.isInstanceOf[Value]
+        && !pattern.pred.isInstanceOf[Value]
+        && !pattern.obj.isInstanceOf[Value]
+        && grouped_by == "subject") {
+        return Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+      } else if (!pattern.subj.isInstanceOf[Value]
+        && pattern.pred.isInstanceOf[Value]
+        && !pattern.obj.isInstanceOf[Value]
+        && grouped_by == "predicate") {
+        return Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+      } else if (!pattern.subj.isInstanceOf[Value]
+        && !pattern.pred.isInstanceOf[Value]
+        && pattern.obj.isInstanceOf[Value]
+        && grouped_by == "object") {
+        return Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+      }
+
+      return None
+    case _ => None
+  }
+
   def registerAllRules = {
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
@@ -352,5 +393,6 @@ object Rules {
     addStrategy(F1)
     addOperatorReplacementStrategy(F2 _)
     addOperatorReplacementStrategy(F3 _)
+    addOperatorReplacementStrategy(F4 _)
   }
 }
