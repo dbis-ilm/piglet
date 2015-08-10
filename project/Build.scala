@@ -11,12 +11,42 @@ object PigBuild extends Build {
     scalaVersion := "2.11.7",
     organization := "dbis"
   )
+  
+  /*
+   * Projects *****************************************************************
+   */
+  lazy val root = (project in file(".")).
+    configs(IntegrationTest).
+    settings(commonSettings: _*).
+    settings(Defaults.itSettings: _*).
+    dependsOn(common).
+    dependsOn(sparklib % "test;it").
+    dependsOn(flinklib % "test;it"). 
+    aggregate(common, sparklib, flinklib) // remove this if you don't want to automatically build these projects when building piglet 
 
+  lazy val common = (project in file("common")).
+    settings(commonSettings: _*)
 
+  lazy val sparklib = (project in file("sparklib")).
+    settings(commonSettings: _*).
+    dependsOn(common)
 
+  lazy val flinklib = (project in file("flinklib")).
+    settings(commonSettings: _*).
+    dependsOn(common)
 
+    
+    
 
-
+  /*
+   * define the backend for the compiler: currently we support spark and flink
+   */
+  val backend = sys.props.getOrElse("backend", default="spark")
+    
+  val itTests = backend match{
+    case "flink" => Seq("dbis.test.flink.FlinkCompileIt","dbis.test.flink.FlinksCompileIt")
+    case "spark" => Seq("dbis.test.spark.SparkCompileIt")
+    case _ => println(s"Unsupported backend: $backend - Will execute no tests"); Seq.empty[String]
   }
 }
 

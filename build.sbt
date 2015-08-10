@@ -8,13 +8,14 @@ mainClass in (Compile, run) := Some("dbis.pig.PigCompiler")
 
 assemblyJarName in assembly := "PigCompiler.jar"
 
-test in assembly := {}
-
 mainClass in assembly := Some("dbis.pig.PigCompiler")
+
+test in assembly := {}
 
 testOptions in IntegrationTest += Tests.Argument("-oDF")
 
 // scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
 
-//excludeFilter in (IntegrationTest, unmanagedSources) := HiddenFileFilter || itExludes
-testOptions in IntegrationTest := Seq(Tests.Filter(s => {println(s); itTests.contains(s)}))
+
+// run only those it tests, that are available for the selected backend
+testOptions in IntegrationTest := Seq(Tests.Filter(s => itTests.contains(s)))
