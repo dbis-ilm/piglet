@@ -31,6 +31,7 @@ class FlinksCompileIt extends FlatSpec with Matchers {
     ("foreach1.pig", "distances.out", "truth/distances.data",false),
     ("construct.pig", "result3.out", "truth/result3.data",false),
     ("windowJoin.pig", "joinedW.out", "truth/joined.data", false),
+    ("windowCross.pig", "crossedW.out", "truth/crossed.data", false),
     ("windowGrouping.pig", "grouping.out", "truth/grouping.data", false),
     ("windowNforeach.pig", "nested.out", "truth/nested.data", false),
     ("windowCount.pig", "marycounts.out", "truth/marycount.data", false),

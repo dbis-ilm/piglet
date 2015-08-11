@@ -661,15 +661,18 @@ object Rewriter extends LazyLogging {
       }
     }
     
-    // Find and process Window Joins 
-    val joins = ListBuffer.empty[Join]
+    // Find and process Window Joins and Cross'
+    val joins = ListBuffer.empty[PigOperator]
     walker2.walk(newPlan){ op => 
       op match {
         case o: Join => joins += o
+        case o: Cross => joins += o
         case _ =>
       }
     }
     newPlan = processWindowJoins(newPlan, joins.toList)
+
+    //TODO: Add Check for WindowOnly operators (distinct, orderBy, etc.)
 
     newPlan
   }
@@ -682,6 +685,7 @@ object Rewriter extends LazyLogging {
       operator match {
         case o: Filter => {
           logger.debug(s"Rewrite Filter to WindowMode")
+          //TODO: Move before Window, not only Filter - all non-WindowOps
           o.windowMode = true
         }
         case o: Limit => {
@@ -707,6 +711,10 @@ object Rewriter extends LazyLogging {
           logger.debug(s"Found Join Node, abort")
           return plan
         }
+        case o: Cross => {
+          logger.debug(s"Found Cross Node, abort")
+          return plan
+        }
         case _ =>
       }
       littleWalker ++= operator.outputs.flatMap(_.consumer)
@@ -721,12 +729,12 @@ object Rewriter extends LazyLogging {
     newPlan
   }
 
-  def processWindowJoins(plan: DataflowPlan, joins: List[Join]): DataflowPlan = {
+  def processWindowJoins(plan: DataflowPlan, joins: List[PigOperator]): DataflowPlan = {
 
     var newPlan = plan
     
     /*
-     * Foreach Join Operator check if Input requirements are met.
+     * Foreach Join or Cross Operator check if Input requirements are met.
      * Collect Window input relations and create new Join with Window 
      * definition and window inputs as new inputs.
      */
@@ -756,8 +764,12 @@ object Rewriter extends LazyLogging {
         })
       }
 
-      val newJoin = Join(joinOp.out, newInputs.toList, joinOp.fieldExprs, 
-                         windowDef.getOrElse(null.asInstanceOf[Tuple2[Int,String]]))
+      val newJoin = joinOp match {
+        case o: Join => Join(o.out, newInputs.toList, o.fieldExprs, windowDef.getOrElse(null.asInstanceOf[Tuple2[Int,String]]))
+        case o: Cross => Cross(o.out, newInputs.toList, windowDef.getOrElse(null.asInstanceOf[Tuple2[Int,String]]))
+        case _ => ???
+      }
+
       /*
        * Replace Old Join with new Join (new Input Pipes and Window Parameter)
        */

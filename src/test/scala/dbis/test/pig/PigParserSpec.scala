@@ -359,6 +359,15 @@ class PigParserSpec extends FlatSpec {
       List(List(PositionalField(0)), List(PositionalField(0)), List(PositionalField(0))))))
   }
 
+  it should "parse a binary cross statement" in {
+    assert(parseScript("a = cross b, c;") == List(Cross(Pipe("a"), List(Pipe("b"), Pipe("c")))))
+  }
+
+  it should "parse a n-ary cross statement" in {
+    assert(parseScript("a = cross b, c, d, e;") == List(Cross(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d"), Pipe("e")))))
+  }
+
+
   it should "parse expressions with deref operators for map" in {
     assert(parseScript("""a = foreach b generate m1#"k1", m1#"k2";""") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(NamedField("m1"), "\"k1\""))),
