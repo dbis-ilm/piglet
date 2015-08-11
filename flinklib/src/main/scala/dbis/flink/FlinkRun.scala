@@ -33,8 +33,9 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.net.InetSocketAddress
 
+import com.typesafe.scalalogging.LazyLogging
 
-class FlinkRun extends PigletBackend {
+class FlinkRun extends PigletBackend with LazyLogging {
   
   override def execute(master: String, className: String, jarFile: Path){
     if (master.startsWith("local") && !master.startsWith("localhost")){
@@ -50,14 +51,17 @@ class FlinkRun extends PigletBackend {
   }
 
   def submitJar(master: String, path: Path, className: String, args: String*) = { 
-    val file = new File(path.toString())
+    val file = path.toFile().getAbsoluteFile()
     val parallelism = 1 
     val wait = true
     try { 
+      logger.debug(s"submitting $file")
       val program = new PackagedProgram(file, className, args:_*)
       val jobManagerAddress = getInetFromHostport(master)
-      val client = new Client(jobManagerAddress, new Configuration(), program.getUserCodeClassLoader(), 1)  
-      println("Executing " + path.toString()); 
+      logger.debug(s"using job manager at $jobManagerAddress  for name $master")
+      val client = new Client(jobManagerAddress, new Configuration(), program.getUserCodeClassLoader(), 1)
+      logger.debug(s"created job client: $client")
+      println(s"Executing ${path.toString}"); 
       client.run(program, parallelism, wait); 
     } catch {
       case e: ProgramInvocationException => e.printStackTrace()

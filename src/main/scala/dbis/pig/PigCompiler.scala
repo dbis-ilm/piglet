@@ -43,8 +43,8 @@ object PigCompiler extends PigParser with LazyLogging {
                             compile: Boolean = false,
                             outDir: String = ".",
                             params: Map[String,String] = Map(),
-                            backend: String = Conf.defaultBackend,
-                            updateConfig: Boolean = false) // XXX: does this work?
+                            backend: String = Conf.defaultBackend, // XXX: does this work?
+                            updateConfig: Boolean = false) 
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
