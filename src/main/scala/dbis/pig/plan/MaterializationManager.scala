@@ -18,11 +18,13 @@ class MaterializationManager(private val mapFile: Path, private val matBaseDir: 
   
   
   logger.debug(s"base: $matBaseDir")
+  logger.debug(s"mat map file: $mapFile")
   
   require(mapFile != null, "the mapFile must not be null")
 //  require(mapFile.exists(), s"mapFile $mapFile does not exist")
   
   val f = mapFile.getParent
+  logger.debug(s"checking mat map file parents: $f")
   if(!Files.exists(f))
     Files.createDirectories(f)
   

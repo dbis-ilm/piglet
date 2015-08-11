@@ -27,6 +27,8 @@ import java.net.URI
 
 import org.clapper.scalasti._
 
+// import scala.collection.mutable.Map
+
 /**
  * Implements a code generator for Scala-based backends such as Spark or Flink which use
  * a template file for the backend-specific code.
@@ -179,7 +181,12 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
           if (requiresTypeCast) {
             val field = s.field(idx)
             val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
-            s"${tuplePrefix}(${idx}).to${typeCast}"
+
+            /* if we need to cast to anything else than string (i.e. int, double, etc) we have to
+             * cast to string before, because if we load from a BinStorage, we only get Any types
+             * that do not have a toInt or toDouble conversion method
+             */
+            s"${tuplePrefix}(${idx})${if(typeCast != "String") ".toString" else ""}.to${typeCast}"
           }
           else
             s"${tuplePrefix}(${idx})"
@@ -272,8 +279,16 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
                             else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
         }
         case None => {
-          // TODO: we don't know the function yet, let's assume there is a corresponding Scala function
-          s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+          // check if we have have an alias in DataflowPlan
+          if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
+            val alias = udfAliases.get(f)
+            val paramList = alias._2 ::: params.map(e => emitExpr(schema, e))
+            s"${alias._1}(${paramList.mkString(",")})"
+          }
+          else {
+            // we don't know the function yet, let's assume there is a corresponding Scala function
+            s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+          }
         }
       }
     }
@@ -380,13 +395,13 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case OrderBy(out, in, orderSpec) => {
         var params = Map[String,Any]()
         //Spark
-        params += "cname" -> s"custKey_${node.outputs.head.name}_${node.inputs.head.name}"
+        params += "cname" -> s"custKey_${node.outPipeName}_${node.inputs.head.name}"
         var col = 0
         params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
         params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
 
         //Flink
-        params += "out"->node.outputs.head.name
+        params += "out"->node.outPipeName
         params += "key"->s"(${orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")})"
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse"->true
 
@@ -414,7 +429,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case Grouping(out, in, groupExpr, windowMode) => { 
         if (windowMode)
           s"""
-          |  def custom${node.outputs.head.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+          |  def custom${node.outPipeName}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
           |    out.collect(ts.groupBy(t => ${emitGroupExpr(node.inputSchema,groupExpr)}).flatMap(x => List(x._1,x._2)).toList)
           |  }""".stripMargin
         else ""
@@ -422,7 +437,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case Foreach(out, in, gen, windowMode) => { 
         if (windowMode)
           s"""
-          |  def custom${node.outputs.head.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+          |  def custom${node.outPipeName}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
           |    ts.foreach { t => out.collect(${emitForeachExpr(node, gen)})}
           |  }""".stripMargin
         else ""
@@ -687,7 +702,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @return the Scala code implementing the STORE operator
    */
   def emitStore(in: String, file: URI, func: String): String = {
-    callST("store", Map("in"->in,"file"->file.toString(),"schema"->s"tuple${in}ToString(t)","func"->func))
+    
+    /* for BinStorage we do not convert the tuple into a string because
+     * we want to keep our fields as is
+     */
+    if(func == "BinStorage")
+      callST("store", Map("in"->in,"file"->file.toString(),"func"->func))
+    else
+      callST("store", Map("in"->in,"file"->file.toString(),"schema"->s"tuple${in}ToString(t)","func"->func))
   }
 
   /**
@@ -723,25 +745,30 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   def emitNode(node: PigOperator): String = {
     val group = STGroupFile(templateFile)
     node match {
-      case Load(out, file, schema, func, params) => emitLoad(node.outputs.head.name, file, func, params)
+        /*
+         * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
+         *       after changing the pipe name. Instead, use node.outPipeName
+         */
+      case Load(out, file, schema, func, params) => emitLoad(node.outPipeName, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inputs.head.name))
       case Store(in, file, func, params) => emitStore(node.inputs.head.name, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""
-      case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outputs.head.name, node.inputs.head.name, pred, windowMode)
-      case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outputs.head.name, node.inputs.head.name, gen, windowMode)
-      case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outputs.head.name, node.inputs.head.name, groupExpr, windowMode)
-      case Distinct(out, in, windowMode) => emitDistinct(node.outputs.head.name, node.inputs.head.name, windowMode)
-      case Limit(out, in, num, windowMode) => emitLimit(node.outputs.head.name, node.inputs.head.name, num, windowMode)
-      case Join(out, rels, exprs, window) => emitJoin(node, node.outputs.head.name, node.inputs, exprs, window)
-      case Cross(out, rels, window) => emitCross(node, node.outputs.head.name, node.inputs, window) 
-      case Union(out, rels) => callST("union", Map("out"->node.outputs.head.name,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
-      case Sample(out, in, expr) => callST("sample", Map("out"->node.outputs.head.name,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
-      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outputs.head.name,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outputs.head.name, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
-      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outputs.head.name,"op"->op,"in"->node.inputs.head.name,"params"->emitParamList(node.schema, params)))
-      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outputs.head.name, address, mode, func, params)
+      case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outPipeName, node.inputs.head.name, pred, windowMode)
+      case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outPipeName, node.inputs.head.name, gen, windowMode)
+      case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outPipeName, node.inputs.head.name, groupExpr, windowMode)
+      case Distinct(out, in, windowMode) => emitDistinct(node.outPipeName, node.inputs.head.name, windowMode)
+      case Limit(out, in, num, windowMode) => emitLimit(node.outPipeName, node.inputs.head.name, num, windowMode)
+      case Join(out, rels, exprs, window) => emitJoin(node, node.outPipeName, rels, exprs, window)
+      case Cross(out, rels, window) => emitCross(node, node.outPipeName, node.inputs, window) 
+      case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
+      case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
+      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outPipeName, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
+      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inputs.head.name,"params"->emitParamList(node.schema, params)))
+      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outPipeName, address, mode, func, params)
       case SocketWrite(in, address, mode) => emitSocketWrite(node.inputs.head.name, address, mode)
-      case Window(out, in, window, slide) => emitWindow(node.outputs.head.name,node.inputs.head.name,window,slide)
-      case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outputs.head.name,"in"->node.inputs.head.name))
+      case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inputs.head.name,window,slide)
+      case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inputs.head.name))
+      case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case Empty(_) => ""
            
       /*

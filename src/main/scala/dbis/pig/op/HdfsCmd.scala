@@ -19,10 +19,21 @@ package dbis.pig.op
 
 
 /**
- * Register represents a pseudo operator for the REGISTER statement. This "operator" will
- * be eliminated during building the dataflow plan.
- *
- * @param jarFile the URI of the Jar file to be registered
+ * HdfsCmd represents a pseudo operator for HDFS commands.
  */
-case class Register(jarFile: String) extends PigOperator
+case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator {
+
+  if (!isValid)
+    throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
+
+  def isValid: Boolean = cmd match {
+    case "copyFromLocal" => true
+    case "copyToRemote" => true
+    case "rm" => true
+    case "rmdir" => true
+    case "ls" => true
+    case "mkdir" => true
+    case _ => false
+  }
+}
 

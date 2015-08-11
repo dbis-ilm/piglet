@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-package dbis.flink
+package dbis.flink.streaming
 
 import org.apache.flink.streaming.api.scala._
+import dbis.flink.ZmqSubscriber
 
 class PigStorage extends java.io.Serializable {
   def load(env: StreamExecutionEnvironment, path: String, delim: Char = '\t'): DataStream[List[String]] = {

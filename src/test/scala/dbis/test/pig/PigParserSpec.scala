@@ -154,6 +154,33 @@ class PigParserSpec extends FlatSpec {
         PPredicate(Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))))))))))
   }
 
+  it should "parse a filter with a function expression" in {
+    assert(parseScript("a = FILTER b BY STARTSWITH($0,\"test\") == true;") ==
+      List(Filter(Pipe("a"), Pipe("b"), Eq(
+                                          Func("STARTSWITH", List(RefExpr(PositionalField(0)), RefExpr(Value("\"test\"")))),
+                                          RefExpr(Value(true))))))
+  }
+
+  it should "parse a filter with a function expression and number" in {
+    assert(parseScript("a = FILTER b BY aFunc(x, y) > 0;") ==
+      List(Filter(Pipe("a"), Pipe("b"), Gt(
+        Func("aFunc", List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),
+        RefExpr(Value("0"))))))
+  }
+
+  it should "parse a filter with a boolean function expression" in {
+    assert(parseScript("a = FILTER b BY STARTSWITH($0,\"test\");") ==
+      List(Filter(Pipe("a"), Pipe("b"),
+        Eq(Func("STARTSWITH", List(RefExpr(PositionalField(0)), RefExpr(Value("\"test\"")))), RefExpr(Value(true))))))
+  }
+  
+  it should "parse a filter with a function expression and boolean" in {
+    assert(parseScript("a = FILTER b BY aFunc(x, y) == true AND cFunc(x, y) >= x;") ==
+      List(Filter(Pipe("a"),Pipe("b"),And(
+            Eq(Func("aFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(Value(true))),
+            Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),false))) 
+  }
+
   it should "parse a simple foreach statement" in {
     assert(parseScript("a = foreach b generate x, y, z;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
@@ -374,7 +401,16 @@ class PigParserSpec extends FlatSpec {
   }
 
   it should "parse a register statement" in {
-    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(Register("\"/usr/local/share/myfile.jar\"")))
+    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(RegisterCmd("\"/usr/local/share/myfile.jar\"")))
+  }
+
+  it should "parse a define (function alias) statement" in {
+    assert(parseScript("""define myFunc class.func();""") == List(DefineCmd("myFunc", "class.func", List())))
+  }
+
+  it should "parse a define (function alias) statement with constructor parameters" in {
+    assert(parseScript("""define myFunc class.func(42, "Hallo");""") ==
+      List(DefineCmd("myFunc", "class.func", List(Value("42"), Value("\"Hallo\"")))))
   }
 
   it should "parse a stream statement without schema" in {
@@ -640,5 +676,18 @@ class PigParserSpec extends FlatSpec {
           SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
+  }
+
+  it should "parse HDFS commands" in {
+    assert(parseScript("fs -copyToRemote /usr/local/file /hdfs/data/file;")
+      == List(HdfsCmd("copyToRemote", List("/usr/local/file", "/hdfs/data/file"))))
+    assert(parseScript("fs -copyFromLocal /hdfs/data/file /usr/local/file;")
+      == List(HdfsCmd("copyFromLocal", List("/hdfs/data/file", "/usr/local/file"))))
+    assert(parseScript("fs -rmdir /hdfs/data;")
+      == List(HdfsCmd("rmdir", List("/hdfs/data"))))
+
+    intercept[java.lang.IllegalArgumentException] {
+      parseScript("fs -unknownCmd something;")
+    }
   }
 }

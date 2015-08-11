@@ -23,10 +23,15 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
 import java.net.URI
+import dbis.pig.tools.Conf
+import dbis.pig.backends.BackendManager
+import com.typesafe.scalalogging.LazyLogging
 
-class FlinksCompileSpec extends FlatSpec {
+class FlinksCompileSpec extends FlatSpec with LazyLogging {
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = "src/main/resources/flinks-template.stg"
+  val templateFile = BackendManager.backend("flinks").templateFile
+  
+  logger.debug(s"template file: $templateFile")
 
   "The compiler output" should "contain the Flink header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -53,21 +58,21 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD" in {
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.csv")
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
 
     val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}")""")
+    val expectedCode = cleanString(s"""val a = dbis.flink.streaming.PigStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.csv")
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
     val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
+    val expectedCode = cleanString(s"""val a = dbis.flink.streaming.PigStorage().load(env, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
@@ -76,7 +81,7 @@ class FlinksCompileSpec extends FlatSpec {
     val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
+    val expectedCode = cleanString(s"""val a = dbis.flink.streaming.RDFFileStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -97,7 +102,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for STORE" in {
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.csv")
+    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
     val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -106,7 +111,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for the STORE helper function" in {
-    val file = new java.net.URI("file.csv")
+    val file = new java.net.URI("input/file.csv")
     val op = Store(Pipe("A"), file)
     op.schema = Some(new Schema(BagType(TupleType(Array(
         Field("f1", Types.IntType),
@@ -215,7 +220,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for a binary JOIN statement with simple expression" in {
-    val file = new java.net.URI("file.csv")
+    val file = new java.net.URI("input/file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
@@ -233,7 +238,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for a binary JOIN statement with expression lists" in {
-    val file = new java.net.URI("file.csv")
+    val file = new java.net.URI("input/file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
       List(PositionalField(1), PositionalField(2))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
@@ -252,7 +257,7 @@ class FlinksCompileSpec extends FlatSpec {
   }
 
   it should "contain code for a multiway JOIN statement" in {
-    val file = new java.net.URI("file.csv")
+    val file = new java.net.URI("input/file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
       List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),

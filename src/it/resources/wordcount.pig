@@ -1,6 +1,6 @@
 -- Load input from the file named mary.txt and call the single
 -- field in the record 'line'.
-input = load 'src/it/resources/mary.txt' as (line);
+input = load 'src/it/resources/input/mary.txt' as (line);
 
 -- TOKENIZE splits the line into a field for each word.
 -- flatten will take the collection of records returned b

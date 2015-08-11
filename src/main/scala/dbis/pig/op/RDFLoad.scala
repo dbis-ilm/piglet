@@ -24,13 +24,21 @@ case class RDFLoad(out: Pipe, uri: URI, grouped: Option[String]) extends PigOper
                   TupleType(
                     fields))))))))
   } else {
-    Some(
-      Schema(
-        BagType(
-          TupleType(
-            Array(
-              Field("subject", Types.CharArrayType),
-              Field("predicate", Types.CharArrayType),
-              Field("object", Types.CharArrayType))))))
+    RDFLoad.plainSchema
   }
+}
+
+object RDFLoad {
+  /** The schema for plain RDF data
+    *
+    */
+  final val plainSchema: Some[Schema] = Some(
+    Schema(
+      BagType(
+        TupleType(
+          Array(
+            Field("subject", Types.CharArrayType),
+            Field("predicate", Types.CharArrayType),
+            Field("object", Types.CharArrayType))))))
+
 }

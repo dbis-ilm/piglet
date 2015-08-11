@@ -26,17 +26,17 @@ import scala.io.Source
 class FlinksCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
     ("script", "result", "truth", "inOrder"), // only the header of the table
-    ("load.pig", "result1.out", "result1.data",false),
-    ("load2.pig", "result2.out", "result2.data",false),
-    ("foreach1.pig", "distances.out", "distances.data",false),
-    ("construct.pig", "result3.out", "result3.data",false),
-    ("windowJoin.pig", "joinedW.out", "joined.data", false),
-    ("windowCross.pig", "crossedW.out", "crossed.data", false),
-    ("windowGrouping.pig", "grouping.out", "grouping.data", false),
-    ("windowNforeach.pig", "nested.out", "nested.data", false),
-    ("windowCount.pig", "marycounts.out", "marycount.data", false),
-    ("windowDistinct.pig", "unique.out", "unique.data", false),
-    ("windowSort.pig","sorted.out","sorted.data", true)
+    ("load.pig", "result1.out", "truth/result1.data",false),
+    ("load2.pig", "result2.out", "truth/result2.data",false),
+    ("foreach1.pig", "distances.out", "truth/distances.data",false),
+    ("construct.pig", "result3.out", "truth/result3.data",false),
+    ("windowJoin.pig", "joinedW.out", "truth/joined.data", false),
+    ("windowCross.pig", "crossedW.out", "truth/crossed.data", false),
+    ("windowGrouping.pig", "grouping.out", "truth/grouping.data", false),
+    ("windowNforeach.pig", "nested.out", "truth/nested.data", false),
+    ("windowCount.pig", "marycounts.out", "truth/marycount.data", false),
+    ("windowDistinct.pig", "unique.out", "truth/unique.data", false),
+    ("windowSort.pig","sorted.out", "truth/sorted.data", true)
     //TODO: Limit, Filter
   )
 

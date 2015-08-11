@@ -4,7 +4,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd._
-import dbis.spark._
+import dbis.pig.backends.spark._
 
 <\n>
 >>
@@ -12,6 +12,7 @@ import dbis.spark._
 // ----------------- BEGIN of code building and initializing the query --------
 query_object(name) ::= <<
 object <name> {
+
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
@@ -111,6 +112,11 @@ orderHelper(params) ::=<<
 // ------------------ STREAM operators ----------------------------------------
 streamOp(out,in,op,params) ::=<<
         val <out> = <op>(sc, <in><params>)
+>>
+
+// ----------------------- FS commands ----------------------------------------
+fs(cmd,params) ::=<<
+    HDFSService.process(<cmd>, <params>)
 >>
 
 // ----------------- END of the code implementing the query -------------------
