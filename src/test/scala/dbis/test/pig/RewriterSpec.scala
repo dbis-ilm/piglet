@@ -569,5 +569,15 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
+
+    // Don't apply F8 if there are no patterns
+    forAll(patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+      val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
+      val op3 = Dump(Pipe("b"))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F8))
+      plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
+      plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
+    }
   }
 }
