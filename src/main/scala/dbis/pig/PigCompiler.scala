@@ -34,21 +34,22 @@ import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.backends.BackendManager
 import java.nio.file.Path
 import java.nio.file.Paths
+import scala.collection.mutable.ListBuffer
 
 
 object PigCompiler extends PigParser with LazyLogging {
   
   case class CompilerConfig(master: String = "local",
-                            input: String = "",
+                            inputs: Seq[File] = Seq.empty,
                             compile: Boolean = false,
                             outDir: String = ".",
                             params: Map[String,String] = Map(),
-                            backend: String = Conf.defaultBackend, // XXX: does this work?
+                            backend: String = Conf.defaultBackend,
                             updateConfig: Boolean = false) 
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
-    var inputFile: Path = null
+    var inputFiles: Seq[Path] = null
     var compileOnly: Boolean = false
     var outDir: Path = null
     var params: Map[String,String] = null
@@ -65,14 +66,14 @@ object PigCompiler extends PigParser with LazyLogging {
       opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in ${Conf.programHome}") 
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
-      arg[String]("<file>") required() action { (x, c) => c.copy(input = x) } text ("Pig file")
+      arg[File]("<file>...") unbounded() required() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
     }
     // parser.parse returns Option[C]
     parser.parse(args, CompilerConfig()) match {
       case Some(config) => {
         // do stuff
         master = config.master
-        inputFile = Paths.get(config.input)
+        inputFiles = config.inputs.map { f => f.toPath() }  //Paths.get(config.input)
         compileOnly = config.compile
         outDir = Paths.get(config.outDir)
         params = config.params
@@ -88,83 +89,127 @@ object PigCompiler extends PigParser with LazyLogging {
     	Conf.copyConfigFile()
     
     // start processing
-    run(inputFile, outDir, compileOnly, master, backend, params)
+    run(inputFiles, outDir, compileOnly, master, backend, params)
   }
 
+  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String]): Unit = {
+    run(Seq(inputFile), outDir, compileOnly, master, backend, params)
+  }
+  
   /**
    * Start compiling the Pig script into a the desired program
    */
-  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String]): Unit = {
+  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String]): Unit = {
     
-    // 1. we read the Pig file
-    val source = Source.fromFile(inputFile.toFile())
-    
-    logger.debug(s"""loaded pig script from "$inputFile" """)
-
-    val fileName = inputFile.getFileName
-
-    // 2. then we parse it and construct a dataflow plan
-    var plan = new DataflowPlan(parseScriptFromSource(source, params, backend))
-    
-    try {
-      // if this does _not_ throw an exception, the schema is ok
-      plan.checkSchemaConformance
-    } catch {
-      case e:SchemaException => {
-        logger.error(s"schema conformance error in ${e.getMessage}")
-        return
+    logger.debug("start parsing input files")
+    val schedule = ListBuffer.empty[(DataflowPlan,Path)]
+    for(file <- inputFiles) {
+      createDataflowPlan(file, params, backend) match {
+        case Some(v) => schedule += v
+        case None => 
+          logger.error(s"failed to create dataflow plan for $file - aborting")
+          return        
       }
     }
 
-    val scriptName = fileName.toString().replace(".pig", "")
-    if (!plan.checkConnectivity) {
-      logger.error(s"dataflow plan not connected")
-      return
+    logger.debug("start processing created dataflow plans")
+    
+    for(plan <- schedule) {
+    
+      // 3. now, we should apply optimizations
+      var newPlan = plan._1
+      val mm = new MaterializationManager
+      newPlan = processMaterializations(newPlan, mm)
+      if (backend=="flinks") newPlan = processWindows(newPlan)
+      newPlan = processPlan(newPlan)
+      
+      logger.debug("finished optimizations")
+      
+      
+      val backendConf = BackendManager.backend(backend)
+      val templateFile = backendConf.templateFile
+      val jarFile = Conf.backendJar(backend)
+  
+      val scriptName = plan._2.getFileName.toString().replace(".pig", "")
+      logger.debug(s"using script name: $scriptName")      
+      
+      FileTools.compileToJar(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile) match {
+        // the file was created --> execute it
+        case Some(jarFile) =>  
+          if (!compileOnly) {
+          // 4. and finally deploy/submit          
+          val runner = backendConf.runnerClass 
+          logger.debug(s"using runner class ${runner.getClass.toString()}")
+          
+          logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
+          
+          runner.execute(master, scriptName, jarFile)
+        } else
+          logger.info("successfully compiled program - exiting.")
+          
+        case None => logger.error("creating jar file failed") 
+      } 
     }
-
-    logger.debug("successfully created dataflow plan")
-    
-    // 3. now, we should apply optimizations
-    
-    val mm = new MaterializationManager
-    plan = processMaterializations(plan, mm)
-    if (backend=="flinks") plan = processWindows(plan)
-    plan = processPlan(plan)
-    
-    logger.debug("finished optimizations")
-    
-    
-    val backendConf = BackendManager.backend(backend)
-    val templateFile = backendConf.templateFile
-    val jarFile = Conf.backendJar(backend)
-
-    FileTools.compileToJar(plan, scriptName, outDir, compileOnly, jarFile, templateFile) match {
-      // the file was created --> execute it
-      case Some(jarFile) =>  
-        if (!compileOnly) {
-        // 4. and finally deploy/submit          
-        val runner = backendConf.runnerClass //FileTools.getRunner(backend)
-        logger.debug(s"using runner class ${runner.getClass.toString()}")
-        
-        logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
-        
-        runner.execute(master, scriptName, jarFile)
-      } else
-        logger.info("successfully compiled program - exiting.")
-        
-      case None => logger.error("creating jar file failed") 
-    } 
       
   }
 
+  /**
+   * Helper method to parse the given file into a dataflow plan
+   * 
+   * @param inputFile The file to parse
+   * @param params Key value pairs to replace placeholders in the script
+   * @param backend The name of the backend
+   */
+  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String): Option[(DataflowPlan,Path)] = {
+      // 1. we read the Pig file
+      val source = Source.fromFile(inputFile.toFile())
+      
+      logger.debug(s"""loaded pig script from "$inputFile" """)
+  
+      // 2. then we parse it and construct a dataflow plan
+      val plan = new DataflowPlan(parseScriptFromSource(source, params, backend))
+      
+      
+      try {
+        // if this does _not_ throw an exception, the schema is ok
+        plan.checkSchemaConformance
+      } catch {
+        case e:SchemaException => {
+          logger.error(s"schema conformance error in ${e.getMessage} for plan $inputFile")
+          return None
+        }
+      }
+      
+      if (!plan.checkConnectivity) {
+        logger.error(s"dataflow plan not connected for $inputFile")
+        return None
+      }
+
+      logger.debug(s"successfully created dataflow plan for $inputFile")
+
+      return Some((plan,inputFile))
+    
+  }
+
+  /**
+   * Replace placeholders in the script with values provided by the given map
+   * 
+   * @param line The line to process
+   * @param params The map of placeholder key and the value to use as replacement
+   */
   def replaceParameters(line: String, params: Map[String,String]): String = {
     var s = line
     params.foreach{case (p, v) => s = s.replaceAll("\\$" + p, v)}
     s
   }
 
+  
   private def parseScriptFromSource(source: Source, params: Map[String,String], backend: String): List[PigOperator] = {
       if (params.nonEmpty)
+
+        /* TODO: can we provide a config value "language_feature" in the backend config ?
+         * So we could parse this value and pass it here for all backends in the same way
+         */        
         if (backend == "flinks")
           parseScript(source.getLines().map(line => replaceParameters(line, params)).mkString("\n"), StreamingPig)
         else
