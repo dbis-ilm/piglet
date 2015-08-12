@@ -18,20 +18,58 @@ package dbis.pig.codegen
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.DataflowPlan
+import scala.collection.immutable.Map
 
-/**
- * Created by kai on 08.04.15.
- */
 trait GenCodeBase {
-  def emitNode(node: PigOperator): String
-  def emitImport: String
-  def emitHeader(scriptName: String): String
-  def emitFooter: String
-  def emitHelperClass(node: PigOperator): String
+  var udfAliases: Option[Map[String, (String, List[dbis.pig.op.Value])]] = None
 
-  // def emitPredicate(schema: Option[Schema], predicate: Predicate): String
-  // def emitRef(schema: Option[Schema], ref: Ref): String
-  // def emitGrouping(schema: Option[Schema], groupingExpr: GroupingExpression): String
+  /**
+   * Generate code for the given Pig operator.
+   *
+   * @param node the operator (an instance of PigOperator)
+   * @return a string representing the code
+   */
+  def emitNode(node: PigOperator): String
+
+  /**
+   * Generate code needed for importing packages, classes, etc.
+   *
+   * @return a string representing the import code
+   */
+  def emitImport: String
+
+  /**
+   * Generate code for the header of the script outside the main class/object,
+   * e.g. defining the main object.
+   *
+   * @param scriptName the name of the script (e.g. used for the object)
+   * @return a string representing the header code
+   */
+  def emitHeader1(scriptName: String): String
+
+  /**
+   * Generate code for the header of the script which should be defined inside
+   * the main class/object.
+   *
+   * @param scriptName the name of the script (e.g. used for the object)
+   * @return a string representing the header code
+   */
+  def emitHeader2(scriptName: String): String
+
+  /**
+   * Generate code needed for finishing the script.
+   *
+   * @return a string representing the end of the code.
+   */
+  def emitFooter: String
+
+  /**
+   * Generate code for any helper class/function if needed by the given operator.
+   *
+   * @param node the Pig operator requiring helper code
+   * @return a string representing the helper code
+   */
+  def emitHelperClass(node: PigOperator): String
 }
 
 /**
@@ -56,8 +94,15 @@ trait Compile {
    */
   def compile(scriptName: String, plan: DataflowPlan): String = {
     require(codeGen != null, "code generator undefined")
+
+    if (plan.udfAliases != null) {
+      codeGen.udfAliases = Some(plan.udfAliases.toMap)
+    }
+
     // generate import statements
     var code = codeGen.emitImport
+
+    code = code + codeGen.emitHeader1(scriptName)
 
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
@@ -65,7 +110,8 @@ trait Compile {
     }
 
     // generate the object definition representing the script
-    code = code + codeGen.emitHeader(scriptName)
+    code = code + codeGen.emitHeader2(scriptName)
+
     for (n <- plan.operators) {
       code = code + codeGen.emitNode(n) + "\n"
     }

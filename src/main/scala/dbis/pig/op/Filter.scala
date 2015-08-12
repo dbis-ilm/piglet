@@ -24,8 +24,9 @@ package dbis.pig.op
  * @param initialInPipeName the name of the input pipe
  * @param pred the predicate used for filtering tuples from the input pipe
  */
-case class Filter(override val initialOutPipeName: String, initialInPipeName: String, pred: Predicate)
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Filter(out: Pipe, in: Pipe, pred: Predicate, var windowMode: Boolean = false) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
@@ -40,11 +41,11 @@ case class Filter(override val initialOutPipeName: String, initialInPipeName: St
     schema match {
       case Some(s) => {
         // if we know the schema we check all named fields
-        pred.traverse(s, Expr.checkExpressionConformance)
+        pred.traverseAnd(s, Expr.checkExpressionConformance)
       }
       case None => {
         // if we don't have a schema all expressions should contain only positional fields
-        pred.traverse(null, Expr.containsNoNamedFields)
+        pred.traverseAnd(null, Expr.containsNoNamedFields)
       }
     }
   }

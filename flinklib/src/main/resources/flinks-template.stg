@@ -1,0 +1,165 @@
+// ----------------- header declaration ----------------- 
+init_code(includes) ::= <<
+import org.apache.flink.streaming.api.scala._
+import dbis.flink._
+import dbis.flink.FlinkExtensions._
+import java.util.concurrent.TimeUnit
+import org.apache.flink.streaming.api.windowing.helper._
+import org.apache.flink.util.Collector
+
+<\n>
+>>
+
+// ----------------- BEGIN of code building and initializing the query --------
+query_object(name) ::= <<
+object <name> {
+>>
+
+// ----------------- BEGIN of code building and initializing the query --------
+begin_query(name) ::= <<<\n>
+  def main(args: Array[String]) {
+    val env = StreamExecutionEnvironment.getExecutionEnvironment<\n>
+>>
+
+// ----------------- LOAD text file -------------------------------------------
+loader(out,file,func,params) ::=<<
+    val <out> = dbis.flink.streaming.<func>().load(env, "<file>"<params>)
+>>
+
+// ------------------ DUMP Results --------------------------------------------
+dump(in) ::=<<
+    <in>.map(_.mkString(",")).print
+>>
+
+// ------------------ STORE Results on Disk -----------------------------------
+store(in,file,func,schema) ::=<<
+    <in>.map(t => <schema>).writeAsText("<file>")
+>>
+
+// ------------------ FILTER for a Predicate ----------------------------------
+filter(out,in,pred,windowMode) ::=<<
+    val <out> = <in>.filter(t => {<pred>})
+>>
+
+// ------------------ Executes an expression FOREACH input element ------------
+foreach(out,in,expr,windowMode) ::=<<
+<if(windowMode)>
+    val <out> = <in>.mapWindow(custom<out>Map _)
+<else>
+    val <out> = <in>.map(t => <expr>)
+<endif>
+>>
+
+// ----- Executes an expression FOREACH input element requiring a flatMap -----
+foreachFlatMap(out,in,expr,windowMode) ::=<<
+    val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
+>>
+
+// ------------------ GROUPS elements on an expression ------------------------
+groupBy(out,in,expr,windowMode) ::=<<
+<if (expr)>
+  <if(windowMode)>
+    val <out> = <in>.groupBy(t => <expr>).mapWindow(custom<out>Map _)
+  <else>
+    val <out> = <in>.groupBy(t => <expr>).map(t => List(<expr>,List(t)))
+  <endif>
+<else>
+    val <out> = <in>
+<endif>
+>>
+
+// ------------------ Outputs only distinct values ----------------------------
+distinct(out,in) ::=<<
+    val <out> = <in>.mapWindow(distinct _)
+>>
+
+// ------------------ Outputs only num records --------------------------------
+limit(out,in,num,windowMode) ::=<<
+    val <out> = <in>.window(Count.of(<num>)).every(Time.of(5, TimeUnit.SECONDS))
+>>
+
+// ------------------ ORDERs the input BY a key -------------------------------
+orderBy(out,in,key,asc) ::=<<
+    val <out> = <in>.mapWindow(custom<out>Order _)
+>>
+
+orderHelper(params) ::=<<
+    def custom<params.out>Order(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
+      ts.toList.asInstanceOf[List[List[String]]].sortBy(t => <params.key>)<if (params.reverse)>(Ordering[String].reverse)<endif>.foreach { x => out.collect(x) }
+    }
+>>
+
+// ------------------ Passes Stream through a Window Operator -----------------
+window(out,in,window,wUnit,slider,sUnit) ::=<<
+<if (wUnit)>
+  <if (sUnit)>
+    val <out> = <in>.window(Time.of(<window>, TimeUnit.<wUnit>)).every(Time.of(<slider>, TimeUnit.<sUnit>))
+  <else>
+    val <out> = <in>.window(Time.of(<window>, TimeUnit.<wUnit>)).every(Count.of(<slider>))
+  <endif>
+<else>
+  <if (sUnit)>
+    val <out> = <in>.window(Count.of(<window>)).every(Time.of(<slider>, TimeUnit.<sUnit>))
+  <else>
+    val <out> = <in>.window(Count.of(<window>)).every(Count.of(<slider>))
+  <endif>
+<endif>
+>>
+
+// --------- Transform Windows back to continuous Stream ----------------------
+windowFlatten(out,in) ::=<<
+    val <out> = <in>.flatten
+>>
+
+// ------------------ Joins two or more streams on the specified keys ---------
+join(out,rel1,key1,rel2,key2,window,wUnit) ::=<<
+    val <out> = <rel1><rel2,key2:{ r,k |<\\>
+    .join(<r>).onWindow(<window>, TimeUnit.<wUnit>).where(t => <key1>).equalTo(t => <k>)<\\>
+    .map{ t => t._1 ++ t._2 \}<\\>
+    }>
+>>
+
+// ------------ Computes the CROSS product of two or more relations -----------
+cross(out,rel1,rel2,window,wUnit) ::=<<
+    val <out> = <rel1><rel2:{ r |<\\>
+    .cross(<r>).onWindow(<window>, TimeUnit.<wUnit>).map{ t => t._1 ++ t._2 \}<\\>
+    }>
+>>
+
+// ------------------ UNIONs multiple streams to one --------------------------
+union(out,in,others) ::=<<
+    val <out> = <in><others:{ e | .union(<e>)}>
+>>
+
+// ------------------ Reads from a SOCKET -------------------------------------
+socketRead(out,addr,mode,func,params) ::=<<
+<if (func)>
+  <if (mode)>
+    val <out> = <func>().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
+  <else>
+    val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
+  <endif>
+<else>
+  <if (mode)>
+    val <out> = PigStream().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>", '\t')
+  <else>
+    val <out> = PigStream().connect(env, "<addr.hostname>", <addr.port>, '\t')
+  <endif>
+<endif>
+>>
+
+// ------------------ Writes to a SOCKET -------------------------------------
+socketWrite(in,addr,mode) ::=<<
+<if (mode)>
+    <in>.addSink(new ZmqPublisher("<addr.protocol><addr.hostname>:<addr.port>")).setParallelism(1)
+<else>
+    <in>.writeToSocket("<addr.hostname>",<addr.port>,new UTF8StringSchema())
+<endif>
+>>
+
+// ----------------- END of the code implementing the query -------------------
+end_query(name) ::= <<
+    env.execute("<name>")
+  }
+}
+>>

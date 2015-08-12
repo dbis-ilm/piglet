@@ -34,8 +34,9 @@ case class GroupingExpression(val keyList: List[Ref])
  * @param initialInPipeName the name of the input pipe
  * @param groupExpr the expression (a key or a list of keys) used for grouping
  */
-case class Grouping(override val initialOutPipeName: String, initialInPipeName: String, groupExpr: GroupingExpression)
-  extends PigOperator(initialOutPipeName, initialInPipeName) {
+case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var windowMode: Boolean = false) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
@@ -47,28 +48,27 @@ case class Grouping(override val initialOutPipeName: String, initialInPipeName: 
   }
 
   override def constructSchema: Option[Schema] = {
-    // val inputSchema = inputs.head.producer.schema
     // tuple(group: typeOfGroupingExpr, in:bag(inputSchema))
     val inputType = inputSchema match {
       case Some(s) => s.element.valueType
-      case None => TupleType("", Array(Field("", Types.ByteArrayType)))
+      case None => TupleType(Array(Field("", Types.ByteArrayType)))
     }
     val groupingType = Types.IntType
     val fields = Array(Field("group", groupingType),
-      Field(inputs.head.name, BagType("", inputType)))
-    schema = Some(new Schema(new BagType("", new TupleType("", fields))))
+      Field(inputs.head.name, BagType(inputType)))
+    schema = Some(new Schema(new BagType(new TupleType(fields), outPipeName)))
     schema
   }
 
   override def checkSchemaConformance: Boolean = {
-    schema match {
+    inputSchema match {
       case Some(s) => {
         // if we know the schema we check all named fields
-        groupExpr.keyList.filter(_.isInstanceOf[NamedField]).exists(f => s.indexOfField(f.asInstanceOf[NamedField].name) != -1)
+        ! groupExpr.keyList.filter(_.isInstanceOf[NamedField]).exists(f => s.indexOfField(f.asInstanceOf[NamedField].name) == -1)
       }
       case None => {
         // if we don't have a schema all expressions should contain only positional fields
-        groupExpr.keyList.map(_.isInstanceOf[NamedField]).exists(b => b)
+        ! groupExpr.keyList.map(_.isInstanceOf[NamedField]).exists(b => b)
       }
     }
   }

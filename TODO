@@ -1,0 +1,5 @@
+* Storage-Klassen sollten Schema berücksichtigen
+* Ableitung von impliziten Typecasts
+* SPLIT, BGP_FILTER
+* nested FOREACH
+* Testcase für SchemaConformance bei FOREACH

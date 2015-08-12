@@ -21,26 +21,79 @@ import java.io.File
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.rewriting.Rewriter._
+import dbis.pig.plan.PrettyPrinter._
 import dbis.pig.schema.SchemaException
-import dbis.pig.tools.FileTools
+import dbis.pig.tools.{HDFSService, FileTools, Conf}
+import dbis.pig.backends.BackendManager
+import dbis.pig.plan.MaterializationManager
+import dbis.pig.plan.rewriting.Rewriter
+
 import jline.console.ConsoleReader
 
 import scala.collection.mutable.ListBuffer
+import java.nio.file.Paths
+import jline.console.history.FileHistory
+import dbis.pig.tools.Conf
+import com.typesafe.scalalogging.LazyLogging
+
+import dbis.pig.plan.MaterializationManager
+import dbis.pig.plan.rewriting.Rewriter
 
 sealed trait JLineEvent
 case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
 case object EmptyLine extends JLineEvent
 case object EOF extends JLineEvent
 
-object PigREPL extends PigParser {
+object PigREPL extends PigParser with LazyLogging {
   val consoleReader = new ConsoleReader()
+  
+  private def unbalancedBrackets(s: String): Boolean = {
+    val leftBrackets = s.count(_ == '{')
+    val rightBrackets = s.count(_ == '}')
+    leftBrackets != rightBrackets
+  }
+
+  private def isCommand(s: String): Boolean = {
+    val cmdList = List("help", "describe", "dump", "prettyprint", "rewrite", "quit", "fs")
+    val line = s.toLowerCase
+    cmdList.exists(cmd => line.startsWith(cmd))
+  }
+
+  private def processFsCmd(s: String): Boolean = {
+    val sList = s.split(" ")
+    val cmdList = sList.slice(1, sList.length)
+    if (cmdList.head.startsWith("-")) {
+      val paramList =
+        if (cmdList.length == 1)
+          List()
+        else {
+          val last = cmdList.last
+          cmdList.slice(1, cmdList.length - 1).toList ::: List(if (last.endsWith(";")) last.substring(0, last.length - 1) else last)
+        }
+      HDFSService.process(cmdList.head.substring(1), paramList)
+    }
+    else
+      println(s"invalid fs command '${cmdList.head}'")
+    false
+  }
 
   def console(handler: JLineEvent => Boolean) {
     var finished = false
     val planBuffer = ListBuffer[PigOperator]()
+    var lineBuffer = ""
+    var prompt = "pigsh> "
 
+    val history = new FileHistory(Conf.replHistoryFile.toFile().getAbsoluteFile)
+    logger.debug(s"will use ${history.getFile} as history file")
+    consoleReader.setHistory(history)  
+    
+    // avoid to handle "!" in special way
+    consoleReader.setExpandEvents(false)
+
+    try {
     while (!finished) {
-      val line = consoleReader.readLine("pigsh> ")
+      val line = consoleReader.readLine(prompt)
       if (line == null) {
         consoleReader.getTerminal().restore()
         consoleReader.shutdown
@@ -50,8 +103,23 @@ object PigREPL extends PigParser {
         finished = handler(EmptyLine)
       }
       else if (line.size > 0) {
-        finished = handler(Line(line, planBuffer))
+        lineBuffer += line
+        // if the line doesn't end with a semicolon or the current
+        // buffer contains a unbalanced number of brackets
+        // then we change the prompt and do not execute the command.
+        if (!isCommand(line) && (! line.trim.endsWith(";") || unbalancedBrackets(lineBuffer))) {
+          prompt = "    | "
+        }
+        else {
+          finished = handler(Line(lineBuffer, planBuffer))
+          prompt = "pigsh> "
+          lineBuffer = ""
+        }
       }
+    }
+    } finally {
+      logger.debug("flushing history file")
+      consoleReader.getHistory.asInstanceOf[FileHistory].flush()
     }
   }
 
@@ -62,6 +130,8 @@ object PigREPL extends PigParser {
         |Diagnostic commands:
         |    describe <alias> - Show the schema for the alias.
         |    dump <alias> - Compute the alias and writes the results to stdout.
+        |    prettyprint - Prints the dataflow plan operator list.
+        |    rewrite - Rewrites the current dataflow plan.
         |Utility Commands:
         |    help - Display this message.
         |    quit - Quit the Pig shell.
@@ -69,11 +139,13 @@ object PigREPL extends PigParser {
   }
 
   def main(args: Array[String]): Unit = {
-    val backend = if(args.length==0) BuildSettings.backends.get("default").get("name")
+    val backend = if(args.length==0) Conf.defaultBackend
                   else { 
                     args(0) match{
-                      case "flink" => "flink"
-                      case "spark" => "spark"
+                      case "flink"  => "flink"
+                      case "flinks" => "flinks"
+                      case "spark"  => "spark"
+                      case "sparks" => "sparks"
                       case _ => throw new Exception("Unknown Backend $_")
                     }
                   }
@@ -81,8 +153,33 @@ object PigREPL extends PigParser {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
       case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
-      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
+      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => {
+        var plan = new DataflowPlan(buf.toList)
+        
+        val mm = new MaterializationManager
+        plan = processMaterializations(plan, mm)
+        plan = processPlan(plan)
+        
+        for(sink <- plan.sinkNodes) {
+          println(pretty(sink))
+        }
+        false
+      }
+      case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => {
         val plan = new DataflowPlan(buf.toList)
+        for (sink <- plan.sinkNodes) {
+          println(pretty(sink))
+          val newSink = processPigOperator(sink)
+          println(pretty(newSink))
+        }
+        false
+      }
+      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
+        var plan = new DataflowPlan(buf.toList)
+        
+        val mm = new MaterializationManager
+        plan = processMaterializations(plan, mm)
+        plan = processPlan(plan)
         
         try {
           plan.checkSchemaConformance
@@ -104,20 +201,39 @@ object PigREPL extends PigParser {
         
         false
       }
-      case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") => {
+      case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") ||
+                            s.toLowerCase().startsWith(s"store ") ||
+                            s.toLowerCase.startsWith(s"socket_write "))=> {
         buf ++= parseScript(s)
-        val plan = new DataflowPlan(buf.toList)
-        if (FileTools.compileToJar(plan, "script", ".", false, backend)) {
-          val jarFile = s".${File.separator}script${File.separator}script.jar"
-//          val jarFile = "script.jar"
-          val runner = FileTools.getRunner(backend)
-          runner.execute("local", "script", jarFile)
+        var plan = new DataflowPlan(buf.toList)
+        
+        val mm = new MaterializationManager
+        plan = processMaterializations(plan, mm)
+        plan = processPlan(plan)
+
+        val jobJar = Conf.backendJar(backend)
+        
+        val backendConf = BackendManager.backend(backend)
+        val templateFile = backendConf.templateFile
+        
+        FileTools.compileToJar(plan, "script", Paths.get("."), false, jobJar, templateFile) match {
+          case Some(jarFile) =>
+            val runner = backendConf.runnerClass
+            runner.execute("local", "script", jarFile)
+          
+          case None => println("failed to build jar file for job")
         }
+
         // buf.clear()
         false
       }
+      case Line(s, buf) if (s.toLowerCase().startsWith(s"fs ")) => {
+        // TODO: handle fs command directly
+        println("fs ---> " + s)
+        processFsCmd(s)
+      }
       case Line(s, buf) => try {
-        buf ++= parseScript(s); 
+        buf ++= parseScript(s);
         false 
       } catch {
         case iae: IllegalArgumentException => println(iae.getMessage); false

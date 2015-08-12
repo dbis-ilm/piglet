@@ -25,13 +25,17 @@ import scala.io.Source
 
 class SparkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
-    ("script", "result", "truth"), // only the header of the table
-    ("load.pig", "result1.out", "result1.data"),
-    ("load2.pig", "result2.out", "result2.data"),
-    ("selfjoin.pig", "joined.out", "joined.data"),
-    ("sort.pig", "sorted.out", "sorted.data"),
-    ("foreach1.pig", "distances.out", "distances.data")
-    // ("skyline.pig", "skyline.out", "skyline.data")
+    ("script", "result", "truth", "inOrder"), // only the header of the table
+    ("load.pig", "result1.out", "truth/result1.data", true),
+    ("load2.pig", "result2.out", "truth/result2.data", true),
+    ("selfjoin.pig", "joined.out", "truth/joined.data", true),
+    ("sort.pig", "sorted.out", "truth/sorted.data", true),
+    ("foreach1.pig", "distances.out", "truth/distances.data", true),
+    ("nforeach.pig", "nested.out", "truth/nested.data", true),
+    ("grouping.pig", "grouping.out", "truth/grouping.data", false),
+    ("wordcount.pig", "marycounts.out", "truth/marycount.data", false),
+    ("construct.pig", "result3.out", "truth/result3.data", true)
+    // ("json.pig", "json.out", "json.data", true)
   )
 
   def cleanupResult(dir: String): Unit = {
@@ -48,7 +52,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
   }
 
   "The Pig compiler" should "compile and execute the script" in {
-    forAll(scripts) { (script: String, resultDir: String, truthFile: String) =>
+    forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean) =>
       // 1. make sure the output directory is empty
       cleanupResult(resultDir)
       cleanupResult(script.replace(".pig",""))
@@ -61,7 +65,10 @@ class SparkCompileIt extends FlatSpec with Matchers {
       val result = Source.fromFile(resultDir + "/part-00000").getLines()
       val truth = Source.fromFile("./src/it/resources/" + truthFile).getLines()
       // 4. compare both files
-      result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
+      if (inOrder)
+        result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
+      else
+        result.toSeq should contain theSameElementsAs (truth.toTraversable)
 
       // 5. delete the output directory
       cleanupResult(resultDir)

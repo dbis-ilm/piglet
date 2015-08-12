@@ -16,28 +16,33 @@
  */
 package dbis.test.flink
 
-import dbis.pig._
+import dbis.test.TestTools._
+
+import dbis.pig.PigCompiler._
 import dbis.pig.codegen.ScalaBackendGenCode
 import dbis.pig.op._
-import dbis.pig.plan.Pipe
+import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
+import dbis.pig.backends.BackendManager
 
 class FlinkCompileSpec extends FlatSpec {
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = "src/main/resources/flink-template.stg"
+  val templateFile = BackendManager.backend("flink").templateFile
 
   "The compiler output" should "contain the Flink header & footer" in {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitImport + codeGenerator.emitHeader("test") + codeGenerator.emitFooter)
+    val generatedCode = cleanString(codeGenerator.emitImport 
+      + codeGenerator.emitHeader1("test") 
+      + codeGenerator.emitHeader2("test") 
+      + codeGenerator.emitFooter)
     val expectedCode = cleanString("""
-      |import org.apache.flink.streaming.api.scala._
+      |import org.apache.flink.api.scala._
       |import dbis.flink._
-      |import java.util.concurrent.TimeUnit
       |
       |object test {
       |    def main(args: Array[String]) {
-      |        val env = StreamExecutionEnvironment.getExecutionEnvironment
+      |        val env = ExecutionEnvironment.getExecutionEnvironment
       |        env.execute("Starting Query")
       |    }
       |}
@@ -46,31 +51,41 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for LOAD" in {
-    val op = Load("a", "file.csv")
+    
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
+    
+    val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = env.readTextFile("file.csv").map(s => List(s))""")
+    val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    val op = Load("a", "file.csv", Option(Schema(BagType("",TupleType("",Array(Field("a1"),Field("a2"),Field("a3")))))), "PigStorage", List("\",\""))
+    
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
+    
+    val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStorage().load(env, "file.csv", ",")""")
+        val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with RDFFileStorage" in {
-    val op = Load("a", "file.n3", None, "RDFFileStorage")
+    
+    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
+    
+    val op = Load(Pipe("a"), file, None, "RDFFileStorage")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = RDFFileStorage().load(env, "file.n3")""")
+    
+    val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for FILTER" in { 
-    val op = Filter("a", "b", Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))) 
+    val op = Filter(Pipe("a"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))) 
     val codeGenerator = new ScalaBackendGenCode(templateFile) 
     val generatedCode = cleanString(codeGenerator.emitNode(op)) 
     val expectedCode = cleanString("val a = b.filter(t => {t(1) < 42})") 
@@ -78,47 +93,48 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for DUMP" in {
-    val op = Dump("a")
+    val op = Dump(Pipe("a"))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""a.print""")
+    val expectedCode = cleanString("""a.map(_.mkString(",")).print""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for STORE" in {
-    val op = Store("a", "file.csv")
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
+    val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""a.map(_.mkString(",")).writeAsText("file.csv")""")
+    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${file}")""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for DISTINCT" in {
-    val op = Distinct("a", "b")
+    val op = Distinct(Pipe("a"), Pipe("b"))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b")
+    val expectedCode = cleanString("val a = b.distinct(t => t(0))")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LIMIT" in {
-    val op = Limit("a", "b", 10)
+    val op = Limit(Pipe("a"), Pipe("b"), 10)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b.window(Count.of(10)).every(Time.of(5, TimeUnit.SECONDS))")
+    val expectedCode = cleanString("val a = b.first(10)")
     assert(generatedCode == expectedCode)
   }
 
 
   it should "contain code for a FOREACH statement with function expressions" in {
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
-    val op = Foreach("a", "b", List(
+    val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
       GeneratorExpr(Func("TOMAP", List(
         RefExpr(Value("\"field1\"")),
         RefExpr(PositionalField(0)),
         RefExpr(Value("\"field2\"")),
         RefExpr(PositionalField(1)))))
-      ))
+      )))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(PigFuncs.toMap(\"field1\",t(0),\"field2\",t(1))))")
@@ -127,10 +143,10 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for a FOREACH statement with another function expression" in {
     // a = FOREACH b GENERATE $0, COUNT($1) AS CNT;
-    val op = Foreach("a", "b", List(
+    val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
       GeneratorExpr(RefExpr(PositionalField(0))),
       GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType)))
-      ))
+      )))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(t(0),PigFuncs.count(t(1).asInstanceOf[Seq[Any]])))")
@@ -139,8 +155,8 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for deref operator on maps in FOREACH statement" in {
     // a = FOREACH b GENERATE $0#"k1", $1#"k2";
-    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
-      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\"")))))
+    val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
+      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\""))))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -150,8 +166,8 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for deref operator on tuple in FOREACH statement" in {
     // a = FOREACH b GENERATE $0.$1, $2.$0;
-    val op = Foreach("a", "b", List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
-      GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0))))))
+    val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
+      GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0)))))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -161,82 +177,82 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for a UNION operator on two relations" in {
     // a = UNION b, c;
-    val op = Union("a", List("b", "c"))
+    val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c")))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.merge(c)""".stripMargin)
+        |val a = b.union(c)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for a UNION operator on more than two relations" in {
     // a = UNION b, c, d;
-    val op = Union("a", List("b", "c", "d"))
+    val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.merge(c).merge(d)""".stripMargin)
+        |val a = b.union(c).union(d)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for a binary JOIN statement with simple expression" in {
-    val op = Join("a", List("b", "c"), List(List(PositionalField(0)), List(PositionalField(0))))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))))
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load("c", "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
+        |val a = b.join(c).where(t => t(0)).equalTo(t => t(0)).map{
         |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for a binary JOIN statement with expression lists" in {
-    val op = Join("a", List("b", "c"), List(List(PositionalField(0), PositionalField(1)),
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
       List(PositionalField(1), PositionalField(2))))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load("c", "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => Array(t(0),t(1)).mkString).equalTo(t => Array(t(1),t(2)).mkString).map{
+        |val a = b.join(c).where(t => Array(t(0),t(1)).mkString).equalTo(t => Array(t(1),t(2)).mkString).map{
         |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for a multiway JOIN statement" in {
-    val op = Join("a", List("b", "c", "d"), List(List(PositionalField(0)),
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
       List(PositionalField(0)), List(PositionalField(0))))
-    val schema = new Schema(BagType("s", TupleType("t", Array(Field("f1", Types.CharArrayType),
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load("b", "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load("c", "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input3 = Pipe("d",Load("d", "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2,input3)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{ 
+      |val a = b.join(c).where(t => t(0)).equalTo(t => t(0)).map{ 
         |t => t._1 ++ t._2
-        |}.join(d).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
+        |}.join(d).where(t => t(0)).equalTo(t => t(0)).map{
         |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for GROUP BY ALL" in {
-    val op = Grouping("a", "b", GroupingExpression(List()))
+    val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List()))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b"
@@ -250,12 +266,11 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for GROUP BY $0" in {
-    val op = Grouping("a", "b", GroupingExpression(List(PositionalField(0))))
+    val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List(PositionalField(0))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.groupBy(t => t(0))")
     assert(generatedCode == expectedCode)
   }
-
 
 }

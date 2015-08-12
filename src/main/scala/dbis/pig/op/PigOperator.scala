@@ -17,40 +17,94 @@
 package dbis.pig.op
 
 import java.security.MessageDigest
-import dbis.pig.plan.Pipe
-import dbis.pig.schema._
 
-import scala.collection.mutable.ArrayBuffer
+import dbis.pig.plan.InvalidPlanException
+import dbis.pig.schema._
+import org.kiama.rewriting.Rewritable
+import scala.collection.immutable.Seq
 
 /**
- * PigOperator is the base class for all Pig operators. An operator contains
+ * PigOperator is the base trait for all Pig operators. An operator contains
  * pipes representing the input and output connections to other operators in the
  * dataflow.
- *
- * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
- *                           can be changed later.
- * @param initialInPipeNames the list of names of initial input pipes.
- * @param schema
  */
-abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNames: List[String], var schema: Option[Schema]) {
-  var inputs: List[Pipe] = List[Pipe]()
-  var output: Option[Pipe] = None
 
-  def this(out: String, in: List[String]) = this(out, in, None)
 
-  def this(out: String) = this(out, List(), None)
+trait PigOperator extends Rewritable {
+  protected var _outputs: List[Pipe] = _
+  protected var _inputs: List[Pipe] = _
 
-  def this(out: String, in: String) = this(out, List(in), None)
+  var schema: Option[Schema] = None
 
-  def outPipeName: String = output match {
-    case Some(p) => p.name
-    case None => ""
+  /**
+   * Getter method for the output pipes.
+   *
+   * @return the list of output pipes
+   */
+  def outputs = _outputs
+
+  /**
+   * Setter method for the output pipes. It ensures
+   * that this is producer of all pipes.
+   *
+   * @param o the new list of output pipes
+   */
+  def outputs_=(o: List[Pipe]) = {
+    _outputs = o
+    // 1. make sure we don't have multiple pipes with the same name
+    if (_outputs.map(p => p.name).distinct.size != _outputs.size)
+      throw InvalidPlanException("duplicate pipe names")
+
+    // 2. make sure that we are producer in all pipes
+    _outputs.foreach(p => {
+      p.producer = this
+      p.consumer.foreach(_.inputs.foreach(
+        _.producer = this
+      ))
+    })
   }
 
-  def inPipeName: String = inPipeNames.head
-  def inPipeNames: List[String] = if (inputs.isEmpty) initialInPipeNames else inputs.map(p => p.name)
+  /**
+   * Getter method for the input pipes.
+   *
+   * @return the list of input pipes
+   */
+  def inputs = _inputs
 
-  def inputSchema =   if (inputs.nonEmpty) inputs.head.producer.schema else None
+  /**
+   * Setter method for the input pipes. It ensures
+   * that this is a consumer in all pipes.
+   *
+   * @param i the new list of input pipes
+   */
+  def inputs_=(i: List[Pipe]) = {
+    _inputs = i
+    // make sure that we are consumer in all pipes
+    _inputs.foreach(p => if (!p.consumer.contains(this)) p.consumer = p.consumer :+ this)
+  }
+
+  def outPipeName: String = if (outputs.nonEmpty) outputs.head.name else ""
+
+  def outPipeNames: List[String] = outputs.map(p => p.name)
+
+  def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
+
+  def preparePlan: Unit = {}
+
+  def checkConnectivity: Boolean = true
+
+  /**
+   * Add an operator as a consumer to the output pipe with the given name.
+   *
+   * @param name the name of the output pipe
+   * @param op the operator instance
+   */
+  def addConsumer(name: String, op: PigOperator): Unit = {
+    _outputs.find(_.name == name) match {
+      case Some(p) => if (!p.consumer.contains(op)) p.consumer = p.consumer :+ op
+      case None => {}
+    }
+  }
 
   /**
    * Constructs the output schema of this operator based on the input + the semantics of the operator.
@@ -59,8 +113,14 @@ abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNam
    * @return the output schema
    */
   def constructSchema: Option[Schema] = {
-    if (inputs.nonEmpty)
+    if (inputs.nonEmpty) {
       schema = inputs.head.producer.schema
+      // the bag should be named with the output pipe
+      schema match {
+        case Some(s) => s.setBagName(outPipeName)
+        case None =>
+      }
+    }
     schema
   }
 
@@ -74,8 +134,8 @@ abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNam
      * schemaToString is mainly called from DESCRIBE. Thus, we can take outPipeName as relation name.
      */
     schema match {
-      case Some(s) => s"${outPipeName}: ${s.element.descriptionString}"
-      case None => s"Schema for ${outPipeName} unknown."
+      case Some(s) => s"$outPipeName: ${s.element.descriptionString}"
+      case None => s"Schema for $outPipeName unknown."
     }
   }
 
@@ -107,5 +167,63 @@ abstract class PigOperator (val initialOutPipeName: String, val initialInPipeNam
    */
   def lineageString: String = {
     inputs.map(p => p.producer.lineageString).mkString("%")
+  }
+
+  /**
+   * Check whether the input and output pipes are still consistent, i.e.
+   * for all output pipes the producer is the current operator and the current
+   * operator is also a consumer in each input pipe.
+   *
+   * @return true if the operator pipes are consistent
+   */
+  def checkConsistency: Boolean = {
+    outputs.forall(p => p.producer == this) && inputs.forall(p => p.consumer.contains(this))
+  }
+
+  /**
+   * Returns the arity, i.e. the number of output pipes of
+   * this operator.
+   *
+   * @return the arity of the operator
+   */
+  def arity = {
+    var numConsumers = 0
+    this.outputs.foreach(p => numConsumers += p.consumer.length)
+    numConsumers
+  }
+
+  def deconstruct: List[PigOperator] = this.outputs.flatMap(_.consumer)
+
+  def reconstruct(outputs: Seq[Any]): PigOperator = {
+    val outname = this.outPipeName
+    reconstruct(outputs, outname)
+  }
+
+  /** Implementation for kiamas Rewritable trait
+    *
+    * It's necessary to set the `outputs` attribute on this object to List.empty, which makes `this.outPipeName`
+    * return "". To work around this, the output name can be provided via `outname`.
+    *
+    * @param outputs
+    * @param outname The output name of this relation
+    * @return
+    */
+  def reconstruct(outputs: Seq[Any], outname: String): PigOperator = {
+    this.outputs = List.empty
+    outputs.foreach {
+      case op: PigOperator =>
+        val idx = this.outputs.indexWhere(_.name == outname)
+        if (idx > -1) {
+          // There already is a Pipe to `outname`
+          this.outputs(idx).consumer = this.outputs(idx).consumer :+ op
+        } else {
+          this.outputs = this.outputs :+ Pipe(outname, this, List(op))
+        }
+      // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
+      // operators
+      case ops: Seq[_] => this.reconstruct(ops, outname)
+      case _ => illegalArgs("PigOperator", "PigOperator", outputs)
+    }
+    this
   }
 }

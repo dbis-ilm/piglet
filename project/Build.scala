@@ -3,112 +3,101 @@ import Keys._
 
 object PigBuild extends Build {
 
-  val possibleBackends = List("flink","spark","sparkflink")
-
-  val flinkSettings = Map(
-    "name"  -> "flink",
-    "runClass" -> "dbis.pig.FlinkRun",
-//    "compilerClass" -> "dbis.pig.FlinkCompile",
-    "templateFile" -> "flink-template.stg"//"src/main/resources/flink-template.stg"
+  /*
+   * Common Settings **********************************************************
+   */
+  lazy val commonSettings = Seq(
+    version := "1.0",
+    scalaVersion := "2.11.7",
+    organization := "dbis"
   )
+  
+  /*
+   * Projects *****************************************************************
+   */
+  lazy val root = (project in file(".")).
+    configs(IntegrationTest).
+    settings(commonSettings: _*).
+    settings(Defaults.itSettings: _*).
+    dependsOn(common).
+    dependsOn(sparklib % "test;it").
+    dependsOn(flinklib % "test;it"). 
+    aggregate(common, sparklib, flinklib) // remove this if you don't want to automatically build these projects when building piglet 
 
-  val sparkSettings = Map(
-    "name"  -> "spark",
-    "runClass" -> "dbis.pig.SparkRun",
-//    "compilerClass" -> "dbis.pig.SparkCompile",
-    "templateFile" -> "spark-template.stg"//"src/main/resources/spark-template.stg"
-  )
+  lazy val common = (project in file("common")).
+    settings(commonSettings: _*)
 
-  val flinkBackend =      Map("flink" -> flinkSettings, "default" -> flinkSettings)
-  val sparkBackend =      Map("spark" -> sparkSettings, "default" -> sparkSettings)
-  val flinksparkBackend = Map("flink" -> flinkSettings, "spark" -> sparkSettings, "default" -> sparkSettings)
+  lazy val sparklib = (project in file("sparklib")).
+    settings(commonSettings: _*).
+    dependsOn(common)
 
-  def backendDependencies(backend: String): Seq[sbt.ModuleID] = backend match {
-    case "flink" => Seq (
-      Dependencies.flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
-    )
-    case "spark" => Seq (
-      Dependencies.sparkCore % "provided"
-    )
-    case "sparkflink" => Seq(
-      Dependencies.flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar",
-      Dependencies.sparkCore % "provided"
-    )
-    case _ => throw new Exception(s"Backend $backend not available")
+  lazy val flinklib = (project in file("flinklib")).
+    settings(commonSettings: _*).
+    dependsOn(common)
+
+    
+    
+
+  /*
+   * define the backend for the compiler: currently we support spark and flink
+   */
+  val backend = sys.props.getOrElse("backend", default="spark")
+  
+  val itDeps = backend match {
+    case "flink" | "flinks" => Seq(Dependencies.flinkDist % "test;it" from Dependencies.flinkAddress)
+    case "spark" | "sparks" => Seq(Dependencies.sparkCore % "test;it", Dependencies.sparkSql % "test;it")
+    case _ => println(s"Unsupported backend: $backend ! I don't know which dependencies to include!"); Seq.empty[ModuleID]
   }
-
-  def excludes(backend: String): Seq[sbt.Def.SettingsDefinition] = backend match{
-    case "flink" => { Seq(
-      excludeFilter in unmanagedSources :=
-      HiddenFileFilter            ||
-      "*SparkRun.scala"           ||
-      "*SparkCompile.scala"       ||
-      "*SparkCompileIt.scala"     ||
-      "*SparkCompileSpec.scala",
-      excludeFilter in unmanagedResources := 
-      HiddenFileFilter || 
-      "spark-template.stg"
-    )} 
-    case "spark" =>{ Seq(
-      excludeFilter in unmanagedSources :=
-      HiddenFileFilter            ||
-      "*FlinkRun.scala"           ||
-      "*FlinkCompile.scala"       ||
-      "*FlinkCompileIt.scala"     ||
-      "*FlinkCompileSpec.scala",
-      excludeFilter in unmanagedResources := 
-      HiddenFileFilter || 
-      "flink-template.stg"
-    )}
-    case "sparkflink" => excludeFilter in unmanagedSources := HiddenFileFilter
-    case _ => throw new Exception(s"Backend $backend not available")
+  
+  val itTests = backend match{
+    case "flink" => Seq("dbis.test.flink.FlinkCompileIt")
+    case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
+    case "spark" => Seq("dbis.test.spark.SparkCompileIt")
+    case _ => println(s"Unsupported backend: $backend - Will execute no tests"); Seq.empty[String]
   }
 }
 
+/*
+ * Dependencies
+ */
 object Dependencies {
-  // Versions
-  lazy val scalaVersion =       "2.11.6"
-  lazy val scalaTestVersion =   "2.2.0"
-  lazy val scalaPCVersion =     "1.0.3"
-  lazy val scalaIoFileVersion = "0.4.3-1"
-  lazy val jlineVersion =       "2.12.1"
-  lazy val graphVersion =       "1.9.2"
-  lazy val sparkVersion =       "1.3.0"
-  lazy val flinkVersion =       "0.9-SNAPSHOT"
-  lazy val scoptVersion =       "3.3.0"
-  lazy val scalastiVersion =    "2.0.0"
-
   // Libraries
-  val scalaCompiler = "org.scala-lang" % "scala-compiler" % scalaVersion
-  val scalaTest = "org.scalatest" %% "scalatest" % scalaTestVersion
-  val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % scalaPCVersion
-  val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % scalaIoFileVersion
-  val jline = "jline" % "jline" % jlineVersion
-  val graphCore = "com.assembla.scala-incubator" %% "graph-core" % graphVersion
-  val sparkCore = "org.apache.spark" %% "spark-core" % sparkVersion
-  val flinkDist = "org.apache.flink" %% "flink-dist" % flinkVersion
-  val scopt = "com.github.scopt" %% "scopt" % scoptVersion
-  val scalasti = "org.clapper" %% "scalasti" % scalastiVersion
+  val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.7"
+  val scalaTest = "org.scalatest" %% "scalatest" % "2.2.0"
+  val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
+  val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
+  val jline = "jline" % "jline" % "2.12.1"
+  val graphCore = "com.assembla.scala-incubator" %% "graph-core" % "1.9.2"
+  val sparkCore = "org.apache.spark" %% "spark-core" % "1.4.1"
+  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.4.1"
+  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.9.0"
+  val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
+  val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
+  val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
+  val kiama = "com.googlecode.kiama" %% "kiama" % "1.8.0"
+  val typesafe = "com.typesafe" % "config" % "1.3.0"
+  val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0" 
+  val log4j = "log4j" % "log4j" % "1.2.17"
+  val slf4j= "org.slf4j" % "slf4j-simple" % "1.6.4"
+  val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
 
+  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.9.0.jar"
+  
   // Projects
   val rootDeps = Seq(
-    jline, 
-    scalaTest % "test,it" withSources(),
+    jline,
+    scalaTest % "test;it" withSources(),
     scalaParserCombinators withSources(),
     scalaCompiler,
-    graphCore,
     scopt,
     scalaIoFile,
-    scalasti
-  )
-  val sparkDeps = Seq(
-    scalaTest % "test" withSources(),
-    scalaCompiler,
-    sparkCore % "provided"
-  )
-  val flinkDeps = Seq(
-    scalaTest % "test" withSources(),
-    scalaCompiler,
-    flinkDist % "provided" from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
+    scalasti,
+    kiama,
+    typesafe,
+    scalaLogging,
+    log4j,
+//    slf4j,
+    hadoop % "provided"
+    
   )
 }

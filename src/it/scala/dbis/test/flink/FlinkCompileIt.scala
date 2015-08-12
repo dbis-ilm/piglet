@@ -20,21 +20,26 @@ import dbis.pig.PigCompiler
 import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
 
+import scalax.file.Path
 import scala.io.Source
 
 class FlinkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
-    ("script", "result", "truth"), // only the header of the table
-    ("load.pig", "result1.out", "result1.data"),
-    ("load2.pig", "result2.out", "result2.data"),
-    ("selfjoin.pig", "joined.out", "joined.data"),
-    ("foreach1.pig", "distances.out", "distances.data")
+    ("script", "result", "truth", "inOrder"), // only the header of the table
+    ("load.pig", "result1.out", "truth/result1.data", true),
+    ("load2.pig", "result2.out", "truth/result2.data", true),
+    ("selfjoin.pig", "joined.out", "truth/joined.data", false),
+//    ("sort.pig", "sorted.out", "sorted.data", true),
+    ("foreach1.pig", "distances.out", "truth/distances.data", true),
+//    ("nforeach.pig", "nested.out", "nested.data", true),
+//    ("grouping.pig", "grouping.out", "grouping.data", false),
+//    ("wordcount.pig", "marycounts.out", "marycount.data", false),
+    ("construct.pig", "result3.out", "truth/result3.data", true)
   )
 
   def cleanupResult(dir: String): Unit = {
-    import scalax.file.Path
 
-    val path: Path = Path(dir)
+    val path: Path = Path.fromString(dir)
     try {
       path.deleteRecursively(continueOnFailure = false)
     }
@@ -45,26 +50,34 @@ class FlinkCompileIt extends FlatSpec with Matchers {
   }
 
   "The Pig compiler" should "compile and execute the script" in {
-    forAll(scripts) { (script: String, resultDir: String, truthFile: String) =>
-      // 1. make sure the output directory is empty
-      cleanupResult(resultDir)
-      cleanupResult(script.replace(".pig",""))
+    forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean) =>
+    val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
+    // 1. make sure the output directory is empty
+    cleanupResult(resultPath.path)
+    cleanupResult(script.replace(".pig",""))
 
-      // 2. compile and execute Pig script
-      PigCompiler.main(Array("--backend", "flink", "--outdir", ".", "./src/it/resources/" + script))
+    // 2. compile and execute Pig script
+    val resourcePath = getClass.getResource("").getPath + "../../../"
       println("execute: " + script)
+      PigCompiler.main(Array("--backend", "flink", "--outdir", resultPath.parent.get.path, resourcePath + script))
 
-      // 3. load the output file and the truth file
+      // 3. load the output file[s] and the truth file
       var result = Iterator[String]()
-      for (file <- new java.io.File(resultDir).listFiles) {
-        result++=Source.fromFile(file).getLines()
-      }
-      val truth = Source.fromFile("./src/it/resources/" + truthFile).getLines()
+      val resultFile = new java.io.File(resultPath.path)
+      if(resultFile.isFile)
+        result ++= Source.fromFile(resultFile).getLines
+      else 
+        for (file <- resultFile.listFiles) 
+        result++=Source.fromFile(file).getLines
+      val truth = Source.fromFile(resourcePath + truthFile).getLines
       // 4. compare both files
-      result.toSeq should contain theSameElementsAs (truth.toTraversable)
+      if (inOrder)
+        result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
+      else
+        result.toSeq should contain theSameElementsAs (truth.toTraversable)
 
       // 5. delete the output directory
-      cleanupResult(resultDir)
+      cleanupResult(resultPath.path)
       cleanupResult(script.replace(".pig",""))
     }
   }
