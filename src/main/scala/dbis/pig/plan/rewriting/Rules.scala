@@ -385,10 +385,10 @@ object Rules {
   /** Applies rewriting rule F7 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
-    * @return Some Filter operator if `term` was a BGPFilter with a single Pattern with two bound variables of which
+    * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with two bound variables of which
     *         one is the grouping column
     */
-  def F7(term: Any): Option[Filter] = term match {
+  def F7(term: Any): Option[BGPFilter] = term match {
     case op @ BGPFilter(out, in, patterns) =>
       if (op.inputSchema == RDFLoad.plainSchema) {
         return None
@@ -417,43 +417,45 @@ object Rules {
       }
 
       val internalPipeName = Random.nextString(10)
-      var group_filter : Option[Filter] = None
-      var other_filter_predicate : Option[Predicate] = None
+      var group_filter : Option[BGPFilter] = None
+      var other_filter_pattern : Option[TriplePattern] = None
 
       // The first pattern in the next 3 pattern matches is for the case where the column that the data is grouped by
       // is bound as a variable in the pattern, but the other two column are as well.
       if (grouped_by == "subject") {
-        group_filter = Some(Filter(Pipe(internalPipeName), in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern
-          .subj))))
-        other_filter_predicate = pattern match {
+        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(pattern.subj, PositionalField(1)
+          , PositionalField(2)))))
+        other_filter_pattern = pattern match {
           case TriplePattern(_, Value(_), Value(_)) => None
-          case TriplePattern(_, pred @ Value(_), _) => Some(Eq(RefExpr(NamedField("predicate")), RefExpr(pred)))
-          case TriplePattern(_, _, obj @ Value(_)) => Some(Eq(RefExpr(NamedField("object")), RefExpr(obj)))
+          case TriplePattern(_, pred @ Value(_), _) => Some(TriplePattern(PositionalField(0), pred, PositionalField(2)))
+          case TriplePattern(_, _, obj @ Value(_)) => Some(TriplePattern(PositionalField(0), PositionalField(1), obj))
         }
       } else if (grouped_by == "predicate") {
-        group_filter = Some(Filter(Pipe(internalPipeName), in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern
-          .pred))))
-        other_filter_predicate = pattern match {
+        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0), pattern
+          .pred, PositionalField(2)))))
+        other_filter_pattern = pattern match {
           case TriplePattern(Value(_), _, Value(_)) => None
-          case TriplePattern(subj @ Value(_), _ , _) => Some(Eq(RefExpr(NamedField("subject")), RefExpr(subj)))
-          case TriplePattern(_, _, obj @ Value(_)) => Some(Eq(RefExpr(NamedField("object")), RefExpr(obj)))
+          case TriplePattern(subj @ Value(_), _ , _) => Some(TriplePattern(subj, PositionalField(1), PositionalField
+            (2)))
+          case TriplePattern(_, _, obj @ Value(_)) => Some(TriplePattern(PositionalField(0), PositionalField(1), obj))
         }
       } else if (grouped_by == "object") {
-        group_filter = Some(Filter(Pipe(internalPipeName), in, Eq(RefExpr(NamedField("object")), RefExpr(pattern
-          .obj))))
-        other_filter_predicate = pattern match {
+        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0),
+          PositionalField(1), pattern.obj))))
+        other_filter_pattern = pattern match {
           case TriplePattern(Value(_), Value(_), _) => None
-          case TriplePattern(subj @ Value(_), _ , _) => Some(Eq(RefExpr(NamedField("subject")), RefExpr(subj)))
-          case TriplePattern(_, pred @ Value(_), _) => Some(Eq(RefExpr(NamedField("predicate")), RefExpr(pred)))
+          case TriplePattern(subj @ Value(_), _ , _) => Some(TriplePattern(subj, PositionalField(1), PositionalField
+            (2)))
+          case TriplePattern(_, pred @ Value(_), _) => Some(TriplePattern(PositionalField(0), pred, PositionalField(2)))
         }
       }
 
-      if (other_filter_predicate.isEmpty) {
+      if (other_filter_pattern.isEmpty) {
         // The grouping column is bound and the other two are as well - this rule doesn't apply.
         return None
       }
 
-      val other_filter = Filter(out, Pipe(internalPipeName, group_filter.get), other_filter_predicate.get)
+      val other_filter = BGPFilter(out, Pipe(internalPipeName, group_filter.get), List(other_filter_pattern.get))
 
       other_filter.outputs foreach { output =>
         output.consumer foreach { consumer =>
@@ -480,9 +482,9 @@ object Rules {
   /** Applies rewriting rule F8 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
-    * @return Some Filter operator if `term` was a BGPFilter with a single Pattern with only bound variables.
+    * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with only bound variables.
     */
-  def F8(term: Any): Option[Filter] = term match {
+  def F8(term: Any): Option[BGPFilter] = term match {
     case op @ BGPFilter(out, in, patterns) =>
       if (op.inputSchema == RDFLoad.plainSchema) {
         return None
@@ -505,30 +507,25 @@ object Rules {
       }
 
       val internalPipeName = Random.nextString(10)
-      var group_filter : Option[Filter] = None
-      var other_filter : Option[Filter] = None
+      var group_filter : Option[BGPFilter] = None
+      var other_filter : Option[BGPFilter] = None
 
       if (grouped_by == "subject") {
-        group_filter = Some(Filter(Pipe(internalPipeName), in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern
-          .subj))))
-        other_filter = Some(Filter(out, Pipe(internalPipeName, group_filter.get),
-          And(
-            Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred)),
-            Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj)))))
+        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(pattern.subj, PositionalField(1),
+          PositionalField(2)))))
+        other_filter = Some(BGPFilter(out, Pipe(internalPipeName), List(TriplePattern(PositionalField(0), pattern.pred,
+          pattern.obj))))
       } else if (grouped_by == "predicate") {
-        group_filter = Some(Filter(Pipe(internalPipeName), in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern
-          .pred))))
-        other_filter = Some(Filter(out, Pipe(internalPipeName, group_filter.get),
-          And(
-            Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj)),
-            Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj)))))
+        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0), pattern.pred,
+          PositionalField(2)))))
+        other_filter = Some(BGPFilter(out, Pipe(internalPipeName), List(TriplePattern(pattern.subj, PositionalField(1),
+          pattern.obj))))
       } else if (grouped_by == "object") {
-        group_filter = Some(Filter(Pipe(internalPipeName), in, Eq(RefExpr(NamedField("object")), RefExpr(pattern
-          .obj))))
-        other_filter = Some(Filter(out, Pipe(internalPipeName, group_filter.get),
-          And(
-            Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj)),
-            Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred)))))
+        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0),
+          PositionalField(1),
+          pattern.obj))))
+        other_filter = Some(BGPFilter(out, Pipe(internalPipeName), List(TriplePattern(pattern.subj, pattern.pred,
+          PositionalField(2)))))
       }
 
       other_filter foreach {

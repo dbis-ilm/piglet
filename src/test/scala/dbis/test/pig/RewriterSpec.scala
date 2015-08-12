@@ -394,44 +394,50 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val patterns = Table(
       ("Pattern", "grouping column", "Grouping column Filter", "Other Filter"),
       // subject & predicate bound, grouped by subject
-      (TriplePattern(Value("subject"),Value("predicate"), PositionalField(2)),
+      (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
         "subject",
-        Filter(Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), Pipe("a"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")))),
-        Filter(Pipe("b"), Pipe("–깍窶䠃ऑ졮硔镔鰛끺"),
-            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))),
+        BGPFilter(Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
+          PositionalField(2)))),
+        BGPFilter(Pipe("b"), Pipe("–깍窶䠃ऑ졮硔镔鰛끺"),
+          List(TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2))))),
       // subject & predicate bound, grouped by predicate
-      (TriplePattern(Value("subject"),Value("predicate"), PositionalField(2)),
+      (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
         "predicate",
-        Filter(Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"), Pipe("a"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))),
-        Filter(Pipe("b"), Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"),
-            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))))),
+        BGPFilter(Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
+          PositionalField(2)))),
+        BGPFilter(Pipe("b"), Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"),
+          List(TriplePattern(Value("subject"), PositionalField(1), PositionalField(2))))),
       // subject & object bound, grouped by subject
       (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
         "subject",
-        Filter(Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), Pipe("a"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")))),
-        Filter(Pipe("b"), Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"),
-            Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))),
+        BGPFilter(Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
+          PositionalField(2)))),
+        BGPFilter(Pipe("b"), Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"),
+          List(TriplePattern(PositionalField(0), PositionalField(1), Value("object"))))),
       // subject & object bound, grouped by object
       (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
         "object",
-        Filter(Pipe("ᚩ룰宿希᭤㕗鋅᥆䢩旚"), Pipe("a"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
-        Filter(Pipe("b"), Pipe("ᚩ룰宿希᭤㕗鋅᥆䢩旚"),
-            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))))),
+        BGPFilter(Pipe("ᚩ룰宿希᭤㕗鋅᥆䢩旚"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
+          ("object")))),
+        BGPFilter(Pipe("b"), Pipe("ᚩ룰宿希᭤㕗鋅᥆䢩旚"),
+          List(TriplePattern(Value("subject"), PositionalField(1), PositionalField(2))))),
       // predicate & object bound, grouped by predicate
       (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
         "predicate",
-        Filter(Pipe("缌㓀⼲킃㌶㾬䢴憩᥷ᣓ"), Pipe("a"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))),
-        Filter(Pipe("b"), Pipe("缌㓀⼲킃㌶㾬䢴憩᥷ᣓ"),
-            Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))),
+        BGPFilter(Pipe("缌㓀⼲킃㌶㾬䢴憩᥷ᣓ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
+          PositionalField(2)))),
+        BGPFilter(Pipe("b"), Pipe("缌㓀⼲킃㌶㾬䢴憩᥷ᣓ"),
+          List(TriplePattern(PositionalField(0), PositionalField(1), Value("object"))))),
       // predicate & object bound, grouped by object
       (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
         "object",
-        Filter(Pipe("ᥴ倓✴톍눜槥呩ᱷ䧉⮨"), Pipe("a"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
-        Filter(Pipe("b"), Pipe("ᥴ倓✴톍눜槥呩ᱷ䧉⮨"),
-            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))))
+        BGPFilter(Pipe("ᥴ倓✴톍눜槥呩ᱷ䧉⮨"), Pipe("a"),
+          List(TriplePattern(PositionalField(0), PositionalField(1), Value("object")))),
+        BGPFilter(Pipe("b"), Pipe("ᥴ倓✴톍눜槥呩ᱷ䧉⮨"),
+          List(TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)))))
     )
 
-    forAll (patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+    forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
@@ -441,7 +447,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     }
 
     // Don't apply F7 to non-grouped data
-    forAll (patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+    forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
@@ -451,7 +457,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     }
 
     // Don't apply F7 if there's more than one pattern
-    forAll (patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+    forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p, p))
       val op3 = Dump(Pipe("b"))
@@ -461,7 +467,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     }
 
     // Don't apply F7 if there are no patterns
-    forAll (patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+    forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))
@@ -474,7 +480,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
 
     // Test that F7 is not applied if the pattern doesn't filter by the grouping column
     forAll (possibleGroupers) { (g: String) =>
-      forAll(patterns) { (p: TriplePattern, grouped_by: String, f1: Filter, f2: Filter) =>
+      forAll(patterns) { (p: TriplePattern, grouped_by: String, f1: BGPFilter, f2: BGPFilter) =>
         whenever(g != grouped_by &&
           // These are all the cases where the column that's grouped by is not bound in the pattern
           !(g == "subject" &&  p.subj.isInstanceOf[Value]
@@ -502,27 +508,24 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       ("Pattern", "grouping column", "Grouping column Filter", "Other Filter"),
       (pattern,
         "subject",
-        Filter(Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), Pipe("a"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")))),
-        Filter(Pipe("b"), Pipe("–깍窶䠃ऑ졮硔镔鰛끺"),
-          And(
-            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
-            Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))),
+        BGPFilter(Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
+          PositionalField(2)))),
+        BGPFilter(Pipe("b"), Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), List(TriplePattern(PositionalField(0), Value("predicate"),
+          Value("object"))))),
       (pattern,
         "predicate",
-        Filter(Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"), Pipe("a"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))),
-        Filter(Pipe("b"), Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"),
-          And(
-            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-            Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))),
+        BGPFilter(Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
+          PositionalField(2)))),
+        BGPFilter(Pipe("b"), Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"), List(TriplePattern(Value("subject"), PositionalField(1), Value
+          ("object"))))),
       (pattern,
         "object",
-        Filter(Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), Pipe("a"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
-        Filter(Pipe("b"), Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"),
-          And(
-            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))))))
+        BGPFilter(Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
+          ("object")))),
+        BGPFilter(Pipe("b"), Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), List(TriplePattern(Value("subject"), Value("predicate"),
+          PositionalField(2))))))
 
-    forAll (patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+    forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
@@ -532,7 +535,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     }
 
     // Don't apply F8 to non-grouped data
-    forAll (patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+    forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
@@ -549,7 +552,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       (p: TriplePattern) => TriplePattern(p.subj, p.pred, PositionalField(2))
     )
 
-    forAll (patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+    forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
       forAll(patternModifier) { (f: TriplePattern => TriplePattern) =>
         val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
         val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(f(p)))
@@ -561,7 +564,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     }
 
     // Don't apply F8 if there's more than one pattern
-    forAll (patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+    forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p, p))
       val op3 = Dump(Pipe("b"))
@@ -571,7 +574,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     }
 
     // Don't apply F8 if there are no patterns
-    forAll(patterns) { (p: TriplePattern, g: String, f1: Filter, f2: Filter) =>
+    forAll(patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))
