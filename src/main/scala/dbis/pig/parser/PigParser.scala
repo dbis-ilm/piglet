@@ -185,6 +185,7 @@ class PigParser extends JavaTokenParsers {
   lazy val groupKeyword = "group".ignoreCase
   lazy val allKeyword = "all".ignoreCase
   lazy val joinKeyword = "join".ignoreCase
+  lazy val crossKeyword = "cross".ignoreCase
   lazy val distinctKeyword = "distinct".ignoreCase
   lazy val defineKeyword = "define".ignoreCase
   lazy val describeKeyword = "describe".ignoreCase
@@ -411,6 +412,13 @@ class PigParser extends JavaTokenParsers {
     case out ~ _ ~ _ ~ jlist => new Join(Pipe(out), extractJoinRelation(jlist), extractJoinFields(jlist)) }
 
   /*
+   * <A> = CROSS <B>, <C>, ...
+   */
+  def crossStmt: Parser[PigOperator] = bag ~ "=" ~ crossKeyword ~ repsep(bag, ",") ^^ {
+    case out ~ _ ~ _ ~ rlist => new Cross(Pipe(out), rlist.map(r => Pipe(r)))
+  }
+
+  /*
    * <A> = UNION <B>, <C>, <D>, ...
    */
   def unionStmt: Parser[PigOperator] = bag ~ "=" ~ unionKeyword ~ repsep(bag, ",") ^^ {
@@ -534,7 +542,7 @@ class PigParser extends JavaTokenParsers {
   }
 
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
@@ -597,7 +605,7 @@ class PigParser extends JavaTokenParsers {
       }
 
   def streamingStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | socketReadStmt | socketWriteStmt | windowStmt | defineStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
@@ -660,7 +668,7 @@ class PigParser extends JavaTokenParsers {
   }
 
   def complexEventStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | socketReadStmt | socketWriteStmt | windowStmt | matcherStmt) ~ ";" ^^ {
       case op ~ _ => op
     }

@@ -43,9 +43,15 @@ object PigBuild extends Build {
    * define the backend for the compiler: currently we support spark and flink
    */
   val backend = sys.props.getOrElse("backend", default="spark")
-    
+  
+  val itDeps = backend match {
+    case "flink" | "flinks" => Seq(Dependencies.flinkDist % "test;it" from Dependencies.flinkAddress)
+    case "spark" | "sparks" => Seq(Dependencies.sparkCore % "test;it", Dependencies.sparkSql % "test;it")
+    case _ => println(s"Unsupported backend: $backend ! I don't know which dependencies to include!"); Seq.empty[ModuleID]
+  }
+  
   val itTests = backend match{
-    case "flink" => Seq("dbis.test.flink.FlinkCompileIt","dbis.test.flink.FlinksCompileIt")
+    case "flink" => Seq("dbis.test.flink.FlinkCompileIt")
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
     case _ => println(s"Unsupported backend: $backend - Will execute no tests"); Seq.empty[String]
@@ -63,9 +69,9 @@ object Dependencies {
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
   val jline = "jline" % "jline" % "2.12.1"
   val graphCore = "com.assembla.scala-incubator" %% "graph-core" % "1.9.2"
-  val sparkCore = "org.apache.spark" %% "spark-core" % "1.4.0"
-  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.4.0"
-  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.9-SNAPSHOT"
+  val sparkCore = "org.apache.spark" %% "spark-core" % "1.4.1"
+  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.4.1"
+  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.9.0"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
@@ -76,6 +82,8 @@ object Dependencies {
   val slf4j= "org.slf4j" % "slf4j-simple" % "1.6.4"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
 
+  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.9.0.jar"
+  
   // Projects
   val rootDeps = Seq(
     jline,
@@ -89,12 +97,8 @@ object Dependencies {
     typesafe,
     scalaLogging,
     log4j,
-    slf4j,
-    hadoop % "provided",
+//    slf4j,
+    hadoop % "provided"
     
-    sparkCore % "test;it",
-    sparkSql % "test;it",
-    
-    flinkDist % "test;it"  from "http://cloud01.prakinf.tu-ilmenau.de/flink-0.9.jar"
   )
 }
