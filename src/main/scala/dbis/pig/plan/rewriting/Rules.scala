@@ -274,7 +274,9 @@ object Rules {
     * @return Some Filter operator, if `term` was an BGPFilter operator with only one bound variable
     */
   def F2(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema != RDFLoad.plainSchema) {
         return None
       }
@@ -308,7 +310,9 @@ object Rules {
     * @return Some Filter operator, if `term` was an BGPFilter operator with multiple bound variables
     */
   def F3(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema != RDFLoad.plainSchema) {
         return None
       }
@@ -348,7 +352,9 @@ object Rules {
     *         of data in the triple group format
     */
   def F4(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema == RDFLoad.plainSchema) {
         return None
       }
@@ -389,7 +395,9 @@ object Rules {
     *         one is the grouping column
     */
   def F7(term: Any): Option[BGPFilter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema == RDFLoad.plainSchema) {
         return None
       }
@@ -485,7 +493,9 @@ object Rules {
     * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with only bound variables.
     */
   def F8(term: Any): Option[BGPFilter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema == RDFLoad.plainSchema) {
         return None
       }
