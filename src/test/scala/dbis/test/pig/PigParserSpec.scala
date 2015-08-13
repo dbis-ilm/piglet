@@ -521,7 +521,16 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse BGP_FILTER in SparqlPig" in {
     assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
-      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\""))))))
+      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value
+        ("\"Stefan\""))
+      ))))
+  }
+
+  it should "parse BGP_FILTER with variables in SparqlPig" in {
+    assert(parseScript( """a = BGP_FILTER b BY { ?a "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
+      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(NamedField("a"), Value("\"firstName\""), Value
+        ("\"Stefan\""))
+      ))))
   }
 
   it should "parse BGP_FILTER with a complex pattern" in {

@@ -18,10 +18,8 @@ package dbis.pig.plan.rewriting
 
 import dbis.pig.op._
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.schema._
+import dbis.pig.plan.rewriting.PipeNameGenerator.generate
 import org.kiama.rewriting.Rewriter._
-
-import scala.util.Random
 
 
 /** This object contains all the rewriting rules that are currently implemented
@@ -274,7 +272,9 @@ object Rules {
     * @return Some Filter operator, if `term` was an BGPFilter operator with only one bound variable
     */
   def F2(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema != RDFLoad.plainSchema) {
         return None
       }
@@ -284,21 +284,27 @@ object Rules {
       }
 
       val pattern = patterns.head
+      var filter : Option[Filter] = None
+
       if (pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]) {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]) {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && pattern.obj.isInstanceOf[Value]) {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
       }
 
-      return None
+      if (filter.isDefined) {
+        in.removeConsumer(op)
+      }
+
+      return filter
     case _ => None
   }
 
@@ -308,7 +314,9 @@ object Rules {
     * @return Some Filter operator, if `term` was an BGPFilter operator with multiple bound variables
     */
   def F3(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema != RDFLoad.plainSchema) {
         return None
       }
@@ -316,6 +324,9 @@ object Rules {
       if (patterns.length != 1) {
         return None
       }
+
+      // We'll reuse in later on, so we need to remove `op` from its consumers
+      in.removeConsumer(op)
 
       patterns.head match {
         case TriplePattern(s@Value(_), p@Value(_), o@Value(_)) => Some(
@@ -348,7 +359,9 @@ object Rules {
     *         of data in the triple group format
     */
   def F4(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema == RDFLoad.plainSchema) {
         return None
       }
@@ -356,29 +369,33 @@ object Rules {
       if (patterns.length != 1) {
         return None
       }
-
       // TODO we make a lot of assumptions about Options and Array lengths here
       val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
 
       val pattern = patterns.head
+      var filter : Option[Filter] = None
       if (pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]
         && grouped_by == "subject") {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]
         && grouped_by == "predicate") {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && pattern.obj.isInstanceOf[Value]
         && grouped_by == "object") {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
       }
 
-      return None
+      if (filter.isDefined) {
+        in.removeConsumer(op)
+      }
+
+      return filter
     case _ => None
   }
 
@@ -389,7 +406,9 @@ object Rules {
     *         one is the grouping column
     */
   def F7(term: Any): Option[BGPFilter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema == RDFLoad.plainSchema) {
         return None
       }
@@ -416,7 +435,7 @@ object Rules {
         return None
       }
 
-      val internalPipeName = Random.nextString(10)
+      val internalPipeName = generate
       var group_filter : Option[BGPFilter] = None
       var other_filter_pattern : Option[TriplePattern] = None
 
@@ -475,6 +494,10 @@ object Rules {
         _.outputs.head.consumer = List(other_filter)
       }
 
+      if (group_filter.isDefined) {
+        in.removeConsumer(op)
+      }
+
       group_filter
     case _ => None
   }
@@ -485,7 +508,9 @@ object Rules {
     * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with only bound variables.
     */
   def F8(term: Any): Option[BGPFilter] = term match {
-    case op @ BGPFilter(out, in, patterns) =>
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
       if (op.inputSchema == RDFLoad.plainSchema) {
         return None
       }
@@ -506,7 +531,7 @@ object Rules {
         return None
       }
 
-      val internalPipeName = Random.nextString(10)
+      val internalPipeName = generate
       var group_filter : Option[BGPFilter] = None
       var other_filter : Option[BGPFilter] = None
 
@@ -548,7 +573,77 @@ object Rules {
         _.outputs.head.consumer = List(other_filter.get)
       }
 
+      if (group_filter.isDefined) {
+        in.removeConsumer(op)
+      }
+
       group_filter
+    case _ => None
+  }
+
+  def J1(term: Any): Option[List[BGPFilter]] = term match {
+    case op @ BGPFilter(_, _, patterns) =>
+      val out = op.outputs.head
+      val in = op.inputs.head
+      if (op.inputSchema != RDFLoad.plainSchema) {
+        return None
+      }
+
+      if (patterns.length < 2) {
+        return None
+      }
+
+      def isNamed(r: Ref): Option[NamedField] = r match {
+        case n @ NamedField(_) => Some(n)
+        case _ => None
+      }
+
+      val namedFields = patterns map { p =>
+        (isNamed(p.subj), isNamed(p.pred), isNamed(p.obj))
+      } toSet
+
+      if (namedFields.size != 1) {
+        // There are either no NamedFields or they appear in more than one position in different patterns, so it's
+        // not a star join
+        return None
+      }
+
+      val anyTripleHasMoreThanOneNamedField = namedFields.toList.map {
+        _ match {
+          case (Some(NamedField(_)), Some(NamedField(_)), _) => true
+          case (Some(NamedField(_)), _, Some(NamedField(_))) => true
+          case (_, Some(NamedField(_)), Some(NamedField(_))) => true
+          case _ => false
+        }
+      }.exists(_ == true)
+
+      if(anyTripleHasMoreThanOneNamedField) {
+        // One of the triples has multiple NamedFields, so it's not a star join
+        return None
+      }
+
+      // We'll reuse in later on, so we need to remove `op` from its consumers
+      in.removeConsumer(op)
+
+      val fieldname = namedFields map {
+        case (Some(n@ NamedField(_)), _, _) => n
+        case (_, Some(n @ NamedField(_)), _) => n
+        case (_, _, Some(n @ NamedField(_))) => n
+        // The early returns in this method should cover all cases where the above 3 cases would not be exhaustive,
+        // so just throw an exception if they're not.
+        case _ => throw new IllegalStateException("This code should not have been reached, you've found a bug")
+      } head
+
+      val filters = patterns map {p => BGPFilter(Pipe(generate), in, List(p))}
+      val join = Join(out,
+                      filters map {f => Pipe(f.outPipeName, f)},
+                      // Use map here to make sure the amount of field expressions is the same as the amount of filters
+                      filters map {_ => List(fieldname)})
+
+      filters foreach {f => f.outputs.head.consumer = List(join)}
+
+      return Some(filters)
+
     case _ => None
   }
 
@@ -568,5 +663,6 @@ object Rules {
     addOperatorReplacementStrategy(F4 _)
     addStrategy(F7 _)
     addStrategy(F8 _)
+    addStrategy(strategyf(t => J1(t)))
   }
 }
