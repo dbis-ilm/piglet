@@ -22,7 +22,7 @@ object HDFSService extends LazyLogging {
     logger.warn(s"HDFS core site file does not exist at: $coreSite")
     
   if(!Files.exists(hdfsSite))
-    logger.warn(s"HDFS hdfs site file does not exist at: $coreSite")
+    logger.warn(s"HDFS hdfs site file does not exist at: $hdfsSite")
     
   
   private val hdfsCoreSitePath = new Path(coreSite.toString())
