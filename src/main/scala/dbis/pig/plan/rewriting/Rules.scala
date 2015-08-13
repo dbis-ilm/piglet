@@ -286,21 +286,27 @@ object Rules {
       }
 
       val pattern = patterns.head
+      var filter : Option[Filter] = None
+
       if (pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]) {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]) {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && pattern.obj.isInstanceOf[Value]) {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
       }
 
-      return None
+      if (filter.isDefined) {
+        in.removeConsumer(op)
+      }
+
+      return filter
     case _ => None
   }
 
@@ -320,6 +326,9 @@ object Rules {
       if (patterns.length != 1) {
         return None
       }
+
+      // We'll reuse in later on, so we need to remove `op` from its consumers
+      in.removeConsumer(op)
 
       patterns.head match {
         case TriplePattern(s@Value(_), p@Value(_), o@Value(_)) => Some(
@@ -362,29 +371,33 @@ object Rules {
       if (patterns.length != 1) {
         return None
       }
-
       // TODO we make a lot of assumptions about Options and Array lengths here
       val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
 
       val pattern = patterns.head
+      var filter : Option[Filter] = None
       if (pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]
         && grouped_by == "subject") {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && pattern.pred.isInstanceOf[Value]
         && !pattern.obj.isInstanceOf[Value]
         && grouped_by == "predicate") {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
       } else if (!pattern.subj.isInstanceOf[Value]
         && !pattern.pred.isInstanceOf[Value]
         && pattern.obj.isInstanceOf[Value]
         && grouped_by == "object") {
-        return Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
       }
 
-      return None
+      if (filter.isDefined) {
+        in.removeConsumer(op)
+      }
+
+      return filter
     case _ => None
   }
 
@@ -483,6 +496,10 @@ object Rules {
         _.outputs.head.consumer = List(other_filter)
       }
 
+      if (group_filter.isDefined) {
+        in.removeConsumer(op)
+      }
+
       group_filter
     case _ => None
   }
@@ -558,6 +575,10 @@ object Rules {
         _.outputs.head.consumer = List(other_filter.get)
       }
 
+      if (group_filter.isDefined) {
+        in.removeConsumer(op)
+      }
+
       group_filter
     case _ => None
   }
@@ -604,7 +625,7 @@ object Rules {
       }
 
       // We'll reuse in later on, so we need to remove `op` from its consumers
-      in.consumer = in.consumer.filterNot(_ != op)
+      in.removeConsumer(op)
 
       val fieldname = namedFields map {
         case (Some(n@ NamedField(_)), _, _) => n
