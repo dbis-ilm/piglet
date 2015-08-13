@@ -397,44 +397,44 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       // subject & predicate bound, grouped by subject
       (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
         "subject",
-        BGPFilter(Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
+        BGPFilter(Pipe("PClecYbNXF"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("–깍窶䠃ऑ졮硔镔鰛끺"),
+        BGPFilter(Pipe("b"), Pipe("PClecYbNXF"),
           List(TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2))))),
       // subject & predicate bound, grouped by predicate
       (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
         "predicate",
-        BGPFilter(Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
+        BGPFilter(Pipe("vHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"),
+        BGPFilter(Pipe("b"), Pipe("vHyYGvOfsZ"),
           List(TriplePattern(Value("subject"), PositionalField(1), PositionalField(2))))),
       // subject & object bound, grouped by subject
       (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
         "subject",
-        BGPFilter(Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
+        BGPFilter(Pipe("EgkYzrkOZO"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"),
+        BGPFilter(Pipe("b"), Pipe("EgkYzrkOZO"),
           List(TriplePattern(PositionalField(0), PositionalField(1), Value("object"))))),
       // subject & object bound, grouped by object
       (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
         "object",
-        BGPFilter(Pipe("ᚩ룰宿希᭤㕗鋅᥆䢩旚"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
+        BGPFilter(Pipe("jvdcHuREqz"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
           ("object")))),
-        BGPFilter(Pipe("b"), Pipe("ᚩ룰宿希᭤㕗鋅᥆䢩旚"),
+        BGPFilter(Pipe("b"), Pipe("jvdcHuREqz"),
           List(TriplePattern(Value("subject"), PositionalField(1), PositionalField(2))))),
       // predicate & object bound, grouped by predicate
       (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
         "predicate",
-        BGPFilter(Pipe("缌㓀⼲킃㌶㾬䢴憩᥷ᣓ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
+        BGPFilter(Pipe("UxwEkfQHGx"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("缌㓀⼲킃㌶㾬䢴憩᥷ᣓ"),
+        BGPFilter(Pipe("b"), Pipe("UxwEkfQHGx"),
           List(TriplePattern(PositionalField(0), PositionalField(1), Value("object"))))),
       // predicate & object bound, grouped by object
       (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
         "object",
-        BGPFilter(Pipe("ᥴ倓✴톍눜槥呩ᱷ䧉⮨"), Pipe("a"),
+        BGPFilter(Pipe("YAXKzBIYXu"), Pipe("a"),
           List(TriplePattern(PositionalField(0), PositionalField(1), Value("object")))),
-        BGPFilter(Pipe("b"), Pipe("ᥴ倓✴톍눜槥呩ᱷ䧉⮨"),
+        BGPFilter(Pipe("b"), Pipe("YAXKzBIYXu"),
           List(TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)))))
     )
 
@@ -509,21 +509,21 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       ("Pattern", "grouping column", "Grouping column Filter", "Other Filter"),
       (pattern,
         "subject",
-        BGPFilter(Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
+        BGPFilter(Pipe("PClecYbNXF"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), List(TriplePattern(PositionalField(0), Value("predicate"),
+        BGPFilter(Pipe("b"), Pipe("PClecYbNXF"), List(TriplePattern(PositionalField(0), Value("predicate"),
           Value("object"))))),
       (pattern,
         "predicate",
-        BGPFilter(Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
+        BGPFilter(Pipe("vHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"), List(TriplePattern(Value("subject"), PositionalField(1), Value
+        BGPFilter(Pipe("b"), Pipe("vHyYGvOfsZ"), List(TriplePattern(Value("subject"), PositionalField(1), Value
           ("object"))))),
       (pattern,
         "object",
-        BGPFilter(Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
+        BGPFilter(Pipe("EgkYzrkOZO"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
           ("object")))),
-        BGPFilter(Pipe("b"), Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), List(TriplePattern(Value("subject"), Value("predicate"),
+        BGPFilter(Pipe("b"), Pipe("EgkYzrkOZO"), List(TriplePattern(Value("subject"), Value("predicate"),
           PositionalField(2))))))
 
     forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
@@ -594,23 +594,23 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))),
         List(
-          BGPFilter(Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")))),
-          BGPFilter(Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))))),
-        Join(Pipe("b"), List(Pipe("–깍窶䠃ऑ졮硔镔鰛끺"), Pipe("⛛⠥톦럫㓚喬詧ǌꏚ蟃")), List(List(NamedField("s")), List(NamedField("s"))))),
+          BGPFilter(Pipe("PClecYbNXF"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")))),
+          BGPFilter(Pipe("vHyYGvOfsZ"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))))),
+        Join(Pipe("b"), List(Pipe("PClecYbNXF"), Pipe("vHyYGvOfsZ")), List(List(NamedField("s")), List(NamedField("s"))))),
       (List(
         TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
         TriplePattern(PositionalField(0), NamedField("p"), Value("obj2"))),
         List(
-          BGPFilter(Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")))),
-          BGPFilter(Pipe("ᚩ룰宿希᭤㕗鋅᥆䢩旚"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"), Value("obj2"))))),
-        Join(Pipe("b"), List(Pipe("僮쓉ᅡ⠭尔厅粑莹්犌"), Pipe("ᚩ룰宿希᭤㕗鋅᥆䢩旚")), List(List(NamedField("p")), List(NamedField("p"))))),
+          BGPFilter(Pipe("EgkYzrkOZO"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")))),
+          BGPFilter(Pipe("jvdcHuREqz"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"), Value("obj2"))))),
+        Join(Pipe("b"), List(Pipe("EgkYzrkOZO"), Pipe("jvdcHuREqz")), List(List(NamedField("p")), List(NamedField("p"))))),
       (List(
         TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")),
         TriplePattern(PositionalField(0), Value("pred2"), NamedField("o"))),
         List(
-          BGPFilter(Pipe("缌㓀⼲킃㌶㾬䢴憩᥷ᣓ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")))),
-          BGPFilter(Pipe("ᥴ倓✴톍눜槥呩ᱷ䧉⮨"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred2"), NamedField("o"))))),
-        Join(Pipe("b"), List(Pipe("缌㓀⼲킃㌶㾬䢴憩᥷ᣓ"), Pipe("ᥴ倓✴톍눜槥呩ᱷ䧉⮨")), List(List(NamedField("o")), List(NamedField("o")))))
+          BGPFilter(Pipe("UxwEkfQHGx"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")))),
+          BGPFilter(Pipe("YAXKzBIYXu"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred2"), NamedField("o"))))),
+        Join(Pipe("b"), List(Pipe("UxwEkfQHGx"), Pipe("YAXKzBIYXu")), List(List(NamedField("o")), List(NamedField("o")))))
     )
 
     forAll(patterns) { (p: List[TriplePattern], fs: List[BGPFilter], j: Join) =>

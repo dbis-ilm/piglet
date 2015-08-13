@@ -18,10 +18,8 @@ package dbis.pig.plan.rewriting
 
 import dbis.pig.op._
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.schema._
+import dbis.pig.plan.rewriting.PipeNameGenerator.generate
 import org.kiama.rewriting.Rewriter._
-
-import scala.util.Random
 
 
 /** This object contains all the rewriting rules that are currently implemented
@@ -437,7 +435,7 @@ object Rules {
         return None
       }
 
-      val internalPipeName = Random.nextString(10)
+      val internalPipeName = generate
       var group_filter : Option[BGPFilter] = None
       var other_filter_pattern : Option[TriplePattern] = None
 
@@ -533,7 +531,7 @@ object Rules {
         return None
       }
 
-      val internalPipeName = Random.nextString(10)
+      val internalPipeName = generate
       var group_filter : Option[BGPFilter] = None
       var other_filter : Option[BGPFilter] = None
 
@@ -636,7 +634,7 @@ object Rules {
         case _ => throw new IllegalStateException("This code should not have been reached, you've found a bug")
       } head
 
-      val filters = patterns map {p => BGPFilter(Pipe(Random.nextString(10)), in, List(p))}
+      val filters = patterns map {p => BGPFilter(Pipe(generate), in, List(p))}
       val join = Join(out,
                       filters map {f => Pipe(f.outPipeName, f)},
                       // Use map here to make sure the amount of field expressions is the same as the amount of filters
