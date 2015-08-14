@@ -636,9 +636,9 @@ object Rules {
 
       val filters = patterns map {p => BGPFilter(Pipe(generate), in, List(p))}
       val join = Join(out,
-                      filters map {f => Pipe(f.outPipeName, f)},
-                      // Use map here to make sure the amount of field expressions is the same as the amount of filters
-                      filters map {_ => List(fieldname)})
+        filters map {f => Pipe(f.outPipeName, f)},
+        // Use map here to make sure the amount of field expressions is the same as the amount of filters
+        filters map {_ => List(fieldname)})
 
       filters foreach {f => f.outputs.head.consumer = List(join)}
 
