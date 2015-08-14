@@ -114,21 +114,21 @@ object PigCompiler extends PigParser with LazyLogging {
 
     logger.debug("start processing created dataflow plans")
     
+    val backendConf = BackendManager.backend(backend)
+    val templateFile = backendConf.templateFile
+    val jarFile = Conf.backendJar(backend)
+    val mm = new MaterializationManager
+    
     for(plan <- schedule) {
     
       // 3. now, we should apply optimizations
       var newPlan = plan._1
-      val mm = new MaterializationManager
       newPlan = processMaterializations(newPlan, mm)
       if (backend=="flinks") newPlan = processWindows(newPlan)
       newPlan = processPlan(newPlan)
       
       logger.debug("finished optimizations")
       
-      
-      val backendConf = BackendManager.backend(backend)
-      val templateFile = backendConf.templateFile
-      val jarFile = Conf.backendJar(backend)
   
       val scriptName = plan._2.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
@@ -147,7 +147,7 @@ object PigCompiler extends PigParser with LazyLogging {
         } else
           logger.info("successfully compiled program - exiting.")
           
-        case None => logger.error("creating jar file failed") 
+        case None => logger.error(s"creating jar file failed for ${plan._2}") 
       } 
     }
       

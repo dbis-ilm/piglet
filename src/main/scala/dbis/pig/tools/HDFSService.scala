@@ -7,14 +7,26 @@ import org.apache.hadoop.fs._
 import org.apache.hadoop.hdfs.DistributedFileSystem
 import collection.JavaConversions._
 import com.typesafe.scalalogging.LazyLogging
+import java.nio.file.Files
 
 /**
  * Created by kai on 06.08.15.
  */
 object HDFSService extends LazyLogging {
   private val conf = new Configuration()
-  private val hdfsCoreSitePath = new Path("core-site.xml")
-  private val hdfsHDFSSitePath = new Path("hdfs-site.xml")
+  
+  val coreSite = Conf.hdfsCoreSiteFile.toAbsolutePath()
+  val hdfsSite = Conf.hdfsHdfsSiteFile.toAbsolutePath()
+  
+  if(!Files.exists(coreSite))
+    logger.warn(s"HDFS core site file does not exist at: $coreSite")
+    
+  if(!Files.exists(hdfsSite))
+    logger.warn(s"HDFS hdfs site file does not exist at: $hdfsSite")
+    
+  
+  private val hdfsCoreSitePath = new Path(coreSite.toString())
+  private val hdfsHDFSSitePath = new Path(hdfsSite.toString())
 
   conf.addResource(hdfsCoreSitePath)
   conf.addResource(hdfsHDFSSitePath)

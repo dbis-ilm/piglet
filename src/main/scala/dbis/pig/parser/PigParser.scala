@@ -531,7 +531,11 @@ class PigParser extends JavaTokenParsers {
   def tuplifyStmt: Parser[PigOperator] = bag ~ "=" ~ tuplifyKeyword ~ bag ~ onKeyword ~ ref ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ r => new Tuplify(Pipe(out), Pipe(in), r) }
 
-  def bgPattern: Parser[TriplePattern] = ref ~ ref ~ ref ^^ { case r1 ~ r2 ~ r3 => TriplePattern(r1, r2, r3)}
+  def bgpVariable: Parser[NamedField] = "?" ~ ident ^^ { case _ ~ varname => NamedField(varname)}
+
+  def bgPattern: Parser[TriplePattern] = (bgpVariable | ref) ~(bgpVariable | ref) ~ (bgpVariable | ref) ^^ {
+    case r1 ~ r2 ~ r3 => TriplePattern(r1, r2, r3)
+  }
 
   def bgpFilterStmt: Parser[PigOperator] = bag ~ "=" ~ bgpFilterKeyword ~ bag ~
     byKeyword ~ "{" ~ repsep(bgPattern, ".") ~ "}" ^^ {
