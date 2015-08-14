@@ -35,7 +35,9 @@ import dbis.pig.backends.BackendManager
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.collection.mutable.ListBuffer
+import dbis.pig.tools.BreadthFirstTopDownWalker
 
+import scala.collection.mutable.{Map => MutableMap}
 
 object PigCompiler extends PigParser with LazyLogging {
   
@@ -112,6 +114,32 @@ object PigCompiler extends PigParser with LazyLogging {
       }
     }
 
+    logger.debug("start creating lineage counter map")
+    
+    val walker = new BreadthFirstTopDownWalker
+
+    val lineageMap = MutableMap.empty[String, Int]
+    
+    def visitor(op: PigOperator): Unit = {
+      val lineage = op.lineageString
+      
+      var old = 0
+      if(lineageMap.contains(lineage))
+        old = lineageMap(lineage)
+        
+      lineageMap(lineage) = old + 1
+    }
+    
+    schedule.foreach{ plan => walker.walk(plan._1)(visitor) }
+    
+    val lineageMapString = new StringBuilder
+    
+    for((k,v) <- lineageMap) {
+      lineageMapString ++= s"$k  -->  $v\n"
+    }
+    
+    logger.debug(s"LINEAGE COUNTER MAP: $lineageMapString")
+    
     logger.debug("start processing created dataflow plans")
     
     val backendConf = BackendManager.backend(backend)
