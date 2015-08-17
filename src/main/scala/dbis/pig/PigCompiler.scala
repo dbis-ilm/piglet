@@ -35,6 +35,7 @@ import dbis.pig.backends.BackendManager
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.collection.mutable.ListBuffer
+import dbis.pig.backends.BackendConf
 
 
 object PigCompiler extends PigParser with LazyLogging {
@@ -101,6 +102,28 @@ object PigCompiler extends PigParser with LazyLogging {
    */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String]): Unit = {
     
+    val backendConf = BackendManager.backend(backend)
+    
+    if(backendConf.raw) {
+      if(compileOnly) {
+        logger.error("Raw backends do not support compile-only mode! Aborting")
+        return
+      }
+      
+      inputFiles.foreach { file => runRaw(file, master, backendConf) }
+      
+    } else {
+      runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf)
+    }
+  }
+  
+  def runRaw(file: Path, master: String, backendConf: BackendConf) {
+    logger.debug(s"executing in raw mode: $file with master $master for backend ${backendConf.name}")    
+    val runner = backendConf.runnerClass
+    runner.executeRaw(file, master)
+  }
+  
+  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf) {
     logger.debug("start parsing input files")
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
     for(file <- inputFiles) {
@@ -114,21 +137,21 @@ object PigCompiler extends PigParser with LazyLogging {
 
     logger.debug("start processing created dataflow plans")
     
+    
+    val templateFile = backendConf.templateFile
+    val jarFile = Conf.backendJar(backend)
+    val mm = new MaterializationManager
+    
     for(plan <- schedule) {
     
       // 3. now, we should apply optimizations
       var newPlan = plan._1
-      val mm = new MaterializationManager
       newPlan = processMaterializations(newPlan, mm)
       if (backend=="flinks") newPlan = processWindows(newPlan)
       newPlan = processPlan(newPlan)
       
       logger.debug("finished optimizations")
       
-      
-      val backendConf = BackendManager.backend(backend)
-      val templateFile = backendConf.templateFile
-      val jarFile = Conf.backendJar(backend)
   
       val scriptName = plan._2.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
@@ -147,10 +170,9 @@ object PigCompiler extends PigParser with LazyLogging {
         } else
           logger.info("successfully compiled program - exiting.")
           
-        case None => logger.error("creating jar file failed") 
+        case None => logger.error(s"creating jar file failed for ${plan._2}") 
       } 
     }
-      
   }
 
   /**

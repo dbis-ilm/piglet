@@ -20,7 +20,7 @@ object Conf extends LazyLogging {
   /**
    * The path to the config file. It will resolve to $USER_HOME/.piglet/application.conf
    */
-  private val configFile = programHome.resolve("application.conf")
+  private val configFile = programHome.resolve("piglet.conf")
   
   /**
    * Load the configuration.
@@ -51,7 +51,7 @@ object Conf extends LazyLogging {
   }
 
   protected[pig] def copyConfigFile() = {
-    val source = Conf.getClass.getClassLoader.getResourceAsStream("application.conf")
+    val source = Conf.getClass.getClassLoader.getResourceAsStream("piglet.conf")
     Files.copy(source, configFile, StandardCopyOption.REPLACE_EXISTING)
     logger.debug(s"copied config file to $configFile")
   }
@@ -70,4 +70,7 @@ object Conf extends LazyLogging {
   def backendJar(backend: String): Path = Paths.get(appconf.getString(s"backends.$backend.jar")) 
   
   def backendConf(backend: String) = appconf.getString(s"backends.$backend.conf")
+  
+  def hdfsCoreSiteFile = Paths.get(appconf.getString("hdfs.coresite"))
+  def hdfsHdfsSiteFile = Paths.get(appconf.getString("hdfs.hdfssite"))
 }

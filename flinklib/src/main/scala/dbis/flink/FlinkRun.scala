@@ -50,6 +50,8 @@ class FlinkRun extends PigletBackend with LazyLogging {
     }
   }
 
+  override def executeRaw(file: Path, master: String) = ???
+  
   def submitJar(master: String, path: Path, className: String, args: String*) = { 
     val file = path.toFile().getAbsoluteFile()
     val parallelism = 1 

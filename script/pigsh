@@ -18,7 +18,7 @@ fi
 # the directory to include in classpath to enable backends
 # this should actually be set by the user using external variables
 if [ -z "$BACKEND_DIR" ]; then # if BACKEND_DIR does not exist, use our default one
-    BACKEND_DIR=`dirname $0`/../sparklib/target/scala-2.11/*
+    BACKEND_DIR=`dirname $0`/../sparklib/target/scala-2.11/*:`dirname $0`/../flinklib/target/scala-2.11/*:`dirname $0`/../mapreduce/target/scala-2.11/*
     echo "No backend direcory (BACKEND_DIR) specified!"
 else
     if [[ "$BACKEND_DIR" == */ ]]; then # if it ends with / it's a directory - include all files using the wildcard *
@@ -30,7 +30,7 @@ fi
 
 echo "Including backends in $BACKEND_DIR"
 
-CP=$CP:$BACKEND_DIR
+CP=$CP:$BACKEND_DIR:$CLASSPATH
 
 BACKEND=""
 while getopts ":b:" opt; do
@@ -40,7 +40,7 @@ while getopts ":b:" opt; do
             shift
             ;;
         \?)
-            echo "Invalid option: -$OPTARG" >&2
+            echo "Invalid option: -$OPTARG" >&2w
             exit 1
             ;;
         :)
@@ -51,7 +51,8 @@ while getopts ":b:" opt; do
 done
 
 case $BACKEND in
-    "spark")
+    "spark") ;&
+    "sparks")
         if [ -z "$SPARK_JAR" ]; then
             echo "Please set SPARK_JAR to your Spark-assembly-hadoop jar file"
             exit 1
@@ -59,7 +60,8 @@ case $BACKEND in
             CP=$SPARK_JAR:$CP
         fi
         ;;
-    "flink")
+    "flink") ;&
+    "flinks")
         if [ -z "$FLINK_JAR" ]; then
             echo "Please set FLINK_JAR to your Flink jar file (built with scala 2.11)"
             exit 1
@@ -67,6 +69,7 @@ case $BACKEND in
             CP=$FLINK_JAR:$CP
         fi
         ;;
+    "mapreduce") ;;
     *)
         echo "Unsupported backend $BACKEND. Please specify your backend via the -b option (spark or flink)."
         exit 1

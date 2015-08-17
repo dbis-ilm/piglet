@@ -190,6 +190,13 @@ class PigParserSpec extends FlatSpec {
       )))))
   }
 
+  it should "parse a simple foreach statement with *" in {
+    assert(parseScript("a = foreach b generate *;") ==
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(RefExpr(NamedField("*")))
+      )))))
+  }
+
   it should "parse a foreach statement with aliases for fields" in {
     assert(parseScript("a = foreach b generate $0 as f1, $1 as f2, $2 as f3;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
@@ -521,7 +528,16 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse BGP_FILTER in SparqlPig" in {
     assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
-      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\""))))))
+      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value
+        ("\"Stefan\""))
+      ))))
+  }
+
+  it should "parse BGP_FILTER with variables in SparqlPig" in {
+    assert(parseScript( """a = BGP_FILTER b BY { ?a "firstName" "Stefan" };""", LanguageFeature.SparqlPig) ==
+      List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(NamedField("a"), Value("\"firstName\""), Value
+        ("\"Stefan\""))
+      ))))
   }
 
   it should "parse BGP_FILTER with a complex pattern" in {
