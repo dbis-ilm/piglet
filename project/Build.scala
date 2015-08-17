@@ -22,7 +22,8 @@ object PigBuild extends Build {
     dependsOn(common).
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
-    aggregate(common, sparklib, flinklib) // remove this if you don't want to automatically build these projects when building piglet 
+    dependsOn(mapreduce % "test;it").
+    aggregate(common, sparklib, flinklib,mapreduce) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -35,7 +36,9 @@ object PigBuild extends Build {
     settings(commonSettings: _*).
     dependsOn(common)
 
-    
+  lazy val mapreduce = (project in file("mapreduce")).
+    settings(commonSettings: _*).
+    dependsOn(common)
     
 
   /*
@@ -46,6 +49,7 @@ object PigBuild extends Build {
   val itDeps = backend match {
     case "flink" | "flinks" => Seq(Dependencies.flinkDist % "test;it" from Dependencies.flinkAddress)
     case "spark" | "sparks" => Seq(Dependencies.sparkCore % "test;it", Dependencies.sparkSql % "test;it")
+    case "mapreduce" => Seq(Dependencies.pig % "test;it")
     case _ => println(s"Unsupported backend: $backend ! I don't know which dependencies to include!"); Seq.empty[ModuleID]
   }
   
@@ -53,6 +57,7 @@ object PigBuild extends Build {
     case "flink" => Seq("dbis.test.flink.FlinkCompileIt")
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
+    case "mapreduce" => Seq.empty[String] // TODO
     case _ => println(s"Unsupported backend: $backend - Will execute no tests"); Seq.empty[String]
   }
 }
@@ -80,6 +85,7 @@ object Dependencies {
   val log4j = "log4j" % "log4j" % "1.2.17"
   val slf4j= "org.slf4j" % "slf4j-simple" % "1.6.4"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
+  val pig = "org.apache.pig" % "pig" % "0.15.0"
 
   val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.9.0.jar"
   
@@ -98,6 +104,5 @@ object Dependencies {
     log4j,
 //    slf4j,
     hadoop % "provided"
-    
   )
 }

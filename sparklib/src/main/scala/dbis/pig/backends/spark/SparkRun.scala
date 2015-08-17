@@ -36,6 +36,8 @@ class SparkRun extends PigletBackend with BackendConf {
     SparkSubmit.main(Array("--master", master, "--class", className, jarFile.toAbsolutePath().toString()))
   }
   
+  override def executeRaw(file: Path, master: String) = ???
+  
   /**
    * Get the name of this backend
    * 
@@ -51,4 +53,6 @@ class SparkRun extends PigletBackend with BackendConf {
   } 
   
   override def templateFile = appconf.getString("backends.spark.template")
+  
+  override def raw = false
 }
