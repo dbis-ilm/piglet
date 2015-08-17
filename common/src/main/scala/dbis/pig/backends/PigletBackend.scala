@@ -32,4 +32,14 @@ trait PigletBackend {
    * @param jarFile The path to the jar file representing the job
    */
   def execute(master: String, className: String, jarFile: Path): Unit
+  
+  /**
+   * Execute the raw Pig script. Use this function if your engine does not rely on
+   * code generation by Piglet but rather needs to process the Pig script directly
+   * by itself 
+   * 
+   * @param master The master information (execution mode)
+   * @param program The path to the script file
+   */
+  def executeRaw(program: Path, master: String)
 }

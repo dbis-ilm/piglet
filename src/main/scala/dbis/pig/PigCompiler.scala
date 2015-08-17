@@ -35,6 +35,7 @@ import dbis.pig.backends.BackendManager
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.collection.mutable.ListBuffer
+import dbis.pig.backends.BackendConf
 
 
 object PigCompiler extends PigParser with LazyLogging {
@@ -101,6 +102,28 @@ object PigCompiler extends PigParser with LazyLogging {
    */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String]): Unit = {
     
+    val backendConf = BackendManager.backend(backend)
+    
+    if(backendConf.raw) {
+      if(compileOnly) {
+        logger.error("Raw backends do not support compile-only mode! Aborting")
+        return
+      }
+      
+      inputFiles.foreach { file => runRaw(file, master, backendConf) }
+      
+    } else {
+      runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf)
+    }
+  }
+  
+  def runRaw(file: Path, master: String, backendConf: BackendConf) {
+    logger.debug(s"executing in raw mode: $file with master $master for backend ${backendConf.name}")    
+    val runner = backendConf.runnerClass
+    runner.executeRaw(file, master)
+  }
+  
+  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf) {
     logger.debug("start parsing input files")
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
     for(file <- inputFiles) {
@@ -114,7 +137,7 @@ object PigCompiler extends PigParser with LazyLogging {
 
     logger.debug("start processing created dataflow plans")
     
-    val backendConf = BackendManager.backend(backend)
+    
     val templateFile = backendConf.templateFile
     val jarFile = Conf.backendJar(backend)
     val mm = new MaterializationManager
@@ -150,7 +173,6 @@ object PigCompiler extends PigParser with LazyLogging {
         case None => logger.error(s"creating jar file failed for ${plan._2}") 
       } 
     }
-      
   }
 
   /**
