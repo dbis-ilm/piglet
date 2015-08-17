@@ -54,5 +54,5 @@ class SparkRun extends PigletBackend with BackendConf {
   
   override def templateFile = appconf.getString("backends.spark.template")
   
-  override def raw = true
+  override def raw = false
 }
