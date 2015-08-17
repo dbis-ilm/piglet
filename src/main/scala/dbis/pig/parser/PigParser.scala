@@ -339,7 +339,9 @@ class PigParser extends JavaTokenParsers {
    * <A> = FOREACH <B> { <SubPlan> }
    */
   def exprSchema: Parser[Field] = asKeyword ~ fieldSchema ^^ { case _ ~ t => t }
-  def genExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
+  def simpleGeneratorExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
+  def asteriskExpr: Parser[GeneratorExpr] = "*" ^^ { case _ => GeneratorExpr(RefExpr(NamedField("*"))) }
+  def genExpr: Parser[GeneratorExpr] = asteriskExpr | simpleGeneratorExpr
   def generatorList: Parser[List[GeneratorExpr]] = repsep(genExpr, ",")
   def plainForeachGenerator: Parser[ForeachGenerator] = generateKeyword ~ generatorList ^^ {
     case _ ~ exList => GeneratorList(exList)

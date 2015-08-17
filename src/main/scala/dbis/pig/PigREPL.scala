@@ -139,16 +139,14 @@ object PigREPL extends PigParser with LazyLogging {
   }
 
   def main(args: Array[String]): Unit = {
-    val backend = if(args.length==0) Conf.defaultBackend
-                  else { 
-                    args(0) match{
-                      case "flink"  => "flink"
-                      case "flinks" => "flinks"
-                      case "spark"  => "spark"
-                      case "sparks" => "sparks"
-                      case _ => throw new Exception("Unknown Backend $_")
-                    }
-                  }
+    val backend = if(args.length==0) Conf.defaultBackend else args(0)
+    
+    logger debug s"""Running REPL with backend "$backend" """
+    
+    val backendConf = BackendManager.backend(backend)
+    if(backendConf.raw)
+      throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
+    
     console {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
@@ -211,17 +209,15 @@ object PigREPL extends PigParser with LazyLogging {
         plan = processMaterializations(plan, mm)
         plan = processPlan(plan)
 
-        val jobJar = Conf.backendJar(backend)
-        
-        val backendConf = BackendManager.backend(backend)
         val templateFile = backendConf.templateFile
+        val jobJar = Conf.backendJar(backend)
         
         FileTools.compileToJar(plan, "script", Paths.get("."), false, jobJar, templateFile) match {
           case Some(jarFile) =>
             val runner = backendConf.runnerClass
             runner.execute("local", "script", jarFile)
           
-          case None => println("failed to build jar file for job")
+          case None => println("failed to build jar file for job")  
         }
 
         // buf.clear()

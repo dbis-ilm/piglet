@@ -190,6 +190,13 @@ class PigParserSpec extends FlatSpec {
       )))))
   }
 
+  it should "parse a simple foreach statement with *" in {
+    assert(parseScript("a = foreach b generate *;") ==
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(RefExpr(NamedField("*")))
+      )))))
+  }
+
   it should "parse a foreach statement with aliases for fields" in {
     assert(parseScript("a = foreach b generate $0 as f1, $1 as f2, $2 as f3;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
