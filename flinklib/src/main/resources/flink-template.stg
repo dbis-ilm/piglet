@@ -3,6 +3,10 @@ init_code(includes) ::= <<
 import org.apache.flink.api.scala._
 import dbis.flink._
 
+<if (includes)>
+<includes>
+<endif>
+
 <\n>
 >>
 
@@ -12,9 +16,13 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name, hook) ::= <<
     def main(args: Array[String]) {
         val env = ExecutionEnvironment.getExecutionEnvironment<\n>
+        
+    <if (hook)>
+		setupHook()
+	<endif>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
@@ -92,8 +100,12 @@ orderBy(out,in,key,asc) ::=<<
 
 
 // ----------------- END of the code implementing the query -------------------
-end_query(name) ::= <<
+end_query(name, hook) ::= <<
         env.execute("<name>")
+        
+    <if (hook)>
+		shutdownHook()
+	<endif>
     }
 }
 >>
