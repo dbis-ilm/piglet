@@ -42,7 +42,7 @@ import org.clapper.scalasti._
  *
  * @param templateFile the name of the backend-specific template fle
  */
-class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path]) extends GenCodeBase with LazyLogging {
+class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) extends GenCodeBase with LazyLogging {
 
   /**
    * An exception representing an error in handling the templates for code generation.
@@ -794,18 +794,20 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path]) extends 
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
     
-    b ++= opCode + "\n"
+    b ++= opCode
     
     if(hookFile.isDefined)
-      b ++= emitAfterHook(node) + "\n"
+      b ++= "\n" + emitAfterHook(node) + "\n"
     
     
     b.toString()
   }
 
-  def emitBeforeHook(op: PigOperator): String = {
-    s"""beforeHook("${op.lineageString}")"""
-  }
+  def emitSetupHook(): String = callST("setupHook")
+  
+  def emitShutDownHook(): String = "shutdownHook()"
+  
+  def emitBeforeHook(op: PigOperator): String = s"""beforeHook("${op.lineageString}")"""
   
   def emitAfterHook(op: PigOperator): String = {
     
@@ -844,14 +846,29 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path]) extends 
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
+  def emitHeader2(scriptName: String): String = {
+    var m  = Map("name" -> scriptName)
+    if(hookFile.isDefined)
+      m = m + ("hook" -> "true")
+      
+    callST("begin_query", m)
+  }
 
   /**
    * Generate code needed for finishing the script and starting the execution.
    *
    * @return a string representing the end of the code.
    */
-  def emitFooter: String = callST("end_query", Map("name" -> "Starting Query"))
+  def emitFooter: String = {
+    var m = Map("name" -> "Starting Query")
+    
+    if(hookFile.isDefined)
+      m = m + ("hook" -> "true") 
+    
+    m.foreach(println(_))  
+      
+    callST("end_query",m)
+  }
 
   /*------------------------------------------------------------------------------------------------- */
   /*                               template handling code                                             */
