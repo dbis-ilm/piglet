@@ -420,6 +420,11 @@ class PigParserSpec extends FlatSpec {
       List(DefineCmd("myFunc", "class.func", List(Value("42"), Value("\"Hallo\"")))))
   }
 
+  it should "parse a SET statement" in {
+    assert(parseScript("set parallelism 5;") == List(SetCmd("parallelism", Value("5"))))
+    assert(parseScript("""set baseDirectory "/home/user";""") == List(SetCmd("baseDirectory", Value("\"/home/user\""))))
+  }
+
   it should "parse a stream statement without schema" in {
     assert(parseScript("a = stream b through package.myOp;") == List(StreamOp(Pipe("a"), Pipe("b"), "package.myOp")))
   }
