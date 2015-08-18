@@ -42,7 +42,7 @@ case class OrderBy(out: Pipe, in: Pipe, orderSpec: List[OrderBySpec]) extends Pi
   _outputs = List(out)
   _inputs = List(in)
 
-  override def lineageString: String = s"""ORDERBY%""" + super.lineageString
+  override def lineageString: String = s"""ORDERBY%${orderSpec}%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
     schema match {
