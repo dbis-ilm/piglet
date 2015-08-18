@@ -22,8 +22,10 @@ import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import dbis.pig.udf._
+import dbis.pig.tools.Conf
 
 import java.net.URI
+import java.nio.file.Path
 
 import org.clapper.scalasti._
 
@@ -40,7 +42,7 @@ import org.clapper.scalasti._
  *
  * @param templateFile the name of the backend-specific template fle
  */
-class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLogging {
+class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path]) extends GenCodeBase with LazyLogging {
 
   /**
    * An exception representing an error in handling the templates for code generation.
@@ -744,7 +746,13 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    */
   def emitNode(node: PigOperator): String = {
     val group = STGroupFile(templateFile)
-    node match {
+    
+    val b = new StringBuilder
+    
+    if(hookFile.isDefined)
+      b ++= emitBeforeHook(node) + "\n"
+    
+    val opCode = node match {
         /*
          * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
          *       after changing the pipe name. Instead, use node.outPipeName
@@ -785,14 +793,39 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
        */
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
+    
+    b ++= opCode + "\n"
+    
+    if(hookFile.isDefined)
+      b ++= emitAfterHook(node) + "\n"
+    
+    
+    b.toString()
   }
 
+  def emitBeforeHook(op: PigOperator): String = {
+    s"""beforeHook("${op.lineageString}")"""
+  }
+  
+  def emitAfterHook(op: PigOperator): String = {
+    
+    val outName = if(op.outPipeName.isEmpty()) "None" else s"""Some(${op.outPipeName})"""
+    
+    s"""afterHook("${op.lineageString}",${outName})"""
+  }
+  
    /**
    * Generate code needed for importing required Scala packages.
    *
    * @return a string representing the import code
    */
-  def emitImport: String = callST("init_code")
+  def emitImport: String = {
+    if(hookFile.isDefined)
+      callST("init_code", Map("includes" -> Seq(s"import ${Conf.hookImport}").mkString("\n")))
+    else
+      callST("init_code")
+  } 
+    
 
   /**
    * Generate code for the header of the script outside the main class/object,
@@ -857,6 +890,6 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   
 }
 
-class ScalaBackendCompile(templateFile: String) extends Compile {
-  override val codeGen = new ScalaBackendGenCode(templateFile)
+class ScalaBackendCompile(templateFile: String, hookFile: Option[Path]) extends Compile {
+  override val codeGen = new ScalaBackendGenCode(templateFile, hookFile)
 }

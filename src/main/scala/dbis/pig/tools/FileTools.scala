@@ -28,6 +28,8 @@ import dbis.pig.backends.BackendConf
 import java.nio.file.Path
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.io.FileInputStream
+import scala.collection.mutable.ListBuffer
 
 object FileTools extends LazyLogging {
   def copyStream(istream : InputStream, ostream : OutputStream) : Unit = {
@@ -65,9 +67,9 @@ object FileTools extends LazyLogging {
     }
   }
   
-  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean = false, backendJar: Path, templateFile: String): Option[Path] = {
+  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean = false, backendJar: Path, templateFile: String, hookFile: Option[Path] = None): Option[Path] = {
     // 4. compile it into Scala code for Spark
-    val compiler = new ScalaBackendCompile(templateFile) 
+    val compiler = new ScalaBackendCompile(templateFile, hookFile) 
 
     // 5. generate the Scala code
     val code = compiler.compile(scriptName, plan)
@@ -106,11 +108,23 @@ object FileTools extends LazyLogging {
     val jobJar = backendJar.toAbsolutePath().toString()
     FileTools.extractJarToDir(jobJar, outputDirectory)
     
-//    if (compileOnly) 
-//      return false // sys.exit(0)
-
+    val sources = ListBuffer(outputFile)
+    
+    if(hookFile.isDefined) {
+      val in = hookFile.get.toAbsolutePath().toFile()
+      val out = outputDirectory.resolve(hookFile.get.getFileName)
+      
+      logger.debug(s"copying hook file from '$in' to '$out'")
+      FileTools.copyStream(new FileInputStream(in), new FileOutputStream(out.toFile()))
+      
+      // add the hook file to the list of files to
+      sources += out
+      
+    }
+    
+    
     // 9. compile the scala code
-    if (!ScalaCompiler.compile(outputDirectory, outputFile))
+    if (!ScalaCompiler.compile(outputDirectory, sources))
       return None
 
 
@@ -123,15 +137,5 @@ object FileTools extends LazyLogging {
     } else 
       return None
   }
-
   
-  
-//  private def getTemplateFile(backend: String): String = {
-//    BuildSettings.backends.get(backend).get("templateFile")
-//  }
-//
-//  def getRunner(backend: String): Run = { 
-//    val className = BuildSettings.backends.get(backend).get("runClass")
-//    Class.forName(className).newInstance().asInstanceOf[Run]
-//  }
 }

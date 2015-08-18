@@ -22,6 +22,7 @@ import scala.tools.nsc.io.AbstractFile
 import scala.tools.nsc.reporters.ConsoleReporter
 import scala.tools.nsc.{Global, Settings}
 import java.nio.file.Path
+import com.typesafe.scalalogging.LazyLogging
 
 trait Probe
 
@@ -30,7 +31,11 @@ trait Probe
  * for compiling source files.
  */
 
-object ScalaCompiler {
+object ScalaCompiler extends LazyLogging {
+  
+  
+  def compile (targetDir: Path, sourceFile: Path) : Boolean = compile(targetDir, Seq(sourceFile))
+  
   /**
    * Compiles the given Scala source file into a class file stored
    * in targetDir.
@@ -38,7 +43,10 @@ object ScalaCompiler {
    * @param targetDir the target directory for the compiled code
    * @param sourceFile the Scala file to be compiled
    */
-  def compile (targetDir: Path, sourceFile: Path) : Boolean = {
+  def compile (targetDir: Path, sourceFiles: Seq[Path]) : Boolean = {
+    
+    logger.debug(s"""compiling source file '${sourceFiles.mkString(",")}' to target dir '$targetDir'""")
+    
     val target = AbstractFile.getDirectory(targetDir.toFile())
     val settings = new Settings
     /*
@@ -56,12 +64,20 @@ object ScalaCompiler {
     val global = Global(settings, reporter)
     import global._
 
-    val file = sourceFile
-    val fileContent = Source.fromFile(file.toFile()).mkString
+    
+    val sources = sourceFiles.map { f => 
+        new BatchSourceFile(f.toString(), Source.fromFile(f.toFile()).mkString) 
+      }
+      .toList
+    
+//    val file = sourceFiles(0)
+//    val fileContent = Source.fromFile(file.toFile()).mkString
 
+    
+//    val sources = List(new BatchSourceFile(file.toString(), fileContent))
+    
     val run = new Run
-    val sourceFiles = List(new BatchSourceFile(file.toString(), fileContent))
-    run.compileSources(sourceFiles)
+    run.compileSources(sources)
 
     !reporter.hasErrors
   }

@@ -6,6 +6,10 @@ import org.apache.spark.SparkConf
 import org.apache.spark.rdd._
 import dbis.pig.backends.spark._
 
+<if (includes)>
+<includes>
+<endif>
+
 <\n>
 >>
 
