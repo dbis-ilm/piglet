@@ -128,7 +128,7 @@ object PigCompiler extends PigParser with LazyLogging {
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
     for(file <- inputFiles) {
       createDataflowPlan(file, params, backend) match {
-        case Some(v) => schedule += v
+        case Some(v) => schedule += ((v,file))
         case None => 
           logger.error(s"failed to create dataflow plan for $file - aborting")
           return        
@@ -182,7 +182,7 @@ object PigCompiler extends PigParser with LazyLogging {
    * @param params Key value pairs to replace placeholders in the script
    * @param backend The name of the backend
    */
-  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String): Option[(DataflowPlan,Path)] = {
+  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String): Option[DataflowPlan] = {
       // 1. we read the Pig file
       val source = Source.fromFile(inputFile.toFile())
       
@@ -209,7 +209,7 @@ object PigCompiler extends PigParser with LazyLogging {
 
       logger.debug(s"successfully created dataflow plan for $inputFile")
 
-      return Some((plan,inputFile))
+      return Some(plan)
     
   }
 
