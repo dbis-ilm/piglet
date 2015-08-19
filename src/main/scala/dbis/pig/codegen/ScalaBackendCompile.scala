@@ -298,7 +298,7 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
     case ConstructTupleExpr(exprs) => s"PigFuncs.toTuple(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case ConstructBagExpr(exprs) => s"PigFuncs.toBag(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case ConstructMapExpr(exprs) => s"PigFuncs.toMap(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
-    case _ => println("unsupported expression: " + expr); ""
+    case _ => logger.error(s"unsupported expression: $expr"); ""
   }
 
   /**
@@ -865,8 +865,6 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
     if(hookFile.isDefined)
       m = m + ("hook" -> "true") 
     
-    m.foreach(println(_))  
-      
     callST("end_query",m)
   }
 
