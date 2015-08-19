@@ -21,3 +21,5 @@ testOptions in IntegrationTest += Tests.Argument("-oDF")
 
 // run only those it tests, that are available for the selected backend
 testOptions in IntegrationTest := Seq(Tests.Filter(s => itTests.contains(s)))
+
+sourcesInBase := false
