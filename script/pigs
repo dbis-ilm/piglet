@@ -50,7 +50,7 @@ isLocalMode $*
 # TODO: we should find our jar file the same way we do for spark
 PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
 
-CP=$PIG_LIB
+CP=$PIG_LIB:$CLASSPATH
 
 if [ "$local" == "$FALSE" ]; then
     if [ -z "$YARN_CONF_DIR" ]; then

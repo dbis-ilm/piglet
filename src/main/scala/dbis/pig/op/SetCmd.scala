@@ -17,33 +17,13 @@
 
 package dbis.pig.op
 
-import dbis.pig.schema.Schema
 
 /**
+ * SetCmd represents a pseudo operator for the SET statement.
  *
- * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
- *                           can be changed later.
- * @param initialInPipeName
- * @param opName
- * @param params
- * @param loadSchema
+ * @param param the parameter name
+ * @param value the value of the parameter set by this statement
  */
-case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref]] = None,
-                    var loadSchema: Option[Schema] = None) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
-  schema = loadSchema
+case class SetCmd(param: String, value: dbis.pig.op.Value) extends PigOperator
 
-  override def lineageString: String = s"""STREAM%${opName}%""" + super.lineageString
-
-  override def checkSchemaConformance: Boolean = {
-    // TODO
-    true
-  }
-
-  override def constructSchema: Option[Schema] = {
-    // TODO
-    schema
-  }
-}
 

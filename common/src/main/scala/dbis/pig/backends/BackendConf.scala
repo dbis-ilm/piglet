@@ -24,4 +24,12 @@ trait BackendConf {
    * @return the name of the template file
    */
   def templateFile: String
+  
+  /**
+   * Defines that a backends needs the raw Pig script
+   * rather than the generated code
+   * 
+   * @return <code>True</code> if the backends wants the original script, otherwise <code>false</code> 
+   */
+  def raw: Boolean
 }

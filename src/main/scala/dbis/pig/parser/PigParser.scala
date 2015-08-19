@@ -222,6 +222,7 @@ class PigParser extends JavaTokenParsers {
   lazy val trueKeyword = "true".ignoreCase
   lazy val falseKeyword = "false".ignoreCase
   lazy val fsKeyword = "fs".ignoreCase
+  lazy val setKeyword = "set".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -339,7 +340,9 @@ class PigParser extends JavaTokenParsers {
    * <A> = FOREACH <B> { <SubPlan> }
    */
   def exprSchema: Parser[Field] = asKeyword ~ fieldSchema ^^ { case _ ~ t => t }
-  def genExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
+  def simpleGeneratorExpr: Parser[GeneratorExpr] = arithmExpr ~ (exprSchema?) ^^ { case e ~ s => GeneratorExpr(e, s) }
+  def asteriskExpr: Parser[GeneratorExpr] = "*" ^^ { case _ => GeneratorExpr(RefExpr(NamedField("*"))) }
+  def genExpr: Parser[GeneratorExpr] = asteriskExpr | simpleGeneratorExpr
   def generatorList: Parser[List[GeneratorExpr]] = repsep(genExpr, ",")
   def plainForeachGenerator: Parser[ForeachGenerator] = generateKeyword ~ generatorList ^^ {
     case _ ~ exList => GeneratorList(exList)
@@ -430,11 +433,16 @@ class PigParser extends JavaTokenParsers {
   def registerStmt: Parser[PigOperator] = registerKeyword ~ stringLiteral ^^{ case _ ~ uri => new RegisterCmd(uri) }
 
   /*
-   * DEFINE <Alias> <FuncName
+   * DEFINE <Alias> <FuncName>
    */
   def defineStmt: Parser[PigOperator] = defineKeyword ~ ident ~ className ~ "(" ~ repsep(literalField, ",") ~ ")" ^^{
     case _ ~ alias ~ funcName ~ _ ~ params ~ _ => DefineCmd(alias, funcName, params.map(r => r.asInstanceOf[dbis.pig.op.Value]))
   }
+
+  /*
+   * SET <Param> <Value>
+   */
+  def setStmt: Parser[PigOperator] = setKeyword ~ ident ~ literalField ^^ { case _ ~ k ~ v => SetCmd(k, v.asInstanceOf[dbis.pig.op.Value]) }
 
   /*
    * <A> = STREAM <B> TROUGH <Operator> [(ParamList)] [AS (<Schema>) ]
@@ -510,7 +518,7 @@ class PigParser extends JavaTokenParsers {
    */
   def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | fsStmt | defineStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   /*
@@ -529,7 +537,11 @@ class PigParser extends JavaTokenParsers {
   def tuplifyStmt: Parser[PigOperator] = bag ~ "=" ~ tuplifyKeyword ~ bag ~ onKeyword ~ ref ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ r => new Tuplify(Pipe(out), Pipe(in), r) }
 
-  def bgPattern: Parser[TriplePattern] = ref ~ ref ~ ref ^^ { case r1 ~ r2 ~ r3 => TriplePattern(r1, r2, r3)}
+  def bgpVariable: Parser[NamedField] = "?" ~ ident ^^ { case _ ~ varname => NamedField(varname)}
+
+  def bgPattern: Parser[TriplePattern] = (bgpVariable | ref) ~(bgpVariable | ref) ~ (bgpVariable | ref) ^^ {
+    case r1 ~ r2 ~ r3 => TriplePattern(r1, r2, r3)
+  }
 
   def bgpFilterStmt: Parser[PigOperator] = bag ~ "=" ~ bgpFilterKeyword ~ bag ~
     byKeyword ~ "{" ~ repsep(bgPattern, ".") ~ "}" ^^ {
@@ -538,7 +550,7 @@ class PigParser extends JavaTokenParsers {
 
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt) ~ ";" ^^ {
+    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
 
@@ -601,7 +613,7 @@ class PigParser extends JavaTokenParsers {
 
   def streamingStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | socketReadStmt | socketWriteStmt | windowStmt | defineStmt) ~ ";" ^^ {
+    splitStmt | socketReadStmt | socketWriteStmt | windowStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   def streamingPigScript: Parser[List[PigOperator]] = rep(streamingStmt)

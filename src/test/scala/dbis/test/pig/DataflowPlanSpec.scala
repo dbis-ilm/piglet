@@ -467,4 +467,27 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
       op.outputs = List(Pipe("b"), Pipe("b"))
     }
   }
+
+  it should "propage set parameters to the operators" in {
+    val plan = new DataflowPlan(parseScript(s"""
+       |A = LOAD 'file' AS (x, y);
+       |SET parallelismHint 5;
+       |B = FILTER A BY x > 100;
+       |C = FILTER B BY y > 100;
+       |SET parallelismHint 3;
+       |SET some "thing";
+       |D = FILTER C by x < 100;""".stripMargin))
+    val opB = plan.findOperatorForAlias("B")
+    val opC = plan.findOperatorForAlias("C")
+    val opD = plan.findOperatorForAlias("D")
+    opB.get.configParams should contain key ("parallelismHint")
+    opB.get.configParams("parallelismHint") should be (Value("5"))
+    opC.get.configParams should contain key ("parallelismHint")
+    opC.get.configParams("parallelismHint") should be (Value("5"))
+    opC.get.configParams should not contain key ("some")
+    opD.get.configParams should contain key ("parallelismHint")
+    opD.get.configParams should contain key ("some")
+    opD.get.configParams("parallelismHint") should be (Value("3"))
+    opD.get.configParams("some") should be (Value("\"thing\""))
+  }
 }
