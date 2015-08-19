@@ -73,4 +73,7 @@ object Conf extends LazyLogging {
   
   def hdfsCoreSiteFile = Paths.get(appconf.getString("hdfs.coresite"))
   def hdfsHdfsSiteFile = Paths.get(appconf.getString("hdfs.hdfssite"))
+  
+  def hookImport = appconf.getString("hooks.import")
+  
 }

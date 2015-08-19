@@ -7,6 +7,10 @@ import java.util.concurrent.TimeUnit
 import org.apache.flink.streaming.api.windowing.helper._
 import org.apache.flink.util.Collector
 
+<if (includes)>
+<includes>
+<endif>
+
 <\n>
 >>
 
@@ -16,9 +20,13 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<<\n>
+begin_query(name, hook) ::= <<<\n>
   def main(args: Array[String]) {
     val env = StreamExecutionEnvironment.getExecutionEnvironment<\n>
+    
+<if (hook)>
+	setupHook()
+<endif>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
@@ -160,6 +168,10 @@ socketWrite(in,addr,mode) ::=<<
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
     env.execute("<name>")
+    
+<if (hook)>
+	shutdownHook()
+<endif>
   }
 }
 >>

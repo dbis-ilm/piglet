@@ -6,6 +6,10 @@ import org.apache.spark.SparkConf
 import org.apache.spark.rdd._
 import dbis.pig.backends.spark._
 
+<if (includes)>
+<includes>
+<endif>
+
 <\n>
 >>
 
@@ -16,10 +20,14 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name, hook) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
+        
+    <if (hook)>
+    	setupHook(sc)
+    <endif>
 
 >>
 
@@ -120,8 +128,12 @@ fs(cmd,params) ::=<<
 >>
 
 // ----------------- END of the code implementing the query -------------------
-end_query(name) ::= <<
+end_query(name, hook) ::= <<
     
+	<if (hook)>
+		shutdownHook(sc)
+	<endif>
+    		
         sc.stop()
     }
 }

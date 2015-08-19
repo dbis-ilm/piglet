@@ -11,3 +11,5 @@ libraryDependencies ++= Seq(
 )
 
 test in assembly := {}
+
+sourcesInBase := false
