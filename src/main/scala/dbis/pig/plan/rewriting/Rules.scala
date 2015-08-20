@@ -647,6 +647,33 @@ object Rules {
     case _ => None
   }
 
+  def foreachGenerateWithAsterisk(term: Any): Option[Foreach] = {
+    term match {
+      case op @Foreach(_, _, gen, _) => gen match {
+        case GeneratorList(exprs) => {
+          if (exprs.size == 1 && exprs.head.expr.isInstanceOf[RefExpr]) {
+            val ref = exprs.head.expr.asInstanceOf[RefExpr]
+            if(ref.r.isInstanceOf[NamedField]) {
+              val field = ref.r.asInstanceOf[NamedField]
+              if (field.name == "*") {
+                if (op.inputSchema.isEmpty)
+                  throw RewriterException("Rewriting * in GENERATE requires a schema")
+                val genExprs = op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
+                val newGen = GeneratorList(genExprs.toList)
+                val newOp = Foreach(op.out, op.in, newGen, op.windowMode)
+                newOp.constructSchema
+                return Some(newOp)
+              }
+            }
+          }
+          None
+        }
+        case _ => None
+      }
+      case _ => None
+    }
+  }
+
   def registerAllRules = {
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
@@ -664,5 +691,6 @@ object Rules {
     addStrategy(F7 _)
     addStrategy(F8 _)
     addStrategy(strategyf(t => J1(t)))
+    addOperatorReplacementStrategy(foreachGenerateWithAsterisk _)
   }
 }
