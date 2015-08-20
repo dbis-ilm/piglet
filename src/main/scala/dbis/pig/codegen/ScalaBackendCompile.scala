@@ -392,10 +392,10 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
     }
 
     node match {
-      case OrderBy(out, in, orderSpec) => {
+      case OrderBy(out, in, orderSpec, windowMode) => {
         var params = Map[String,Any]()
         //Spark
-        params += "cname" -> s"custKey_${node.outPipeName}_${node.inputs.head.name}"
+        params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
         var col = 0
         params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
         params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
@@ -408,7 +408,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
         callST("orderHelper", Map("params"->params))
       }
       case Store(in, file,_,params) => { s"""
-        |def tuple${node.inputs.head.name}ToString(t: List[Any]): String = {
+        |def tuple${node.inPipeName}ToString(t: List[Any]): String = {
         |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
         |
         |  val sb = new StringBuilder
@@ -461,19 +461,19 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
           val p1 = findFieldPosition(schema, r1)
           val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
           require(p1 >= 0 && p2 >= 0)
-          s"""val ${n.outputs.head.name} = t($p1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]]($p2))"""
+          s"""val ${n.outPipeName} = t($p1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]]($p2))"""
         }
         case _ => "" // should not happen
       }
       case n@Distinct(out, in, windowMode) => {
         if (templateFile.contains("flinks"))
-          s"""val ${n.outputs.head.name} = ${n.inputs.head.name}.distinct"""
+          s"""val ${n.outPipeName} = ${n.inPipeName}.distinct"""
         else
-          callST("distinct", Map("out"->n.outputs.head.name,"in"->n.inputs.head.name))  
+          callST("distinct", Map("out"->n.outPipeName,"in"->n.inPipeName))  
       }
-      case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
-      case n@Limit(out, in, num, windowMode) => callST("limit", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "num" -> num,"windowMode"->windowMode))
-      case OrderBy(out, in, orderSpec) => "" // TODO!!!!
+      case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
+      case n@Limit(out, in, num) => callST("limit", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "num" -> num))
+      case OrderBy(out, in, orderSpec, windowMode) => "" // TODO!!!!
       case _ => ""
     }.mkString("\n") + "}"
   }
@@ -527,11 +527,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @return the Scala code implementing the DISTINCT operator
    */
   def emitDistinct(out: String, in: String, windowMode: Boolean): String = {
-    //TODO: Kind of ugly
-    if (templateFile.contains("flinks") && !windowMode)
-      throw new TemplateException(s"Distinct not supported outside of windows")
-    else
-      callST("distinct", Map("out"->out,"in"->in))
+    callST("distinct", Map("out"->out,"in"->in))
   }
  
   /**
@@ -624,15 +620,10 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @param out name of the output bag
    * @param in name of the input bag
    * @param num amount of retruned records
-   * @param windowMode true if operator is called within a window environment
    * @return the Scala code implementing the LIMIT operator
    */
-  def emitLimit(out: String, in: String, num: Int, windowMode: Boolean): String = {
-    if(windowMode)
-      callST("limit", Map("out"->out,"in"->in,"num"->num,"windowMode"->windowMode))
-    else
-      callST("limit", Map("out"->out,"in"->in,"num"->num))
-
+  def emitLimit(out: String, in: String, num: Int): String = {
+    callST("limit", Map("out"->out,"in"->in,"num"->num))
   }
   
   /**
@@ -664,18 +655,11 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @return the Scala code implementing the SOCKET_READ operator
    */
   def emitSocketRead(out: String, addr: SocketAddress, mode: String, streamFunc: String, streamParams: List[String]): String ={
-    if(streamFunc == ""){
-      if(mode!="")
-        callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode))
-      else
-        callST("socketRead", Map("out"->out,"addr"->addr))
-    } else {
-      val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
-      if(mode!="")
-        callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->streamFunc,"params"->params))
-      else
-        callST("socketRead", Map("out"->out,"addr"->addr,"func"->streamFunc,"params"->params))
-    }
+    val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
+    if(mode!="")
+      callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->streamFunc,"params"->params))
+    else
+      callST("socketRead", Map("out"->out,"addr"->addr,"func"->streamFunc,"params"->params))
   }
  
   /**
@@ -684,13 +668,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @param in name of the input bag
    * @param addr the socket address to connect to
    * @param mode the connection mode, e.g. zmq or empty for standard sockets
+   * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
    * @return the Scala code implementing the SOCKET_WRITE operator
    */
-  def emitSocketWrite(in: String, addr: SocketAddress, mode: String): String = {
+  def emitSocketWrite(in: String, addr: SocketAddress, mode: String, streamFunc: String): String = {
     if(mode!="")
-      callST("socketWrite", Map("in"->in,"addr"->addr,"mode"->mode))
+      callST("socketWrite", Map("in"->in,"addr"->addr,"mode"->mode,"func"->streamFunc))
     else
-      callST("socketWrite", Map("in"->in,"addr"->addr))
+      callST("socketWrite", Map("in"->in,"addr"->addr,"func"->streamFunc))
   }
  
   /**
@@ -750,24 +735,24 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
          *       after changing the pipe name. Instead, use node.outPipeName
          */
       case Load(out, file, schema, func, params) => emitLoad(node.outPipeName, file, func, params)
-      case Dump(in) => callST("dump", Map("in"->node.inputs.head.name))
-      case Store(in, file, func, params) => emitStore(node.inputs.head.name, file, func)
+      case Dump(in) => callST("dump", Map("in"->node.inPipeName))
+      case Store(in, file, func, params) => emitStore(node.inPipeName, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""
-      case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outPipeName, node.inputs.head.name, pred, windowMode)
-      case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outPipeName, node.inputs.head.name, gen, windowMode)
-      case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outPipeName, node.inputs.head.name, groupExpr, windowMode)
-      case Distinct(out, in, windowMode) => emitDistinct(node.outPipeName, node.inputs.head.name, windowMode)
-      case Limit(out, in, num, windowMode) => emitLimit(node.outPipeName, node.inputs.head.name, num, windowMode)
-      case Join(out, rels, exprs, window) => emitJoin(node, node.outPipeName, rels, exprs, window)
+      case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outPipeName, node.inPipeName, pred, windowMode)
+      case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outPipeName, node.inPipeName, gen, windowMode)
+      case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outPipeName, node.inPipeName, groupExpr, windowMode)
+      case Distinct(out, in, windowMode) => emitDistinct(node.outPipeName, node.inPipeName, windowMode)
+      case Limit(out, in, num) => emitLimit(node.outPipeName, node.inPipeName, num)
+      case Join(out, rels, exprs, window) => emitJoin(node, node.outPipeName, node.inputs, exprs, window)
       case Cross(out, rels, window) => emitCross(node, node.outPipeName, node.inputs, window) 
-      case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
-      case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
-      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outPipeName, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
-      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inputs.head.name,"params"->emitParamList(node.schema, params)))
+      case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->node.inPipeName,"others"->node.inPipeNames.tail))
+      case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
+      case OrderBy(out, in, orderSpec, windowMode) => callST("orderBy", Map("out"->node.outPipeName,"in"->node.inPipeName,"key"->emitSortKey(node.schema, orderSpec, node.outPipeName, node.inPipeName),"asc"->ascendingSortOrder(orderSpec.head)))
+      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inPipeName,"params"->emitParamList(node.schema, params)))
       case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outPipeName, address, mode, func, params)
-      case SocketWrite(in, address, mode) => emitSocketWrite(node.inputs.head.name, address, mode)
-      case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inputs.head.name,window,slide)
-      case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inputs.head.name))
+      case SocketWrite(in, address, mode, func) => emitSocketWrite(node.inPipeName, address, mode, func)
+      case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inPipeName,window,slide)
+      case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inPipeName))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case Empty(_) => ""
            

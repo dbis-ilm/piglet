@@ -19,45 +19,32 @@ package dbis.flink.streaming
 
 import org.apache.flink.streaming.api.scala._
 import dbis.flink.ZmqSubscriber
+import dbis.flink.ZmqPublisher
+import dbis.flink.UTF8StringSchema
 
-class PigStorage extends java.io.Serializable {
+
+class PigStream extends java.io.Serializable {
+ 
   def load(env: StreamExecutionEnvironment, path: String, delim: Char = '\t'): DataStream[List[String]] = {
     env.readTextFile(path).map(line => line.split(delim).toList)
   }
-}
 
-object PigStorage {
-  def apply(): PigStorage = {
-    new PigStorage
-  }
-}
+  def write(path: String, result: DataStream[String]) = result.writeAsText(path).setParallelism(1)
 
-class RDFFileStorage extends java.io.Serializable {
-  val pattern = "([^\"]\\S*|\".+?\")\\s*".r
-
-  def rdfize(line: String): Array[String] = {
-    val fields = pattern.findAllIn(line).map(_.trim)
-    fields.toArray.slice(0, 3)
-  }
-
-  def load(env: StreamExecutionEnvironment, path: String): DataStream[Array[String]] = {
-    env.readTextFile(path).map(line => rdfize(line))
-  }
-}
-
-object RDFFileStorage {
-  def apply(): RDFFileStorage = {
-    new RDFFileStorage
-  }
-}
-
-class PigStream extends java.io.Serializable {
-  def connect(env: StreamExecutionEnvironment, host: String, port: Int, delim: Char = ' '): DataStream[List[String]] = {
+  def connect(env: StreamExecutionEnvironment, host: String, port: Int, delim: Char = '\t'): DataStream[List[String]] = {
     env.socketTextStream(host,port).map(line => line.split(delim).toList)
   }
 
-  def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, delim: Char = ' '): DataStream[List[String]] = {
+  def bind(host: String, port: Int, result: DataStream[List[String]]) = {
+    result.writeToSocket(host, port, new UTF8StringSchema())
+  }
+
+  def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, delim: Char = '\t'): DataStream[List[String]] = {
     env.addSource(new ZmqSubscriber(addr)).map(line => line.split(delim).toList)
+  }
+
+  def zmqPublish(addr: String, result: DataStream[List[String]]) = {
+    result.addSink(new ZmqPublisher(addr)).setParallelism(1)
   }
 }
 
@@ -68,11 +55,16 @@ object PigStream {
 }
 
 class RDFStream extends java.io.Serializable {
+
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
   def rdfize(line: String): Array[String] = {
     val fields = pattern.findAllIn(line).map(_.trim)
     fields.toArray.slice(0, 3)
+  }
+
+  def load(env: StreamExecutionEnvironment, path: String): DataStream[Array[String]] = {
+    env.readTextFile(path).map(line => rdfize(line))
   }
 
   def connect(env: StreamExecutionEnvironment, host: String, port: Int): DataStream[Array[String]] = {

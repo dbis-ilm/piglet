@@ -96,6 +96,12 @@ object PigCompiler extends PigParser with LazyLogging {
    */
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String]): Unit = {
     
+    // 0. Setting some backend dependend variables
+    val backendConf = BackendManager.backend(backend)
+    BackendManager.backend = backendConf
+    val templateFile = backendConf.templateFile
+    val jarFile = Conf.backendJar(backend)
+
     // 1. we read the Pig file
     val source = Source.fromFile(inputFile.toFile())
     
@@ -133,11 +139,6 @@ object PigCompiler extends PigParser with LazyLogging {
     
     logger.debug("finished optimizations")
     
-    
-    val backendConf = BackendManager.backend(backend)
-    val templateFile = backendConf.templateFile
-    val jarFile = Conf.backendJar(backend)
-
     FileTools.compileToJar(plan, scriptName, outDir, compileOnly, jarFile, templateFile) match {
       // the file was created --> execute it
       case Some(jarFile) =>  

@@ -2,6 +2,7 @@
 init_code(includes) ::= <<
 import org.apache.flink.streaming.api.scala._
 import dbis.flink._
+import dbis.flink.streaming._
 import dbis.flink.FlinkExtensions._
 import java.util.concurrent.TimeUnit
 import org.apache.flink.streaming.api.windowing.helper._
@@ -23,7 +24,7 @@ begin_query(name) ::= <<<\n>
 
 // ----------------- LOAD text file -------------------------------------------
 loader(out,file,func,params) ::=<<
-    val <out> = dbis.flink.streaming.<func>().load(env, "<file>"<params>)
+    val <out> = <func>().load(env, "<file>"<params>)
 >>
 
 // ------------------ DUMP Results --------------------------------------------
@@ -33,7 +34,13 @@ dump(in) ::=<<
 
 // ------------------ STORE Results on Disk -----------------------------------
 store(in,file,func,schema) ::=<<
-    <in>.map(t => <schema>).writeAsText("<file>")
+    <if (schema)>
+        val <in>_storehelper = <in>.map(t => <schema>)
+    <else>
+        val <in>_storehelper = <in>
+    <endif>
+
+    <func>().write("<file>", <in>_storehelper)
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -71,11 +78,6 @@ groupBy(out,in,expr,windowMode) ::=<<
 // ------------------ Outputs only distinct values ----------------------------
 distinct(out,in) ::=<<
     val <out> = <in>.mapWindow(distinct _)
->>
-
-// ------------------ Outputs only num records --------------------------------
-limit(out,in,num,windowMode) ::=<<
-    val <out> = <in>.window(Count.of(<num>)).every(Time.of(5, TimeUnit.SECONDS))
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------
@@ -133,27 +135,19 @@ union(out,in,others) ::=<<
 
 // ------------------ Reads from a SOCKET -------------------------------------
 socketRead(out,addr,mode,func,params) ::=<<
-<if (func)>
-  <if (mode)>
+<if (mode)>
     val <out> = <func>().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
-  <else>
-    val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
-  <endif>
 <else>
-  <if (mode)>
-    val <out> = PigStream().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>", '\t')
-  <else>
-    val <out> = PigStream().connect(env, "<addr.hostname>", <addr.port>, '\t')
-  <endif>
+    val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
 <endif>
 >>
 
 // ------------------ Writes to a SOCKET -------------------------------------
-socketWrite(in,addr,mode) ::=<<
+socketWrite(in,addr,mode,func) ::=<<
 <if (mode)>
-    <in>.addSink(new ZmqPublisher("<addr.protocol><addr.hostname>:<addr.port>")).setParallelism(1)
+    <func>().zmqPublish("<addr.protocol><addr.hostname>:<addr.port>", <in>)
 <else>
-    <in>.writeToSocket("<addr.hostname>",<addr.port>,new UTF8StringSchema())
+    <func>().bind("<addr.hostname>",<addr.port>, <in>)
 <endif>
 >>
 

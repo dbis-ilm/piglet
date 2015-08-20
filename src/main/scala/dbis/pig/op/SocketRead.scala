@@ -16,6 +16,7 @@
  */
 package dbis.pig.op
 
+import dbis.pig.backends.BackendManager
 import dbis.pig.schema.Schema
 
 case class SocketAddress(protocol: String, hostname: String, port: String)
@@ -29,9 +30,12 @@ case class SocketAddress(protocol: String, hostname: String, port: String)
  * @param streamFunc name of the stream function used for data preprocessing
  * @param streamParams parameters for streamFunc
  */
-case class SocketRead(out: Pipe, addr: SocketAddress, mode: String, 
-                      var streamSchema: Option[Schema] = None, 
-                      streamFunc: String = "", streamParams: List[String] = null) extends PigOperator{
+case class SocketRead(private val out: Pipe,
+                      addr: SocketAddress,
+                      mode: String,
+                      var streamSchema: Option[Schema] = None,
+                      streamFunc: String = BackendManager.backend.defaultConnector,
+                      streamParams: List[String] = null) extends PigOperator{
   _outputs = List(out)
   _inputs = List()
   schema = streamSchema

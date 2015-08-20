@@ -23,6 +23,8 @@ class PigStorage extends java.io.Serializable {
   def load(env: ExecutionEnvironment, path: String, delim: Char = ' '): DataSet[List[String]] = {
     env.readTextFile(path).map(line => line.split(delim).toList)
   }
+
+  def write(path: String, result: DataSet[String]) = result.writeAsText(path)
 }
 
 object PigStorage {

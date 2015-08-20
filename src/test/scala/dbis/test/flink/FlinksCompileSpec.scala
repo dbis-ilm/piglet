@@ -29,8 +29,10 @@ import com.typesafe.scalalogging.LazyLogging
 
 class FlinksCompileSpec extends FlatSpec with LazyLogging {
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = BackendManager.backend("flinks").templateFile
-  
+  val backendConf = BackendManager.backend("flinks") 
+  BackendManager.backend = backendConf 
+  val templateFile = backendConf.templateFile
+
   logger.debug(s"template file: $templateFile")
 
   "The compiler output" should "contain the Flink header & footer" in {
@@ -42,6 +44,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val expectedCode = cleanString("""
       |import org.apache.flink.streaming.api.scala._
       |import dbis.flink._
+      |import dbis.flink.streaming._
       |import dbis.flink.FlinkExtensions._
       |import java.util.concurrent.TimeUnit
       |import org.apache.flink.streaming.api.windowing.helper._
@@ -63,25 +66,25 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = dbis.flink.streaming.PigStorage().load(env, "${file}")""")
+    val expectedCode = cleanString(s"""val a = PigStream().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for LOAD with PigStorage" in {
+  it should "contain code for LOAD with PigStream" in {
     val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
-    val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
+    val op = Load(Pipe("a"), file, None, "PigStream", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = dbis.flink.streaming.PigStorage().load(env, "${file}", ',')""")
+    val expectedCode = cleanString(s"""val a = PigStream().load(env, "${file}", ',')""")
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for LOAD with RDFFileStorage" in {
+  it should "contain code for LOAD with RDFStream" in {
     val file = new URI(new java.io.File(".").getCanonicalPath + "/file.n3")
-    val op = Load(Pipe("a"), file, None, "RDFFileStorage")
+    val op = Load(Pipe("a"), file, None, "RDFStream")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""val a = dbis.flink.streaming.RDFFileStorage().load(env, "${file}")""")
+    val expectedCode = cleanString(s"""val a = RDFStream().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
   }
 
@@ -106,7 +109,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${file}")""")
+    val expectedCode = cleanString(s"""val A_storehelper = A.map(t => tupleAToString(t)) PigStream().write("${file}", A_storehelper)""")
     assert(generatedCode == expectedCode)
   }
 
@@ -140,15 +143,6 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val expectedCode = cleanString("val a = b.mapWindow(distinct _)")
     assert(generatedCode == expectedCode)
   }
-
-  it should "contain code for LIMIT" in {
-    val op = Limit(Pipe("a"), Pipe("b"), 10)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b.window(Count.of(10)).every(Time.of(5, TimeUnit.SECONDS))")
-    assert(generatedCode == expectedCode)
-  }
-
 
   it should "contain code for a FOREACH statement with function expressions" in {
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
@@ -332,7 +326,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val op = SocketRead(Pipe("a"), SocketAddress("", "localhost", "9999"), "")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStream().connect(env, "localhost", 9999, '\t')""")
+    val expectedCode = cleanString("""val a = PigStream().connect(env, "localhost", 9999)""")
     assert(generatedCode == expectedCode)
   }
 
@@ -356,7 +350,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val op = SocketRead(Pipe("a"), SocketAddress("tcp://", "localhost", "9999"), "zmq")
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val a = PigStream().zmqSubscribe(env, "tcp://localhost:9999", '\t')""")
+    val expectedCode = cleanString("""val a = PigStream().zmqSubscribe(env, "tcp://localhost:9999")""")
     assert(generatedCode == expectedCode)
   }
 

@@ -16,6 +16,7 @@
  */
 package dbis.pig.op
 
+import dbis.pig.backends.BackendManager
 import java.net.URI
 
 /**
@@ -24,7 +25,10 @@ import java.net.URI
  * @param initialInPipeName the name of the input pipe
  * @param file the name of the output file
  */
-case class Store(in: Pipe, file: URI, func: String = "PigStorage", params: List[String] = null) extends PigOperator {
+case class Store(in: Pipe,
+                 file: URI,
+                 func: String = BackendManager.backend.defaultConnector,
+                 params: List[String] = null) extends PigOperator {
   _outputs = List()
   _inputs = List(in)
 
