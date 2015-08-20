@@ -52,6 +52,12 @@ filter(out,in,pred,windowMode) ::=<<
 <endif>
 >>
 
+filterHelper(params) ::=<<
+    def custom<params.out>Filter(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
+      ts.filter(t => {<params.pred>}).foreach(x => out.collect(x))
+    }
+>>
+
 // ------------------ Executes an expression FOREACH input element ------------
 foreach(out,in,expr,windowMode) ::=<<
 <if(windowMode)>
@@ -59,6 +65,12 @@ foreach(out,in,expr,windowMode) ::=<<
 <else>
     val <out> = <in>.map(t => <expr>)
 <endif>
+>>
+
+foreachHelper(params) ::=<<
+    def custom<params.out>Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+      ts.foreach { t => out.collect(<params.expr>)}
+    }
 >>
 
 // ----- Executes an expression FOREACH input element requiring a flatMap -----
@@ -79,9 +91,21 @@ groupBy(out,in,expr,windowMode) ::=<<
 <endif>
 >>
 
+groupByHelper(params) ::=<<
+    def custom<params.out>Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+      out.collect(ts.groupBy(t => <params.expr>).flatMap(x => List(x._1,x._2)).toList)
+    }
+>>
+
 // ------------------ Outputs only distinct values ----------------------------
 distinct(out,in) ::=<<
     val <out> = <in>.mapWindow(distinct _)
+>>
+
+distinctHelper(params) ::=<<
+    def distinct(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
+      ts.toList.distinct.foreach{ x => out.collect(x) }
+    }
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------
@@ -91,7 +115,7 @@ orderBy(out,in,key,asc) ::=<<
 
 orderHelper(params) ::=<<
     def custom<params.out>Order(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
-      ts.toList.asInstanceOf[List[List[String]]].sortBy(t => <params.key>)<if (params.reverse)>(Ordering[String].reverse)<endif>.foreach { x => out.collect(x) }
+      ts.toList.asInstanceOf[List[List[String]]].sortBy(t => (<params.key>))<if (params.reverse)>(Ordering[String].reverse)<endif>.foreach { x => out.collect(x) }
     }
 >>
 

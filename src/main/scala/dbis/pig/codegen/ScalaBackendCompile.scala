@@ -402,7 +402,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
 
         //Flink
         params += "out"->node.outPipeName
-        params += "key"->s"(${orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")})"
+        params += "key"->orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse"->true
 
         callST("orderHelper", Map("params"->params))
@@ -417,38 +417,31 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
         |}""".stripMargin
       }
       case Distinct(out, in, windowMode) => {
-        //TODO: Maybe outsource as there are no variables
-        if (windowMode)
-          s"""
-          |  def distinct(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
-          |    ts.toList.distinct.foreach{ x => out.collect(x) }
-          |  }
-          """.stripMargin
-        else ""
+        if (windowMode) callST("distinctHelper", Map("params"->Map[String,Any]())) else ""
       }
       case Grouping(out, in, groupExpr, windowMode) => { 
-        if (windowMode)
-          s"""
-          |  def custom${node.outPipeName}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-          |    out.collect(ts.groupBy(t => ${emitGroupExpr(node.inputSchema,groupExpr)}).flatMap(x => List(x._1,x._2)).toList)
-          |  }""".stripMargin
-        else ""
+        if (windowMode) {
+          var params = Map[String,Any]()
+          params += "out"->node.outPipeName
+          params += "expr"->emitGroupExpr(node.inputSchema,groupExpr)
+          callST("groupByHelper", Map("params"->params))
+        } else ""
       }
       case Foreach(out, in, gen, windowMode) => { 
-        if (windowMode)
-          s"""
-          |  def custom${node.outPipeName}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-          |    ts.foreach { t => out.collect(${emitForeachExpr(node, gen)})}
-          |  }""".stripMargin
-        else ""
+        if (windowMode){
+          var params = Map[String,Any]()
+          params += "out"->node.outPipeName
+          params += "expr"->emitForeachExpr(node, gen)
+          callST("foreachHelper", Map("params"->params))
+        } else ""
       }
       case Filter(out, in, pred, windowMode) => { 
-        if (windowMode)
-          s"""
-          |  def custom${node.outPipeName}Filter(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
-          |    ts.filter(t => {${emitPredicate(node.schema, pred)}}).foreach(x => out.collect(x))
-          |  }""".stripMargin
-        else ""
+        if (windowMode){
+          var params = Map[String,Any]()
+          params += "out"->node.outPipeName
+          params += "pred"->emitPredicate(node.schema, pred)
+          callST("filterHelper", Map("params"->params))
+        } else ""
       }
 
       case _ => ""
