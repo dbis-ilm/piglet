@@ -1,4 +1,4 @@
-daily = load 'src/it/resources/input/nested.csv' using PigStorage(',') as (exchange, symbol);
+daily = load 'src/it/resources/input/nested.csv' using PigStream(',') as (exchange, symbol);
 win = window daily range 10 seconds slide range 10 seconds;
 grpd  = group win by exchange;
 uniqcnt  = foreach grpd {
