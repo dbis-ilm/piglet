@@ -15,13 +15,9 @@
  * limitations under the License.
  */
 
-package dbis.flink.streaming
+package dbis.pig.backends.flink.streaming
 
 import org.apache.flink.streaming.api.scala._
-import dbis.flink.ZmqSubscriber
-import dbis.flink.ZmqPublisher
-import dbis.flink.UTF8StringSchema
-
 
 class PigStream extends java.io.Serializable {
  

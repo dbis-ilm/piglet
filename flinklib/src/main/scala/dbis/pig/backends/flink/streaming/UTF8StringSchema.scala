@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.flink
+package dbis.pig.backends.flink.streaming
 
 import org.apache.commons.lang3.SerializationUtils
 import org.apache.flink.streaming.util.serialization._

@@ -43,9 +43,9 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
       + codeGenerator.emitFooter)
     val expectedCode = cleanString("""
       |import org.apache.flink.streaming.api.scala._
-      |import dbis.flink._
-      |import dbis.flink.streaming._
-      |import dbis.flink.FlinkExtensions._
+      |import dbis.pig.backends.flink._
+      |import dbis.pig.backends.flink.streaming._
+      |import dbis.pig.backends.flink.streaming.FlinkExtensions._
       |import java.util.concurrent.TimeUnit
       |import org.apache.flink.streaming.api.windowing.helper._
       |import org.apache.flink.util.Collector

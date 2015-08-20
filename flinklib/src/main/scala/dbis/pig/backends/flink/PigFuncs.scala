@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.flink
+package dbis.pig.backends.flink
 
 import scala.Numeric.Implicits._
 import scala.collection.mutable.ListBuffer

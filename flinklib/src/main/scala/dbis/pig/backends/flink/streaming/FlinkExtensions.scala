@@ -1,4 +1,4 @@
-package dbis.flink
+package dbis.pig.backends.flink.streaming
 
 import org.apache.flink.streaming.api.scala.WindowedDataStream
 import org.apache.flink.streaming.api.scala.createTypeInformation

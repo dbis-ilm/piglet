@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.flink
+package dbis.pig.backends.flink
 
 import scala.sys.process._
 import java.security._

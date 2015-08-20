@@ -1,7 +1,7 @@
 // ----------------- header declaration ----------------- 
 init_code(includes) ::= <<
 import org.apache.flink.api.scala._
-import dbis.flink._
+import dbis.pig.backends.flink._
 
 <\n>
 >>

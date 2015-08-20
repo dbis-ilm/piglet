@@ -40,7 +40,7 @@ class FlinkCompileSpec extends FlatSpec {
       + codeGenerator.emitFooter)
     val expectedCode = cleanString("""
       |import org.apache.flink.api.scala._
-      |import dbis.flink._
+      |import dbis.pig.backends.flink._
       |
       |object test {
       |    def main(args: Array[String]) {

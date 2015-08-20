@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package dbis.flink.test
+package dbis.pig.backends.flink.test
 
-import dbis.flink.PigFuncs
+import dbis.pig.backends.flink.PigFuncs
 import org.scalatest._
 
 class FuncsSpec extends FlatSpec with Matchers {
