@@ -30,7 +30,7 @@ case class SocketWrite(in: Pipe,
                        mode: String,
                        func: String = BackendManager.backend.defaultConnector) extends PigOperator {
   _outputs = List()
-  _inputs = List()
+  _inputs = List(in)
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

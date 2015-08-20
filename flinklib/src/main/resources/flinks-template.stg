@@ -151,7 +151,7 @@ socketWrite(in,addr,mode,func) ::=<<
 <if (mode)>
     <func>().zmqPublish("<addr.protocol><addr.hostname>:<addr.port>", <in>)
 <else>
-    <func>().bind("<addr.hostname>",<addr.port>, <in>)
+    <func>().bind("<addr.hostname>", <addr.port>, <in>)
 <endif>
 >>
 
