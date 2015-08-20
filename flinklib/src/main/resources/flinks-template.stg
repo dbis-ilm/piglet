@@ -45,7 +45,11 @@ store(in,file,func,schema) ::=<<
 
 // ------------------ FILTER for a Predicate ----------------------------------
 filter(out,in,pred,windowMode) ::=<<
+<if (windowMode)>
+    val <out> = <in>.mapWindow(custom<out>Filter _)
+<else>
     val <out> = <in>.filter(t => {<pred>})
+<endif>
 >>
 
 // ------------------ Executes an expression FOREACH input element ------------

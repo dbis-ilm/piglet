@@ -180,7 +180,7 @@ object Rewriter extends LazyLogging {
     val newSources = plan.sourceNodes.flatMap(
       processPigOperator(_, strategy) match {
         case op : PigOperator => List(op)
-        case ops : Seq[PigOperator] => ops
+        case ops : Seq[PigOperator @unchecked] => ops
         case e => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
           "PigOperator or " +
           "Sequence of them, namely" + e)
@@ -699,7 +699,6 @@ object Rewriter extends LazyLogging {
       operator match {
         case o: Filter => {
           logger.debug(s"Rewrite Filter to WindowMode")
-          //TODO: Move before Window, not only Filter - all non-WindowOps
           o.windowMode = true
         }
         case o: Distinct => {

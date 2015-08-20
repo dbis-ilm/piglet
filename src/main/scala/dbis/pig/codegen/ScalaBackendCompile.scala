@@ -442,6 +442,15 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
           |  }""".stripMargin
         else ""
       }
+      case Filter(out, in, pred, windowMode) => { 
+        if (windowMode)
+          s"""
+          |  def custom${node.outPipeName}Filter(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
+          |    ts.filter(t => ${emitPredicate(node.schema, pred)}).foreach(x => out.collect(x))
+          |  }""".stripMargin
+        else ""
+      }
+
       case _ => ""
     }
   }
