@@ -59,4 +59,35 @@ class PigOperatorSpec extends FlatSpec with Matchers {
     val splitOp = plan.findOperatorForAlias("b")
     splitOp.value.arity shouldBe 3
   }
+
+  "PigOperators" should "return useful lieage strings" in {
+    val plan = new DataflowPlan(parseScript(s"""
+         |A = LOAD 'file' AS (x, y, z);
+         |B = FILTER A BY x > 0;
+         |C = SAMPLE B 0.1;
+         |D = GROUP C BY x;
+         |E = FOREACH D GENERATE group, COUNT(C) AS cnt;
+         |F = DISTINCT E;
+         |G = ORDER F BY cnt;
+         |H = LIMIT G 20;
+         |""".stripMargin))
+    val plan2 = new DataflowPlan(parseScript(s"""
+         |A = LOAD 'file2' AS (x, y, z);
+         |B = FILTER A BY x < 0;
+         |CC = SAMPLE B 0.1;
+         |DD = GROUP CC BY x;
+         |EE = FOREACH DD GENERATE group, COUNT(C) AS counter;
+         |F = DISTINCT EE;
+         |G = ORDER F BY counter;
+         |H = LIMIT G 25;
+         |""".stripMargin))
+    plan.findOperatorForAlias("A").get.lineageString should not be equal (plan2.findOperatorForAlias("A").get.lineageString)
+    plan.findOperatorForAlias("B").get.lineageString should not be equal (plan2.findOperatorForAlias("A").get.lineageString)
+    plan.findOperatorForAlias("C").get.lineageString should not be equal (plan2.findOperatorForAlias("CC").get.lineageString)
+    plan.findOperatorForAlias("D").get.lineageString should not be equal (plan2.findOperatorForAlias("DD").get.lineageString)
+    plan.findOperatorForAlias("E").get.lineageString should not be equal (plan2.findOperatorForAlias("EE").get.lineageString)
+    plan.findOperatorForAlias("F").get.lineageString should not be equal (plan2.findOperatorForAlias("F").get.lineageString)
+    plan.findOperatorForAlias("G").get.lineageString should not be equal (plan2.findOperatorForAlias("G").get.lineageString)
+    plan.findOperatorForAlias("H").get.lineageString should not be equal (plan2.findOperatorForAlias("H").get.lineageString)
+  }
 }

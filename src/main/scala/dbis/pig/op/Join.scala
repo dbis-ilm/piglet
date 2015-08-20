@@ -36,7 +36,7 @@ case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]], timeWindo
   _inputs = in
 
   override def lineageString: String = {
-    s"""JOIN%""" + super.lineageString
+    s"""JOIN%${fieldExprs}%""" + super.lineageString
   }
 
   override def constructSchema: Option[Schema] = {

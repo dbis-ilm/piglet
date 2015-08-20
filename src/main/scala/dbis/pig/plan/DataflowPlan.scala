@@ -59,7 +59,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
     val pipes: Map[String, Pipe] = Map[String, Pipe]()
 
     /*
-     * 0. We remove all REGISTER and DEFINE operators: they are just pseudo-operators.
+     * 0. We remove all REGISTER, DEFINE and SET operators: they are just pseudo-operators.
      *    Instead, we add their arguments to the additionalJars list and udfAliases map
      */
     ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
@@ -68,8 +68,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
     }
 
-    val planOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd])
-
+    val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd])
+    val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])
     /*
      * 1. We create a Map from names to the pipes that *write* them.
      */
@@ -118,6 +118,20 @@ class DataflowPlan(var operators: List[PigOperator]) {
       case e: java.util.NoSuchElementException => throw new InvalidPlanException("invalid pipe: " + e.getMessage)
     }
     operators = planOps
+  }
+
+  /**
+   * Looks for SetCmd operators in the operator list and apply the parameter to
+   * each subsequent operator in the list.
+   */
+  def processSetCmds(opList: List[PigOperator]): List[PigOperator] = {
+    val currentParams: Map[String, Any] = Map()
+    opList.foreach(op => op match {
+      case SetCmd(key, value) => currentParams += (key -> value)
+      case _ => op.configParams = op.configParams ++ currentParams
+      }
+    )
+    opList
   }
 
   /**

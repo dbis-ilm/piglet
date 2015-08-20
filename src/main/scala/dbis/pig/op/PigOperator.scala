@@ -28,12 +28,18 @@ import scala.collection.immutable.Seq
  * pipes representing the input and output connections to other operators in the
  * dataflow.
  */
-
-
 trait PigOperator extends Rewritable {
   protected var _outputs: List[Pipe] = _
   protected var _inputs: List[Pipe] = _
 
+  /**
+   * A map of key-value pairs representing operator-specific parameters.
+   */
+  var configParams: Map[String, Any] = Map()
+
+  /**
+   * The (optional) schema describing the output produced by the operator.
+   */
   var schema: Option[Schema] = None
 
   /**

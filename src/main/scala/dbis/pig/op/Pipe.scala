@@ -38,6 +38,8 @@ class Pipe (var name: String, var producer: PigOperator = null, var consumer: Li
   override def hashCode = name.hashCode
 
   def inputSchema = if (producer != null) producer.schema else None
+
+  def removeConsumer(op:PigOperator): Unit = this.consumer = this.consumer.filterNot(_ == op)
 }
 
 object Pipe {

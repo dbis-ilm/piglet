@@ -28,7 +28,7 @@ case class Sample(out: Pipe, in: Pipe, expr: ArithmeticExpr) extends PigOperator
   _outputs = List(out)
   _inputs = List(in)
 
-  override def lineageString: String = s"""SAMPLE%""" + super.lineageString
+  override def lineageString: String = s"""SAMPLE%${expr}%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
     schema match {

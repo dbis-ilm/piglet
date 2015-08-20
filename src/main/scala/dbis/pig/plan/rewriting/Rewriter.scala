@@ -111,17 +111,13 @@ object Rewriter extends LazyLogging {
   //noinspection ScalaDocMissingParameterDescription
   def addStrategy(f: Any => Option[PigOperator]): Unit = addStrategy(strategyf(t => f(t)))
 
-  /** Adds a function `f` that replaces a single [[PigOperator]] with another one as a [[org.kiama.rewriting.Strategy]]
-    *  to this object.
-    *
-    * If applying `f` to a term succeeded (Some(_)) was returned, the input term will be replaced by the new term in
-    * the input pipes of the new terms successors (the consumers of its output pipes).
+  /** Builds the strategy for [[addOperatorReplacementStrategy]].
     *
     * @param f
+    * @return
     */
-  //noinspection ScalaDocMissingParameterDescription
-  def addOperatorReplacementStrategy(f: Any => Option[PigOperator]): Unit = {
-    val strat = (t: Any) => f(t) map { op: PigOperator =>
+  def buildOperatorReplacementStrategy(f: Any => Option[PigOperator]): Strategy = strategyf(t =>
+    f(t) map { op: PigOperator =>
       op.outputs foreach { output =>
         output.consumer foreach { consumer =>
           consumer.inputs foreach { input =>
@@ -136,8 +132,19 @@ object Rewriter extends LazyLogging {
       }
       op
     }
+  )
 
-    addStrategy(strategyf(t => strat(t)))
+  /** Adds a function `f` that replaces a single [[PigOperator]] with another one as a [[org.kiama.rewriting.Strategy]]
+    *  to this object.
+    *
+    * If applying `f` to a term succeeded (Some(_)) was returned, the input term will be replaced by the new term in
+    * the input pipes of the new terms successors (the consumers of its output pipes).
+    *
+    * @param f
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  def addOperatorReplacementStrategy(f: Any => Option[PigOperator]): Unit = {
+    addStrategy(buildOperatorReplacementStrategy(f))
   }
 
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via

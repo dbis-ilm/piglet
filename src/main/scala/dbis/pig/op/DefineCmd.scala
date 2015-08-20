@@ -22,7 +22,9 @@ package dbis.pig.op
  * DefineCmd represents a pseudo operator for the DEFINE statement. This "operator" will
  * be eliminated during building the dataflow plan.
  *
- * @param jarFile the URI of the Jar file to be registered
+ * @param alias the alias name of the UDF
+ * @param scalaName the full classified Scala name of the function
+ * @param paramList a list of values uses as the first standard parameters in the function call
  */
 case class DefineCmd(alias: String, scalaName: String, paramList: List[Value]) extends PigOperator
 

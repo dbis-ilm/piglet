@@ -29,4 +29,6 @@ class FlinkConf extends BackendConf {
   override def templateFile: String = appconf.getString("backends.flink.template")
 
   override def defaultConnector: String = appconf.getString("backends.flink.connector")
+  
+  override def raw = false
 }

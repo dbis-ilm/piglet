@@ -91,13 +91,6 @@ case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator, var windowM
   }
 
   override def checkConnectivity: Boolean = {
-    /*
-    def checkSubOperatorConnectivity(op: PigOperator): Boolean = op match {
-      case Generate(exprs) => true // check all exprs
-      case ConstructBag(out, ref) => println("check: " + ref); true // check ref
-      case _ => true
-    }
-*/
     generator match {
       case GeneratorList(expr) => true
       case GeneratorPlan(plan) => {
@@ -121,11 +114,6 @@ case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator, var windowM
         }
         }
         result
-/*
-        plan.forall(op => op.inputs.forall(p => p.producer != null) &&
-                          op.outputs.forall(p => p.consumer.nonEmpty)
-
-        )*/
       }
     }
   }
