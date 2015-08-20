@@ -639,8 +639,8 @@ object Rewriter extends LazyLogging {
     val walker1 = new BreadthFirstTopDownWalker
     val walker2 = new BreadthFirstBottomUpWalker
 
-    // All Window Ops: Group,Filter,Distinct,Limit,OrderBy,Foreach
-    // Two modes: Group,Filter,Limit,Foreach
+    // All Window Ops: Group,Filter,Distinct,OrderBy,Foreach
+    // Two modes: Group,Filter,Foreach
     // Terminator: Foreach, Join
  
     logger.debug(s"Searching for Window Operators")
@@ -665,7 +665,21 @@ object Rewriter extends LazyLogging {
     }
     newPlan = processWindowJoins(newPlan, joins.toList)
 
-    //TODO: Add Check for WindowOnly operators (distinct, orderBy, etc.)
+    // Checking window-only Operators
+    logger.debug(s"Checking whether window-only operators are correctly set")
+    walker1.walk(newPlan){ op => 
+      op match {
+        case o: Distinct if(o.windowMode==false) =>
+          throw new RewriterException("Distinct can oly be used within Windows")
+        case o: OrderBy if(o.windowMode==false) =>
+          throw new RewriterException("OrderBy can oly be used within Windows")
+        case o: Join if(o.timeWindow==null) =>
+          throw new RewriterException("Join has no window definition")
+        case o: Cross if(o.timeWindow==null) =>
+          throw new RewriterException("Cross has no window definition")
+        case _ =>
+      }
+    }
 
     newPlan
   }
@@ -681,15 +695,15 @@ object Rewriter extends LazyLogging {
           //TODO: Move before Window, not only Filter - all non-WindowOps
           o.windowMode = true
         }
-        case o: Limit => {
-          logger.debug(s"Rewrite Limit to WindowMode")
-          o.windowMode = true
-        }
         case o: Distinct => {
           logger.debug(s"Rewrite Distinct to WindowMode")
           o.windowMode = true
         }
-       case o: Grouping => {
+        case o: OrderBy => {
+          logger.debug(s"Rewrite OrderBy to WindowMode")
+          o.windowMode = true
+        }
+        case o: Grouping => {
           logger.debug(s"Rewrite Grouping to WindowMode")
           o.windowMode = true
         }
