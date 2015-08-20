@@ -27,6 +27,11 @@ lodhub_data
 *.class
 *.log
 
+
+#####
+# ignore database
+db
+
 # sbt specific
 .cache
 .cache-*

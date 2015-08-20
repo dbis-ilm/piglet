@@ -37,8 +37,9 @@ import java.nio.file.Paths
 import scala.collection.mutable.ListBuffer
 import dbis.pig.backends.BackendConf
 import dbis.pig.tools.BreadthFirstTopDownWalker
-
+import dbis.pig.tools.DBConnection
 import scala.collection.mutable.{Map => MutableMap}
+import scalikejdbc._
 
 object PigCompiler extends PigParser with LazyLogging {
   
@@ -107,31 +108,47 @@ object PigCompiler extends PigParser with LazyLogging {
    * Start compiling the Pig script into a the desired program
    */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], hookFile: Option[Path]): Unit = {
-    
-    val backendConf = BackendManager.backend(backend)
-    
-    if(backendConf.raw) {
-      if(compileOnly) {
-        logger.error("Raw backends do not support compile-only mode! Aborting")
-        return
-      }
+
+	  try {
+
+		  // initialize database driver and connection pool
+		  DBConnection.init(Conf.databaseSetting)
+
+		  val backendConf = BackendManager.backend(backend)
+
+		  if(backendConf.raw) {
+			  if(compileOnly) {
+				  logger.error("Raw backends do not support compile-only mode! Aborting")
+				  return
+			  }
+
+			  inputFiles.foreach { file => runRaw(file, master, backendConf) }
+
+		  } else {
+			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf, hookFile)
+		  }
+
+	  } catch {
+      case e: Exception => logger.error(s"An error occured: ${e.getMessage}",e)
       
-      inputFiles.foreach { file => runRaw(file, master, backendConf) }
-      
-    } else {
-      runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf, hookFile)
-    }
+	  } finally {
+
+		  // close connection pool
+		  DBConnection.exit()  
+	  }
   }
   
-  def runRaw(file: Path, master: String, backendConf: BackendConf) {
+  private def runRaw(file: Path, master: String, backendConf: BackendConf) {
     logger.debug(s"executing in raw mode: $file with master $master for backend ${backendConf.name}")    
     val runner = backendConf.runnerClass
     runner.executeRaw(file, master)
   }
   
-  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf, hookFile: Option[Path]) {
+  private def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf, hookFile: Option[Path]) {
     logger.debug("start parsing input files")
+    
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
+    
     for(file <- inputFiles) {
       createDataflowPlan(file, params, backend) match {
         case Some(v) => schedule += ((v,file))
@@ -141,31 +158,14 @@ object PigCompiler extends PigParser with LazyLogging {
       }
     }
 
-    logger.debug("start creating lineage counter map")
     
-    val walker = new BreadthFirstTopDownWalker
-
-    val lineageMap = MutableMap.empty[String, Int]
+    //////////////////////////////////////
+    // begin global analysis phase
     
-    def visitor(op: PigOperator): Unit = {
-      val lineage = op.lineageString
-      
-      var old = 0
-      if(lineageMap.contains(lineage))
-        old = lineageMap(lineage)
-        
-      lineageMap(lineage) = old + 1
-    }
+    analyzePlans(schedule)
     
-    schedule.foreach{ plan => walker.walk(plan._1)(visitor) }
-    
-    val lineageMapString = new StringBuilder
-    
-    for((k,v) <- lineageMap) {
-      lineageMapString ++= s"$k  -->  $v\n"
-    }
-    
-    logger.debug(s"LINEAGE COUNTER MAP: $lineageMapString")
+    ///////////////////////////////////////////
+    // end analysis and continue normal processing
     
     logger.debug("start processing created dataflow plans")
     
@@ -215,7 +215,7 @@ object PigCompiler extends PigParser with LazyLogging {
    * @param params Key value pairs to replace placeholders in the script
    * @param backend The name of the backend
    */
-  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String): Option[DataflowPlan] = {
+  private def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String): Option[DataflowPlan] = {
       // 1. we read the Pig file
       val source = Source.fromFile(inputFile.toFile())
       
@@ -274,5 +274,55 @@ object PigCompiler extends PigParser with LazyLogging {
           parseScript(source.getLines().mkString("\n"), StreamingPig)
         else
           parseScript(source.getLines().mkString("\n"))
+  }
+  
+  private def analyzePlans(schedule: Seq[(DataflowPlan, Path)]) {
+    
+    logger.debug("start creating lineage counter map")
+    
+    val walker = new BreadthFirstTopDownWalker
+
+    val lineageMap = MutableMap.empty[String, Int]
+    
+    def visitor(op: PigOperator): Unit = {
+      val lineage = op.lineageString
+//      logger.debug(s"visiting: $lineage")
+      var old = 0
+      if(lineageMap.contains(lineage))
+        old = lineageMap(lineage)
+        
+      lineageMap(lineage) = old + 1
+    }
+    
+    schedule.foreach{ plan => walker.walk(plan._1)(visitor) }
+    
+    val entrySet = lineageMap.map { case (k,v) => Seq('id -> k, 'cnt -> v) }.toSeq
+    
+    
+    DB autoCommit { implicit session => 
+      sql"create table if not exists opcount(id varchar(200) primary key, cnt int default 0)"
+        .execute
+        .apply()
+    }
+    
+    DB localTx { implicit session =>
+      
+      sql"merge into opcount(id,cnt) select {id}, case when exists(select 1 from opcount where id={id}) then (select cnt from opcount where id={id})+{cnt} else 1 end"
+        .batchByName(entrySet:_ *)
+        .apply()
+      
+    }
+//    id, cnt + {cnt} from opcount where id = {id}
+    
+    val entries = DB readOnly { implicit session => 
+      sql"select * from opcount"
+        .map{ rs => s"${rs.string("id")}  -->  ${rs.int("cnt")}" }
+        .list
+        .apply()
+      
+    }
+    
+    entries.foreach { println }
+    
   }
 }
