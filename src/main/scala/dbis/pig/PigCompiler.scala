@@ -285,7 +285,7 @@ object PigCompiler extends PigParser with LazyLogging {
     val lineageMap = MutableMap.empty[String, Int]
     
     def visitor(op: PigOperator): Unit = {
-      val lineage = op.lineageString
+      val lineage = op.lineageSignature
 //      logger.debug(s"visiting: $lineage")
       var old = 0
       if(lineageMap.contains(lineage))

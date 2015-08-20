@@ -807,13 +807,13 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
   
   def emitShutDownHook(): String = "shutdownHook()"
   
-  def emitBeforeHook(op: PigOperator): String = s"""beforeHook("${op.lineageString}")"""
+  def emitBeforeHook(op: PigOperator): String = s"""beforeHook("${op.lineageSignature}")"""
   
   def emitAfterHook(op: PigOperator): String = {
     
     val outName = if(op.outPipeName.isEmpty()) "None" else s"""Some(${op.outPipeName})"""
     
-    s"""afterHook("${op.lineageString}",${outName})"""
+    s"""afterHook("${op.lineageSignature}",${outName})"""
   }
   
    /**
