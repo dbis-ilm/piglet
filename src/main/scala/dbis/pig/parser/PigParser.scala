@@ -283,7 +283,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
     case b ~ _ ~ _ ~ f ~ u ~ s => 
       
-      val uri = new URI(f)
+      val uri = new java.io.File(f).getAbsoluteFile().toURI()
       
       u match {
         case Some(p) => new Load(Pipe(b), uri, s, p._1, if (p._2.isEmpty) null else p._2)
@@ -301,7 +301,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def rdfLoadStmt: Parser[PigOperator] = bag ~ "=" ~ rdfLoadKeyword ~ "(" ~ fileName ~ ")" ~ (groupedOnClause?) ^^ {
     case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped => 
-      val uri = new URI(filename)
+      val uri = new java.io.File(filename).getAbsoluteFile().toURI()
       new RDFLoad(Pipe(b), uri, grouped)
   }
 
@@ -315,7 +315,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ~ (usingClause?) ^^ { 
     case _ ~ b ~  _ ~ f ~ u => 
-      val uri = new URI(f)
+      val uri = new java.io.File(f).getAbsoluteFile().toURI()
       u match {
         case Some(p) => new Store(Pipe(b), uri, p._1, if(p._2.isEmpty) null else p._2)
         case None => new Store(Pipe(b), uri)
