@@ -366,6 +366,11 @@ object Rules {
         return None
       }
 
+      if (op.inputSchema.isEmpty
+        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+        return None
+      }
+
       if (patterns.length != 1) {
         return None
       }
@@ -410,6 +415,11 @@ object Rules {
       val in = op.inputs.head
       val out = op.outputs.head
       if (op.inputSchema == RDFLoad.plainSchema) {
+        return None
+      }
+
+      if (op.inputSchema.isEmpty
+        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
         return None
       }
 
@@ -512,6 +522,11 @@ object Rules {
       val in = op.inputs.head
       val out = op.outputs.head
       if (op.inputSchema == RDFLoad.plainSchema) {
+        return None
+      }
+
+      if (op.inputSchema.isEmpty
+        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
         return None
       }
 
