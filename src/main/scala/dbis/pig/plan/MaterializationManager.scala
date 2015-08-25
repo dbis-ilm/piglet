@@ -1,6 +1,8 @@
 package dbis.pig.plan
 
 import java.io.File
+import dbis.pig.mm.MaterializationPoint
+
 import scala.io.Source
 import java.io.PrintWriter
 import java.io.FileWriter
@@ -81,5 +83,4 @@ class MaterializationManager(private val mapFile: Path, private val matBaseDir: 
     
     matFile
   }
-  
-}
+ }
