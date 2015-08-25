@@ -1,6 +1,6 @@
 -- Load input from the file named mary.txt and call the single
 -- field in the record 'line'.
-input = load 'src/it/resources/input/mary.txt' as (line);
+input = load '$inbase/input/mary.txt' as (line);
 
 -- TOKENIZE splits the line into a field for each word.
 -- flatten will take the collection of records returned b
@@ -14,4 +14,4 @@ grpd = group words by word;
 -- Count them.
 cntd = foreach grpd generate group, COUNT(words);
 
-store cntd into 'marycounts.out';
+store cntd into '$outfile';

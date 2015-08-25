@@ -20,8 +20,8 @@ package dbis.test.spark
 import dbis.pig.PigCompiler
 import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
-
 import scala.io.Source
+import scalax.file.Path
 
 class SparkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
@@ -57,13 +57,16 @@ class SparkCompileIt extends FlatSpec with Matchers {
       cleanupResult(resultDir)
       cleanupResult(script.replace(".pig",""))
 
+      val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
+      val resourcePath = getClass.getResource("").getPath + "../../../"
+      
       // 2. compile and execute Pig script
-      PigCompiler.main(Array("--backend", "spark", "--master", "local[2]", "--outdir", ".", "./src/it/resources/" + script))
+      PigCompiler.main(Array("--backend", "spark", "--params", s"inbase=$resourcePath,outfile=${resultPath.path}", "--master", "local[2]", "--outdir", ".", resourcePath + script))
       println("execute: " + script)
 
       // 3. load the output file and the truth file
       val result = Source.fromFile(resultDir + "/part-00000").getLines()
-      val truth = Source.fromFile("./src/it/resources/" + truthFile).getLines()
+      val truth = Source.fromFile(resourcePath + truthFile).getLines()
       // 4. compare both files
       if (inOrder)
         result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
