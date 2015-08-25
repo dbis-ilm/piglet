@@ -28,6 +28,8 @@ import dbis.pig.parser.LanguageFeature
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
 
+import scala.util.Random
+
 class PigParserSpec extends FlatSpec {
   "The parser" should "parse a simple load statement" in  {
     val uri = new java.io.File("file.csv").getAbsoluteFile().toURI()
@@ -570,48 +572,17 @@ class PigParserSpec extends FlatSpec {
     assert(grouped_on_subj == List(RDFLoad(Pipe("a"), s"${uri}", Some("subject"))))
     assert(grouped_on_pred == List(RDFLoad(Pipe("a"), s"${uri}", Some("predicate"))))
     assert(grouped_on_obj == List(RDFLoad(Pipe("a"), s"${uri}", Some("object"))))
+    assert(grouped_on_subj.head.schema.get == RDFLoad.groupedSchemas("subject"))
+    assert(grouped_on_pred.head.schema.get == RDFLoad.groupedSchemas("predicate"))
+    assert(grouped_on_obj.head.schema.get == RDFLoad.groupedSchemas("object"))
+  }
 
-    val grouped_on_subj_schema = Some(
-      Schema(
-        BagType(
-          TupleType(
-            Array(
-              Field("subject", Types.CharArrayType),
-              Field("stmts",
-                BagType(
-                  TupleType(
-                    Array(
-                      Field("predicate", Types.CharArrayType),
-                      Field("object", Types.CharArrayType))))))))))
-    assert(grouped_on_subj.head.schema == grouped_on_subj_schema)
-
-    val grouped_on_pred_schema = Some(
-      Schema(
-        BagType(
-          TupleType(
-            Array(
-              Field("predicate", Types.CharArrayType),
-              Field("stmts",
-                BagType(
-                  TupleType(
-                    Array(
-                      Field("subject", Types.CharArrayType),
-                      Field("object", Types.CharArrayType))))))))))
-    assert(grouped_on_pred.head.schema == grouped_on_pred_schema)
-
-    val grouped_on_obj_schema = Some(
-      Schema(
-        BagType(
-          TupleType(
-            Array(
-              Field("object", Types.CharArrayType),
-              Field("stmts",
-                BagType(
-                  TupleType(
-                    Array(
-                      Field("subject", Types.CharArrayType),
-                      Field("predicate", Types.CharArrayType))))))))))
-    assert(grouped_on_obj.head.schema == grouped_on_obj_schema)
+  it should "reject RDFLoad operators with unknown grouping column names" in {
+    val colname = Random.nextString(10)
+    intercept[IllegalArgumentException] {
+      val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on $colname;""", LanguageFeature
+        .SparqlPig)
+    }
   }
 
   it should "parse a matcher  statement using only mode" in {
