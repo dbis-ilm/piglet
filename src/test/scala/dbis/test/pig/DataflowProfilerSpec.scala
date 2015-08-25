@@ -1,7 +1,7 @@
-package dbis.spark.test
+package dbis.test.pig
 
-import org.scalatest.{FlatSpec, Matchers}
 import dbis.pig.mm.{DataflowProfiler, MaterializationPoint}
+import org.scalatest.{FlatSpec, Matchers}
 
 /**
  * Created by kai on 13.07.15.
