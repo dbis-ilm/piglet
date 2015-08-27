@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{Ref, Value, TriplePattern}
+import dbis.pig.op.{NamedField, Ref, Value, TriplePattern}
 import dbis.pig.plan.rewriting.Column.Column
 
 /** An enumeration of the three columns in RDF data - subject, predicate and object.
@@ -25,6 +25,17 @@ import dbis.pig.plan.rewriting.Column.Column
 object Column extends Enumeration {
   type Column = Value
   val Subject, Predicate, Object = Value
+
+  /** Maps [[dbis.pig.plan.rewriting.Column]]s to [[dbis.pig.op.NamedField]]s.
+    *
+    * @param c
+    * @return
+    */
+  def columnToNamedField(c: Column) = c match {
+    case Column.Subject => NamedField("subject")
+    case Column.Predicate => NamedField("predicate")
+    case Column.Object => NamedField("object")
+  }
 }
 
 object RDF {

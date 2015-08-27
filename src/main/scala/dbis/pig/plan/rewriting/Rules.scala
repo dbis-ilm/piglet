@@ -20,6 +20,7 @@ import dbis.pig.op._
 import dbis.pig.plan.rewriting.Column.Column
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.PipeNameGenerator.generate
+import dbis.pig.schema.{Field, Types}
 import org.kiama.rewriting.Rewriter._
 
 
@@ -401,6 +402,90 @@ object Rules {
       }
 
       return filter
+    case _ => None
+  }
+
+  def F5(term: Any): Option[Foreach] = term match {
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
+
+      if (op.inputSchema == RDFLoad.plainSchema) {
+        return None
+      }
+
+      if (op.inputSchema.isEmpty
+        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+        return None
+      }
+
+      if (patterns.length != 1) {
+        return None
+      }
+
+      // TODO we make a lot of assumptions about Options and Array lengths here
+      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+      val pattern = patterns.head
+
+      // Check if the column that's grouped by is not bound in this pattern
+      val bound_column = RDF.getBoundColumn(pattern)
+
+      val applies =  grouped_by match {
+        case "subject" if bound_column contains Column.Subject => false
+        case "predicate" if bound_column contains Column.Predicate => false
+        case "object" if bound_column contains Column.Object => false
+        // Just in case there's no bound column
+        case _ if bound_column.isEmpty => false
+        case _ => true
+      }
+
+      // If not, this rule doesn't apply
+      if (!applies) {
+        return None
+      }
+
+      val internalPipeName = generate
+      val intermediaResultName = generate
+      val filter_by = Column.columnToNamedField(bound_column.get)
+      val filter_value = bound_column.get match {
+        case Column.Subject => pattern.subj
+        case Column.Predicate => pattern.pred
+        case Column.Object => pattern.obj
+      }
+
+
+      val foreach =
+        Foreach(Pipe(internalPipeName), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe(intermediaResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField(intermediaResultName)))),
+                Some(Field("cnt", Types.ByteArrayType))))))))
+
+      val filter = Filter(out, Pipe(internalPipeName, foreach),
+                    Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
+
+      foreach.outputs foreach (_.addConsumer(filter))
+
+      filter.outputs foreach { output =>
+        output.consumer foreach { consumer =>
+          consumer.inputs foreach { input =>
+            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
+            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
+            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
+            // that.
+            if (input.producer == op) {
+              input.producer = filter
+            }
+          }
+        }
+      }
+
+      in.removeConsumer(op)
+
+      Some(foreach)
     case _ => None
   }
 
