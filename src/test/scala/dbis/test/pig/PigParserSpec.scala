@@ -183,6 +183,11 @@ class PigParserSpec extends FlatSpec {
             Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),false))) 
   }
 
+  it should "parse a filter with a string value" in {
+    assert(parseScript("b = FILTER a BY  x == 'xyz';") ==
+      List(Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("x")), RefExpr(Value("xyz"))))))
+  }
+
   it should "parse a simple foreach statement" in {
     assert(parseScript("a = foreach b generate x, y, z;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
