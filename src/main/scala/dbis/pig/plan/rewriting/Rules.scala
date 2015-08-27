@@ -17,6 +17,7 @@
 package dbis.pig.plan.rewriting
 
 import dbis.pig.op._
+import dbis.pig.plan.rewriting.Column.Column
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.PipeNameGenerator.generate
 import org.kiama.rewriting.Rewriter._
@@ -255,9 +256,7 @@ object Rules {
         fail
       } else {
         val pattern = patterns.head
-        if (!pattern.subj.isInstanceOf[Value]
-          && !pattern.pred.isInstanceOf[Value]
-          && !pattern.obj.isInstanceOf[Value]) {
+        if (RDF.allUnbound(pattern)) {
           removalStrategy(op)
         } else {
           fail
@@ -285,19 +284,19 @@ object Rules {
 
       val pattern = patterns.head
       var filter : Option[Filter] = None
+      val bound_column = RDF.getBoundColumn(pattern)
 
-      if (pattern.subj.isInstanceOf[Value]
-        && !pattern.pred.isInstanceOf[Value]
-        && !pattern.obj.isInstanceOf[Value]) {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
-      } else if (!pattern.subj.isInstanceOf[Value]
-        && pattern.pred.isInstanceOf[Value]
-        && !pattern.obj.isInstanceOf[Value]) {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
-      } else if (!pattern.subj.isInstanceOf[Value]
-        && !pattern.pred.isInstanceOf[Value]
-        && pattern.obj.isInstanceOf[Value]) {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+      filter = bound_column.flatMap { col: Column =>
+        if (col == Column.Subject) {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+        } else if (col == Column.Predicate) {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+        } else if (col == Column.Object) {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+        } else {
+          // In reality, one of the above cases should always match
+          None
+        }
       }
 
       if (filter.isDefined) {
@@ -379,21 +378,22 @@ object Rules {
 
       val pattern = patterns.head
       var filter : Option[Filter] = None
-      if (pattern.subj.isInstanceOf[Value]
-        && !pattern.pred.isInstanceOf[Value]
-        && !pattern.obj.isInstanceOf[Value]
-        && grouped_by == "subject") {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
-      } else if (!pattern.subj.isInstanceOf[Value]
-        && pattern.pred.isInstanceOf[Value]
-        && !pattern.obj.isInstanceOf[Value]
-        && grouped_by == "predicate") {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
-      } else if (!pattern.subj.isInstanceOf[Value]
-        && !pattern.pred.isInstanceOf[Value]
-        && pattern.obj.isInstanceOf[Value]
-        && grouped_by == "object") {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+      val bound_column = RDF.getBoundColumn(pattern)
+
+      filter = bound_column.flatMap { col: Column =>
+        if (col == Column.Subject
+          && grouped_by == "subject") {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+        } else if (col == Column.Predicate
+          && grouped_by == "predicate") {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+        } else if (col == Column.Object
+          && grouped_by == "object") {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+        } else {
+          // In reality, one of the above cases should always match
+          None
+        }
       }
 
       if (filter.isDefined) {
@@ -433,10 +433,11 @@ object Rules {
       val pattern = patterns.head
 
       // Check if the column that's grouped by is bound in this pattern
-      val applies = pattern match {
-        case TriplePattern(Value(_), _, _) if grouped_by == "subject" => true
-        case TriplePattern(_, Value(_), _) if grouped_by == "predicate" => true
-        case TriplePattern(_, _, Value(_)) if grouped_by == "object" => true
+      val bound_columns = RDF.getAllBoundColumns(pattern)
+      val applies =  grouped_by match {
+        case "subject" if bound_columns contains Column.Subject => true
+        case "predicate" if bound_columns contains Column.Predicate => true
+        case "object" if bound_columns contains Column.Object => true
         case _ => false
       }
 
