@@ -597,6 +597,11 @@ object Rules {
     case _ => None
   }
 
+  /** Applies rewriting rule F8 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    * @param term
+    * @return Some BGPFilter objects if the input filters BGP is a star join.
+    */
   def J1(term: Any): Option[List[BGPFilter]] = term match {
     case op @ BGPFilter(_, _, patterns) =>
       val out = op.outputs.head
