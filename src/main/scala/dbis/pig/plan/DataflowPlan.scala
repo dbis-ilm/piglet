@@ -30,8 +30,6 @@ import scala.collection.mutable.{ListBuffer, Map}
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
 class DataflowPlan(var operators: List[PigOperator]) {
-  // private var graph = Graph[PigOperator,DiEdge]()
-
   /**
    * A list of JAR files specified by the REGISTER statement
    */
@@ -155,12 +153,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return true if the plan is connected, false otherwise
    */
   def checkConnectivity: Boolean = {
-    // we simply construct a graph and check its connectivity
-    /*
-    var graph = Graph[PigOperator,DiEdge]()
-    operators.foreach(op => op.inputs.foreach(p => graph += p.producer ~> op))
-    graph.isConnected
-    */
     /*
      * make sure that for all operators the following holds:
      * (1) all input pipes have a producer
