@@ -248,7 +248,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperCode = cleanString("""
       |def customBOrder(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
-      |  ts.toList.asInstanceOf[List[List[String]]].sortBy(t => (t(0).toString,t(2).toString.toInt)).foreach { x => out.collect(x) }
+      |  ts.toList.asInstanceOf[List[List[String]]].sortBy(t => (t(0).asInstanceOf[String],t(2).asInstanceOf[Int])).foreach { x => out.collect(x) }
       |}""".stripMargin)
     assert(generatedHelperCode == expectedHelperCode)
   }

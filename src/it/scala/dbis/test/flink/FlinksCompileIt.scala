@@ -66,7 +66,7 @@ class FlinksCompileIt extends FlatSpec with Matchers {
       val resourcePath = getClass.getResource("").getPath + "../../../"
       println("execute: " + script)
       //println("resultPath: " + resultPath.path)
-      PigCompiler.main(Array("--backend", "flinks", "--outdir", resultPath.parent.get.path, resourcePath + "streaming/" + script))
+      PigCompiler.main(Array("--backend", "flinks", "--params", s"inbase=$resourcePath,outfile=${resultPath.path}", "--outdir", resultPath.parent.get.path, resourcePath + "streaming/"+ script))
 
       // 3. load the output file[s] and the truth file
       var result = Iterator[String]()

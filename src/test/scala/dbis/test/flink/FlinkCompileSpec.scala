@@ -54,8 +54,8 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for LOAD" in {
     
-    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
-
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
+    
     val op = Load(Pipe("a"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -65,7 +65,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for LOAD with PigStorage" in {
     
-    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     
     val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -103,7 +103,7 @@ class FlinkCompileSpec extends FlatSpec {
   }
 
   it should "contain code for STORE" in {
-    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
+    val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     val op = Store(Pipe("A"), file)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -202,8 +202,8 @@ class FlinkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -220,8 +220,8 @@ class FlinkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -238,9 +238,9 @@ class FlinkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input3 = Pipe("d",Load(Pipe("d"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2,input3)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))

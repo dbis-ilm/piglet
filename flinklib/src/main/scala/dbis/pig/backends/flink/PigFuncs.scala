@@ -114,10 +114,10 @@ object PigFuncs {
     val updatedState = currentState.zip(fields).map{a => a._2._1 match {
       case "AVG" => {
         val avgState = a._1.asInstanceOf[(Double,Long)]
-        (avgState._1 + in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[String].toDouble,
+        (avgState._1 + in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[Int].toDouble,
          avgState._2 + 1)
       }
-      case "SUM" => (a._1.asInstanceOf[Double] +  in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).toString.toDouble)
+      case "SUM" => (a._1.asInstanceOf[Double] +  in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[Int].toDouble)
       case "COUNT" => (a._1.asInstanceOf[Long] + 1) 
     }}
 
@@ -152,10 +152,10 @@ object PigFuncs {
     val updatedState = currentState.zip(fields).map{a => a._2._1 match {
       case "AVG" => {
         val avgState = a._1.asInstanceOf[(Double,Long)]
-        (avgState._1 + in(a._2._2(0)).asInstanceOf[String].toDouble,
+        (avgState._1 + in(a._2._2(0)).asInstanceOf[Int].toDouble,
          avgState._2 + 1)
       }
-      case "SUM" => (a._1.asInstanceOf[Double] +  in(a._2._2(0)).toString.toDouble)
+      case "SUM" => (a._1.asInstanceOf[Double] +  in(a._2._2(0)).asInstanceOf[Int].toDouble)
       case "COUNT" => (a._1.asInstanceOf[Long] + 1) 
     }}
 

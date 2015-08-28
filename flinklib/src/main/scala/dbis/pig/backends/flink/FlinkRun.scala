@@ -37,24 +37,24 @@ import com.typesafe.scalalogging.LazyLogging
 
 class FlinkRun extends PigletBackend with LazyLogging {
   
-  override def execute(master: String, className: String, jarFile: Path){
+  override def execute(master: String, className: String, jarFile: Path, numExecutors: Int){
     if (master.startsWith("local") && !master.startsWith("localhost")){
 //      val cli = new CliFrontend
 //      val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
-      submitJar("localhost:6123", jarFile, className)
+      submitJar("localhost:6123", numExecutors, jarFile, className)
     }
     else {
 //      val cli = new CliFrontend
 //      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
-      submitJar(master, jarFile, className)
+      submitJar(master, numExecutors, jarFile, className)
     }
   }
 
-  override def executeRaw(file: Path, master: String) = ???
+  override def executeRaw(file: Path, master: String, numExecutors: Int) = ???
   
-  def submitJar(master: String, path: Path, className: String, args: String*) = { 
+  def submitJar(master: String, numExecutors: Int, path: Path, className: String, args: String*) = { 
     val file = path.toFile().getAbsoluteFile()
-    val parallelism = 1 
+    val parallelism = if(numExecutors <= 0) 1 else numExecutors 
     val wait = true
     try { 
       logger.debug(s"submitting $file")

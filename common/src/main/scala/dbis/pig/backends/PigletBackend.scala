@@ -30,8 +30,9 @@ trait PigletBackend {
    * @param master The master information (execution mode)
    * @param className The className of the main class in the job
    * @param jarFile The path to the jar file representing the job
+   * @param numExecutors The number of parallel executors
    */
-  def execute(master: String, className: String, jarFile: Path): Unit
+  def execute(master: String, className: String, jarFile: Path, numExecutors: Int = 0): Unit
   
   /**
    * Execute the raw Pig script. Use this function if your engine does not rely on
@@ -40,6 +41,7 @@ trait PigletBackend {
    * 
    * @param master The master information (execution mode)
    * @param program The path to the script file
+   * @param numExecutors The number of parallel executors
    */
-  def executeRaw(program: Path, master: String)
+  def executeRaw(program: Path, master: String, numExecutors: Int = 0)
 }

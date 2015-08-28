@@ -119,7 +119,7 @@ class SparkCompileSpec extends FlatSpec {
     val op = ops(1)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val c = b.filter(t => {t(0).toString.toDouble > 0 && (t(1).toString.toDouble < 0 || (!(t(2).toString.toInt == t(3).toString.toInt)))})")
+    val expectedCode = cleanString("val c = b.filter(t => {t(0).asInstanceOf[Double] > 0 && (t(1).asInstanceOf[Double] < 0 || (!(t(2).asInstanceOf[Int] == t(3).asInstanceOf[Int])))})")
     assert(generatedCode == expectedCode)
   }
 
@@ -142,8 +142,8 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val a = b.filter(t => {aFunc(t(0).toString.toInt,t(1).toString.toDouble) == true && 
-      |cFunc(t(0).toString.toInt,t(1).toString.toDouble) >= t(0).toString.toInt})
+      |val a = b.filter(t => {aFunc(t(0).asInstanceOf[Int],t(1).asInstanceOf[Double]) == true && 
+      |cFunc(t(0).asInstanceOf[Int],t(1).asInstanceOf[Double]) >= t(0).asInstanceOf[Int]})
       |""".stripMargin)
     assert(generatedCode == expectedCode)
   }
@@ -422,7 +422,7 @@ class SparkCompileSpec extends FlatSpec {
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("out").get))
 
     val expectedCode = cleanString(
-      """val out = data.map(t => List(PigFuncs.toTuple(t(0).toString.toInt,t(1).toString.toInt),PigFuncs.toBag(t(0).toString.toInt,t(1).toString.toInt),PigFuncs.toMap(t(2).toString,t(0).toString.toInt)))""".stripMargin)
+      """val out = data.map(t => List(PigFuncs.toTuple(t(0).asInstanceOf[Int],t(1).asInstanceOf[Int]),PigFuncs.toBag(t(0).asInstanceOf[Int],t(1).asInstanceOf[Int]),PigFuncs.toMap(t(2).asInstanceOf[String],t(0).asInstanceOf[Int])))""".stripMargin)
 
     assert(generatedCode == expectedCode)
   }
@@ -510,7 +510,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.keyBy(t => custKey_a_b(t(0).toString,t(2).toString.toInt)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
+        |val a = b.keyBy(t => custKey_a_b(t(0).asInstanceOf[String],t(2).asInstanceOf[Int])).sortByKey(true).map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
 
     val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(op))

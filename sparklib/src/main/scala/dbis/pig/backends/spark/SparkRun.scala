@@ -26,17 +26,27 @@ import com.typesafe.config.Config
 import scala.collection.JavaConversions._
 import dbis.pig.backends.BackendConf
 import java.nio.file.Path
+import scala.collection.mutable.ListBuffer
 
 class SparkRun extends PigletBackend with BackendConf {
 
   // loads the default configuration file in resources/sparkbackend.conf
   private val appconf = ConfigFactory.load() 
   
-  override def execute(master: String, className: String, jarFile: Path) {
-    SparkSubmit.main(Array("--master", master, "--class", className, jarFile.toAbsolutePath().toString()))
+  override def execute(master: String, className: String, jarFile: Path, numExecutors: Int) {
+    
+    var args = List("--master", master, "--class", className, jarFile.toAbsolutePath().toString())
+    
+    if(numExecutors > 0) {
+      val l = List("--num-executors",numExecutors.toString())
+      args = l ::: args
+    }
+      
+    
+    SparkSubmit.main(args.toArray)
   }
   
-  override def executeRaw(file: Path, master: String) = ???
+  override def executeRaw(file: Path, master: String, numExecutors: Int) = ???
   
   /**
    * Get the name of this backend
