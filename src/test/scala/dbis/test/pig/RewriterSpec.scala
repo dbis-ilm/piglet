@@ -643,4 +643,17 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
   }
+
+  it should "replace GENERATE * by a list of fields" in {
+    val plan = new DataflowPlan(parseScript(
+      s"""A = LOAD 'file' AS (x, y, z);
+         |B = FOREACH A GENERATE *;
+         |DUMP B;
+       """.stripMargin))
+    val rewrittenPlan = processPlan(plan)
+    val op = rewrittenPlan.findOperatorForAlias("B")
+    op should be (Some(Foreach(Pipe("B"),Pipe("A"),
+      GeneratorList(List(GeneratorExpr(RefExpr(NamedField("x"))),
+        GeneratorExpr(RefExpr(NamedField("y"))), GeneratorExpr(RefExpr(NamedField("z"))))))))
+  }
 }
