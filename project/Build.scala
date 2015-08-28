@@ -75,7 +75,8 @@ object Dependencies {
   val graphCore = "com.assembla.scala-incubator" %% "graph-core" % "1.9.2"
   val sparkCore = "org.apache.spark" %% "spark-core" % "1.4.1"
   val sparkSql = "org.apache.spark" %% "spark-sql" % "1.4.1"
-  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.9.0"
+//  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.9.0"
+  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10-SNAPSHOT"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
@@ -87,7 +88,8 @@ object Dependencies {
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
 
-  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.9.0.jar"
+//  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.9.0.jar"
+  val flinkAddress = "file:///home/blaze/Masterthesis/projects/flink/build-target/lib/flink-dist-0.10-SNAPSHOT.jar"
   
   // Projects
   val rootDeps = Seq(

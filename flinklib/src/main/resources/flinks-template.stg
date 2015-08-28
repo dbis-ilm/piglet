@@ -59,18 +59,31 @@ filterHelper(params) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element ------------
-foreach(out,in,expr,windowMode) ::=<<
+foreach(out,in,expr,aggrs,windowMode) ::=<<
 <if(windowMode)>
     val <out> = <in>.mapWindow(custom<out>Map _)
 <else>
+    <if (aggrs)>
+    val <out> = <in>.mapWithState(PigFuncs.streamFunc(<aggrs>)).map(t => <expr>)
+    <else>
     val <out> = <in>.map(t => <expr>)
+    <endif>
+<! 
+    val <out> = <in><aggrs,fields:{ a,f |<\\>
+    .mapWithState(PigFuncs.stream<a>(<f>))<\\>
+    }><\\>
+    .map(t => <expr>)
+ !>
 <endif>
 >>
 
 foreachHelper(params) ::=<<
+<if(params.windowMode)>
     def custom<params.out>Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
       ts.foreach { t => out.collect(<params.expr>)}
     }
+<else>    
+<endif>
 >>
 
 // ----- Executes an expression FOREACH input element requiring a flatMap -----
@@ -84,7 +97,7 @@ groupBy(out,in,expr,windowMode) ::=<<
   <if(windowMode)>
     val <out> = <in>.groupBy(t => <expr>).mapWindow(custom<out>Map _)
   <else>
-    val <out> = <in>.groupBy(t => <expr>).map(t => List(<expr>,List(t)))
+    val <out> = <in>.map(t => List((<expr>),List(t))).groupBy(t => t(0)) <! <expr>) !>
   <endif>
 <else>
     val <out> = <in>

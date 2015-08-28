@@ -649,7 +649,7 @@ object Rules {
 
   def foreachGenerateWithAsterisk(term: Any): Option[Foreach] = {
     term match {
-      case op @Foreach(_, _, gen, _) => gen match {
+      case op @Foreach(_, _, gen, _, _) => gen match {
         case GeneratorList(exprs) => {
           if (exprs.size == 1 && exprs.head.expr.isInstanceOf[RefExpr]) {
             val ref = exprs.head.expr.asInstanceOf[RefExpr]

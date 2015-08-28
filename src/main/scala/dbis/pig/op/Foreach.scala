@@ -58,7 +58,11 @@ case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
  * @param initialInPipeName the name of the input pipe
  * @param generator the generator (a list of expressions or a subplan)
  */
-case class Foreach(out: Pipe, in: Pipe, generator: ForeachGenerator, var windowMode: Boolean = false) extends PigOperator {
+case class Foreach(out: Pipe,
+                   in: Pipe,
+                   generator: ForeachGenerator,
+                   streaming: Boolean = false,
+                   var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 
@@ -243,6 +247,16 @@ class RefExprExtractor {
     case _ => true
   }
 }
+
+class FuncExtractor {
+  val funcs = ListBuffer[Func]()
+
+  def collectFuncExprs(schema: Schema, ex: Expr): Boolean = ex match {
+    case Func(f, params) => funcs += ex.asInstanceOf[Func]; true
+    case _ => true
+  }
+}
+
 /**
  * GENERATE represents the final generate statement inside a nested FOREACH.
  *

@@ -355,6 +355,11 @@ class PigParser extends JavaTokenParsers {
       case out ~ _ ~ _ ~ in ~ ex => new Foreach(Pipe(out), Pipe(in), ex)
     }
 
+  def foreachStreamingStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~
+    (plainForeachGenerator | nestedForeachGenerator) ^^ {
+      case out ~ _ ~ _ ~ in ~ ex => new Foreach(Pipe(out), Pipe(in), ex, streaming=true)
+    }
+
   /*
    * <A> = FILTER <B> BY <Predicate>
    */
@@ -611,7 +616,7 @@ class PigParser extends JavaTokenParsers {
         case _ ~ b ~ _ ~ addr ~ _ ~ mode => SocketWrite(Pipe(b), addr, mode)
       }
 
-  def streamingStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
+  def streamingStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStreamingStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | socketReadStmt | socketWriteStmt | windowStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
     case op ~ _  => op }

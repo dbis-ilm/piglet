@@ -462,7 +462,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
         RefExpr(PositionalField(0)),
         RefExpr(Value("\"field2\"")),
         RefExpr(PositionalField(1)))))
-      )),true)
+      )),windowMode=true)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.mapWindow(customaMap _)")
@@ -479,13 +479,21 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
 
   it should "contain code for a FOREACH statement with another function expression" in {
     // a = FOREACH b GENERATE $0, COUNT($1) AS CNT;
+
     val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
       GeneratorExpr(RefExpr(PositionalField(0))),
       GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType)))
       )))
+    
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+                                                    Field("f2", Types.IntType)))))
+    val file = new java.net.URI("input/file.csv")
+    val input = Pipe("b",Load(Pipe("b"), file, Some(schema), "PigStream", List("\",\"")))
+    op.inputs=List(input)
+    
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b.map(t => List(t(0),PigFuncs.count(t(1).asInstanceOf[Seq[Any]])))")
+    val expectedCode = cleanString("""val a = b.mapWithState(PigFuncs.streamFunc(List(("COUNT", List(1))))).map(t => List(t(0),t(2)))""")
     assert(generatedCode == expectedCode)
   }
 
@@ -532,7 +540,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List(PositionalField(0))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b.groupBy(t => t(0)).map(t => List(t(0),List(t)))")
+    val expectedCode = cleanString("val a = b.map(t => List((t(0)),List(t))).groupBy(t => t(0))")
     assert(generatedCode == expectedCode)
   }
 

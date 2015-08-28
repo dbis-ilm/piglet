@@ -24,6 +24,7 @@ import dbis.pig.schema._
 import dbis.pig.udf._
 
 import java.net.URI
+import scala.collection.mutable.ListBuffer
 
 import org.clapper.scalasti._
 
@@ -156,6 +157,57 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
     case _ => -1
   }
 
+  def extractAggregates(node: PigOperator, gen: ForeachGenerator): Tuple3[PigOperator, ForeachGenerator, List[String]]= {
+    val udfs = ListBuffer.empty[String]
+
+    var exprs = gen match {
+      case GeneratorList(expr) => expr
+      case GeneratorPlan(plan) => plan.last.asInstanceOf[Generate].exprs
+    }
+
+    var posCounter=0
+    exprs = exprs.map( e => e.expr match {
+      case Func(f, params) => {
+        val pTypes = params.map(p => {p.resultType(node.inputSchema)._2})
+        UDFTable.findUDF(f, pTypes) match {
+          case Some(udf) if (udf.isAggregate) => {
+            if(node.inputSchema == None) throw new SchemaException(s"unknown input schema for node $node")
+            val newExpr = params.head.asInstanceOf[RefExpr].r match {
+              case NamedField(f) => {
+                udfs += s"""("${udf.name}" ,List(${node.inputSchema.get.indexOfField(f)}))"""
+                PositionalField(node.inputSchema.get.fields.size + posCounter)
+              }
+              case PositionalField(pos) => {
+                udfs += s"""("${udf.name}", List(${pos}))"""
+                PositionalField(node.inputSchema.get.fields.size + posCounter)
+              }
+              case DerefTuple(r1, r2) => {
+                udfs += s"""("${udf.name}", List(${emitRef(node.inputSchema, r1, "", false)}, ${emitRef(tupleSchema(node.inputSchema, r1), r2, "", false)}))"""
+                DerefTuple(r1, PositionalField(tupleSchema(node.inputSchema, r1).get.fields.size + posCounter))
+              }
+              case _ => ???
+            }
+            posCounter=posCounter+1
+            GeneratorExpr(RefExpr(newExpr), e.alias)
+          }
+          case _ => GeneratorExpr(e.expr, e.alias)
+        }
+      }
+      case _ => GeneratorExpr(e.expr, e.alias)
+    })
+    val newGen = gen match {
+      case GeneratorList(expr) => GeneratorList(exprs)
+      case GeneratorPlan(plan) => {
+        var newPlan = plan
+        newPlan = newPlan.updated(newPlan.size-1, Generate(exprs))
+        node.asInstanceOf[Foreach].subPlan = Option(new DataflowPlan(newPlan))
+        GeneratorPlan(newPlan)
+      }
+    }
+    //println(newGen)
+    (node, newGen, udfs.toList)
+  }
+
 
   /*------------------------------------------------------------------------------------------------- */
   /*                                  Scala-specific code generators                                  */
@@ -197,8 +249,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
     case PositionalField(pos) => s"$tuplePrefix($pos)"
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
-    // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
-    case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
+     case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
+    //case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]](0).asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
     case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
     case _ => { "" }
   }
@@ -427,23 +479,24 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
           callST("groupByHelper", Map("params"->params))
         } else ""
       }
-      case Foreach(out, in, gen, windowMode) => { 
-        if (windowMode){
+      case Foreach(out, in, gen, streaming, windowMode) => {
+        //if (streaming) {
+        if (templateFile.contains("flinks")) {
           var params = Map[String,Any]()
           params += "out"->node.outPipeName
           params += "expr"->emitForeachExpr(node, gen)
+          if (windowMode) params += "windowMode"->true
           callST("foreachHelper", Map("params"->params))
         } else ""
       }
-      case Filter(out, in, pred, windowMode) => { 
-        if (windowMode){
+      case Filter(out, in, pred, windowMode) => {
+        if(windowMode){
           var params = Map[String,Any]()
           params += "out"->node.outPipeName
           params += "pred"->emitPredicate(node.schema, pred)
           callST("filterHelper", Map("params"->params))
         } else ""
       }
-
       case _ => ""
     }
   }
@@ -556,22 +609,41 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @param out name of the output bag
    * @param in name of the input bag
    * @param gen the generate expression
+   * @param streaming true when working with a streaming data flow
    * @param windowMode true if operator is called within a window environment
    * @return the Scala code implementing the FOREACH operator
    */
-  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator, windowMode: Boolean): String = {
+  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator, streaming: Boolean, windowMode: Boolean): String = {
     // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
+    
+    var generator = gen
+    var foreachNode = node
+    var aggrs: String = ""
+
+//    if (streaming && !windowMode) {
+    if (templateFile.contains("flinks") && !windowMode){
+      val exAggrs: Tuple3[PigOperator,ForeachGenerator, List[String]] = extractAggregates(node,gen)
+      generator = exAggrs._2
+      foreachNode = exAggrs._1
+      if (!exAggrs._3.isEmpty) aggrs = exAggrs._3.toString
+    }
+
+    val expr = emitForeachExpr(foreachNode, generator)
+
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     if (requiresFlatMap)
       if (windowMode)
-        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->emitForeachExpr(node, gen),"windowMode"->windowMode))
+        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->expr,"windowMode"->windowMode))
       else
-        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->emitForeachExpr(node, gen)))
+        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->expr))
     else
       if (windowMode)
-        callST("foreach", Map("out"->out,"in"->in,"expr"->emitForeachExpr(node, gen),"windowMode"->windowMode))
+        callST("foreach", Map("out"->out,"in"->in,"expr"->expr,"windowMode"->windowMode))
       else
-        callST("foreach", Map("out"->out,"in"->in,"expr"->emitForeachExpr(node, gen)))
+        if (aggrs == "")
+          callST("foreach", Map("out"->out,"in"->in,"expr"->expr))
+        else
+          callST("foreach", Map("out"->out,"in"->in,"expr"->expr,"aggrs"->aggrs))
   }
   
   /**
@@ -741,7 +813,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case Store(in, file, func, params) => emitStore(node.inPipeName, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outPipeName, node.inPipeName, pred, windowMode)
-      case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outPipeName, node.inPipeName, gen, windowMode)
+      case Foreach(out, in, gen, streaming,windowMode) => emitForeach(node, node.outPipeName, node.inPipeName, gen, streaming, windowMode)
       case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outPipeName, node.inPipeName, groupExpr, windowMode)
       case Distinct(out, in, windowMode) => emitDistinct(node.outPipeName, node.inPipeName, windowMode)
       case Limit(out, in, num) => emitLimit(node.outPipeName, node.inPipeName, num)
