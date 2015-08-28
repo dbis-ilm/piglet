@@ -714,32 +714,14 @@ object Rules {
         return None
       }
 
-      val anyTripleHasMoreThanOneNamedField = namedFields.toList.map {
-        _ match {
-          case (Some(NamedField(_)), Some(NamedField(_)), _) => true
-          case (Some(NamedField(_)), _, Some(NamedField(_))) => true
-          case (_, Some(NamedField(_)), Some(NamedField(_))) => true
-          case _ => false
-        }
-      }.exists(_ == true)
-
-      if(anyTripleHasMoreThanOneNamedField) {
-        // One of the triples has multiple NamedFields, so it's not a star join
+      if (!RDF.isStarJoin(patterns)) {
         return None
       }
 
       // We'll reuse in later on, so we need to remove `op` from its consumers
       in.removeConsumer(op)
 
-      val fieldname = namedFields map {
-        case (Some(n@ NamedField(_)), _, _) => n
-        case (_, Some(n @ NamedField(_)), _) => n
-        case (_, _, Some(n @ NamedField(_))) => n
-        // The early returns in this method should cover all cases where the above 3 cases would not be exhaustive,
-        // so just throw an exception if they're not.
-        case _ => throw new IllegalStateException("This code should not have been reached, you've found a bug")
-      } head
-
+      val fieldname = RDF.starJoinColumn(patterns).get._2
       val filters = patterns map {p => BGPFilter(Pipe(generate), in, List(p))}
       val join = Join(out,
                       filters map {f => Pipe(f.outPipeName, f)},

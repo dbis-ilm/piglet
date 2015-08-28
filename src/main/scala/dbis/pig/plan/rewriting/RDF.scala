@@ -18,6 +18,7 @@ package dbis.pig.plan.rewriting
 
 import dbis.pig.op.{NamedField, Ref, Value, TriplePattern}
 import dbis.pig.plan.rewriting.Column.Column
+import scala.collection.mutable.Map
 
 /** An enumeration of the three columns in RDF data - subject, predicate and object.
   *
@@ -85,5 +86,67 @@ object RDF {
     isBound(pattern.subj, Column.Subject) ++
       isBound(pattern.pred, Column.Predicate) ++
       isBound(pattern.obj, Column.Object)
+  }
+
+  /** Build a map of ([[Column]], [[NamedField]]) to the number of their occurences in ``patterns``.
+    */
+  private def buildStarJoinMap(patterns: List[TriplePattern]): Map[(Column.Value, NamedField), Int] = {
+    // We count how often each (Column, NamedField) tuple appears in each pattern. If, at the end, a single tuple
+    // appears as often as patterns is long, the same variable appears in the same position in each pattern,
+    // therefore patterns form a star join.
+    val variableInPosition  = Map[(Column.Value, NamedField), Int]().withDefaultValue(0)
+    patterns foreach {pattern: TriplePattern =>
+      if (pattern.subj.isInstanceOf[NamedField]) {
+        val key = (Column.Subject, pattern.subj.asInstanceOf[NamedField])
+        variableInPosition(key) = variableInPosition(key) + 1
+      }
+
+      if (pattern.pred.isInstanceOf[NamedField]) {
+        val key = (Column.Subject, pattern.pred.asInstanceOf[NamedField])
+        variableInPosition(key) = variableInPosition(key) + 1
+      }
+
+      if (pattern.obj.isInstanceOf[NamedField]) {
+        val key = (Column.Subject, pattern.obj.asInstanceOf[NamedField])
+        variableInPosition(key) = variableInPosition(key) + 1
+      }
+    }
+
+    variableInPosition
+  }
+
+  /** Returns the [[dbis.pig.plan.rewriting.Column.Column]] and [[dbis.pig.op.NamedField]] of the star join column in ``patterns`` or None if it's not a star join.
+    *
+    * If two variables appear in the same position in all ``patterns``, None will be returned
+    * @param patterns
+    * @return
+    */
+  def starJoinColumn(patterns: List[TriplePattern]): Option[(Column, NamedField)] = {
+    val variableInPosition = buildStarJoinMap(patterns)
+    var column: Option[(Column, NamedField)] = None
+
+    variableInPosition foreach { case ((col, namedfield), count) =>
+     if (count == patterns.length) {
+       if (column.isDefined) {
+         // There's already a namedfield which appears pattern.length times in the same position
+         return None
+       }
+
+       column = Some((col, namedfield))
+     }
+    }
+
+    column
+  }
+
+    /** Returns true if ``patterns`` form a star join
+      *
+      * ``patterns`` form a star join if the same [[dbis.pig.op.NamedField]] is used in the same position in each
+      * pattern.
+      */
+  def isStarJoin(patterns: List[TriplePattern]): Boolean = {
+    buildStarJoinMap(patterns).foldLeft(false) { case (old, ((_, _), count)) =>
+      old || count == patterns.length
+    }
   }
 }
