@@ -37,14 +37,23 @@ object PipeNameGenerator {
     */
   final lazy val numChars = characters.length
 
+  /** The prefix of the pipe name.
+    *
+    */
+  final val prefix = "pipe"
+
   /** Generate a pipe name of the specified `length`.
     *
     * @param length
     * @return
     */
-  def generate(length: Int): String = length match {
-    case 0 => ""
-    case n => characters(Random.nextInt(numChars)).toString ++ generate(n-1)
+  def generate(length: Int): String = prefix ++ recGenerate(length)
+
+  private def recGenerate(length: Int): String = {
+    length match {
+      case 0 => ""
+      case n => characters(Random.nextInt(numChars)).toString ++ recGenerate(n - 1)
+    }
   }
 
   /** Generate a pipe name of length [[length]].
