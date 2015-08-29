@@ -527,7 +527,7 @@ object Rules {
       }
 
       // If not, this rule doesn't apply
-      if (!applies) {
+      if (!(applies && bound_columns.length == 2)) {
         return None
       }
 
