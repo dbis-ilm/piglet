@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{NamedField, Ref, Value, TriplePattern}
+import dbis.pig.op._
 import dbis.pig.plan.rewriting.Column.Column
 import scala.collection.mutable.Map
 
@@ -148,5 +148,21 @@ object RDF {
     buildStarJoinMap(patterns).foldLeft(false) { case (old, ((_, _), count)) =>
       old || count == patterns.length
     }
+  }
+
+  /** Converts multiple TriplePatterns to a String representation as a BGP.
+    *
+    * @param patterns
+    * @return
+    */
+  def triplePatternsToString(patterns: Seq[TriplePattern]): String = {
+    def columnToString(column: Ref): String = column match {
+      case NamedField(n) => s"?$n"
+      case PositionalField(p) => s"$$$p"
+      case Value(v) => s"""$v"""
+    }
+    "{ " + patterns.map { p: TriplePattern =>
+      columnToString(p.subj) + " " + columnToString(p.pred) + " " + columnToString(p.obj)
+    }.mkString(" . ") + " }"
   }
 }
