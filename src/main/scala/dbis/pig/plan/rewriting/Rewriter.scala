@@ -164,7 +164,7 @@ object Rewriter extends LazyLogging {
     * @return
     */
   private def processPigOperator(sink: PigOperator, strategy: Strategy): Any = {
-    val rewriter = bottomup(attempt(strategy))
+    val rewriter = downup(attempt(strategy))
     rewrite(rewriter)(sink)
   }
 

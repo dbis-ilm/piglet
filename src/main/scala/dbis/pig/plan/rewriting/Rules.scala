@@ -232,7 +232,7 @@ object Rules {
   //noinspection ScalaDocMissingParameterDescription
   def R2(parent: RDFLoad, child: BGPFilter): Option[Load] = {
     Some(Load(child.out, parent.uri, parent.schema, "pig.SPARQLLoader",
-      List(child.patterns.head.toString))
+      List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(child.patterns)))
     )
   }
 

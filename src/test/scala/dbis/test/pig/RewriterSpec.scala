@@ -227,9 +227,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val op3 = Dump(Pipe("b"))
     val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
     val source = plan.sourceNodes.headOption.value
-    assume(false, "The conversion of TriplePatterns to Strings is not yet implemented")
     source shouldBe Load(Pipe("b"), "http://example.com", op1.schema, "pig.SPARQLLoader",
-      List("""SELECT * WHERE { $0 "firstName" "Stefan" }"""))
+      List("""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }"""))
   }
 
   it should "apply rewriting rule L2" in {
