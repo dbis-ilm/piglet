@@ -210,6 +210,11 @@ object Rules {
   //noinspection ScalaDocMissingParameterDescription
   def R1(term: Any): Option[Load] = term match {
     case op@RDFLoad(p, uri, None) =>
+      // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
+      if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
+        return None
+      }
+
       if (uri.getScheme == "http" || uri.getScheme == "https") {
         Some(Load(p, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
       } else {
