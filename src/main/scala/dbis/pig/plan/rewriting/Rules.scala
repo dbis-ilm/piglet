@@ -143,7 +143,7 @@ object Rules {
     *         Filters, None otherwise.
     */
   def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] =
-    Some(Filter(child.out, parent.in, And(parent.pred, child.pred)))
+    Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
 
   def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
     case node@SplitInto(inPipeName, splits) =>
@@ -231,7 +231,8 @@ object Rules {
     */
   //noinspection ScalaDocMissingParameterDescription
   def R2(parent: RDFLoad, child: BGPFilter): Option[Load] = {
-    Some(Load(child.out, parent.uri, parent.schema, "pig.SPARQLLoader",
+    val out = child.outputs.head
+    Some(Load(out, parent.uri, parent.schema, "pig.SPARQLLoader",
       List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(child.patterns)))
     )
   }
@@ -753,7 +754,7 @@ object Rules {
                   throw RewriterException("Rewriting * in GENERATE requires a schema")
                 val genExprs = op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
                 val newGen = GeneratorList(genExprs.toList)
-                val newOp = Foreach(op.out, op.in, newGen, op.windowMode)
+                val newOp = Foreach(op.outputs.head, op.inputs.head, newGen, op.windowMode)
                 newOp.constructSchema
                 return Some(newOp)
               }
