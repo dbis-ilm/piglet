@@ -18,6 +18,14 @@ case class RDFLoad(out: Pipe, uri: URI, grouped: Option[String]) extends PigOper
   } else {
     RDFLoad.plainSchema
   }
+
+  def BGPFilterIsReachable: Boolean = {
+    def isBGPFilter(op: PigOperator): Boolean = op match {
+      case _: BGPFilter => true
+      case _ => op.outputs.flatMap(_.consumer).map(isBGPFilter).exists(_ == true)
+    }
+    isBGPFilter(this)
+  }
 }
 
 object RDFLoad {

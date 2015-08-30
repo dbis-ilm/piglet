@@ -208,19 +208,25 @@ object Rules {
     * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
     */
   //noinspection ScalaDocMissingParameterDescription
-  def R1(term: Any): Option[Load] = term match {
-    case op@RDFLoad(p, uri, None) =>
-      // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
-      if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
-        return None
-      }
+  def R1(term: Any): Option[Load] = {
+    term match {
+      case op@RDFLoad(_, uri, None) =>
+        // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
+        if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
+          return None
+        }
 
-      if (uri.getScheme == "http" || uri.getScheme == "https") {
-        Some(Load(p, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
-      } else {
-        None
-      }
-    case _ => None
+        if (op.BGPFilterIsReachable) {
+          return None
+        }
+
+        if (uri.getScheme == "http" || uri.getScheme == "https") {
+          Some(Load(op.outputs.head, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
+        } else {
+          None
+        }
+      case _ => None
+    }
   }
 
   /** Applies rewriting rule R2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
