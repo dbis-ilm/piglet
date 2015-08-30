@@ -230,17 +230,43 @@ object Rules {
   }
 
   /** Applies rewriting rule R2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
-    *
-    * @param parent
-    * @param child
-    * @return
     */
   //noinspection ScalaDocMissingParameterDescription
-  def R2(parent: RDFLoad, child: BGPFilter): Option[Load] = {
-    val out = child.outputs.head
-    Some(Load(out, parent.uri, parent.schema, "pig.SPARQLLoader",
-      List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(child.patterns)))
-    )
+  def R2 = rulefs[RDFLoad] {
+    case op =>
+      /** Finds the next BGPFilter object reachable from ``op``.
+        */
+      def nextBGPFilter(op: PigOperator): Option[BGPFilter] = op match {
+        case bf@BGPFilter(_, _, _) => Some(bf)
+        // We need to make sure that each intermediate operator has only one successor - if it has multiple, we can't
+        // pull up the BGPFilter because its patterns don't apply to all successors of the RDFLoad
+        case _ : OrderBy | _ :Distinct | _ : Limit | _ : RDFLoad
+          if op.outputs.flatMap(_.consumer).length == 1 => op.outputs.flatMap(_.consumer).map(nextBGPFilter).head
+        case _ => None
+      }
+
+      val bf = nextBGPFilter(op)
+
+      if (bf.isDefined) {
+        // This is the function we'll use for replacing RDFLoad with Load
+        def replacer = buildOperatorReplacementStrategy { sop: Any =>
+          if (sop == op) {
+            Some(Load(op.outputs.head, op.uri, op.schema, "pig.SPARQLLoader",
+              List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(bf.get.patterns))))
+          } else {
+            None
+          }
+        }
+
+        // This is the function we'll use to remove the BGPFilter
+        def remover = topdown(attempt(removalStrategy(bf.get)))
+
+        val strategy = ior(replacer, remover)
+        strategy
+      }
+      else {
+        fail
+      }
   }
 
   /** Applies rewriting rule L2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -777,12 +803,12 @@ object Rules {
   def registerAllRules = {
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
-    merge[RDFLoad, BGPFilter](R2)
     reorder[OrderBy, Filter]
     addStrategy(buildBinaryPigOperatorStrategy(filterBeforeJoin))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
     addOperatorReplacementStrategy(R1)
+    addStrategy(R2)
     addOperatorReplacementStrategy(L2)
     addStrategy(F1)
     addOperatorReplacementStrategy(F2)

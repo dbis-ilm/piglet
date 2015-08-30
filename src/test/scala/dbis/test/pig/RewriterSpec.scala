@@ -218,17 +218,19 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
 
   it should "apply rewriting rule R2" in {
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
-    val op2 = BGPFilter(Pipe("b"), Pipe("a"),
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List(OrderBySpec(NamedField("subject"), OrderByDirection.DescendingOrder)))
+    val op3 = BGPFilter(Pipe("c"), Pipe("b"),
       List(
         TriplePattern(
           PositionalField(0),
           Value(""""firstName""""),
           Value(""""Stefan""""))))
-    val op3 = Dump(Pipe("b"))
-    val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
+    val op4 = Dump(Pipe("c"))
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
-    source shouldBe Load(Pipe("b"), "http://example.com", op1.schema, "pig.SPARQLLoader",
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, "pig.SPARQLLoader",
       List("""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }"""))
+    plan.operators should not contain op3
   }
 
   it should "apply rewriting rule L2" in {
