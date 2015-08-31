@@ -428,6 +428,7 @@ object Rewriter extends LazyLogging {
   def remove(plan: DataflowPlan, rem: PigOperator, removePredecessors: Boolean = false): DataflowPlan = {
     var strat = removalStrategy(rem)
 
+    var newPlan = processPlan(plan, strat)
     if (removePredecessors) {
       var nodes = Set[PigOperator]()
       var nodesToProcess = rem.inputs.map(_.producer).toSet
@@ -441,10 +442,9 @@ object Rewriter extends LazyLogging {
         }
       }
 
-      strat = nodes.foldLeft(strat) ((s: Strategy, p: PigOperator) => ior(s, removalStrategy(p)))
+      newPlan = nodes.foldLeft(newPlan) ((p: DataflowPlan, op: PigOperator) => processPlan(p, removalStrategy(op)))
     }
-
-    processPlan(plan, strat)
+    newPlan
   }
 
   /** Swap the positions of `op1` and `op2` in `plan`

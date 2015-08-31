@@ -143,7 +143,7 @@ object Rules {
     *         Filters, None otherwise.
     */
   def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] =
-    Some(Filter(child.out, parent.in, And(parent.pred, child.pred)))
+    Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
 
   def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
     case node@SplitInto(inPipeName, splits) =>
@@ -208,32 +208,65 @@ object Rules {
     * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
     */
   //noinspection ScalaDocMissingParameterDescription
-  def R1(term: Any): Option[Load] = term match {
-    case op@RDFLoad(p, uri, None) =>
-      // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
-      if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
-        return None
-      }
+  def R1(term: Any): Option[Load] = {
+    term match {
+      case op@RDFLoad(_, uri, None) =>
+        // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
+        if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
+          return None
+        }
 
-      if (uri.getScheme == "http" || uri.getScheme == "https") {
-        Some(Load(p, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
-      } else {
-        None
-      }
-    case _ => None
+        if (op.BGPFilterIsReachable) {
+          return None
+        }
+
+        if (uri.getScheme == "http" || uri.getScheme == "https") {
+          Some(Load(op.outputs.head, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
+        } else {
+          None
+        }
+      case _ => None
+    }
   }
 
   /** Applies rewriting rule R2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
-    *
-    * @param parent
-    * @param child
-    * @return
     */
   //noinspection ScalaDocMissingParameterDescription
-  def R2(parent: RDFLoad, child: BGPFilter): Option[Load] = {
-    Some(Load(child.out, parent.uri, parent.schema, "pig.SPARQLLoader",
-      List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(child.patterns)))
-    )
+  def R2 = rulefs[RDFLoad] {
+    case op =>
+      /** Finds the next BGPFilter object reachable from ``op``.
+        */
+      def nextBGPFilter(op: PigOperator): Option[BGPFilter] = op match {
+        case bf@BGPFilter(_, _, _) => Some(bf)
+        // We need to make sure that each intermediate operator has only one successor - if it has multiple, we can't
+        // pull up the BGPFilter because its patterns don't apply to all successors of the RDFLoad
+        case _ : OrderBy | _ :Distinct | _ : Limit | _ : RDFLoad
+          if op.outputs.flatMap(_.consumer).length == 1 => op.outputs.flatMap(_.consumer).map(nextBGPFilter).head
+        case _ => None
+      }
+
+      val bf = nextBGPFilter(op)
+
+      if (bf.isDefined) {
+        // This is the function we'll use for replacing RDFLoad with Load
+        def replacer = buildOperatorReplacementStrategy { sop: Any =>
+          if (sop == op) {
+            Some(Load(op.outputs.head, op.uri, op.schema, "pig.SPARQLLoader",
+              List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(bf.get.patterns))))
+          } else {
+            None
+          }
+        }
+
+        // This is the function we'll use to remove the BGPFilter
+        def remover = topdown(attempt(removalStrategy(bf.get)))
+
+        val strategy = ior(replacer, remover)
+        strategy
+      }
+      else {
+        fail
+      }
   }
 
   /** Applies rewriting rule L2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -450,7 +483,7 @@ object Rules {
       }
 
       val internalPipeName = generate
-      val intermediaResultName = generate
+      val intermediateResultName = generate
       val filter_by = Column.columnToNamedField(bound_column.get)
       val filter_value = bound_column.get match {
         case Column.Subject => pattern.subj
@@ -458,15 +491,17 @@ object Rules {
         case Column.Object => pattern.obj
       }
 
+      val bagConstructor = ConstructBag(Pipe("stmts"), DerefTuple(NamedField(in.name), NamedField("stmts")))
 
       val foreach =
-        Foreach(Pipe(internalPipeName), Pipe("a"), GeneratorPlan(List(
-          Filter(Pipe(intermediaResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
+        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
+          bagConstructor,
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
               GeneratorExpr(Func("COUNT",
-                List(RefExpr(NamedField(intermediaResultName)))),
+                List(RefExpr(NamedField(intermediateResultName)))),
                 Some(Field("cnt", Types.ByteArrayType))))))))
 
       val filter = Filter(out, Pipe(internalPipeName, foreach),
@@ -753,7 +788,7 @@ object Rules {
                   throw RewriterException("Rewriting * in GENERATE requires a schema")
                 val genExprs = op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
                 val newGen = GeneratorList(genExprs.toList)
-                val newOp = Foreach(op.out, op.in, newGen, op.windowMode)
+                val newOp = Foreach(op.outputs.head, op.inputs.head, newGen, op.windowMode)
                 newOp.constructSchema
                 return Some(newOp)
               }
@@ -770,12 +805,12 @@ object Rules {
   def registerAllRules = {
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
-    merge[RDFLoad, BGPFilter](R2)
     reorder[OrderBy, Filter]
     addStrategy(buildBinaryPigOperatorStrategy(filterBeforeJoin))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
     addOperatorReplacementStrategy(R1)
+    addStrategy(R2)
     addOperatorReplacementStrategy(L2)
     addStrategy(F1)
     addOperatorReplacementStrategy(F2)
