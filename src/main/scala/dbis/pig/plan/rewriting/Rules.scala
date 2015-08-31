@@ -494,7 +494,7 @@ object Rules {
       val bagConstructor = ConstructBag(Pipe("stmts"), DerefTuple(NamedField(in.name), NamedField("stmts")))
 
       val foreach =
-        Foreach(Pipe(internalPipeName), Pipe("a"), GeneratorPlan(List(
+        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
           bagConstructor,
           Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
           Generate(
