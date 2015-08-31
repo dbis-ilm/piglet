@@ -483,7 +483,7 @@ object Rules {
       }
 
       val internalPipeName = generate
-      val intermediaResultName = generate
+      val intermediateResultName = generate
       val filter_by = Column.columnToNamedField(bound_column.get)
       val filter_value = bound_column.get match {
         case Column.Subject => pattern.subj
@@ -494,12 +494,12 @@ object Rules {
 
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe("a"), GeneratorPlan(List(
-          Filter(Pipe(intermediaResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
               GeneratorExpr(Func("COUNT",
-                List(RefExpr(NamedField(intermediaResultName)))),
+                List(RefExpr(NamedField(intermediateResultName)))),
                 Some(Field("cnt", Types.ByteArrayType))))))))
 
       val filter = Filter(out, Pipe(internalPipeName, foreach),
