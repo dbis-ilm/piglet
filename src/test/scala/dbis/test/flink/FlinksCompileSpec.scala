@@ -559,6 +559,30 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     assert(generatedHelperCode == expectedHelperCode)
   }
 
+  /****************************/
+  /* Tests for STREAM THROUGH */
+  /****************************/
+  it should "contain code for the stream through statement without parameters" in {
+    // aa = STREAM bb THROUGH myOp
+    val op = StreamOp(Pipe("aa"), Pipe("bb"), "myOp")
+      val codeGenerator = new ScalaBackendGenCode(templateFile)
+      val generatedCode = cleanString(codeGenerator.emitNode(op))
+      val expectedCode = cleanString("""
+        |val aa = myOp(env, bb)""".stripMargin)
+      assert(generatedCode == expectedCode)
+    }
+
+    it should "contain code for the stream through statement with parameters" in {
+      // a = STREAM b THROUGH package.myOp(1, 42.0)
+      val op = StreamOp(Pipe("a"), Pipe("b"), "package.myOp", Some(List(Value("1"), Value(42.0))))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val a = package.myOp(env, b,1,42.0)""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+
   /*------------------------------------------------------------------------------------------------- */
   /*                              Testing of Stream Only Operators                                    */
   /*------------------------------------------------------------------------------------------------- */
@@ -566,7 +590,6 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
   /************************/
   /* Tests for SPLIT INTO */
   /************************/
-
   it should "contain code for SPLIT a INTO b IF f1==2, c IF f2>3" in {
     val op = SplitInto(Pipe("a"), List(SplitBranch(Pipe("b"),Eq(RefExpr(PositionalField(0)), RefExpr(Value(2)))),SplitBranch(Pipe("c"),Gt(RefExpr(PositionalField(1)), RefExpr(Value(3))))))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
@@ -577,5 +600,20 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
       |""".stripMargin)
     assert(generatedCode == expectedCode)
   }
+
+  /********************/
+  /* Tests for SAMPLE */
+  /********************/
+  it should "contain code for the SAMPLE operator with a literal value" in {
+    val op = Sample(Pipe("a"), Pipe("b"), RefExpr(Value("0.1")))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val a = b.filter(t => util.Random.nextDouble <= 0.1)
+      |""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+
 
 }

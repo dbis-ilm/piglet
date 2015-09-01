@@ -181,6 +181,10 @@ sample(out,in,expr) ::=<<
     val <out> = <in>.filter(t => util.Random.nextDouble \<= <expr>)
 >>
 
+// ------------------ STREAM operators ----------------------------------------
+streamOp(out,in,op,params) ::=<<
+    val <out> = <op>(env, <in><params>)
+>>
 
 // ------------------ Reads from a SOCKET -------------------------------------
 socketRead(out,addr,mode,func,params) ::=<<
