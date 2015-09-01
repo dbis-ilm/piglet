@@ -407,7 +407,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
   }
 
   /*------------------------------------------------------------------------------------------------- */
-  /*                                 Testing of Hybrid Operators                                     */
+  /*                                 Testing of Hybrid Operators                                      */
   /*------------------------------------------------------------------------------------------------- */
 
   /*******************/
@@ -558,4 +558,24 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
       |}""".stripMargin)
     assert(generatedHelperCode == expectedHelperCode)
   }
+
+  /*------------------------------------------------------------------------------------------------- */
+  /*                              Testing of Stream Only Operators                                    */
+  /*------------------------------------------------------------------------------------------------- */
+
+  /************************/
+  /* Tests for SPLIT INTO */
+  /************************/
+
+  it should "contain code for SPLIT a INTO b IF f1==2, c IF f2>3" in {
+    val op = SplitInto(Pipe("a"), List(SplitBranch(Pipe("b"),Eq(RefExpr(PositionalField(0)), RefExpr(Value(2)))),SplitBranch(Pipe("c"),Gt(RefExpr(PositionalField(1)), RefExpr(Value(3))))))
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val b = a.filter(t => {t(0) == 2})
+      |val c = a.filter(t => {t(1) > 3})
+      |""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
 }

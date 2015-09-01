@@ -316,6 +316,7 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
         case None => if (p > 0) throw SchemaException("invalid index $p in GENERATE")
       }
       case Value(v) => {} // okay
+      case DerefStreamingTuple(r1, r2) => {} // TODO: is r1 a valid ref?
       case DerefTuple(r1, r2) => {} // TODO: is r1 a valid ref?
       case DerefMap(r1, r2) => {} // TODO: is r1 a valid ref?
     })

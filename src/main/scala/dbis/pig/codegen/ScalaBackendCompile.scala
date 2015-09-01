@@ -183,7 +183,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
               }
               case DerefTuple(r1, r2) => {
                 udfs += s"""("${udf.name}", List(${emitRef(node.inputSchema, r1, "", false)}, ${emitRef(tupleSchema(node.inputSchema, r1), r2, "", false)}))"""
-                DerefTuple(r1, PositionalField(tupleSchema(node.inputSchema, r1).get.fields.size + posCounter))
+                DerefStreamingTuple(r1, PositionalField(tupleSchema(node.inputSchema, r1).get.fields.size + posCounter))
               }
               case _ => ???
             }
@@ -253,6 +253,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
     case DerefTuple(r1, r2) => 
       if (aggregate) s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]].map(e => e${emitRef(tupleSchema(schema, r1), r2, "", false)})"
       else s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
+    case DerefStreamingTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]](0)${emitRef(tupleSchema(schema, r1), r2, "", false)}"
     case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
     case _ => { "" }
   }
@@ -488,12 +489,11 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
         } else ""
       }
       case Foreach(out, in, gen, streaming, windowMode) => {
-        //if (streaming) {
-        if (templateFile.contains("flinks")) {
+        if (windowMode) {
           var params = Map[String,Any]()
           params += "out"->node.outPipeName
           params += "expr"->emitForeachExpr(node, gen)
-          if (windowMode) params += "windowMode"->true
+          params += "windowMode"->true
           callST("foreachHelper", Map("params"->params))
         } else ""
       }
@@ -852,6 +852,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case Store(in, file, func, params) => emitStore(node.inPipeName, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outPipeName, node.inPipeName, pred, windowMode)
+      case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))
       case Foreach(out, in, gen, streaming,windowMode) => emitForeach(node, node.outPipeName, node.inPipeName, gen, streaming, windowMode)
       case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outPipeName, node.inPipeName, groupExpr, windowMode)
       case Distinct(out, in, windowMode) => emitDistinct(node.outPipeName, node.inPipeName, windowMode)
@@ -868,19 +869,6 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inPipeName))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case Empty(_) => ""
-           
-      /*
-       case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
-       val s1 = s"""
-       |val split = ${rels.head}.split(${emitExpr(node.schema, expr)} match {
-           |  case true => List("1st")
-           |  case false => List("2nd")
-           |})
-         """.stripMargin
-         val s2 = rels.tail.map{rel => s"""val ${rel} = split.select("1st")"""}.mkString
-         s1 + s2
-       }
-       */
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
   }

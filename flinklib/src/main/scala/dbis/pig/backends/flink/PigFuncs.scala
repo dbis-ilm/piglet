@@ -108,7 +108,9 @@ object PigFuncs {
         case "AVG" => (0.0D, 0L)
         case "SUM" => (0.0D)
         case "COUNT" => (0L)
-      }})
+        case "MAX" => (Double.MinValue)
+        case "MIN" => (Double.MaxValue)
+    }})
 
     // Update state
     val updatedState = currentState.zip(fields).map{a => a._2._1 match {
@@ -118,7 +120,9 @@ object PigFuncs {
          avgState._2 + 1)
       }
       case "SUM" => (a._1.asInstanceOf[Double] +  in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[Int].toDouble)
-      case "COUNT" => (a._1.asInstanceOf[Long] + 1) 
+      case "COUNT" => (a._1.asInstanceOf[Long] + 1)
+      case "MAX" => Math.max(a._1.asInstanceOf[Double], in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[Int].toDouble)
+      case "MIN" => Math.min(a._1.asInstanceOf[Double], in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[Int].toDouble)
     }}
 
     // Update output Value
@@ -146,6 +150,8 @@ object PigFuncs {
         case "AVG" => (0.0D, 0L)
         case "SUM" => (0.0D)
         case "COUNT" => (0L)
+        case "MAX" => (Double.MinValue)
+        case "MIN" => (Double.MaxValue)
       }})
 
     // Update state
@@ -156,7 +162,9 @@ object PigFuncs {
          avgState._2 + 1)
       }
       case "SUM" => (a._1.asInstanceOf[Double] +  in(a._2._2(0)).asInstanceOf[Int].toDouble)
-      case "COUNT" => (a._1.asInstanceOf[Long] + 1) 
+      case "COUNT" => (a._1.asInstanceOf[Long] + 1)
+      case "MAX" => Math.max(a._1.asInstanceOf[Double], in(a._2._2(0)).asInstanceOf[Int].toDouble)
+      case "MIN" => Math.min(a._1.asInstanceOf[Double], in(a._2._2(0)).asInstanceOf[Int].toDouble)
     }}
 
     // Update output Value

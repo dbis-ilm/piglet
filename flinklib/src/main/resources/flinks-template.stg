@@ -58,6 +58,14 @@ filterHelper(params) ::=<<
     }
 >>
 
+// ------------------ SPLIT input INTO multiple outputs -----------------------
+splitInto(in,out,pred) ::=<<
+<out,pred:{ o,p |<\\>
+    val <o> = <in>.filter(t => {<p>\})
+}>
+>>
+
+
 // ------------------ Executes an expression FOREACH input element ------------
 foreach(out,in,expr,aggrs,windowMode) ::=<<
 <if(windowMode)>
@@ -68,12 +76,6 @@ foreach(out,in,expr,aggrs,windowMode) ::=<<
     <else>
     val <out> = <in>.map(t => <expr>)
     <endif>
-<! 
-    val <out> = <in><aggrs,fields:{ a,f |<\\>
-    .mapWithState(PigFuncs.stream<a>(<f>))<\\>
-    }><\\>
-    .map(t => <expr>)
- !>
 <endif>
 >>
 
@@ -173,6 +175,12 @@ cross(out,rel1,rel2,window,wUnit) ::=<<
 union(out,in,others) ::=<<
     val <out> = <in><others:{ e | .union(<e>)}>
 >>
+
+// ------------------ Outputs only a SAMPLE of the data -----------------------
+sample(out,in,expr) ::=<<
+    val <out> = <in>.filter(t => util.Random.nextDouble \<= <expr>)
+>>
+
 
 // ------------------ Reads from a SOCKET -------------------------------------
 socketRead(out,addr,mode,func,params) ::=<<

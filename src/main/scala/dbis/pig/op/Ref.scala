@@ -26,4 +26,6 @@ case class Value(v: Any) extends Ref
 
 case class DerefTuple(tref: Ref, component: Ref) extends Ref
 
+case class DerefStreamingTuple(tref: Ref, component: Ref) extends Ref
+
 case class DerefMap(mref: Ref, key: String) extends Ref

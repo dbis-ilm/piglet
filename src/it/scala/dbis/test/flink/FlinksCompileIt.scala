@@ -25,21 +25,23 @@ import scala.io.Source
 
 class FlinksCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
-    ("script",            "result",        "truth",              "inOrder"), // header of the table
-    ("load.pig",          "result1.out",   "truth/result1.data",  false),
-    ("load2.pig",         "result2.out",   "truth/result2.data",  false),
-    ("foreach1.pig",      "distances.out", "truth/distances.data",false),
-    ("filter.pig",        "filtered.out",  "truth/filtered.data", false),
-    ("construct.pig",     "result3.out",   "truth/result3.data",  false),
-    ("union.pig",         "united.out",    "truth/united.data",   false),
-    ("windowJoin.pig",    "joinedW.out",   "truth/joined.data",   false),
-    ("windowCross.pig",   "crossedW.out",  "truth/crossed.data",  false),
-    ("windowGrouping.pig","grouping.out",  "truth/grouping.data", false),
-    ("windowNforeach.pig","nested.out",    "truth/nested.data",   false),
-    ("windowFilter.pig",  "filtered.out",  "truth/filtered.data", false),
-    ("windowCount.pig",   "marycounts.out","truth/marycount.data",false),
-    ("windowDistinct.pig","unique.out",    "truth/unique.data",   false),
-    ("windowSort.pig",    "sorted.out",    "truth/sorted.data",   true)
+    ("script",            "result",        "truth",               "inOrder"), // header of the table
+    ("load.pig",          "result1.out",   "truth/result1.data",   false),
+    ("load2.pig",         "result2.out",   "truth/result2.data",   false),
+    ("foreach1.pig",      "distances.out", "truth/distances.data", false),
+    ("filter.pig",        "filtered.out",  "truth/filtered.data",  false),
+    ("construct.pig",     "result3.out",   "truth/result3.data",   false),
+    ("union.pig",         "united.out",    "truth/united.data",    false),
+    ("aggregate.pig",     "aggregate.out", "truth/aggregate2.data",false),
+    ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false),
+    ("windowJoin.pig",    "joinedW.out",   "truth/joined.data",    false),
+    ("windowCross.pig",   "crossedW.out",  "truth/crossed.data",   false),
+    ("windowGrouping.pig","grouping.out",  "truth/grouping.data",  false),
+    ("windowNforeach.pig","nested.out",    "truth/nested.data",    false),
+    ("windowFilter.pig",  "filtered.out",  "truth/filtered.data",  false),
+    ("windowCount.pig",   "marycounts.out","truth/marycount.data", false),
+    ("windowDistinct.pig","unique.out",    "truth/unique.data",    false),
+    ("windowSort.pig",    "sorted.out",    "truth/sorted.data",    true)
     //TODO: Sample, Split, Stream-Through, Hybrid-Operators
   )
 
