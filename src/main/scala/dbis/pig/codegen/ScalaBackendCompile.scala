@@ -171,7 +171,7 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
    * @param requiresTypeCast
    * @return
    */
-  def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true): String = ref match {
+  def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = ref match {
     case NamedField(f) => schema match {
       case Some(s) => {
         val idx = s.indexOfField(f)
@@ -188,7 +188,7 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
              * cast to string before, because if we load from a BinStorage, we only get Any types
              * that do not have a toInt or toDouble conversion method
              */
-            s"${tuplePrefix}(${idx})${if(typeCast != "String") ".toString" else ""}.to${typeCast}"
+            s"${tuplePrefix}(${idx}).asInstanceOf[${typeCast}]"
           }
           else
             s"${tuplePrefix}(${idx})"
@@ -200,7 +200,9 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
-    case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
+    case DerefTuple(r1, r2) => 
+      if (aggregate) s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]].map(e => e${emitRef(tupleSchema(schema, r1), r2, "", false)})"
+      else s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
     case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
     case _ => { "" }
   }
@@ -261,7 +263,7 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
    * @param requiresTypeCast
    * @return
    */
-  def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true): String = expr match {
+  def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
       val targetType = scalaTypeMappingTable(t)
@@ -273,12 +275,18 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
     case Minus(e1, e2) => s"${emitExpr(schema, e1)} - ${emitExpr(schema, e2)}"
     case Mult(e1, e2) => s"${emitExpr(schema, e1)} * ${emitExpr(schema, e2)}"
     case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
-    case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast)}"
+    case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast, aggregate)}"
     case Func(f, params) => {
       val pTypes = params.map(p => {p.resultType(schema)._2})
       UDFTable.findUDF(f, pTypes) match {
-        case Some(udf) => { if (udf.isAggregate) s"${udf.scalaName}(${emitExpr(schema, params.head, false)}.asInstanceOf[Seq[Any]])"
-                            else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+        case Some(udf) => { 
+          if (udf.isAggregate) {
+            if (!f.equalsIgnoreCase("count"))
+              s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)}.map(e => e.asInstanceOf[Number].doubleValue))"
+            else
+               s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)}.asInstanceOf[Seq[Any]])"  
+          }
+          else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
         }
         case None => {
           // check if we have have an alias in DataflowPlan
@@ -637,6 +645,16 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
 
   }
   
+  private def getFieldTypes(s: Schema): String = {
+      val fieldList = s.fields.zipWithIndex
+      val castList = fieldList.map { case (f, i) => ( 
+          if (f.fType == Types.CharArrayType || f.fType == Types.ByteArrayType) 
+            s"t($i)" 
+          else  
+            s"t($i).to${scalaTypeMappingTable(f.fType)}"
+      ) }
+      castList.mkString(",")
+  }
   /**
    * Generates code for the LOAD operator.
    *
@@ -646,13 +664,34 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
    * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
    * @return the Scala code implementing the LOAD operator
    */
-  def emitLoad(out: String, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
+  def emitLoader(out: String, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
     if (loaderFunc == "")
       callST("loader", Map("out"->out,"file"->file.toString()))
     else {
       val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams.mkString(",") else ""
       callST("loader", Map("out"->out,"file"->file.toString(),"func"->loaderFunc,"params"->params))
     }
+  }
+  
+  /**
+   * Generates code for the LOAD operator.
+   *
+   * @param node the load node operator itself
+   * @param file the name of the file to be loaded
+   * @param loaderFunc an optional loader function (we assume a corresponding Scala function is available)
+   * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
+   * @return the Scala code implementing the LOAD operator
+   */
+  def emitLoad(node: PigOperator, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
+    node.schema match {
+      case Some(s) => {
+        val op = emitLoader(s"${node.outPipeName}_", file, loaderFunc, loaderParams) 
+        op +"\n" +callST("foreach", Map("out"->node.outPipeName,"in"->s"${node.outPipeName}_","expr"->s"List(${getFieldTypes(s)})"))
+      }
+      case None => {
+        emitLoader(node.outPipeName, file, loaderFunc, loaderParams)
+      }
+    }   
   }
 
   /**
@@ -757,7 +796,7 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
          * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
          *       after changing the pipe name. Instead, use node.outPipeName
          */
-      case Load(out, file, schema, func, params) => emitLoad(node.outPipeName, file, func, params)
+      case Load(out, file, schema, func, params) => emitLoad(node, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inputs.head.name))
       case Store(in, file, func, params) => emitStore(node.inputs.head.name, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""

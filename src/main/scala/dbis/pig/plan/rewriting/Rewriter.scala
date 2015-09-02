@@ -164,7 +164,7 @@ object Rewriter extends LazyLogging {
     * @return
     */
   private def processPigOperator(sink: PigOperator, strategy: Strategy): Any = {
-    val rewriter = bottomup(attempt(strategy))
+    val rewriter = downup(attempt(strategy))
     rewrite(rewriter)(sink)
   }
 
@@ -262,7 +262,7 @@ object Rewriter extends LazyLogging {
     * @tparam T2 The type of the child operator.
     */
   //noinspection ScalaDocMissingParameterDescription
-  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[Tuple2[T2, T]]):
+  def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[(T2, T)]):
   Unit = {
     val strategy = (parent: T, child: T2) =>
       f(parent, child).map(tup => fixInputsAndOutputs(tup._2, tup._1, tup._1, tup._2))
@@ -428,6 +428,7 @@ object Rewriter extends LazyLogging {
   def remove(plan: DataflowPlan, rem: PigOperator, removePredecessors: Boolean = false): DataflowPlan = {
     var strat = removalStrategy(rem)
 
+    var newPlan = processPlan(plan, strat)
     if (removePredecessors) {
       var nodes = Set[PigOperator]()
       var nodesToProcess = rem.inputs.map(_.producer).toSet
@@ -441,10 +442,9 @@ object Rewriter extends LazyLogging {
         }
       }
 
-      strat = nodes.foldLeft(strat) ((s: Strategy, p: PigOperator) => ior(s, removalStrategy(p)))
+      newPlan = nodes.foldLeft(newPlan) ((p: DataflowPlan, op: PigOperator) => processPlan(p, removalStrategy(op)))
     }
-
-    processPlan(plan, strat)
+    newPlan
   }
 
   /** Swap the positions of `op1` and `op2` in `plan`

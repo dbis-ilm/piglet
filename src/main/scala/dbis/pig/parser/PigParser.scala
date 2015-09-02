@@ -150,14 +150,26 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def mapConstructor: Parser[ArithmeticExpr] = "[" ~ repsep(arithmExpr, ",") ~ "]"  ^^ { case _ ~ l ~ _ => ConstructMapExpr(l) }
   def typeConstructor: Parser[ArithmeticExpr] = (tupleConstructor | bagConstructor | mapConstructor)
 
-  def comparisonExpr: Parser[Predicate] = arithmExpr ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ arithmExpr ^^ {
-    case a ~ op ~ b => op match {
+  def comparisonExpr: Parser[Predicate] = arithmExpr ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ (arithmExpr |
+    pigStringLiteral ) ^^ {
+    case a ~ op ~ (b: ArithmeticExpr) => op match {
       case "==" => Eq(a, b)
       case "!=" => Neq(a, b)
       case "<" => Lt(a, b)
       case "<=" => Leq(a, b)
       case ">" => Gt(a, b)
       case ">=" => Geq(a, b)
+    }
+    case a ~ op ~ (b: String) => {
+      val b_val = RefExpr(Value(unquote(b)))
+      op match {
+        case "==" => Eq(a, b_val)
+        case "!=" => Neq(a, b_val)
+        case "<" => Lt(a, b_val)
+        case "<=" => Leq(a, b_val)
+        case ">" => Gt(a, b_val)
+        case ">=" => Geq(a, b_val)
+      }
     }
   }
 

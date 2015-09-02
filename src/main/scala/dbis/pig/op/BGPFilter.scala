@@ -44,7 +44,6 @@ case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends
   schema = inputSchema
 
   override def constructSchema: Option[Schema] = {
-    // TODO
     schema
   }
 }
