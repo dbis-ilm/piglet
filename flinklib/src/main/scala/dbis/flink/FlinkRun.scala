@@ -33,31 +33,37 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.net.InetSocketAddress
 
+import com.typesafe.scalalogging.LazyLogging
 
-class FlinkRun extends PigletBackend {
+class FlinkRun extends PigletBackend with LazyLogging {
   
-  override def execute(master: String, className: String, jarFile: Path){
+  override def execute(master: String, className: String, jarFile: Path, numExecutors: Int){
     if (master.startsWith("local") && !master.startsWith("localhost")){
 //      val cli = new CliFrontend
 //      val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
-      submitJar("localhost:6123", jarFile, className)
+      submitJar("localhost:6123", numExecutors, jarFile, className)
     }
     else {
 //      val cli = new CliFrontend
 //      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
-      submitJar(master, jarFile, className)
+      submitJar(master, numExecutors, jarFile, className)
     }
   }
 
-  def submitJar(master: String, path: Path, className: String, args: String*) = { 
-    val file = new File(path.toString())
-    val parallelism = 1 
+  override def executeRaw(file: Path, master: String, numExecutors: Int) = ???
+  
+  def submitJar(master: String, numExecutors: Int, path: Path, className: String, args: String*) = { 
+    val file = path.toFile().getAbsoluteFile()
+    val parallelism = if(numExecutors <= 0) 1 else numExecutors 
     val wait = true
     try { 
+      logger.debug(s"submitting $file")
       val program = new PackagedProgram(file, className, args:_*)
       val jobManagerAddress = getInetFromHostport(master)
-      val client = new Client(jobManagerAddress, new Configuration(), program.getUserCodeClassLoader(), 1)  
-      println("Executing " + path.toString()); 
+      logger.debug(s"using job manager at $jobManagerAddress  for name $master")
+      val client = new Client(jobManagerAddress, new Configuration(), program.getUserCodeClassLoader(), 1)
+      logger.debug(s"created job client: $client")
+      println(s"Executing ${path.toString}"); 
       client.run(program, parallelism, wait); 
     } catch {
       case e: ProgramInvocationException => e.printStackTrace()

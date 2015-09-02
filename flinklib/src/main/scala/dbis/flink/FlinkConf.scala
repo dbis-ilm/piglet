@@ -28,4 +28,5 @@ class FlinkConf extends BackendConf {
   
   override def templateFile: String = appconf.getString("backends.flink.template")
   
+  override def raw = false
 }

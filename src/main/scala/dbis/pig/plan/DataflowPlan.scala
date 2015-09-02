@@ -30,8 +30,6 @@ import scala.collection.mutable.{ListBuffer, Map}
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
 class DataflowPlan(var operators: List[PigOperator]) {
-  // private var graph = Graph[PigOperator,DiEdge]()
-
   /**
    * A list of JAR files specified by the REGISTER statement
    */
@@ -59,7 +57,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
     val pipes: Map[String, Pipe] = Map[String, Pipe]()
 
     /*
-     * 0. We remove all REGISTER and DEFINE operators: they are just pseudo-operators.
+     * 0. We remove all REGISTER, DEFINE and SET operators: they are just pseudo-operators.
      *    Instead, we add their arguments to the additionalJars list and udfAliases map
      */
     ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
@@ -68,8 +66,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
     }
 
-    val planOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd])
-
+    val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd])
+    val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])
     /*
      * 1. We create a Map from names to the pipes that *write* them.
      */
@@ -121,6 +119,20 @@ class DataflowPlan(var operators: List[PigOperator]) {
   }
 
   /**
+   * Looks for SetCmd operators in the operator list and apply the parameter to
+   * each subsequent operator in the list.
+   */
+  def processSetCmds(opList: List[PigOperator]): List[PigOperator] = {
+    val currentParams: Map[String, Any] = Map()
+    opList.foreach(op => op match {
+      case SetCmd(key, value) => currentParams += (key -> value)
+      case _ => op.configParams = op.configParams ++ currentParams
+      }
+    )
+    opList
+  }
+
+  /**
    * Returns a set of operators acting as sinks (without output bags) in the dataflow plan.
    *
    * @return the set of sink operators
@@ -141,12 +153,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return true if the plan is connected, false otherwise
    */
   def checkConnectivity: Boolean = {
-    // we simply construct a graph and check its connectivity
-    /*
-    var graph = Graph[PigOperator,DiEdge]()
-    operators.foreach(op => op.inputs.foreach(p => graph += p.producer ~> op))
-    graph.isConnected
-    */
     /*
      * make sure that for all operators the following holds:
      * (1) all input pipes have a producer

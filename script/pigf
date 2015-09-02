@@ -40,6 +40,6 @@ fi
 
 echo "Including backends in $BACKEND_DIR"
 
-CP=$BACKEND_DIR:$CP
+CP=$BACKEND_DIR:$CP:$CLASSPATH
 
-java -Dscala.usejavacp=true -cp $CP dbis.pig.PigCompiler $*
+java -Dscala.usejavacp=true -cp $CP dbis.pig.PigCompiler -b flink $*

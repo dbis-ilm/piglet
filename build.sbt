@@ -5,6 +5,8 @@ name := "Piglet"
 
 libraryDependencies ++= Dependencies.rootDeps
 
+libraryDependencies ++= itDeps
+
 mainClass in (Compile, packageBin) := Some("dbis.pig.PigREPL")
 
 mainClass in (Compile, run) := Some("dbis.pig.PigCompiler")

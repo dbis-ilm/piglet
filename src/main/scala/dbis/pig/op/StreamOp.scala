@@ -34,7 +34,7 @@ case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref
   _inputs = List(in)
   schema = loadSchema
 
-  override def lineageString: String = s"""STREAM%""" + super.lineageString
+  override def lineageString: String = s"""STREAM%${opName}%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
     // TODO

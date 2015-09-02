@@ -169,7 +169,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @param requiresTypeCast
    * @return
    */
-  def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true): String = ref match {
+  def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = ref match {
     case NamedField(f) => schema match {
       case Some(s) => {
         val idx = s.indexOfField(f)
@@ -186,7 +186,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
              * cast to string before, because if we load from a BinStorage, we only get Any types
              * that do not have a toInt or toDouble conversion method
              */
-            s"${tuplePrefix}(${idx})${if(typeCast != "String") ".toString" else ""}.to${typeCast}"
+            s"${tuplePrefix}(${idx}).asInstanceOf[${typeCast}]"
           }
           else
             s"${tuplePrefix}(${idx})"
@@ -198,7 +198,9 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
-    case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
+    case DerefTuple(r1, r2) => 
+      if (aggregate) s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]].map(e => e${emitRef(tupleSchema(schema, r1), r2, "", false)})"
+      else s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
     case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
     case _ => { "" }
   }
@@ -259,7 +261,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * @param requiresTypeCast
    * @return
    */
-  def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true): String = expr match {
+  def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
       val targetType = scalaTypeMappingTable(t)
@@ -271,12 +273,18 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
     case Minus(e1, e2) => s"${emitExpr(schema, e1)} - ${emitExpr(schema, e2)}"
     case Mult(e1, e2) => s"${emitExpr(schema, e1)} * ${emitExpr(schema, e2)}"
     case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
-    case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast)}"
+    case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast, aggregate)}"
     case Func(f, params) => {
       val pTypes = params.map(p => {p.resultType(schema)._2})
       UDFTable.findUDF(f, pTypes) match {
-        case Some(udf) => { if (udf.isAggregate) s"${udf.scalaName}(${emitExpr(schema, params.head, false)}.asInstanceOf[Seq[Any]])"
-                            else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+        case Some(udf) => { 
+          if (udf.isAggregate) {
+            if (!f.equalsIgnoreCase("count"))
+              s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)}.map(e => e.asInstanceOf[Number].doubleValue))"
+            else
+               s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)}.asInstanceOf[Seq[Any]])"  
+          }
+          else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
         }
         case None => {
           // check if we have have an alias in DataflowPlan
@@ -395,13 +403,13 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case OrderBy(out, in, orderSpec) => {
         var params = Map[String,Any]()
         //Spark
-        params += "cname" -> s"custKey_${node.outputs.head.name}_${node.inputs.head.name}"
+        params += "cname" -> s"custKey_${node.outPipeName}_${node.inputs.head.name}"
         var col = 0
         params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
         params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
 
         //Flink
-        params += "out"->node.outputs.head.name
+        params += "out"->node.outPipeName
         params += "key"->s"(${orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")})"
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse"->true
 
@@ -429,7 +437,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case Grouping(out, in, groupExpr, windowMode) => { 
         if (windowMode)
           s"""
-          |  def custom${node.outputs.head.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+          |  def custom${node.outPipeName}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
           |    out.collect(ts.groupBy(t => ${emitGroupExpr(node.inputSchema,groupExpr)}).flatMap(x => List(x._1,x._2)).toList)
           |  }""".stripMargin
         else ""
@@ -437,7 +445,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case Foreach(out, in, gen, windowMode) => { 
         if (windowMode)
           s"""
-          |  def custom${node.outputs.head.name}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+          |  def custom${node.outPipeName}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
           |    ts.foreach { t => out.collect(${emitForeachExpr(node, gen)})}
           |  }""".stripMargin
         else ""
@@ -465,14 +473,14 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
         }
         case _ => "" // should not happen
       }
-    case n@Distinct(out, in, windowMode) => {
+      case n@Distinct(out, in, windowMode) => {
         if (templateFile.contains("flinks"))
           s"""val ${n.outputs.head.name} = ${n.inputs.head.name}.distinct"""
         else
           callST("distinct", Map("out"->n.outputs.head.name,"in"->n.inputs.head.name))  
-    }
-    case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
-    case n@Limit(out, in, num, windowMode) => callST("limit", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "num" -> num,"windowMode"->windowMode))
+      }
+      case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
+      case n@Limit(out, in, num, windowMode) => callST("limit", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "num" -> num,"windowMode"->windowMode))
       case OrderBy(out, in, orderSpec) => "" // TODO!!!!
       case _ => ""
     }.mkString("\n") + "}"
@@ -503,9 +511,25 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   /*------------------------------------------------------------------------------------------------- */
  
   /**
+   * Generates code for the CROSS operator.
+   *
+   * @param node the Cross Operator node
+   * @param out name of the output bag
+   * @param rels list of Pipes to cross
+   * @param window window information for Cross' on streams
+   * @return the Scala code implementing the CROSS operator
+   */
+  def emitCross(node: PigOperator, out: String, rels: List[Pipe], window: Tuple2[Int,String]): String = {
+    if(window!=null)
+      callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name),"window"->window._1,"wUnit"->window._2))
+    else
+      callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name)))
+  }
+
+  /**
    * Generates code for the DISTINCT Operator
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param windowMode true if operator is called within a window environment
    * @return the Scala code implementing the DISTINCT operator
@@ -522,7 +546,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * Generates code for the FILTER Operator
    *
    * @param schema the nodes schema
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param pred the filter predicate
    * @param windowMode true if operator is called within a window environment
@@ -539,7 +563,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * Generates code for the FOREACH Operator
    *
    * @param node the FOREACH Operator node
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param gen the generate expression
    * @param windowMode true if operator is called within a window environment
@@ -564,7 +588,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * Generates code for the GROUPING Operator
    *
    * @param schema the nodes input schema
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param groupExpr the grouping expression
    * @param windowMode true if operator is called within a window environment
@@ -587,14 +611,13 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
    * Generates code for the JOIN operator.
    *
    * @param node the Join Operator node
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param rels list of Pipes to join
    * @param exprs list of join keys
    * @param window window information for Joins on streams
    * @return the Scala code implementing the JOIN operator
    */
-  def emitJoin(node: PigOperator, out: String, rels: List[Pipe], 
-               exprs: List[List[Ref]], window: Tuple2[Int,String]): String = {
+  def emitJoin(node: PigOperator, out: String, rels: List[Pipe], exprs: List[List[Ref]], window: Tuple2[Int,String]): String = {
     val res = node.inputs.zip(exprs)
     val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
     if(window!=null)
@@ -606,7 +629,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   /**
    * Generates code for the LIMIT Operator
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param num amount of retruned records
    * @param windowMode true if operator is called within a window environment
@@ -620,16 +643,26 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
 
   }
   
+  private def getFieldTypes(s: Schema): String = {
+      val fieldList = s.fields.zipWithIndex
+      val castList = fieldList.map { case (f, i) => ( 
+          if (f.fType == Types.CharArrayType || f.fType == Types.ByteArrayType) 
+            s"t($i)" 
+          else  
+            s"t($i).to${scalaTypeMappingTable(f.fType)}"
+      ) }
+      castList.mkString(",")
+  }
   /**
    * Generates code for the LOAD operator.
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param file the name of the file to be loaded
    * @param loaderFunc an optional loader function (we assume a corresponding Scala function is available)
    * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
    * @return the Scala code implementing the LOAD operator
    */
-  def emitLoad(out: String, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
+  def emitLoader(out: String, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
     if (loaderFunc == "")
       callST("loader", Map("out"->out,"file"->file.toString()))
     else {
@@ -637,11 +670,32 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       callST("loader", Map("out"->out,"file"->file.toString(),"func"->loaderFunc,"params"->params))
     }
   }
+  
+  /**
+   * Generates code for the LOAD operator.
+   *
+   * @param node the load node operator itself
+   * @param file the name of the file to be loaded
+   * @param loaderFunc an optional loader function (we assume a corresponding Scala function is available)
+   * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
+   * @return the Scala code implementing the LOAD operator
+   */
+  def emitLoad(node: PigOperator, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
+    node.schema match {
+      case Some(s) => {
+        val op = emitLoader(s"${node.outPipeName}_", file, loaderFunc, loaderParams) 
+        op +"\n" +callST("foreach", Map("out"->node.outPipeName,"in"->s"${node.outPipeName}_","expr"->s"List(${getFieldTypes(s)})"))
+      }
+      case None => {
+        emitLoader(node.outPipeName, file, loaderFunc, loaderParams)
+      }
+    }   
+  }
 
   /**
    * Generates code for the SOCKET_READ Operator
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param addr the socket address to connect to
    * @param mode the connection mode, e.g. zmq or empty for standard sockets
    * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
@@ -700,7 +754,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
   /**
    * Generates code for the WINDOW Operator
    *
-   * @param node.outputs.head.name of the output bag
+   * @param out name of the output bag
    * @param in name of the input bag
    * @param window window size information (Num, Unit)
    * @param slide window slider information (Num, Unit)
@@ -734,7 +788,7 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
          * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
          *       after changing the pipe name. Instead, use node.outPipeName
          */
-      case Load(out, file, schema, func, params) => emitLoad(node.outPipeName, file, func, params)
+      case Load(out, file, schema, func, params) => emitLoad(node, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inputs.head.name))
       case Store(in, file, func, params) => emitStore(node.inputs.head.name, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""
@@ -744,9 +798,10 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case Distinct(out, in, windowMode) => emitDistinct(node.outPipeName, node.inputs.head.name, windowMode)
       case Limit(out, in, num, windowMode) => emitLimit(node.outPipeName, node.inputs.head.name, num, windowMode)
       case Join(out, rels, exprs, window) => emitJoin(node, node.outPipeName, rels, exprs, window)
+      case Cross(out, rels, window) => emitCross(node, node.outPipeName, node.inputs, window) 
       case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
-      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outputs.head.name, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
+      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outPipeName, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
       case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inputs.head.name,"params"->emitParamList(node.schema, params)))
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outPipeName, address, mode, func, params)
@@ -755,8 +810,8 @@ class ScalaBackendGenCode(templateFile: String) extends GenCodeBase with LazyLog
       case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inputs.head.name))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case Empty(_) => ""
+
       /*
-       case Cross(out, rels) =>{ s"val $out = ${rels.head}" + rels.tail.map{other => s".cross(${other}).onWindow(5, TimeUnit.SECONDS)"}.mkString }
        case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
        val s1 = s"""
        |val split = ${rels.head}.split(${emitExpr(node.schema, expr)} match {
