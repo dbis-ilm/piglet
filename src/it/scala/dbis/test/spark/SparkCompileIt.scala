@@ -35,12 +35,9 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("grouping.pig", "grouping.out", "truth/grouping.data", false),
     ("wordcount.pig", "marycounts.out", "truth/marycount.data", false),
     ("construct.pig", "result3.out", "truth/result3.data", true),
-<<<<<<< HEAD
-    ("rscript.pig", "cluster.out", "truth/cluster.data", true)
-=======
+    ("rscript.pig", "cluster.out", "truth/cluster.data", true),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false)
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
->>>>>>> master
     // ("json.pig", "json.out", "json.data", true)
   )
 
