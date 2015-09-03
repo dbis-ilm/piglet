@@ -11,8 +11,9 @@ import org.apache.flink.util.Collector
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-query_object(name) ::= <<
+query_object(name, embedded_code) ::= <<
 object <name> {
+  <embedded_code>
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------

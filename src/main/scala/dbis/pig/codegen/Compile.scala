@@ -43,9 +43,10 @@ trait GenCodeBase {
    * e.g. defining the main object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
-   * @return a string representing the header code
+   * @param additionalCode source code (Scala, C++) that was embedded into the script
+* @return a string representing the header code
    */
-  def emitHeader1(scriptName: String): String
+  def emitHeader1(scriptName: String, additionalCode: String): String
 
   /**
    * Generate code for the header of the script which should be defined inside
@@ -102,7 +103,7 @@ trait Compile {
     // generate import statements
     var code = codeGen.emitImport
 
-    code = code + codeGen.emitHeader1(scriptName)
+    code = code + codeGen.emitHeader1(scriptName, plan.code)
 
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
