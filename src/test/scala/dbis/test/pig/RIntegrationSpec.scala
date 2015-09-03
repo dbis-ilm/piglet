@@ -27,16 +27,31 @@ import org.ddahl.jvmr.RInScala
 import scala.io.Source
 
 class RIntegrationSpec extends FlatSpec with Matchers {
+  def checkForWorkingR(): Boolean = {
+    try {
+      val R = RInScala()
+      true
+    } catch {
+      case e: Exception => false
+    }
+  }
+
   "The R integration" should "allow to invoke a R script" in {
-    val R = RInScala()
-    R.x = Array(10.0, 20.0, 30.0)
-    R.y = Array(5.0, 6.0, 7.0)
-    R.eval("res <- x + y")
-    val res = R.toVector[Double]("res")
-    res should be(Array(15.0, 26.0, 37.0))
+    if (checkForWorkingR) {
+      val R = RInScala()
+      R.x = Array(10.0, 20.0, 30.0)
+      R.y = Array(5.0, 6.0, 7.0)
+      R.eval("res <- x + y")
+      val res = R.toVector[Double]("res")
+      res should be(Array(15.0, 26.0, 37.0))
+    }
+    else
+      assume(false, "R not enabled, no test performed")
+
   }
 
   it should "run DBSCAN in R" in {
+    if (checkForWorkingR) {
     /**
      * Prepare the data in R as follows:
      * > data(ruspini, package="cluster")
@@ -62,6 +77,9 @@ class RIntegrationSpec extends FlatSpec with Matchers {
     val res = R.toMatrix[Double]("res")
     res.length should be (75)
     println(res)
+    }
+    else
+      assume(false, "R not enabled, no test performed")
   }
 
   "The parser" should "accept the SCRIPT statement" in  {
