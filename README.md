@@ -106,8 +106,8 @@ In addition to the standard Pig Latin statements we provide the following extens
  ```
  out = RSCRIPT in USING '<R code>';
  ```
- Within the R code `$_` refers to the input data (a matrix), the result which will returned to the Piglet script has to be assigned to the R variable `res.
- * ACCUMULATE
+ Within the R code `$_` refers to the input data (a matrix), the result which will returned to the Piglet script has to be assigned to the R variable `res`.
+ * ACCUMULATE - tbd
  * MATERIALIZE - creates a materialization point, i.e. the bag is serialized into a HDFS file. Subsequent runs of the script (or other scripts sharing the same dataflow until the materialization point) can just start from this point. Usage:
 
 ```
