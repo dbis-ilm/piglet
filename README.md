@@ -101,10 +101,24 @@ Depending on the target backend Piglet supports different language features. For
  * SET
  
 In addition to the standard Pig Latin statements we provide the following extensions:
- * RSCRIPT
+ * RSCRIPT - sends data to a R script and converts the result back to a bag. Usage:
+ 
+ ```
+ out = RSCRIPT in USING '<R code>';
+ ```
+ Within the R code `$_` refers to the input data (a matrix), the result which will returned to the Piglet script has to be assigned to the R variable `res.
  * ACCUMULATE
- * MATERIALIZE
- * embedded code
+ * MATERIALIZE - creates a materialization point, i.e. the bag is serialized into a HDFS file. Subsequent runs of the script (or other scripts sharing the same dataflow until the materialization point) can just start from this point. Usage:
+
+```
+MATERIALIZE bag;
+``` 
+ * embedded code - allows to embed Scala code for implementing user-defined functions and operators directly into the script. The code has to be enclosed by `<%` and `%>`. Usage:
+
+```
+<% def myFunc(i: Int): Int = i + 42 %>
+out = FOREACH in GENERATE myFunc($0);
+```
  
 Furthermore, Piglet adds two statements simplifying the processing of RDF data:
  * RDFLOAD
