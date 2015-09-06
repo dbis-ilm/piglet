@@ -123,7 +123,7 @@ object FileTools extends LazyLogging {
       } else
         return None
     } else {
-      if (CppCompiler.compile(outputDirectory.toString(), outputFile.toString(), CppCompilerConf.cppConf("pipefabric"))) {
+      if (CppCompiler.compile(outputDirectory.toString(), outputFile.toString(), CppCompilerConf.cppConf(backend))) {
         logger.info(s"created job's file at $outputFile")
         return Some(outputFile)
       } else

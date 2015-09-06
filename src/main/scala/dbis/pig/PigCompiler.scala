@@ -206,10 +206,10 @@ object PigCompiler extends PigParser with LazyLogging {
         }
       }
       
-      //if (!plan.checkConnectivity) {
-        //logger.error(s"dataflow plan not connected for $inputFile")
-        //return None
-      //}
+      if (!plan.checkConnectivity) {
+        logger.error(s"dataflow plan not connected for $inputFile")
+        return None
+      }
 
       logger.debug(s"successfully created dataflow plan for $inputFile")
 
