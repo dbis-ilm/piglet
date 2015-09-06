@@ -86,6 +86,7 @@ object Dependencies {
   val slf4j= "org.slf4j" % "slf4j-simple" % "1.6.4"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
+  val commonsExec = "org.apache.commons" % "commons-exec" % "1.3"
 
   val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.9.0.jar"
   
@@ -103,6 +104,7 @@ object Dependencies {
     scalaLogging,
     log4j,
 //    slf4j,
+    commonsExec,
     hadoop % "provided"
   )
 }
