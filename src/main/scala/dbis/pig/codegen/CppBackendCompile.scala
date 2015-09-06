@@ -63,7 +63,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * are used during the tuple processing in this operator.
    * @param schema to build the schema typedef accordingly for the operators
    */
-  private def schemaToTupleStruct(schema: Option[Schema]): String = schema match {
+  def schemaToTupleStruct(schema: Option[Schema]): String = schema match {
     // TODO: works only for primitive types
     case Some(s) => s.fields.map(f => cppTypeMappingTable(f.fType)).mkString(",")
     case None    => throw SchemaException("Cannot handle unknown schema.")
