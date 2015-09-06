@@ -8,7 +8,7 @@ object PigBuild extends Build {
    */
   lazy val commonSettings = Seq(
     version := "1.0",
-    scalaVersion := "2.11.4",
+    scalaVersion := "2.11.7",
     organization := "dbis"
   )
   
@@ -46,7 +46,7 @@ object PigBuild extends Build {
    */
   lazy val pipefabric = (project in file("pipefabric")).
     settings(commonSettings: _*).
-    dependsOn(common)///.
+    dependsOn(common)//.
     //dependsOn(pfabricdeploy)
     
 
@@ -55,7 +55,7 @@ object PigBuild extends Build {
   /*
    * define the backend for the compiler: currently we support spark and flink
    */
-  val backend = sys.props.getOrElse("backend", default="pipefabric")
+  val backend = sys.props.getOrElse("backend", default="spark")
   
   val itDeps = backend match {
     case "flink" | "flinks" => Seq(Dependencies.flinkDist % "test;it" from Dependencies.flinkAddress)
@@ -89,7 +89,7 @@ object Dependencies {
   val sparkCore = "org.apache.spark" %% "spark-core" % "1.4.1"
   val sparkSql = "org.apache.spark" %% "spark-sql" % "1.4.1"
   val flinkDist = "org.apache.flink" %% "flink-dist" % "0.9.0"
-  val scopt = "com.github.scopt" % "scopt_2.10" % "3.3.0"
+  val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
   val kiama = "com.googlecode.kiama" %% "kiama" % "1.8.0"
