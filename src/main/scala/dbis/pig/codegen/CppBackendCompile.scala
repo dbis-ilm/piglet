@@ -2,7 +2,7 @@ package dbis.pig.codegen
 
 import dbis.pig.op._
 import dbis.pig.schema._
-import dbis.pig.udf.UDFTable
+import dbis.pig.udf._
 import org.clapper.scalasti.STGroupFile
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -420,7 +420,6 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * @return a string representing the code
    */
   def emitNode(node: PigOperator): String = {
-    println(node)
     node match {
       case Load(out, storage, schema, func, params) => {
         startupList += node
@@ -436,8 +435,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
         var returnValue: String = ""
         gen match {
           case GeneratorList(expr) => {
-            val aggr = expr.map(_.expr).filter(ex => ex.isInstanceOf[Func]).asInstanceOf[List[Func]].filter(aggr => checkAggrFun(aggr, node.schema))
-            if (aggr.length > 0) {
+            if (checkAggrFun(expr, node.schema) == true) {
               returnValue = generateAggregation(out.name, in.name, expr, node.inputs.head.producer.schema)
             } else returnValue = emitForeach(node, out.name, in.name, expr)
           }
@@ -555,23 +553,19 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
     }
     case g @ Grouping(out, in, groupExpr, _) => {
       //node.schema = node.inputSchema
-      println(node.schema)
       groupingNode = g // TODO: instead we can check the previous node instead of storing it
       //emitOpType(node) // not necessary since it will get from the previous operator
       ""
     }
     case Foreach(out, in, gen, _) => {
-      println(node.schema)
       gen match {
         case GeneratorList(expr) => {
-          val aggr = expr.map(_.expr).filter(ex => ex.isInstanceOf[Func]).asInstanceOf[List[Func]].filter(aggr => checkAggrFun(aggr, node.schema))
-          if (aggr.length > 0) {
+          if (checkAggrFun(expr, node.schema) == true) {
             var targetSchema: Option[Schema] = null
             if (groupingNode == null)
               targetSchema = node.inputs.head.producer.schema
             else
               targetSchema = groupingNode.inputs.head.producer.schema
-            println(targetSchema)
             emitOpType(node) + generateAggrHelperCode(out.name, expr, node.inputs.head.producer.schema)
           } else emitOpType(node)
         }
@@ -633,28 +627,21 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
     var resultType = ""
     val aggregates = generators.zipWithIndex.map {
       case (gen, i) => gen.expr match {
-        case Func(f, params) => {
-          val pTypes = params.map(p => { p.resultType(schema)._2 })
-          UDFTable.findUDF(f, pTypes) match {
-            case Some(udf) => {
-              if (udf.isAggregate) {
-                val inType = cppTypeMappingTable(udf.paramTypes(0))
-                resultType = cppTypeMappingTable(udf.resultType)
-                udf.name.toLowerCase() match {
-                  case "count" => "AggrCount<" + inType + ", int>" + " count" + i + "_;"
-                  case "sum"   => "AggrSum<" + inType + "> sum" + i + "_;"
-                  case "min"   => "AggrMinMax<" + inType + ", std::less<" + inType + ">> min" + i + "_;"
-                  case "max"   => "AggrMinMax<" + inType + ", std::greater<" + inType + ">> max" + i + "_;"
-                  case "avg"   => "AggrAvg<" + inType + ", " + resultType + "> avg" + i + "_;"
-                  case _       => throw CompilerException("this aggregate funcrion is not supported")
-                }
-              } else {
-                throw CompilerException("only aggregate funcrions is allowed here")
-              }
+        case fun @ Func(f, params) => {
+          val aggr = getAggrFun(fun, schema)
+          if (aggr != null) {
+            val inType = cppTypeMappingTable(aggr.paramTypes(0))
+            resultType = cppTypeMappingTable(aggr.resultType)
+            aggr.name.toLowerCase() match {
+              case "count" => "AggrCount<" + inType + ", int>" + " count" + i + "_;"
+              case "sum"   => "AggrSum<" + inType + "> sum" + i + "_;"
+              case "min"   => "AggrMinMax<" + inType + ", std::less<" + inType + ">> min" + i + "_;"
+              case "max"   => "AggrMinMax<" + inType + ", std::greater<" + inType + ">> max" + i + "_;"
+              case "avg"   => "AggrAvg<" + inType + ", " + resultType + "> avg" + i + "_;"
+              case _       => throw CompilerException("this aggregate funcrion is not supported")
             }
-            case None => {
-              throw CompilerException("No UDF function is inserted, mainly, it should be aggregate function")
-            }
+          } else {
+            throw CompilerException("only aggregate funcrions is allowed here")
           }
         }
         case RefExpr(e) => {
@@ -669,19 +656,12 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
   private def buildInitExpr(generators: List[GeneratorExpr], schema: Option[Schema]): String = {
     val initValue = generators.zipWithIndex.map {
       case (gen, i) => gen.expr match {
-        case Func(f, params) => {
-          val pTypes = params.map(p => { p.resultType(schema)._2 })
-          UDFTable.findUDF(f, pTypes) match {
-            case Some(udf) => {
-              if (udf.isAggregate) {
-                udf.name.toLowerCase() + i + "_.init();"
-              } else {
-                throw CompilerException("only aggregate funcrions is allowed here")
-              }
-            }
-            case None => {
-              throw CompilerException("No UDF function is inserted, mainly, it should be aggregate function")
-            }
+        case fun @ Func(f, params) => {
+          val aggr = getAggrFun(fun, schema)
+          if (aggr != null) {
+            aggr.name.toLowerCase() + i + "_.init();"
+          } else {
+            throw CompilerException("only aggregate funcrions is allowed here")
           }
         }
         case RefExpr(e) => {
@@ -700,24 +680,16 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * @param schema the input schema
    */
   private def buildIterateExpr(generators: List[GeneratorExpr], schema: Option[Schema]): String = {
-    println(schema)
     var resultType: Int = 0
     val iterateValue = generators.zipWithIndex.map {
       case (gen, i) => gen.expr match {
-        case Func(f, params) => {
-          val pTypes = params.map(p => { p.resultType(schema)._2 })
-          UDFTable.findUDF(f, pTypes) match {
-            case Some(udf) => {
-              if (udf.isAggregate) {
-                val attr = params(0).asInstanceOf[RefExpr].r
-                "myState->" + udf.name.toLowerCase() + i + "_.iterate(" + emitRef(schema, attr) + ", outdated);"
-              } else {
-                throw CompilerException("only aggregate funcrions is allowed here")
-              }
-            }
-            case None => {
-              throw CompilerException("No UDF function is inserted, mainly, it should be aggregate function")
-            }
+        case fun @ Func(f, params) => {
+          val aggr = getAggrFun(fun, schema)
+          if (aggr != null) {
+            val attr = params(0).asInstanceOf[RefExpr].r
+            "myState->" + aggr.name.toLowerCase() + i + "_.iterate(" + emitRef(schema, attr) + ", outdated);"
+          } else {
+            throw CompilerException("only aggregate funcrions is allowed here")
           }
         }
         case RefExpr(e) => {
@@ -737,19 +709,12 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
   private def buildFinalizeExpr(generators: List[GeneratorExpr], schema: Option[Schema]): String = {
     val finalizeExpr = generators.zipWithIndex.map {
       case (gen, i) => gen.expr match {
-        case Func(f, params) => {
-          val pTypes = params.map(p => { p.resultType(schema)._2 })
-          UDFTable.findUDF(f, pTypes) match {
-            case Some(udf) => {
-              if (udf.isAggregate) {
-                "myState->" + udf.name.toLowerCase() + i + "_.value()"
-              } else {
-                throw CompilerException("only aggregate funcrions is allowed here")
-              }
-            }
-            case None => {
-              throw CompilerException("No UDF function is inserted, mainly, it should be aggregate function")
-            }
+        case fun @ Func(f, params) => {
+          val aggr = getAggrFun(fun, schema)
+          if (aggr != null)
+            "myState->" + aggr.name.toLowerCase() + i + "_.value()"
+          else {
+            throw CompilerException("only aggregate funcrions is allowed here")
           }
         }
         case RefExpr(e) => {
@@ -795,19 +760,19 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * @param schema the schema of the operator
    * @param aggr the function to be checked
    */
-  private def checkAggrFun(aggr: Func, schema: Option[Schema]) = {
+  private def getAggrFun(aggr: Func, schema: Option[Schema]): UDF = {
     val pTypes = aggr.params.map(p => { p.resultType(schema)._2 })
     UDFTable.findUDF(aggr.f, pTypes) match {
       case Some(udf) => {
-        if (udf.isAggregate)
-          true
-        else
-          false
+        if (udf.isAggregate) udf else null
       }
-      case None => {
-        false
-      }
+      case None => null
     }
+  }
+  private def checkAggrFun (generators: List[GeneratorExpr], schema: Option[Schema]): Boolean = {
+    generators.map(_.expr).
+                   filter(ex => ex.isInstanceOf[Func]).asInstanceOf[List[Func]].
+                   exists(aggr => (getAggrFun(aggr, schema)!= null))
   }
 }
 
