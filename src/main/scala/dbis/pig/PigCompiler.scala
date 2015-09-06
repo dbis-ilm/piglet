@@ -229,21 +229,57 @@ object PigCompiler extends PigParser with LazyLogging {
     s
   }
 
-  
-  private def parseScriptFromSource(source: Source, params: Map[String,String], backend: String): List[PigOperator] = {
-      if (params.nonEmpty)
+  def loadScript(inputFile: Path): Iterator[String] = {
+    logger.debug(s"""try to load pig script from "$inputFile" """)
+    val source = Source.fromFile(inputFile.toFile())
+    source.getLines()
+  }
 
+  /**
+   * Handle IMPORT statements by simply replacing the line containing IMPORT with the content
+   * of the imported file.
+   *
+   * @param lines the original script
+   * @return the script where IMPORTs are replaced
+   */
+   def resolveImports(lines: Iterator[String]): Iterator[String] = {
+    val buf: ListBuffer[String] = ListBuffer()
+    for (l <- lines) {
+      if (l.matches("""[ \t]*[iI][mM][pP][oO][rR][tT][ \t]*'([^'\p{Cntrl}\\]|\\[\\"bfnrt]|\\u[a-fA-F0-9]{4})*'[ \t\n]*;""")) {
+        val s = l.split(" ")(1)
+        val name = s.substring(1, s.length - 2)
+        val path = Paths.get(name)
+        val resolvedLine = resolveImports(loadScript(path))
+        buf ++= resolvedLine
+      }
+      else
+        buf += l
+    }
+    buf.toIterator
+  }
+
+  private def parseScriptFromSource(source: Source, params: Map[String,String], backend: String): List[PigOperator] = {
+    /*
+     * Handle IMPORT statements.
+     */
+    val sourceLines = resolveImports(source.getLines())
+      if (params.nonEmpty) {
+        /*
+         * Replace placeholders by parameters.
+         */
         /* TODO: can we provide a config value "language_feature" in the backend config ?
          * So we could parse this value and pass it here for all backends in the same way
-         */        
+         */
         if (backend == "flinks")
-          parseScript(source.getLines().map(line => replaceParameters(line, params)).mkString("\n"), StreamingPig)
+          parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"), StreamingPig)
         else
-          parseScript(source.getLines().map(line => replaceParameters(line, params)).mkString("\n"))
-      else
+          parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"))
+      }
+      else {
         if (backend == "flinks")
-          parseScript(source.getLines().mkString("\n"), StreamingPig)
+          parseScript(sourceLines.mkString("\n"), StreamingPig)
         else
-          parseScript(source.getLines().mkString("\n"))
+          parseScript(sourceLines.mkString("\n"))
+      }
   }
 }
