@@ -568,4 +568,24 @@ class SparkCompileSpec extends FlatSpec {
 
     assert(codeGenerator.emitNode(op) == "")
   }
+
+  it should "contain embedded code" in {
+    val ops = parseScript(
+      """
+        |<% def someFunc(s: String): String = {
+        | s
+        |}
+        |%>
+        |A = LOAD 'file.csv';
+      """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    assert(cleanString(codeGenerator.emitHeader1("test", plan.code)) ==
+      cleanString("""
+        |object test {
+        |def someFunc(s: String): String = {
+        | s
+        |}
+      """.stripMargin))
+  }
 }

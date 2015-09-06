@@ -873,9 +873,11 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
    * i.e. defining the main object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
+   * @param additionalCode Scala source code that was embedded into the script
    * @return a string representing the header code
    */
-  def emitHeader1(scriptName: String): String = callST("query_object", Map("name" -> scriptName))
+  def emitHeader1(scriptName: String, additionalCode: String = ""): String =
+    callST("query_object", Map("name" -> scriptName, "embedded_code" -> additionalCode))
 
   /**
    *

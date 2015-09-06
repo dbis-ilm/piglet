@@ -14,8 +14,9 @@ import dbis.pig.backends.spark._
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-query_object(name) ::= <<
+query_object(name, embedded_code) ::= <<
 object <name> {
+    <embedded_code>
 
 >>
 
