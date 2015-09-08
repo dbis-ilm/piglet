@@ -29,11 +29,9 @@ import org.kiama.rewriting.Rewriter._
   *
   */
 object Rules {
-  /** Put Filters before Joins if we can figure out which side of the join contains the fields used in the Filters
-    * predicate
-    *
+  /** Put Filters before multipleInputOp if we can figure out which input of multipleInputOp contains the fields used in the Filters predicate
     */
-  def filterBeforeJoin(join: Join, filter: Filter): Option[Filter] = {
+  def filterBeforeMultipleInputOp(multipleInputOp: PigOperator, filter: Filter): Option[Filter] = {
     val fields = extractFields(filter.pred)
 
     if (fields.exists(field => !field.isInstanceOf[NamedField])) {
@@ -42,7 +40,7 @@ object Rules {
     }
 
     val namedfields = fields.map(_.asInstanceOf[NamedField])
-    val inputs = join.inputs.map(_.producer)
+    val inputs = multipleInputOp.inputs.map(_.producer)
     var inputWithCorrectFields: Option[PigOperator] = findInputForFields(inputs, namedfields)
 
     if (inputWithCorrectFields.isEmpty) {
@@ -56,7 +54,7 @@ object Rules {
     // We can't use fixInputsAndOutputs here because they don't work correctly for Joins
     val inp = inputWithCorrectFields.get
 
-    Some(pullOpAcrossMultipleInputOp(filter, join, inp).asInstanceOf[Filter])
+    Some(pullOpAcrossMultipleInputOp(filter, multipleInputOp, inp).asInstanceOf[Filter])
   }
 
   /** Merges two [[dbis.pig.op.Filter]] operations if one is the only input of the other.
@@ -730,7 +728,7 @@ object Rules {
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
     reorder[OrderBy, Filter]
-    addStrategy(buildBinaryPigOperatorStrategy(filterBeforeJoin))
+    addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
     addOperatorReplacementStrategy(R1)
