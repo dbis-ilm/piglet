@@ -13,17 +13,18 @@ import kafka.consumer.Whitelist
 import kafka.server.OffsetManager
 import org.apache.kafka.common.utils.Utils.formatAddress
 import kafka.common.{ Topic, AdminCommandFailedException }
+import com.typesafe.scalalogging.LazyLogging
 object ZkClientConfig {
   val sessionTimeout: Int = 30000
   val connectTimeout: Int = 30000
 }
 
-class KafkaManager(zkClientPtah: String) {
+class KafkaManager(zkClientPtah: String) extends LazyLogging {
   val zkClient = new ZkClient(zkClientPtah, ZkClientConfig.connectTimeout, ZkClientConfig.sessionTimeout, ZKStringSerializer)
   def createTopic(topic: String, partitions: Int) {
     val configs = new Properties
     AdminUtils.createTopic(zkClient, topic, partitions, 1, configs)
-    println(s"Created topic $topic")
+    logger.info(s"Created topic $topic")
   }
 
   def topicExists(topic: String) = AdminUtils.topicExists(zkClient, topic)
@@ -32,9 +33,9 @@ class KafkaManager(zkClientPtah: String) {
     val topics = ZkUtils.getAllTopics(zkClient).sorted
     for (topic <- topics) {
       if (ZkUtils.pathExists(zkClient, ZkUtils.getDeleteTopicPath(topic))) {
-        println(s"$topic - marked for deletion")
+        logger.info(s"$topic - marked for deletion")
       } else {
-        println(topic)
+        logger.info(topic)
       }
     }
     topics
@@ -74,7 +75,7 @@ class KafkaManager(zkClientPtah: String) {
         val configs = AdminUtils.fetchTopicConfig(zkClient, topic)
         val partitionsCnt = topicPartitionAssignment.size
         val replFactor = topicPartitionAssignment.head._2.size
-        println(s"Topic: $topic  PartitionCount:$partitionsCnt ReplicationFactor: $replFactor Configs:${configs.map(kv => kv._1 + "=" + kv._2).mkString(",")}")
+        logger.info(s"Topic: $topic  PartitionCount:$partitionsCnt ReplicationFactor: $replFactor Configs:${configs.map(kv => kv._1 + "=" + kv._2).mkString(",")}")
         for ((partitionId, assignedReplicas) <- sortedPartitions) {
           val inSyncReplicas = ZkUtils.getInSyncReplicasForPartition(zkClient, topic, partitionId)
           val leader = ZkUtils.getLeaderForPartition(zkClient, topic, partitionId)
@@ -82,12 +83,14 @@ class KafkaManager(zkClientPtah: String) {
           print("\tPartition: " + partitionId)
           print("\tLeader: " + (if (leader.isDefined) leader.get else "none"))
           print("\tReplicas: " + assignedReplicas.mkString(","))
-          println("\tIsr: " + inSyncReplicas.mkString(","))
+          logger.info("\tIsr: " + inSyncReplicas.mkString(","))
         }
       case None =>
-        println("Topic " + topic + " doesn't exist!")
+        logger.info("Topic " + topic + " doesn't exist!")
 
     }
   }
+  
+  def close() = zkClient.close()
 
 }

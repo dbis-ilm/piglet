@@ -15,7 +15,7 @@ object ProcessTaskRunnerFactory extends TaskRunnerFactory {
    * get the generated task to the system
    */
   override def getTaskRunner(task: URI, supportingFile: URI, numberOfTasks: Int) = {
-    new ProcessTaskRunner(task.getPath, supportingFile.getPath, numberOfTasks)
+    new ProcessTaskRunner(task.toString(), supportingFile.toString(), numberOfTasks)
   }
 }
 
