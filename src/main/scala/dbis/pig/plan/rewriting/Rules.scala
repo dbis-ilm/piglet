@@ -729,6 +729,7 @@ object Rules {
     merge[PigOperator, Empty](mergeWithEmpty)
     reorder[OrderBy, Filter]
     addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
+    addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
     addOperatorReplacementStrategy(R1)

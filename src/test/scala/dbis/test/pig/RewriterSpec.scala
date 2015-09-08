@@ -104,6 +104,32 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(op4, op2)
   }
 
+  it should "order Filter operations before Cross operators if only NamedFields are used" in {
+    val op1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
+    ))))
+    val op2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
+      ("bid", Types.IntType)))
+    ))))
+    val predicate1 = Lt(RefExpr(NamedField("a")), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op3 = Cross(Pipe("c"), List(Pipe("a"), Pipe("b")))
+    val op4 = Filter(Pipe("d"), Pipe("c"), predicate1)
+    val op5 = Dump(Pipe("d"))
+
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4, op5)))
+    op1.outputs.headOption.value.consumer should contain only op4
+    op2.outputs.headOption.value.consumer should contain only op3
+    op4.outputs.headOption.value.consumer should contain only(op3, op5)
+
+    op1.outputs should have length 1
+    op2.outputs should have length 1
+    op3.outputs should have length 1
+    op4.outputs should have length 1
+
+    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(op4, op2)
+  }
+
   it should "rewrite SplitInto operators into multiple Filter ones" in {
     val plan = new DataflowPlan(parseScript( s"""
                                                 |a = LOAD 'file' AS (x, y);
