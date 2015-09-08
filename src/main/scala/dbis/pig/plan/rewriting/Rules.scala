@@ -56,38 +56,7 @@ object Rules {
     // We can't use fixInputsAndOutputs here because they don't work correctly for Joins
     val inp = inputWithCorrectFields.get
 
-    // First, make the Filter a consumer of the correct input
-    inp.outputs foreach { outp =>
-      if (outp.consumer contains join) {
-        outp.consumer = outp.consumer.filterNot(_ == join) :+ filter
-      }
-    }
-
-    filter.inputs.filterNot(_.producer == join) :+ Pipe(inp.outPipeName, inp)
-
-    // Second, make the Filter an input of the Join
-    join.inputs = join.inputs.filterNot(_.name == inp.outPipeName) :+ Pipe(filter.outPipeName, filter)
-
-    // Third, replace the Filter in the Joins outputs with the Filters outputs
-    join.outputs foreach { outp =>
-      if (outp.consumer contains filter) {
-        outp.consumer = outp.consumer.filterNot(_ == filter) ++ filter.outputs.flatMap(_.consumer)
-      }
-    }
-
-    // Fourth, make the Join the producer of all the Filters outputs inputs
-    filter.outputs foreach { outp =>
-      outp.consumer foreach { cons =>
-        cons.inputs map { cinp =>
-          if (cinp.producer == filter) {
-            Pipe(join.outPipeName, join)
-          } else {
-            cinp
-          }
-        }
-      }
-    }
-    Some(filter)
+    Some(pullOpAcrossMultipleInputOp(filter, join, inp).asInstanceOf[Filter])
   }
 
   /** Merges two [[dbis.pig.op.Filter]] operations if one is the only input of the other.

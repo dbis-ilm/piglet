@@ -737,4 +737,36 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       GeneratorList(List(GeneratorExpr(RefExpr(NamedField("x"))),
         GeneratorExpr(RefExpr(NamedField("y"))), GeneratorExpr(RefExpr(NamedField("z"))))))))
   }
+
+  "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    // This sets up pipes etc.
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    intercept[IllegalArgumentException] {
+      pullOpAcrossMultipleInputOp(op4, op2, op1)
+    }
+  }
+
+  it should "pull up toBePulled if it's a consumer of multipleInputOps output pipes" in {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    // This sets up pipes etc.
+    new DataflowPlan(List(op1, op2, op3, op4))
+
+    pullOpAcrossMultipleInputOp(op3, op2, op1)
+
+    op1.outputs.flatMap(_.consumer) should contain only op3
+    op3.inputs.map(_.producer) should contain only op1
+    op3.outputs.flatMap(_.consumer) should contain only op2
+    op2.inputs.map(_.producer) should contain only op3
+  }
 }
