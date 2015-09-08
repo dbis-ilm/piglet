@@ -18,6 +18,7 @@ package dbis.pig.plan.rewriting
 
 import dbis.pig.op._
 import dbis.pig.plan.rewriting.Column.Column
+import dbis.pig.plan.rewriting.FilterUtils._
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.PipeNameGenerator.generate
 import dbis.pig.schema.{Field, Types}
@@ -33,25 +34,6 @@ object Rules {
     *
     */
   def filterBeforeJoin(join: Join, filter: Filter): Option[Filter] = {
-    // Collect all Fields of the Filter operator
-    def extractFields(p: Expr): List[Ref] =
-      p match {
-        case RefExpr(Value(_)) => Nil
-        case RefExpr(r) => List(r)
-        case BinaryExpr(l, r) => extractFields(l) ++ extractFields(r)
-        case And(l, r) => extractFields(l) ++ extractFields(r)
-        case Or(l, r) => extractFields(l) ++ extractFields(r)
-        case Not(p) => extractFields(p)
-        case FlattenExpr(e) => extractFields(e)
-        case PExpr(e) => extractFields(e)
-        case CastExpr(t, e) => extractFields(e)
-        case MSign(e) => extractFields(e)
-        case Func(f, p) => p.flatMap(extractFields)
-        case ConstructBagExpr(ex) => ex.flatMap(extractFields)
-        case ConstructMapExpr(ex) => ex.flatMap(extractFields)
-        case ConstructTupleExpr(ex) => ex.flatMap(extractFields)
-      }
-
     val fields = extractFields(filter.pred)
 
     if (fields.exists(field => !field.isInstanceOf[NamedField])) {
@@ -60,35 +42,8 @@ object Rules {
     }
 
     val namedfields = fields.map(_.asInstanceOf[NamedField])
-
     val inputs = join.inputs.map(_.producer)
-
-    var inputWithCorrectFields: Option[PigOperator] = None
-
-    inputs foreach { inp =>
-      namedfields foreach { f =>
-        if (inp.schema.isEmpty) {
-          // The schema of an input is not defined, abort because it might or might not contain one of the fields
-          // we're looking for
-          return None
-        }
-
-        if (inp.schema.get.fields.exists(_.name == f.name)) {
-          if (inputWithCorrectFields.isEmpty) {
-            // We found an input that has the correct field and we haven't found one with a matching field before
-            inputWithCorrectFields = Some(inp)
-          }
-
-          if (inputWithCorrectFields.get != inp) {
-            // We found an input that has a field we're looking for but we already found an input with a matching
-            // field but it's not the same as the current input.
-            // TODO Just abort the operation for now - in the future, we could try to split push different Filters into
-            // multiple inputs of the Join.
-            return None
-          }
-        }
-      }
-    }
+    var inputWithCorrectFields: Option[PigOperator] = findInputForFields(inputs, namedfields)
 
     if (inputWithCorrectFields.isEmpty) {
       // We did not find an input that has all the fields we're looking for - this might be because the fields are
