@@ -737,4 +737,30 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       GeneratorList(List(GeneratorExpr(RefExpr(NamedField("x"))),
         GeneratorExpr(RefExpr(NamedField("y"))), GeneratorExpr(RefExpr(NamedField("z"))))))))
   }
+
+  it should "replace GENERATE *, fields" in {
+    val plan = new DataflowPlan(parseScript(
+      "A = LOAD 'file' AS (x, y, z);\nB = FOREACH A GENERATE *, $0, $2;\nDUMP B;"))
+    val rewrittenPlan = processPlan(plan)
+    val op = rewrittenPlan.findOperatorForAlias("B")
+    op should be (Some(Foreach(Pipe("B"),Pipe("A"),
+      GeneratorList(List(GeneratorExpr(RefExpr(NamedField("x"))),
+        GeneratorExpr(RefExpr(NamedField("y"))),
+        GeneratorExpr(RefExpr(NamedField("z"))),
+        GeneratorExpr(RefExpr(PositionalField(0))),
+        GeneratorExpr(RefExpr(PositionalField(2)))
+      )))))
+  }
+
+  it should "replace GENERATE * in a nested FOREACH" in {
+    val plan = new DataflowPlan(parseScript(
+      """triples = LOAD 'file' AS (sub, pred, obj);
+         |stmts = GROUP triples BY sub;
+         |tmp = FOREACH stmts {
+         |r1 = FILTER triples BY (pred == 'aPred1');
+         |r2 = FILTER triples BY (pred == 'aPred2');
+         |GENERATE *, COUNT(r1) AS cnt1, COUNT(r2) AS cnt2;
+         |};""".stripMargin))
+    val rewrittenPlan = processPlan(plan)
+  }
 }

@@ -60,7 +60,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
 
     /*
      * 0. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
-     *    Instead, we add their arguments to the additionalJars list and udfAliases map
+     *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
      */
     ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
     ops.filter(_.isInstanceOf[DefineCmd]).foreach { op =>
