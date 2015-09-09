@@ -14,8 +14,9 @@ import dbis.pig.backends.spark._
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-query_object(name) ::= <<
+query_object(name, embedded_code) ::= <<
 object <name> {
+    <embedded_code>
 
 >>
 
@@ -24,7 +25,8 @@ begin_query(name, hook) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
-        
+        sc.addSparkListener(new PerfMonitor())
+
     <if (hook)>
     	setupHook(sc)
     <endif>
