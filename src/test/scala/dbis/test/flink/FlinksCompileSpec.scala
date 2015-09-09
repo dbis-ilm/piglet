@@ -526,13 +526,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List()))
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b"
-      /*"""
-        |val fields = new ListBuffer[Int]
-        |for(i <- 0 to b.getType.getTotalFields()-1)(fields+=i)
-        |val a = b.groupBy(fields.toList:_*)
-        |""".stripMargin*/
-    )
+    val expectedCode = cleanString("""val a = b.map(t => List("all", List(t))).groupBy(t => t(0))""")
     assert(generatedCode == expectedCode)
   }
 
@@ -548,13 +542,13 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List(PositionalField(0))), true)
     val codeGenerator = new ScalaBackendGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b.groupBy(t => t(0)).mapWindow(customaMap _)")
+    val expectedCode = cleanString("val a = b.mapWindow(customaMap _).groupBy(t => t(0))")
     assert(generatedCode == expectedCode)
 
     val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperCode = cleanString("""
       |def customaMap(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-      |  out.collect(ts.groupBy(t => t(0)).flatMap(x => List(x._1,x._2)).toList)
+      |  ts.groupBy(t => t(0)).foreach(t => out.collect(List(t._1,t._2)))
       |}""".stripMargin)
     assert(generatedHelperCode == expectedHelperCode)
   }

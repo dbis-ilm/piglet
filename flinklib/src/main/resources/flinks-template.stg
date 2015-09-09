@@ -97,18 +97,19 @@ foreachFlatMap(out,in,expr,windowMode) ::=<<
 groupBy(out,in,expr,windowMode) ::=<<
 <if (expr)>
   <if(windowMode)>
-    val <out> = <in>.groupBy(t => <expr>).mapWindow(custom<out>Map _)
+    val <out> = <in>.mapWindow(custom<out>Map _).groupBy(t => t(0))
   <else>
-    val <out> = <in>.map(t => List((<expr>),List(t))).groupBy(t => t(0)) <! <expr>) !>
+    val <out> = <in>.map(t => List((<expr>),List(t))).groupBy(t => t(0))
   <endif>
 <else>
-    val <out> = <in>
+    val <out> = <in>.map(t => List("all", List(t))).groupBy(t => t(0))
 <endif>
 >>
 
 groupByHelper(params) ::=<<
     def custom<params.out>Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-      out.collect(ts.groupBy(t => <params.expr>).flatMap(x => List(x._1,x._2)).toList)
+<!      out.collect(ts.groupBy(t => <params.expr>).flatMap(x => List(x._1,x._2)).toList) !>
+      ts.groupBy(t => <params.expr>).foreach(t => out.collect(List(t._1,t._2)))
     }
 >>
 
