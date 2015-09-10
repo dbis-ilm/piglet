@@ -36,7 +36,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   "The rewriter" should "merge two Filter operations" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val predicate2 = Neq(RefExpr(PositionalField(1)), RefExpr(Value("21")))
     val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
     val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
     val op4 = Dump(Pipe("c"))
@@ -54,6 +54,24 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be(opMerged)
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+  }
+
+  it should "remove Filter operation if it has the same predicate as an earlier one" in {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
+    val op2_after = Filter(Pipe("c"), Pipe("a"), predicate1)
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+
+    val pPlan = processPlan(plan)
+    pPlan.findOperatorForAlias("b").value should be(op2)
+    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
+    op2.outputs.flatMap(_.consumer) should contain only op4
+    op4.inputs.map(_.producer) should contain only op2
   }
 
   it should "order Filter operations before Order By ones" in {
@@ -88,6 +106,32 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       List(List(NamedField("aid")),
            List(NamedField("bid"))
       ))
+    val op4 = Filter(Pipe("d"), Pipe("c"), predicate1)
+    val op5 = Dump(Pipe("d"))
+
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4, op5)))
+    op1.outputs.headOption.value.consumer should contain only op4
+    op2.outputs.headOption.value.consumer should contain only op3
+    op4.outputs.headOption.value.consumer should contain only(op3, op5)
+
+    op1.outputs should have length 1
+    op2.outputs should have length 1
+    op3.outputs should have length 1
+    op4.outputs should have length 1
+
+    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(op4, op2)
+  }
+
+  it should "order Filter operations before Cross operators if only NamedFields are used" in {
+    val op1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
+    ))))
+    val op2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
+      ("bid", Types.IntType)))
+    ))))
+    val predicate1 = Lt(RefExpr(NamedField("a")), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op3 = Cross(Pipe("c"), List(Pipe("a"), Pipe("b")))
     val op4 = Filter(Pipe("d"), Pipe("c"), predicate1)
     val op5 = Dump(Pipe("d"))
 
@@ -762,5 +806,37 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
          |GENERATE *, COUNT(r1) AS cnt1, COUNT(r2) AS cnt2;
          |};""".stripMargin))
     val rewrittenPlan = processPlan(plan)
+  }
+
+  "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    // This sets up pipes etc.
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    intercept[IllegalArgumentException] {
+      pullOpAcrossMultipleInputOp(op4, op2, op1)
+    }
+  }
+
+  it should "pull up toBePulled if it's a consumer of multipleInputOps output pipes" in {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    // This sets up pipes etc.
+    new DataflowPlan(List(op1, op2, op3, op4))
+
+    pullOpAcrossMultipleInputOp(op3, op2, op1)
+
+    op1.outputs.flatMap(_.consumer) should contain only op3
+    op3.inputs.map(_.producer) should contain only op1
+    op3.outputs.flatMap(_.consumer) should contain only op2
+    op2.inputs.map(_.producer) should contain only op3
   }
 }
