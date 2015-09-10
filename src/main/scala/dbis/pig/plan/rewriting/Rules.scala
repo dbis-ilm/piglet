@@ -16,6 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
+import scala.collection.mutable.ListBuffer
 import dbis.pig.op._
 import dbis.pig.plan.rewriting.Column.Column
 import dbis.pig.plan.rewriting.FilterUtils._
@@ -713,28 +714,62 @@ object Rules {
     case _ => None
   }
 
-  def foreachGenerateWithAsterisk(term: Any): Option[Foreach] = {
+  /**
+   * Process the list of generator expressions in GENERATE and replace the * by the list of named fields
+   *
+   * @param exprs
+   * @param op
+   * @return
+   */
+  def constructGeneratorList(exprs: List[GeneratorExpr], op: PigOperator): (List[GeneratorExpr], Boolean) = {
+    val genExprs: ListBuffer[GeneratorExpr] = ListBuffer()
+    var foundStar: Boolean = false
+    for (ex <- exprs) {
+      if (ex.expr.isInstanceOf[RefExpr]) {
+        val ref = ex.expr.asInstanceOf[RefExpr]
+        if (ref.r.isInstanceOf[NamedField]) {
+          val field = ref.r.asInstanceOf[NamedField]
+          if (field.name == "*") {
+            if (op.inputSchema.isEmpty)
+              throw RewriterException("Rewriting * in GENERATE requires a schema")
+            foundStar = true
+            genExprs ++= op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
+          }
+          else genExprs += ex
+        }
+        else genExprs += ex
+      }
+      else genExprs += ex
+    }
+    (genExprs.toList, foundStar)
+  }
+
+  def foreachGenerateWithAsterisk(term: Any): Option[PigOperator] = {
     term match {
       case op @Foreach(_, _, gen, _) => gen match {
         case GeneratorList(exprs) => {
-          if (exprs.size == 1 && exprs.head.expr.isInstanceOf[RefExpr]) {
-            val ref = exprs.head.expr.asInstanceOf[RefExpr]
-            if(ref.r.isInstanceOf[NamedField]) {
-              val field = ref.r.asInstanceOf[NamedField]
-              if (field.name == "*") {
-                if (op.inputSchema.isEmpty)
-                  throw RewriterException("Rewriting * in GENERATE requires a schema")
-                val genExprs = op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
-                val newGen = GeneratorList(genExprs.toList)
-                val newOp = Foreach(op.outputs.head, op.inputs.head, newGen, op.windowMode)
-                newOp.constructSchema
-                return Some(newOp)
-              }
-            }
+          val (genExprs, foundStar) = constructGeneratorList(exprs, op)
+          if (foundStar) {
+            val newGen = GeneratorList(genExprs.toList)
+            val newOp = Foreach(op.outputs.head, op.inputs.head, newGen, op.windowMode)
+            newOp.constructSchema
+            return Some(newOp)
           }
-          None
+          else
+            return None
         }
         case _ => None
+        }
+      case op@Generate(exprs) => {
+        val (genExprs, foundStar) = constructGeneratorList(exprs, op)
+        if (foundStar) {
+          val newOp = Generate(genExprs.toList)
+          newOp.copyPipes(op)
+          newOp.constructSchema
+          return Some(newOp)
+        }
+        else
+          return None
       }
       case _ => None
     }

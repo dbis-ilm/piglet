@@ -19,6 +19,7 @@ package dbis.test.pig
 
 import java.net.URI
 
+import dbis.pig.plan.DataflowPlan
 import dbis.test.TestTools._
 
 import dbis.pig._
@@ -686,5 +687,17 @@ class PigParserSpec extends FlatSpec {
     intercept[java.lang.IllegalArgumentException] {
       parseScript("fs -unknownCmd something;")
     }
+  }
+
+  it should "parse a script with embedded code" in {
+    val ops = parseScript(
+      """
+        |<% def someFunc(s: String): String = {
+        | s
+        |}
+        |%>
+        |A = LOAD 'file.csv';
+      """.stripMargin)
+      assert (ops(1) == Load(Pipe("A"), new URI("file.csv")))
   }
 }

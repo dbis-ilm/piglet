@@ -40,6 +40,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
    */
   val udfAliases = Map[String,(String,  List[dbis.pig.op.Value])]()
 
+  var code: String = ""
+
   constructPlan(operators)
 
   /**
@@ -57,16 +59,17 @@ class DataflowPlan(var operators: List[PigOperator]) {
     val pipes: Map[String, Pipe] = Map[String, Pipe]()
 
     /*
-     * 0. We remove all REGISTER, DEFINE and SET operators: they are just pseudo-operators.
-     *    Instead, we add their arguments to the additionalJars list and udfAliases map
+     * 0. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
+     *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
      */
     ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
     ops.filter(_.isInstanceOf[DefineCmd]).foreach { op =>
       val defineOp = op.asInstanceOf[DefineCmd]
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
     }
+    ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => code += op.asInstanceOf[EmbedCmd].code)
 
-    val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd])
+    val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd]).filterNot(_.isInstanceOf[EmbedCmd])
     val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])
     /*
      * 1. We create a Map from names to the pipes that *write* them.

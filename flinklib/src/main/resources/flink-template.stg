@@ -7,13 +7,14 @@ import dbis.flink._
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-query_object(name) ::= <<
+query_object(name, embedded_code) ::= <<
 object <name> {
+    <embedded_code>
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name) ::= <<
-    def main(args: Array[String]) {
+        def main(args: Array[String]) {
         val env = ExecutionEnvironment.getExecutionEnvironment<\n>
 >>
 

@@ -218,6 +218,8 @@ object Rewriter extends LazyLogging {
 
     val newPlan = new DataflowPlan(newPlanNodes.toList)
     newPlan.additionalJars ++= plan.additionalJars
+    newPlan.udfAliases ++= plan.udfAliases
+    newPlan.code = plan.code
     newPlan
   }
 

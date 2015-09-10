@@ -17,10 +17,10 @@
 
 package dbis.pig.tools
 
-import java.io.{File, FileOutputStream, FileWriter, InputStream, OutputStream}
+import java.io.{ File, FileOutputStream, FileWriter, InputStream, OutputStream }
 import java.util.jar.JarFile
 import dbis.pig._
-import dbis.pig.codegen.ScalaBackendCompile
+import dbis.pig.codegen._
 import dbis.pig.plan.DataflowPlan
 import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.backends.BackendManager
@@ -30,17 +30,17 @@ import java.nio.file.Files
 import java.nio.file.Paths
 
 object FileTools extends LazyLogging {
-  def copyStream(istream : InputStream, ostream : OutputStream) : Unit = {
-    var bytes =  new Array[Byte](1024)
+  def copyStream(istream: InputStream, ostream: OutputStream): Unit = {
+    var bytes = new Array[Byte](1024)
     var len = -1
-    while({ len = istream.read(bytes, 0, 1024); len != -1 })
+    while ({ len = istream.read(bytes, 0, 1024); len != -1 })
       ostream.write(bytes, 0, len)
   }
 
   def extractJarToDir(jarName: String, outDir: Path): Unit = {
-    
-    logger.debug(s"extracting jar $jarName to $outDir" )
-    
+
+    logger.debug(s"extracting jar $jarName to $outDir")
+
     val jar = new JarFile(jarName)
     val enu = jar.entries
     while (enu.hasMoreElements) {
@@ -48,13 +48,12 @@ object FileTools extends LazyLogging {
       val entryPath = entry.getName
 
       // we don't need the MANIFEST.MF file
-      if (! entryPath.endsWith("MANIFEST.MF")) {
+      if (!entryPath.endsWith("MANIFEST.MF")) {
 
         // println("Extracting to " + outDir + "/" + entryPath)
         if (entry.isDirectory) {
           Files.createDirectories(outDir.resolve(entryPath))
-        }
-        else {
+        } else {
           val istream = jar.getInputStream(entry)
           val ostream = new FileOutputStream(outDir.resolve(entryPath).toFile())
           copyStream(istream, ostream)
@@ -64,74 +63,80 @@ object FileTools extends LazyLogging {
       }
     }
   }
-  
-  def compileToJar(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean = false, backendJar: Path, templateFile: String): Option[Path] = {
+
+  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, templateFile: String, backend: String): Option[Path] = {
     // 4. compile it into Scala code for Spark
-    val compiler = new ScalaBackendCompile(templateFile) 
+    val generatorClass = Conf.backendGenerator(backend)
+    val extension = Conf.backendExtension(backend)
+    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
+    val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[Compile]
 
     // 5. generate the Scala code
     val code = compiler.compile(scriptName, plan)
 
     logger.debug("successfully generated scala program")
-    
+
     // 6. write it to a file
 
-    val outputDir =  outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
-    
+    val outputDir = outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
+
     logger.debug(s"outputDir: $outputDir")
-    
-    if(!Files.exists(outputDir)) {
+
+    if (!Files.exists(outputDir)) {
       Files.createDirectories(outputDir)
     }
-    
 
-    val outputDirectory = outputDir.resolve("out")  //s"${outputDir.getCanonicalPath}${File.separator}out"
+    val outputDirectory = outputDir.resolve("out") //s"${outputDir.getCanonicalPath}${File.separator}out"
     logger.debug(s"outputDirectory: $outputDirectory")
-    
+
     // check whether output directory exists
-    if(!Files.exists(outputDirectory)) {
+    if (!Files.exists(outputDirectory)) {
       Files.createDirectory(outputDirectory)
     }
-    
-    val outputFile = outputDirectory.resolve(s"$scriptName.scala")
+
+    val outputFile = outputDirectory.resolve(s"$scriptName.$extension")
     logger.debug(s"outputFile: $outputFile")
     val writer = new FileWriter(outputFile.toFile())
     writer.append(code)
     writer.close()
+    if (extension.equalsIgnoreCase("scala")) {
+      // 7. extract all additional jar files to output
+      plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
 
-    // 7. extract all additional jar files to output
-    plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
-    
-    // 8. copy the sparklib library to output
-    val jobJar = backendJar.toAbsolutePath().toString()
-    FileTools.extractJarToDir(jobJar, outputDirectory)
-    
-//    if (compileOnly) 
-//      return false // sys.exit(0)
+      // 8. copy the sparklib library to output
+      val jobJar = backendJar.toAbsolutePath().toString()
+      FileTools.extractJarToDir(jobJar, outputDirectory)
 
-    // 9. compile the scala code
-    if (!ScalaCompiler.compile(outputDirectory, outputFile))
-      return None
+      //    if (compileOnly) 
+      //      return false // sys.exit(0)
 
+      // 9. compile the scala code
+      if (!ScalaCompiler.compile(outputDirectory, outputFile))
+        return None
 
-    // 10. build a jar file
-    val jarFile = Paths.get(outDir.toAbsolutePath().toString(), scriptName, s"$scriptName.jar") //s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
-    
-    if(JarBuilder(outputDirectory, jarFile, verbose = false)) {
-      logger.info(s"created job's jar file at $jarFile")
-      return Some(jarFile)
-    } else 
-      return None
+      // 10. build a jar file
+      val jarFile = Paths.get(outDir.toAbsolutePath().toString(), scriptName, s"$scriptName.jar") //s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
+
+      if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
+        logger.info(s"created job's jar file at $jarFile")
+        return Some(jarFile)
+      } else
+        return None
+    } else {
+      if (CppCompiler.compile(outputDirectory.toString(), outputFile.toString(), CppCompilerConf.cppConf(backend))) {
+        logger.info(s"created job's file at $outputFile")
+        return Some(outputFile)
+      } else
+        return None
+    }
   }
 
-  
-  
-//  private def getTemplateFile(backend: String): String = {
-//    BuildSettings.backends.get(backend).get("templateFile")
-//  }
-//
-//  def getRunner(backend: String): Run = { 
-//    val className = BuildSettings.backends.get(backend).get("runClass")
-//    Class.forName(className).newInstance().asInstanceOf[Run]
-//  }
+  //  private def getTemplateFile(backend: String): String = {
+  //    BuildSettings.backends.get(backend).get("templateFile")
+  //  }
+  //
+  //  def getRunner(backend: String): Run = { 
+  //    val className = BuildSettings.backends.get(backend).get("runClass")
+  //    Class.forName(className).newInstance().asInstanceOf[Run]
+  //  }
 }
