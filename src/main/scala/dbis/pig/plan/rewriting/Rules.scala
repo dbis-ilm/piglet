@@ -19,40 +19,21 @@ package dbis.pig.plan.rewriting
 import scala.collection.mutable.ListBuffer
 import dbis.pig.op._
 import dbis.pig.plan.rewriting.Column.Column
+import dbis.pig.plan.rewriting.FilterUtils._
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.PipeNameGenerator.generate
 import dbis.pig.schema.{Field, Types}
 import org.kiama.rewriting.Rewriter._
+import org.kiama.rewriting.Strategy
 
 
 /** This object contains all the rewriting rules that are currently implemented
   *
   */
 object Rules {
-  /** Put Filters before Joins if we can figure out which side of the join contains the fields used in the Filters
-    * predicate
-    *
+  /** Put Filters before multipleInputOp if we can figure out which input of multipleInputOp contains the fields used in the Filters predicate
     */
-  def filterBeforeJoin(join: Join, filter: Filter): Option[Filter] = {
-    // Collect all Fields of the Filter operator
-    def extractFields(p: Expr): List[Ref] =
-      p match {
-        case RefExpr(Value(_)) => Nil
-        case RefExpr(r) => List(r)
-        case BinaryExpr(l, r) => extractFields(l) ++ extractFields(r)
-        case And(l, r) => extractFields(l) ++ extractFields(r)
-        case Or(l, r) => extractFields(l) ++ extractFields(r)
-        case Not(p) => extractFields(p)
-        case FlattenExpr(e) => extractFields(e)
-        case PExpr(e) => extractFields(e)
-        case CastExpr(t, e) => extractFields(e)
-        case MSign(e) => extractFields(e)
-        case Func(f, p) => p.flatMap(extractFields)
-        case ConstructBagExpr(ex) => ex.flatMap(extractFields)
-        case ConstructMapExpr(ex) => ex.flatMap(extractFields)
-        case ConstructTupleExpr(ex) => ex.flatMap(extractFields)
-      }
-
+  def filterBeforeMultipleInputOp(multipleInputOp: PigOperator, filter: Filter): Option[Filter] = {
     val fields = extractFields(filter.pred)
 
     if (fields.exists(field => !field.isInstanceOf[NamedField])) {
@@ -61,35 +42,8 @@ object Rules {
     }
 
     val namedfields = fields.map(_.asInstanceOf[NamedField])
-
-    val inputs = join.inputs.map(_.producer)
-
-    var inputWithCorrectFields: Option[PigOperator] = None
-
-    inputs foreach { inp =>
-      namedfields foreach { f =>
-        if (inp.schema.isEmpty) {
-          // The schema of an input is not defined, abort because it might or might not contain one of the fields
-          // we're looking for
-          return None
-        }
-
-        if (inp.schema.get.fields.exists(_.name == f.name)) {
-          if (inputWithCorrectFields.isEmpty) {
-            // We found an input that has the correct field and we haven't found one with a matching field before
-            inputWithCorrectFields = Some(inp)
-          }
-
-          if (inputWithCorrectFields.get != inp) {
-            // We found an input that has a field we're looking for but we already found an input with a matching
-            // field but it's not the same as the current input.
-            // TODO Just abort the operation for now - in the future, we could try to split push different Filters into
-            // multiple inputs of the Join.
-            return None
-          }
-        }
-      }
-    }
+    val inputs = multipleInputOp.inputs.map(_.producer)
+    var inputWithCorrectFields: Option[PigOperator] = findInputForFields(inputs, namedfields)
 
     if (inputWithCorrectFields.isEmpty) {
       // We did not find an input that has all the fields we're looking for - this might be because the fields are
@@ -102,38 +56,7 @@ object Rules {
     // We can't use fixInputsAndOutputs here because they don't work correctly for Joins
     val inp = inputWithCorrectFields.get
 
-    // First, make the Filter a consumer of the correct input
-    inp.outputs foreach { outp =>
-      if (outp.consumer contains join) {
-        outp.consumer = outp.consumer.filterNot(_ == join) :+ filter
-      }
-    }
-
-    filter.inputs.filterNot(_.producer == join) :+ Pipe(inp.outPipeName, inp)
-
-    // Second, make the Filter an input of the Join
-    join.inputs = join.inputs.filterNot(_.name == inp.outPipeName) :+ Pipe(filter.outPipeName, filter)
-
-    // Third, replace the Filter in the Joins outputs with the Filters outputs
-    join.outputs foreach { outp =>
-      if (outp.consumer contains filter) {
-        outp.consumer = outp.consumer.filterNot(_ == filter) ++ filter.outputs.flatMap(_.consumer)
-      }
-    }
-
-    // Fourth, make the Join the producer of all the Filters outputs inputs
-    filter.outputs foreach { outp =>
-      outp.consumer foreach { cons =>
-        cons.inputs map { cinp =>
-          if (cinp.producer == filter) {
-            Pipe(join.outPipeName, join)
-          } else {
-            cinp
-          }
-        }
-      }
-    }
-    Some(filter)
+    Some(pullOpAcrossMultipleInputOp(filter, multipleInputOp, inp).asInstanceOf[Filter])
   }
 
   /** Merges two [[dbis.pig.op.Filter]] operations if one is the only input of the other.
@@ -143,10 +66,25 @@ object Rules {
     * @return On success, an Option containing a new [[dbis.pig.op.Filter]] operator with the predicates of both input
     *         Filters, None otherwise.
     */
-  def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] =
+  def mergeFilters(parent: Filter, child: Filter): Option[Filter] = {
     Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
+  }
 
-  def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
+  /** Removes a [[dbis.pig.op.Filter]] object that's a successor of a Filter with the same Predicate
+    */
+  def removeDuplicateFilters = rulefs[Filter] {
+    case op@Filter(_, _, pred, _) => {
+      topdown(
+        attempt(
+          op.outputs.flatMap(_.consumer).
+            filter(_.isInstanceOf[Filter]).
+            filter { f: PigOperator => extractPredicate(f.asInstanceOf[Filter].pred) == extractPredicate(pred) }.
+            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, removalStrategy(pigOp)
+          )}))
+    }
+  }
+
+  def splitIntoToFilters(node: Any): Option[List[Filter]] = node match {
     case node@SplitInto(inPipeName, splits) =>
       val filters = (for (branch <- splits) yield branch.output.name -> Filter(branch.output, inPipeName, branch
         .expr)).toMap
@@ -838,10 +776,12 @@ object Rules {
   }
 
   def registerAllRules = {
+    addStrategy(removeDuplicateFilters)
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
     reorder[OrderBy, Filter]
-    addStrategy(buildBinaryPigOperatorStrategy(filterBeforeJoin))
+    addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
+    addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
     addOperatorReplacementStrategy(R1)

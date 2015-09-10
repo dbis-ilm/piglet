@@ -568,6 +568,59 @@ object Rewriter extends LazyLogging {
     newParent
   }
 
+  /** Changes inputs and outputs so that ``toBePulled`` is between ``multipleInputOp`` and ``indicator``.
+    *
+    * ``toBePulled`` has to be a consumer of ``multipleInputOp``s output pipes.
+    * @param toBePulled
+    * @param multipleInputOp
+    * @param indicator
+    * @return
+    */
+  def pullOpAcrossMultipleInputOp(toBePulled: PigOperator, multipleInputOp: PigOperator, indicator: PigOperator):
+  PigOperator = {
+    require(multipleInputOp.outputs.flatMap(_.consumer) contains toBePulled, "toBePulled is not a consumer of " +
+      "multipleInputOp")
+    // First, make the toBePulled a consumer of the correct input
+    indicator.outputs foreach { outp =>
+      if (outp.consumer contains multipleInputOp) {
+        outp.consumer = outp.consumer.filterNot(_ == multipleInputOp) :+ toBePulled
+      }
+    }
+
+    toBePulled.inputs = toBePulled.inputs.filterNot(_.producer == multipleInputOp) :+ Pipe(indicator.outPipeName,
+      indicator)
+
+    // Second, make the toBePulled an input of the multipleInputOp
+    multipleInputOp.inputs = multipleInputOp.inputs.filterNot(_.name == indicator.outPipeName) :+ Pipe(toBePulled.outPipeName, toBePulled)
+
+    // Third, replace the toBePulled in the multipleInputOps outputs with the Filters outputs
+    multipleInputOp.outputs foreach { outp =>
+      if (outp.consumer contains toBePulled) {
+        outp.consumer = outp.consumer.filterNot(_ == toBePulled) ++ toBePulled.outputs.flatMap(_.consumer)
+      }
+    }
+
+    // Fourth, make the multipleInputOp the producer of all the toBePulleds outputs inputs
+    toBePulled.outputs foreach { outp =>
+      outp.consumer foreach { cons =>
+        cons.inputs map { cinp =>
+          if (cinp.producer == toBePulled) {
+            Pipe(multipleInputOp.outPipeName, multipleInputOp)
+          } else {
+            cinp
+          }
+        }
+      }
+    }
+
+    // Fifth, make multipleInputOp the consumer of all of toBePulled output pipes
+    toBePulled.outputs foreach { outp =>
+      outp.consumer = List(multipleInputOp)
+    }
+
+    toBePulled
+  }
+
   def processMaterializations(plan: DataflowPlan, mm: MaterializationManager): DataflowPlan = {
     require(plan != null, "Plan must not be null")
     require(mm != null, "Materialization Manager must not be null")

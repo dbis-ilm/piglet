@@ -23,8 +23,7 @@ object PigBuild extends Build {
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
     dependsOn(mapreduce % "test;it").
-    dependsOn(pipefabric % "test;it").
-    aggregate(common, sparklib, flinklib,mapreduce, pipefabric/*, pfabricdeploy*/) // remove this if you don't want to automatically build these projects when building piglet 
+    aggregate(common, sparklib, flinklib,mapreduce) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -40,17 +39,7 @@ object PigBuild extends Build {
   lazy val mapreduce = (project in file("mapreduce")).
     settings(commonSettings: _*).
     dependsOn(common)
-    
-  /*lazy val pfabricdeploy = (project in file("pfabricdeploy")).
-    settings(commonSettings: _*)
-   */
-  lazy val pipefabric = (project in file("pipefabric")).
-    settings(commonSettings: _*).
-    dependsOn(common)//.
-    //dependsOn(pfabricdeploy)
-    
-
-    
+        
 
   /*
    * define the backend for the compiler: currently we support spark and flink
@@ -61,7 +50,6 @@ object PigBuild extends Build {
     case "flink" | "flinks" => Seq(Dependencies.flinkDist % "test;it" from Dependencies.flinkAddress)
     case "spark" | "sparks" => Seq(Dependencies.sparkCore % "test;it", Dependencies.sparkSql % "test;it")
     case "mapreduce" => Seq(Dependencies.pig % "test;it")
-    //case "pipefabric" => Seq.empty[String]
     case _ => println(s"Unsupported backend: $backend ! I don't know which dependencies to include!"); Seq.empty[ModuleID]
   }
   
@@ -70,7 +58,6 @@ object PigBuild extends Build {
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
     case "mapreduce" => Seq.empty[String] // TODO
-    case "pipefabric" => Seq.empty[String]
     case _ => println(s"Unsupported backend: $backend - Will execute no tests"); Seq.empty[String]
   }
 }
