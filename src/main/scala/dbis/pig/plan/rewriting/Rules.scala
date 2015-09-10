@@ -16,9 +16,12 @@
  */
 package dbis.pig.plan.rewriting
 
+import scala.collection.mutable.ListBuffer
 import dbis.pig.op._
+import dbis.pig.plan.rewriting.Column.Column
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.PipeNameGenerator.generate
+import dbis.pig.schema.{Field, Types}
 import org.kiama.rewriting.Rewriter._
 
 
@@ -141,7 +144,7 @@ object Rules {
     *         Filters, None otherwise.
     */
   def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] =
-    Some(Filter(child.out, parent.in, And(parent.pred, child.pred)))
+    Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
 
   def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
     case node@SplitInto(inPipeName, splits) =>
@@ -206,27 +209,65 @@ object Rules {
     * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
     */
   //noinspection ScalaDocMissingParameterDescription
-  def R1(term: Any): Option[Load] = term match {
-    case op@RDFLoad(p, uri, None) =>
-      if (uri.getScheme == "http" || uri.getScheme == "https") {
-        Some(Load(p, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
-      } else {
-        None
-      }
-    case _ => None
+  def R1(term: Any): Option[Load] = {
+    term match {
+      case op@RDFLoad(_, uri, None) =>
+        // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
+        if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
+          return None
+        }
+
+        if (op.BGPFilterIsReachable) {
+          return None
+        }
+
+        if (uri.getScheme == "http" || uri.getScheme == "https") {
+          Some(Load(op.outputs.head, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
+        } else {
+          None
+        }
+      case _ => None
+    }
   }
 
   /** Applies rewriting rule R2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
-    *
-    * @param parent
-    * @param child
-    * @return
     */
   //noinspection ScalaDocMissingParameterDescription
-  def R2(parent: RDFLoad, child: BGPFilter): Option[Load] = {
-    Some(Load(child.out, parent.uri, parent.schema, "pig.SPARQLLoader",
-      List(child.patterns.head.toString))
-    )
+  def R2 = rulefs[RDFLoad] {
+    case op =>
+      /** Finds the next BGPFilter object reachable from ``op``.
+        */
+      def nextBGPFilter(op: PigOperator): Option[BGPFilter] = op match {
+        case bf@BGPFilter(_, _, _) => Some(bf)
+        // We need to make sure that each intermediate operator has only one successor - if it has multiple, we can't
+        // pull up the BGPFilter because its patterns don't apply to all successors of the RDFLoad
+        case _ : OrderBy | _ :Distinct | _ : Limit | _ : RDFLoad
+          if op.outputs.flatMap(_.consumer).length == 1 => op.outputs.flatMap(_.consumer).map(nextBGPFilter).head
+        case _ => None
+      }
+
+      val bf = nextBGPFilter(op)
+
+      if (bf.isDefined) {
+        // This is the function we'll use for replacing RDFLoad with Load
+        def replacer = buildOperatorReplacementStrategy { sop: Any =>
+          if (sop == op) {
+            Some(Load(op.outputs.head, op.uri, op.schema, "pig.SPARQLLoader",
+              List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(bf.get.patterns))))
+          } else {
+            None
+          }
+        }
+
+        // This is the function we'll use to remove the BGPFilter
+        def remover = topdown(attempt(removalStrategy(bf.get)))
+
+        val strategy = ior(replacer, remover)
+        strategy
+      }
+      else {
+        fail
+      }
   }
 
   /** Applies rewriting rule L2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -255,9 +296,7 @@ object Rules {
         fail
       } else {
         val pattern = patterns.head
-        if (!pattern.subj.isInstanceOf[Value]
-          && !pattern.pred.isInstanceOf[Value]
-          && !pattern.obj.isInstanceOf[Value]) {
+        if (RDF.allUnbound(pattern)) {
           removalStrategy(op)
         } else {
           fail
@@ -285,19 +324,19 @@ object Rules {
 
       val pattern = patterns.head
       var filter : Option[Filter] = None
+      val bound_column = RDF.getBoundColumn(pattern)
 
-      if (pattern.subj.isInstanceOf[Value]
-        && !pattern.pred.isInstanceOf[Value]
-        && !pattern.obj.isInstanceOf[Value]) {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
-      } else if (!pattern.subj.isInstanceOf[Value]
-        && pattern.pred.isInstanceOf[Value]
-        && !pattern.obj.isInstanceOf[Value]) {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
-      } else if (!pattern.subj.isInstanceOf[Value]
-        && !pattern.pred.isInstanceOf[Value]
-        && pattern.obj.isInstanceOf[Value]) {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+      filter = bound_column.flatMap { col: Column =>
+        if (col == Column.Subject) {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+        } else if (col == Column.Predicate) {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+        } else if (col == Column.Object) {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+        } else {
+          // In reality, one of the above cases should always match
+          None
+        }
       }
 
       if (filter.isDefined) {
@@ -366,6 +405,11 @@ object Rules {
         return None
       }
 
+      if (op.inputSchema.isEmpty
+        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+        return None
+      }
+
       if (patterns.length != 1) {
         return None
       }
@@ -374,21 +418,22 @@ object Rules {
 
       val pattern = patterns.head
       var filter : Option[Filter] = None
-      if (pattern.subj.isInstanceOf[Value]
-        && !pattern.pred.isInstanceOf[Value]
-        && !pattern.obj.isInstanceOf[Value]
-        && grouped_by == "subject") {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
-      } else if (!pattern.subj.isInstanceOf[Value]
-        && pattern.pred.isInstanceOf[Value]
-        && !pattern.obj.isInstanceOf[Value]
-        && grouped_by == "predicate") {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
-      } else if (!pattern.subj.isInstanceOf[Value]
-        && !pattern.pred.isInstanceOf[Value]
-        && pattern.obj.isInstanceOf[Value]
-        && grouped_by == "object") {
-        filter = Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+      val bound_column = RDF.getBoundColumn(pattern)
+
+      filter = bound_column.flatMap { col: Column =>
+        if (col == Column.Subject
+          && grouped_by == "subject") {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+        } else if (col == Column.Predicate
+          && grouped_by == "predicate") {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+        } else if (col == Column.Object
+          && grouped_by == "object") {
+          Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+        } else {
+          // In reality, one of the above cases should always match
+          None
+        }
       }
 
       if (filter.isDefined) {
@@ -396,6 +441,92 @@ object Rules {
       }
 
       return filter
+    case _ => None
+  }
+
+  def F5(term: Any): Option[Foreach] = term match {
+    case op @ BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
+
+      if (op.inputSchema == RDFLoad.plainSchema) {
+        return None
+      }
+
+      if (op.inputSchema.isEmpty
+        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+        return None
+      }
+
+      if (patterns.length != 1) {
+        return None
+      }
+
+      // TODO we make a lot of assumptions about Options and Array lengths here
+      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+      val pattern = patterns.head
+
+      // Check if the column that's grouped by is not bound in this pattern
+      val bound_column = RDF.getBoundColumn(pattern)
+
+      val applies =  grouped_by match {
+        case "subject" if bound_column contains Column.Subject => false
+        case "predicate" if bound_column contains Column.Predicate => false
+        case "object" if bound_column contains Column.Object => false
+        // Just in case there's no bound column
+        case _ if bound_column.isEmpty => false
+        case _ => true
+      }
+
+      // If not, this rule doesn't apply
+      if (!applies) {
+        return None
+      }
+
+      val internalPipeName = generate
+      val intermediateResultName = generate
+      val filter_by = Column.columnToNamedField(bound_column.get)
+      val filter_value = bound_column.get match {
+        case Column.Subject => pattern.subj
+        case Column.Predicate => pattern.pred
+        case Column.Object => pattern.obj
+      }
+
+      val bagConstructor = ConstructBag(Pipe("stmts"), DerefTuple(NamedField(in.name), NamedField("stmts")))
+
+      val foreach =
+        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
+          bagConstructor,
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField(intermediateResultName)))),
+                Some(Field("cnt", Types.ByteArrayType))))))))
+
+      val filter = Filter(out, Pipe(internalPipeName, foreach),
+                    Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
+
+      foreach.outputs foreach (_.addConsumer(filter))
+
+      filter.outputs foreach { output =>
+        output.consumer foreach { consumer =>
+          consumer.inputs foreach { input =>
+            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
+            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
+            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
+            // that.
+            if (input.producer == op) {
+              input.producer = filter
+            }
+          }
+        }
+      }
+
+      in.removeConsumer(op)
+
+      Some(foreach)
     case _ => None
   }
 
@@ -413,6 +544,11 @@ object Rules {
         return None
       }
 
+      if (op.inputSchema.isEmpty
+        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+        return None
+      }
+
       if (patterns.length != 1) {
         return None
       }
@@ -423,15 +559,16 @@ object Rules {
       val pattern = patterns.head
 
       // Check if the column that's grouped by is bound in this pattern
-      val applies = pattern match {
-        case TriplePattern(Value(_), _, _) if grouped_by == "subject" => true
-        case TriplePattern(_, Value(_), _) if grouped_by == "predicate" => true
-        case TriplePattern(_, _, Value(_)) if grouped_by == "object" => true
+      val bound_columns = RDF.getAllBoundColumns(pattern)
+      val applies =  grouped_by match {
+        case "subject" if bound_columns contains Column.Subject => true
+        case "predicate" if bound_columns contains Column.Predicate => true
+        case "object" if bound_columns contains Column.Object => true
         case _ => false
       }
 
       // If not, this rule doesn't apply
-      if (!applies) {
+      if (!(applies && bound_columns.length == 2)) {
         return None
       }
 
@@ -515,6 +652,11 @@ object Rules {
         return None
       }
 
+      if (op.inputSchema.isEmpty
+        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+        return None
+      }
+
       if (patterns.length != 1) {
         return None
       }
@@ -581,6 +723,11 @@ object Rules {
     case _ => None
   }
 
+  /** Applies rewriting rule F8 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    * @param term
+    * @return Some BGPFilter objects if the input filters BGP is a star join.
+    */
   def J1(term: Any): Option[List[BGPFilter]] = term match {
     case op @ BGPFilter(_, _, patterns) =>
       val out = op.outputs.head
@@ -608,32 +755,14 @@ object Rules {
         return None
       }
 
-      val anyTripleHasMoreThanOneNamedField = namedFields.toList.map {
-        _ match {
-          case (Some(NamedField(_)), Some(NamedField(_)), _) => true
-          case (Some(NamedField(_)), _, Some(NamedField(_))) => true
-          case (_, Some(NamedField(_)), Some(NamedField(_))) => true
-          case _ => false
-        }
-      }.exists(_ == true)
-
-      if(anyTripleHasMoreThanOneNamedField) {
-        // One of the triples has multiple NamedFields, so it's not a star join
+      if (!RDF.isStarJoin(patterns)) {
         return None
       }
 
       // We'll reuse in later on, so we need to remove `op` from its consumers
       in.removeConsumer(op)
 
-      val fieldname = namedFields map {
-        case (Some(n@ NamedField(_)), _, _) => n
-        case (_, Some(n @ NamedField(_)), _) => n
-        case (_, _, Some(n @ NamedField(_))) => n
-        // The early returns in this method should cover all cases where the above 3 cases would not be exhaustive,
-        // so just throw an exception if they're not.
-        case _ => throw new IllegalStateException("This code should not have been reached, you've found a bug")
-      } head
-
+      val fieldname = RDF.starJoinColumn(patterns).get._2
       val filters = patterns map {p => BGPFilter(Pipe(generate), in, List(p))}
       val join = Join(out,
                       filters map {f => Pipe(f.outPipeName, f)},
@@ -647,28 +776,62 @@ object Rules {
     case _ => None
   }
 
-  def foreachGenerateWithAsterisk(term: Any): Option[Foreach] = {
-    term match {
-      case op @Foreach(_, _, gen, _, _) => gen match {
-        case GeneratorList(exprs) => {
-          if (exprs.size == 1 && exprs.head.expr.isInstanceOf[RefExpr]) {
-            val ref = exprs.head.expr.asInstanceOf[RefExpr]
-            if(ref.r.isInstanceOf[NamedField]) {
-              val field = ref.r.asInstanceOf[NamedField]
-              if (field.name == "*") {
-                if (op.inputSchema.isEmpty)
-                  throw RewriterException("Rewriting * in GENERATE requires a schema")
-                val genExprs = op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
-                val newGen = GeneratorList(genExprs.toList)
-                val newOp = Foreach(op.out, op.in, newGen, op.windowMode)
-                newOp.constructSchema
-                return Some(newOp)
-              }
-            }
+  /**
+   * Process the list of generator expressions in GENERATE and replace the * by the list of named fields
+   *
+   * @param exprs
+   * @param op
+   * @return
+   */
+  def constructGeneratorList(exprs: List[GeneratorExpr], op: PigOperator): (List[GeneratorExpr], Boolean) = {
+    val genExprs: ListBuffer[GeneratorExpr] = ListBuffer()
+    var foundStar: Boolean = false
+    for (ex <- exprs) {
+      if (ex.expr.isInstanceOf[RefExpr]) {
+        val ref = ex.expr.asInstanceOf[RefExpr]
+        if (ref.r.isInstanceOf[NamedField]) {
+          val field = ref.r.asInstanceOf[NamedField]
+          if (field.name == "*") {
+            if (op.inputSchema.isEmpty)
+              throw RewriterException("Rewriting * in GENERATE requires a schema")
+            foundStar = true
+            genExprs ++= op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
           }
-          None
+          else genExprs += ex
+        }
+        else genExprs += ex
+      }
+      else genExprs += ex
+    }
+    (genExprs.toList, foundStar)
+  }
+
+  def foreachGenerateWithAsterisk(term: Any): Option[PigOperator] = {
+    term match {
+      case op @Foreach(_, _, gen, _) => gen match {
+        case GeneratorList(exprs) => {
+          val (genExprs, foundStar) = constructGeneratorList(exprs, op)
+          if (foundStar) {
+            val newGen = GeneratorList(genExprs.toList)
+            val newOp = Foreach(op.outputs.head, op.inputs.head, newGen, op.windowMode)
+            newOp.constructSchema
+            return Some(newOp)
+          }
+          else
+            return None
         }
         case _ => None
+        }
+      case op@Generate(exprs) => {
+        val (genExprs, foundStar) = constructGeneratorList(exprs, op)
+        if (foundStar) {
+          val newOp = Generate(genExprs.toList)
+          newOp.copyPipes(op)
+          newOp.constructSchema
+          return Some(newOp)
+        }
+        else
+          return None
       }
       case _ => None
     }
@@ -677,17 +840,17 @@ object Rules {
   def registerAllRules = {
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
-    merge[RDFLoad, BGPFilter](R2)
     reorder[OrderBy, Filter]
     addStrategy(buildBinaryPigOperatorStrategy(filterBeforeJoin))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
-    addOperatorReplacementStrategy(R1 _)
-    addOperatorReplacementStrategy(L2 _)
+    addOperatorReplacementStrategy(R1)
+    addStrategy(R2)
+    addOperatorReplacementStrategy(L2)
     addStrategy(F1)
-    addOperatorReplacementStrategy(F2 _)
-    addOperatorReplacementStrategy(F3 _)
-    addOperatorReplacementStrategy(F4 _)
+    addOperatorReplacementStrategy(F2)
+    addOperatorReplacementStrategy(F3)
+    addOperatorReplacementStrategy(F4)
     addStrategy(F7 _)
     addStrategy(F8 _)
     addStrategy(strategyf(t => J1(t)))

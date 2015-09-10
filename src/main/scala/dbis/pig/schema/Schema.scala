@@ -71,7 +71,7 @@ case class Schema(var element: BagType) {
   @throws[SchemaException]("if the schema doesn't contain a field with the given name")
   def field(name: String): Field = {
     val idx = indexOfField(name)
-    if (idx == -1) throw SchemaException("unkown field '" + name + "' in "+ this)
+    if (idx == -1) throw SchemaException("unknown field '" + name + "' in "+ this)
     field(idx)
   }
 

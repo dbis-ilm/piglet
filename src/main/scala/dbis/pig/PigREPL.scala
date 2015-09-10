@@ -211,8 +211,9 @@ object PigREPL extends PigParser with LazyLogging {
 
         val templateFile = backendConf.templateFile
         val jobJar = Conf.backendJar(backend)
+ 
         
-        FileTools.compileToJar(plan, "script", Paths.get("."), false, jobJar, templateFile) match {
+        FileTools.compilePlan(plan, "script", Paths.get("."), false, jobJar, templateFile, backend) match {
           case Some(jarFile) =>
             val runner = backendConf.runnerClass
             runner.execute("local", "script", jarFile)

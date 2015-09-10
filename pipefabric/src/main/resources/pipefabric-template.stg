@@ -1,0 +1,262 @@
+// ----------------- header declaration -----------------
+init_code(includes) ::= <<
+#include "pipefabric.hpp"
+<if (includes)><includes:includeItem()><endif>
+
+using namespace pfabric;
+<\n>
+>>
+
+includeItem(it) ::= <<
+#include "<it>.hpp"
+
+>>
+
+// ----------------- begin of code building and initializing the query -----------------
+begin_query() ::= <<
+void buildQuery(QueryContext& qctx) {<\n>
+>>
+
+// ----------------- code for tuple typedefs -----------------
+tuple_typedef(tuple_struct, type_name) ::= <<
+typedef pfabric::Tuple\<<tuple_struct>\> <type_name>_;
+typedef pfabric::TuplePtr\<<type_name>_> <type_name>Ptr_;<\n>
+>>
+
+// ----------------- parameterizing the operators of the query -----------------
+parameterize_query() ::= <<
+        qctx.parameterizeOperators();<\n>
+>>
+
+// ----------------- begin of the code initializing a timer  -----------------
+exec_time_begin() ::= <<
+    boost::chrono::system_clock::time_point start = boost::chrono::system_clock::now();<\n>
+>>
+
+// ----------------- end of the code to find the execution time -----------------
+exec_time_end() ::= <<
+    boost::chrono::duration\<double> sec = boost::chrono::system_clock::now() - start;
+    std::cout\<\< "took " \<\< sec.count() \<\< " seconds\n";<\n>
+>>
+
+// ----------------- end of the code implementing the query -----------------
+end_query() ::= <<
+}
+>>
+
+// ----------------- code for LOAD operator -----------------
+
+// ----------------- code for FileSource operator -----------------
+file_source(op_name, input_file, tuple_type, ifs) ::= <<
+        auto <op_name>_ = ns_types::make_shared\<FileSource\<<tuple_type>Ptr_>\>("<input_file>"<if (ifs)>, "<ifs>"<endif>);
+        qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+source_start(op_name) ::= <<
+        <op_name>_->start();<\n>
+>>
+
+// ----------------- code for DBSource operator -----------------
+db_source(op_name, tuple_type,  db_connection, prepare, query) ::= << 
+    auto prepareFun =
+            [&](const soci::row& r) {
+                auto tp = makeTuplePtr(<prepare>);
+                return tp;
+            };
+    auto <op_name>_ = ns_types::make_shared\<DBSource\<<tuple_type>Ptr_>\>("<db_connection>",
+            "<query>", prepareFun);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+db_source_start(op_name) ::= <<
+    <op_name>_->start();<\n>
+>>
+
+
+// ----------------- code for SPARQLSource operator ----------------- 
+sparql_source(op_name, backend, tuple_type, endpoint, query) ::= << 
+    auto <op_name>_ = ns_types::make_shared\<SPARQLSource\<<tuple_type>Ptr_>\>("<backend>","<endpoint>", "<query>");
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+sparql_source_start(op_name) ::= <<
+    <op_name>_->start();<\n>
+>>
+
+// ----------------- end the code for LOAD operator -----------------
+
+
+// ----------------- code for store operator -----------------
+store(op_name, input, tuple_type, stream, file) ::= <<
+        <if (use_format)>
+            auto <op_name>_formatter_fun = [&](std::ostream& os, const <tuple_type>Ptr_& tp) { 
+                os \<\< <format> \<\< std::endl;<\n> 
+            };<\n>
+        <endif>
+        auto <op_name>_ = ns_types::make_shared\<StreamWriter\<<tuple_type>Ptr_>\>("<file>"<if (use_format)>, <op_name>_formatter_fun<endif>);
+        makeLink(<input>_, <op_name>_);
+        qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+// ----------------- code for dump operator writing to std::cout -----------------
+dump(op_name, input, tuple_type) ::= <<
+        auto <op_name>_ = ns_types::make_shared\<StreamWriter\<<tuple_type>Ptr_>\>(std::cout);
+        makeLink(<input>_, <op_name>_);
+        qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+// ----------------- code for filter operator -----------------
+filter(op_name, input, tuple_type, expr) ::= <<
+        auto <op_name>_ = ns_types::make_shared\<Filter\<<tuple_type>Ptr_>\>([&](const <tuple_type>Ptr_& tp) { return <expr>; });
+        makeLink(<input>_, <op_name>_);
+        qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+// ----------------- code for project operator ----------------- 
+foreach(op_name, input, in_tuple_type, out_tuple_type, expr) ::= <<
+    auto <op_name>_ = ns_types::make_shared\<Projection\<<in_tuple_type>Ptr_, <out_tuple_type>Ptr_>\>([&](const <in_tuple_type>Ptr_& tp) { 
+       auto newTup = makeTuplePtr(<expr>);
+       return newTup;
+    });
+    makeLink(<input>_, <op_name>_);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+// ----------------- code for union operator ----------------- 
+union(op_name, tuple_type, input1, input2) ::= <<
+    auto <op_name>_ = ns_types::make_shared\<Merge\<<tuple_type>Ptr_>\>();
+    makeLinks(<input1>_, <input2>_, <op_name>_);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+
+// ----------------- code for relation hash join operator ----------------- 
+relh_join(op_name, input1, ltuple_type, input2, rtuple_type, lhash_expr, rhash_expr, join_predicate, outer) ::= <<
+    auto <op_name>_join_pred = [&](<ltuple_type>Ptr_ tp1, <rtuple_type>Ptr_ tp2) { 
+        return <join_predicate>; 
+    };
+    auto <op_name>_lhash_fun = [&](<ltuple_type>Ptr_ tp) { 
+        std::size_t seed = 0; 
+        <lhash_expr> 
+        return seed; 
+    };
+    auto <op_name>_rhash_fun = [&](<rtuple_type>Ptr_ tp) { 
+        std::size_t seed = 0; 
+        <rhash_expr> 
+        return seed; 
+    };
+    auto <op_name>_ = ns_types::make_shared\<RHJoin\<<ltuple_type>Ptr_, <rtuple_type>Ptr_\>>(<op_name>_lhash_fun, <op_name>_rhash_fun, <op_name>_join_pred, false);
+    makeLinks(<input1>_, <input2>_, <op_name>_);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+// ----------------- code for ZMQSource operator ----------------- 
+zmq_source(op_name, endpoint, tuple_type) ::= << 
+    auto <op_name>_ = ns_types::make_shared\<ZMQSource\<<tuple_type>Ptr_>\>("<endpoint>", ZMQParams::SubscriberSource, ZMQParams::BinaryMode);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+zmq_sink(op_name, input, endpoint, tuple_type) ::= << 
+    auto <op_name>_ = ns_types::make_shared\<ZMQSink\<<tuple_type>Ptr_>\>("<endpoint>", ZMQParams::PublisherSink, ZMQParams::BinaryMode);
+    makeLink(<input>, <op_name>_);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+// ----------------- code for Window operator ----------------- 
+sliding_window(op_name, input, win_type, tuple_type, win_size, slide_len) ::= <<
+    auto <op_name>_ = ns_types::make_shared\<SlidingWindow\<<tuple_type>Ptr_>\>(WindowParams::<win_type>, <win_size>, <slide_len>);
+    makeLink(<input>_, <op_name>_);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+
+// ----------------- code for TopK operator -----------------
+order_by(op_name, input, tuple_type, expr,  limit, slide_len, op) ::= <<
+    auto <op_name>ComparePredicate =
+            [&](const <tuple_type>Ptr_& tp, const <tuple_type>Ptr_& tp1) { return <expr> };
+    auto <op_name>_ = ns_types::make_shared\<Sorter\<<tuple_type>Ptr_>\>(<op_name>ComparePredicate <if (limit)>, <limit> <endif><if (slide_len)>, <slide_len><endif>); 
+    makeLink(<input>_, <op_name>_);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+
+>>
+
+// ----------------- code for Aggregate helper  ---------------
+aggr_helper(op_name, aggr_fun, init) ::= <<
+struct <op_name>AggregateState : public BaseAggregateState {
+    <aggr_fun>
+
+    <op_name>AggregateState() { init(); }
+
+    virtual void init() override {
+        <init>
+    }
+
+    virtual AggregateStatePtr clone() const override {
+        return ns_types::make_shared\<<op_name>AggregateState>();
+    }
+};
+<\n>
+>>
+
+// ----------------- code for Aggregate operator -----------------
+aggr(op_name, in_tuple_type, out_tuple_type, input, iterate, finalize, slen,  realtime) ::= <<
+    auto <op_name>_iterate_fun = [&](const <in_tuple_type>Ptr_& tp, AggregateStatePtr state, bool outdated) {
+        auto myState = dynamic_cast\<<op_name>AggregateState *>(state.get());
+        <iterate>
+    };
+    auto <op_name>_final_fun =  [&](AggregateStatePtr state, Timestamp ts) {
+        auto myState = dynamic_cast\<<op_name>AggregateState *>(state.get());
+        auto tp = makeTuplePtr(<finalize>);
+        tp->setTimestamp(ts);
+        return tp;
+    };
+    
+    auto <op_name>_ = ns_types::make_shared\<NRAggregation\<<in_tuple_type>Ptr_, <out_tuple_type>Ptr_>\>(std::make_shared\<<op_name>AggregateState>(), <op_name>_final_fun, <op_name>_iterate_fun, <slen>);                            
+    makeLink(<input>_, <op_name>_);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>
+
+// ----------------- code for GroupedAggregate helper  --------------- 
+gaggr_helper(op_name, aggr_fun, init, match) ::= <<
+template \<class T>
+struct <op_name>AggregateState : public GroupedAggregateState\<T> {
+    <aggr_fun>
+
+    <op_name>AggregateState() { init(); }
+
+    virtual void init() override {
+        <init>
+    }
+
+    bool groupMatches(const T& tp) const {
+        return <match>;
+    } 
+    virtual GroupedAggregateStatePtr\<T> clone() const override {
+        return ns_types::make_shared\<<op_name>AggregateState\<T>\>();
+    }
+};
+<\n>
+>>
+
+// ----------------- code for GroupedAggregate operator ----------------- 
+gaggr(op_name, in_tuple_type, out_tuple_type, input, hash, iterate, finalize, slen, realtime) ::= <<
+    auto <op_name>_grouping_fun = [&](const <in_tuple_type>Ptr_& tp) {
+        std::size_t seed = 0;
+        <hash>
+        return seed;
+    };
+    auto <op_name>_iterate_fun = [&](const <in_tuple_type>Ptr_& tp, GroupedAggregateStatePtr\<<in_tuple_type>Ptr_> state, bool outdated) {
+        auto myState = dynamic_cast\<<op_name>AggregateState\<<in_tuple_type>Ptr_>*>(state.get());
+        <iterate>
+    };
+    auto <op_name>_final_fun =  [&](GroupedAggregateStatePtr\<<in_tuple_type>Ptr_> state, Timestamp ts) {
+        auto myState = dynamic_cast\<<op_name>AggregateState\<<in_tuple_type>Ptr_>*>(state.get());
+        auto tp = makeTuplePtr(<finalize>);
+        tp->setTimestamp(ts);
+        return tp;
+    };
+    
+    auto <op_name>_ = ns_types::make_shared\<GroupedAggregation\<<in_tuple_type>Ptr_, <out_tuple_type>Ptr_>\>(std::make_shared\<<op_name>AggregateState\<<in_tuple_type>Ptr_>\>(), <op_name>_grouping_fun, <op_name>_final_fun, <op_name>_iterate_fun, <slen>);                           
+    makeLink(<input>_, <op_name>_);
+    qctx.registerOperator("<op_name>", <op_name>_);<\n>
+>>

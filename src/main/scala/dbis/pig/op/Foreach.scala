@@ -54,14 +54,14 @@ case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
 /**
  * Foreach represents the FOREACH operator of Pig.
  *
- * @param initialOutPipeName the name of the output pipe (relation).
- * @param initialInPipeName the name of the input pipe
+ * @param out the output pipe (relation).
+ * @param in the input pipe
  * @param generator the generator (a list of expressions or a subplan)
+ * @param windowMode ???
  */
 case class Foreach(out: Pipe,
                    in: Pipe,
                    generator: ForeachGenerator,
-                   streaming: Boolean = false,
                    var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
@@ -267,6 +267,11 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
   _inputs = List()
 
   var parentOp: Foreach = null
+
+  def copyPipes(op: Generate): Unit = {
+    _inputs = op._inputs
+    _outputs = op._outputs
+  }
 
   /**
    * Check all generate expressions and derive from the NamedField objects all possible

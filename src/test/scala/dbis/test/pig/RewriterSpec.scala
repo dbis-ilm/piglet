@@ -218,18 +218,19 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
 
   it should "apply rewriting rule R2" in {
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
-    val op2 = BGPFilter(Pipe("b"), Pipe("a"),
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List(OrderBySpec(NamedField("subject"), OrderByDirection.DescendingOrder)))
+    val op3 = BGPFilter(Pipe("c"), Pipe("b"),
       List(
         TriplePattern(
           PositionalField(0),
           Value(""""firstName""""),
           Value(""""Stefan""""))))
-    val op3 = Dump(Pipe("b"))
-    val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
+    val op4 = Dump(Pipe("c"))
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
-    assume(false, "The conversion of TriplePatterns to Strings is not yet implemented")
-    source shouldBe Load(Pipe("b"), "http://example.com", op1.schema, "pig.SPARQLLoader",
-      List("""SELECT * WHERE { $0 "firstName" "Stefan" }"""))
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, "pig.SPARQLLoader",
+      List("""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }"""))
+    plan.operators should not contain op3
   }
 
   it should "apply rewriting rule L2" in {
@@ -386,6 +387,76 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     }
   }
 
+  it should "apply rewriting rule F5" in {
+    assume(false, "Filters in Foreach do not yet work")
+    Random.setSeed(123456789)
+    val patterns = Table(
+      ("Pattern", "grouping column", "ForEach", "Filter"),
+      (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
+        "subject",
+        Foreach(Pipe("random"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("random2"), Pipe("stmts"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")))),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                                List(RefExpr(NamedField("t")))),
+                                Some(Field("cnt", Types.ByteArrayType)))))))),
+        Filter(Pipe("b"), Pipe("random"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
+      (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
+        "predicate",
+        Foreach(Pipe("random"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("random2"), Pipe("stmts"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField("t")))),
+                Some(Field("cnt", Types.ByteArrayType)))))))),
+        Filter(Pipe("b"), Pipe("random"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
+      (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
+        "object",
+        Foreach(Pipe("random"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("random2"), Pipe("stmts"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField("t")))),
+                Some(Field("cnt", Types.ByteArrayType)))))))),
+        Filter(Pipe("b"), Pipe("random"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))))
+
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+
+    forAll (possibleGroupers) { (g: String) =>
+      forAll(patterns) { (p: TriplePattern, grouped_by: String, fo: Foreach, fi: Filter) =>
+        // Test that F5 is only applied if the BGP does not filter by the grouping column
+        whenever(g != grouped_by) {
+          val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+          val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
+          val op3 = Dump(Pipe("b"))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F5))
+
+          plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only fo
+          plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+          plan.findOperatorForAlias("b").value shouldBe fi
+          plan.operators should contain only(op1, fo, fi, op3)
+        }
+
+        // If the filter uses the grouping column, nothing should happen
+         whenever(g == grouped_by) {
+           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+           val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
+           val op3 = Dump(Pipe("b"))
+           val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F5))
+
+           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+           plan.operators should contain only(op1, op2, op3)
+         }
+      }
+    }
+  }
+
   it should "apply rewriting rule F7" in {
     // F7 needs to build an internal pipe between the two new operators, its name is determined via Random.nextString
     // (10). The tests below include the values that are generated by Random.nextString(10) after setting the seed to
@@ -397,44 +468,44 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       // subject & predicate bound, grouped by subject
       (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
         "subject",
-        BGPFilter(Pipe("PClecYbNXF"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
+        BGPFilter(Pipe("pipePClecYbNXF"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("PClecYbNXF"),
+        BGPFilter(Pipe("b"), Pipe("pipePClecYbNXF"),
           List(TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2))))),
       // subject & predicate bound, grouped by predicate
       (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
         "predicate",
-        BGPFilter(Pipe("vHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
+        BGPFilter(Pipe("pipevHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("vHyYGvOfsZ"),
+        BGPFilter(Pipe("b"), Pipe("pipevHyYGvOfsZ"),
           List(TriplePattern(Value("subject"), PositionalField(1), PositionalField(2))))),
       // subject & object bound, grouped by subject
       (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
         "subject",
-        BGPFilter(Pipe("EgkYzrkOZO"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
+        BGPFilter(Pipe("pipeEgkYzrkOZO"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("EgkYzrkOZO"),
+        BGPFilter(Pipe("b"), Pipe("pipeEgkYzrkOZO"),
           List(TriplePattern(PositionalField(0), PositionalField(1), Value("object"))))),
       // subject & object bound, grouped by object
       (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
         "object",
-        BGPFilter(Pipe("jvdcHuREqz"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
+        BGPFilter(Pipe("pipejvdcHuREqz"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
           ("object")))),
-        BGPFilter(Pipe("b"), Pipe("jvdcHuREqz"),
+        BGPFilter(Pipe("b"), Pipe("pipejvdcHuREqz"),
           List(TriplePattern(Value("subject"), PositionalField(1), PositionalField(2))))),
       // predicate & object bound, grouped by predicate
       (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
         "predicate",
-        BGPFilter(Pipe("UxwEkfQHGx"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
+        BGPFilter(Pipe("pipeUxwEkfQHGx"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("UxwEkfQHGx"),
+        BGPFilter(Pipe("b"), Pipe("pipeUxwEkfQHGx"),
           List(TriplePattern(PositionalField(0), PositionalField(1), Value("object"))))),
       // predicate & object bound, grouped by object
       (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
         "object",
-        BGPFilter(Pipe("YAXKzBIYXu"), Pipe("a"),
+        BGPFilter(Pipe("pipeYAXKzBIYXu"), Pipe("a"),
           List(TriplePattern(PositionalField(0), PositionalField(1), Value("object")))),
-        BGPFilter(Pipe("b"), Pipe("YAXKzBIYXu"),
+        BGPFilter(Pipe("b"), Pipe("pipeYAXKzBIYXu"),
           List(TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)))))
     )
 
@@ -509,21 +580,21 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       ("Pattern", "grouping column", "Grouping column Filter", "Other Filter"),
       (pattern,
         "subject",
-        BGPFilter(Pipe("PClecYbNXF"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
+        BGPFilter(Pipe("pipePClecYbNXF"), Pipe("a"), List(TriplePattern(Value("subject"), PositionalField(1),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("PClecYbNXF"), List(TriplePattern(PositionalField(0), Value("predicate"),
+        BGPFilter(Pipe("b"), Pipe("pipePClecYbNXF"), List(TriplePattern(PositionalField(0), Value("predicate"),
           Value("object"))))),
       (pattern,
         "predicate",
-        BGPFilter(Pipe("vHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
+        BGPFilter(Pipe("pipevHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("predicate"),
           PositionalField(2)))),
-        BGPFilter(Pipe("b"), Pipe("vHyYGvOfsZ"), List(TriplePattern(Value("subject"), PositionalField(1), Value
+        BGPFilter(Pipe("b"), Pipe("pipevHyYGvOfsZ"), List(TriplePattern(Value("subject"), PositionalField(1), Value
           ("object"))))),
       (pattern,
         "object",
-        BGPFilter(Pipe("EgkYzrkOZO"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
+        BGPFilter(Pipe("pipeEgkYzrkOZO"), Pipe("a"), List(TriplePattern(PositionalField(0), PositionalField(1), Value
           ("object")))),
-        BGPFilter(Pipe("b"), Pipe("EgkYzrkOZO"), List(TriplePattern(Value("subject"), Value("predicate"),
+        BGPFilter(Pipe("b"), Pipe("pipeEgkYzrkOZO"), List(TriplePattern(Value("subject"), Value("predicate"),
           PositionalField(2))))))
 
     forAll (patterns) { (p: TriplePattern, g: String, f1: BGPFilter, f2: BGPFilter) =>
@@ -594,23 +665,33 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))),
         List(
-          BGPFilter(Pipe("PClecYbNXF"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")))),
-          BGPFilter(Pipe("vHyYGvOfsZ"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))))),
-        Join(Pipe("b"), List(Pipe("PClecYbNXF"), Pipe("vHyYGvOfsZ")), List(List(NamedField("s")), List(NamedField("s"))))),
+          BGPFilter(Pipe("pipePClecYbNXF"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1),
+            Value("obj1")))),
+          BGPFilter(Pipe("pipevHyYGvOfsZ"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1),
+            Value("obj2"))))),
+        Join(Pipe("b"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")), List(List(NamedField("s")),
+          List(NamedField("s"))))),
       (List(
         TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
         TriplePattern(PositionalField(0), NamedField("p"), Value("obj2"))),
         List(
-          BGPFilter(Pipe("EgkYzrkOZO"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")))),
-          BGPFilter(Pipe("jvdcHuREqz"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"), Value("obj2"))))),
-        Join(Pipe("b"), List(Pipe("EgkYzrkOZO"), Pipe("jvdcHuREqz")), List(List(NamedField("p")), List(NamedField("p"))))),
+          BGPFilter(Pipe("pipeEgkYzrkOZO"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"),
+            Value("obj1")))),
+          BGPFilter(Pipe("pipejvdcHuREqz"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"),
+            Value("obj2"))))),
+        Join(Pipe("b"), List(Pipe("pipeEgkYzrkOZO"), Pipe("pipejvdcHuREqz")), List(List(NamedField("p")), List
+          (NamedField
+          ("p"))))),
       (List(
         TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")),
         TriplePattern(PositionalField(0), Value("pred2"), NamedField("o"))),
         List(
-          BGPFilter(Pipe("UxwEkfQHGx"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")))),
-          BGPFilter(Pipe("YAXKzBIYXu"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred2"), NamedField("o"))))),
-        Join(Pipe("b"), List(Pipe("UxwEkfQHGx"), Pipe("YAXKzBIYXu")), List(List(NamedField("o")), List(NamedField("o")))))
+          BGPFilter(Pipe("pipeUxwEkfQHGx"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred1"), NamedField
+            ("o")))),
+          BGPFilter(Pipe("pipeYAXKzBIYXu"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred2"), NamedField
+            ("o"))))),
+        Join(Pipe("b"), List(Pipe("pipeUxwEkfQHGx"), Pipe("pipeYAXKzBIYXu")), List(List(NamedField("o")), List
+          (NamedField("o")))))
     )
 
     forAll(patterns) { (p: List[TriplePattern], fs: List[BGPFilter], j: Join) =>
@@ -655,5 +736,31 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     op should be (Some(Foreach(Pipe("B"),Pipe("A"),
       GeneratorList(List(GeneratorExpr(RefExpr(NamedField("x"))),
         GeneratorExpr(RefExpr(NamedField("y"))), GeneratorExpr(RefExpr(NamedField("z"))))))))
+  }
+
+  it should "replace GENERATE *, fields" in {
+    val plan = new DataflowPlan(parseScript(
+      "A = LOAD 'file' AS (x, y, z);\nB = FOREACH A GENERATE *, $0, $2;\nDUMP B;"))
+    val rewrittenPlan = processPlan(plan)
+    val op = rewrittenPlan.findOperatorForAlias("B")
+    op should be (Some(Foreach(Pipe("B"),Pipe("A"),
+      GeneratorList(List(GeneratorExpr(RefExpr(NamedField("x"))),
+        GeneratorExpr(RefExpr(NamedField("y"))),
+        GeneratorExpr(RefExpr(NamedField("z"))),
+        GeneratorExpr(RefExpr(PositionalField(0))),
+        GeneratorExpr(RefExpr(PositionalField(2)))
+      )))))
+  }
+
+  it should "replace GENERATE * in a nested FOREACH" in {
+    val plan = new DataflowPlan(parseScript(
+      """triples = LOAD 'file' AS (sub, pred, obj);
+         |stmts = GROUP triples BY sub;
+         |tmp = FOREACH stmts {
+         |r1 = FILTER triples BY (pred == 'aPred1');
+         |r2 = FILTER triples BY (pred == 'aPred2');
+         |GENERATE *, COUNT(r1) AS cnt1, COUNT(r2) AS cnt2;
+         |};""".stripMargin))
+    val rewrittenPlan = processPlan(plan)
   }
 }

@@ -19,8 +19,20 @@ package dbis.pig.codegen
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.DataflowPlan
 import scala.collection.immutable.Map
+import org.clapper.scalasti._
+
+/**
+ * An exception representing an error in handling the templates for code generation.
+ *
+ * @param msg the error message
+ */
+case class TemplateException(msg: String) extends Exception(msg)
+
 
 trait GenCodeBase {
+  
+  var templateFile: String = null
+  
   var udfAliases: Option[Map[String, (String, List[dbis.pig.op.Value])]] = None
 
   /**
@@ -43,9 +55,10 @@ trait GenCodeBase {
    * e.g. defining the main object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
+   * @param additionalCode source code (Scala, C++) that was embedded into the script
    * @return a string representing the header code
    */
-  def emitHeader1(scriptName: String): String
+  def emitHeader1(scriptName: String, additionalCode: String): String
 
   /**
    * Generate code for the header of the script which should be defined inside
@@ -70,6 +83,41 @@ trait GenCodeBase {
    * @return a string representing the helper code
    */
   def emitHelperClass(node: PigOperator): String
+  
+  /*------------------------------------------------------------------------------------------------- */
+  /*                               template handling code                                             */
+  /*------------------------------------------------------------------------------------------------- */
+
+  /** 
+    * Invoke a given string template without parameters.
+    *
+    * @param template the name of the string template
+    * @return the text from the template
+    */
+  def callST(template: String): String = callST(template, Map[String, Any]())
+
+  /** 
+    * Invoke a given string template with a map of key-value pairs used for replacing
+    * the keys in the template by the string values.
+    *
+    * @param template the name of the string template
+    * @param attributes the map of key-value pairs
+    * @return the text from the template
+    */
+  def callST(template: String, attributes: Map[String, Any]): String = { 
+    val group = STGroupFile(templateFile)
+    val tryST = group.instanceOf(template)
+    if (tryST.isSuccess) {
+      val st = tryST.get
+      if (attributes.nonEmpty) {
+        attributes.foreach {
+          attr => st.add(attr._1, attr._2)
+        }
+      }   
+      st.render()
+    } else throw TemplateException(s"Template '$template' not implemented or not found")
+  }
+
 }
 
 /**
@@ -102,7 +150,7 @@ trait Compile {
     // generate import statements
     var code = codeGen.emitImport
 
-    code = code + codeGen.emitHeader1(scriptName)
+    code = code + codeGen.emitHeader1(scriptName, plan.code)
 
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {

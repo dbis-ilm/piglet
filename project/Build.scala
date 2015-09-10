@@ -23,7 +23,8 @@ object PigBuild extends Build {
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
     dependsOn(mapreduce % "test;it").
-    aggregate(common, sparklib, flinklib,mapreduce) // remove this if you don't want to automatically build these projects when building piglet 
+    dependsOn(pipefabric % "test;it").
+    aggregate(common, sparklib, flinklib,mapreduce, pipefabric/*, pfabricdeploy*/) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -40,6 +41,16 @@ object PigBuild extends Build {
     settings(commonSettings: _*).
     dependsOn(common)
     
+  /*lazy val pfabricdeploy = (project in file("pfabricdeploy")).
+    settings(commonSettings: _*)
+   */
+  lazy val pipefabric = (project in file("pipefabric")).
+    settings(commonSettings: _*).
+    dependsOn(common)//.
+    //dependsOn(pfabricdeploy)
+    
+
+    
 
   /*
    * define the backend for the compiler: currently we support spark and flink
@@ -50,6 +61,7 @@ object PigBuild extends Build {
     case "flink" | "flinks" => Seq(Dependencies.flinkDist % "test;it" from Dependencies.flinkAddress)
     case "spark" | "sparks" => Seq(Dependencies.sparkCore % "test;it", Dependencies.sparkSql % "test;it")
     case "mapreduce" => Seq(Dependencies.pig % "test;it")
+    //case "pipefabric" => Seq.empty[String]
     case _ => println(s"Unsupported backend: $backend ! I don't know which dependencies to include!"); Seq.empty[ModuleID]
   }
   
@@ -58,6 +70,7 @@ object PigBuild extends Build {
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
     case "mapreduce" => Seq.empty[String] // TODO
+    case "pipefabric" => Seq.empty[String]
     case _ => println(s"Unsupported backend: $backend - Will execute no tests"); Seq.empty[String]
   }
 }
@@ -86,6 +99,7 @@ object Dependencies {
   val slf4j= "org.slf4j" % "slf4j-simple" % "1.6.4"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
+  val commons = "org.apache.commons" % "commons-exec" % "1.3"
 
   val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10-SNAPSHOT.jar"
   
@@ -102,6 +116,7 @@ object Dependencies {
     typesafe,
     scalaLogging,
     log4j,
+    commons,
 //    slf4j,
     hadoop % "provided"
   )

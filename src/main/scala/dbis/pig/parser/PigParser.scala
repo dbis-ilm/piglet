@@ -150,14 +150,26 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def mapConstructor: Parser[ArithmeticExpr] = "[" ~ repsep(arithmExpr, ",") ~ "]"  ^^ { case _ ~ l ~ _ => ConstructMapExpr(l) }
   def typeConstructor: Parser[ArithmeticExpr] = (tupleConstructor | bagConstructor | mapConstructor)
 
-  def comparisonExpr: Parser[Predicate] = arithmExpr ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ arithmExpr ^^ {
-    case a ~ op ~ b => op match {
+  def comparisonExpr: Parser[Predicate] = arithmExpr ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ (arithmExpr |
+    pigStringLiteral ) ^^ {
+    case a ~ op ~ (b: ArithmeticExpr) => op match {
       case "==" => Eq(a, b)
       case "!=" => Neq(a, b)
       case "<" => Lt(a, b)
       case "<=" => Leq(a, b)
       case ">" => Gt(a, b)
       case ">=" => Geq(a, b)
+    }
+    case a ~ op ~ (b: String) => {
+      val b_val = RefExpr(Value(unquote(b)))
+      op match {
+        case "==" => Eq(a, b_val)
+        case "!=" => Neq(a, b_val)
+        case "<" => Lt(a, b_val)
+        case "<=" => Leq(a, b_val)
+        case ">" => Gt(a, b_val)
+        case ">=" => Geq(a, b_val)
+      }
     }
   }
 
@@ -359,11 +371,6 @@ class PigParser extends JavaTokenParsers with LazyLogging {
       case out ~ _ ~ _ ~ in ~ ex => new Foreach(Pipe(out), Pipe(in), ex)
     }
 
-  def foreachStreamingStmt: Parser[PigOperator] = bag ~ "=" ~ foreachKeyword ~ bag ~
-    (plainForeachGenerator | nestedForeachGenerator) ^^ {
-      case out ~ _ ~ _ ~ in ~ ex => new Foreach(Pipe(out), Pipe(in), ex, streaming=true)
-    }
-
   /*
    * <A> = FILTER <B> BY <Predicate>
    */
@@ -522,14 +529,21 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def fsParam: Parser[String] = ("""[^;][/\w\.\-]*""").r
 
   def fsStmt: Parser[PigOperator] = fsKeyword ~ fsCmd ~ rep(fsParam) ^^ { case _ ~ cmd ~ params => HdfsCmd(cmd, params)}
+
+  def embeddedCode: Parser[String] = ("""(?s)(.*?)%>""").r
+  def embedStmt: Parser[PigOperator] = "<%" ~ embeddedCode ^^ { case _ ~ code => EmbedCmd(code.substring(0, code.length-2))}
+
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
-  def stmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
+  def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
+  def undelimStmt: Parser[PigOperator] = embedStmt
+
+  def stmt: Parser[PigOperator] = delimStmt | undelimStmt
   /*
    * A plain Pig script is a list of statements.
    */
@@ -620,7 +634,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
         case _ ~ b ~ _ ~ addr ~ _ ~ mode => SocketWrite(Pipe(b), addr, mode)
       }
 
-  def streamingStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStreamingStmt | filterStmt | groupingStmt |
+  def streamingStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | socketReadStmt | socketWriteStmt | windowStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
     case op ~ _  => op }

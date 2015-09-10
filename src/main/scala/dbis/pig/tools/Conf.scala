@@ -71,6 +71,10 @@ object Conf extends LazyLogging {
   
   def backendConf(backend: String) = appconf.getString(s"backends.$backend.conf")
   
+  def backendGenerator(backend: String) = appconf.getString(s"backends.$backend.generator.class")
+  def backendExtension(backend: String) = appconf.getString(s"backends.$backend.generator.extension")
+  def backendCompileConf(backend: String) = appconf.getString(s"backends.$backend.compileconf")
+  
   def hdfsCoreSiteFile = Paths.get(appconf.getString("hdfs.coresite"))
   def hdfsHdfsSiteFile = Paths.get(appconf.getString("hdfs.hdfssite"))
 }

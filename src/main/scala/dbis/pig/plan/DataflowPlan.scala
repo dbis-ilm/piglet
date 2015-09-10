@@ -30,8 +30,6 @@ import scala.collection.mutable.{ListBuffer, Map}
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
 class DataflowPlan(var operators: List[PigOperator]) {
-  // private var graph = Graph[PigOperator,DiEdge]()
-
   /**
    * A list of JAR files specified by the REGISTER statement
    */
@@ -41,6 +39,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * A map for UDF aliases + constructor arguments.
    */
   val udfAliases = Map[String,(String,  List[dbis.pig.op.Value])]()
+
+  var code: String = ""
 
   constructPlan(operators)
 
@@ -59,16 +59,17 @@ class DataflowPlan(var operators: List[PigOperator]) {
     val pipes: Map[String, Pipe] = Map[String, Pipe]()
 
     /*
-     * 0. We remove all REGISTER, DEFINE and SET operators: they are just pseudo-operators.
-     *    Instead, we add their arguments to the additionalJars list and udfAliases map
+     * 0. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
+     *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
      */
     ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
     ops.filter(_.isInstanceOf[DefineCmd]).foreach { op =>
       val defineOp = op.asInstanceOf[DefineCmd]
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
     }
+    ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => code += op.asInstanceOf[EmbedCmd].code)
 
-    val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd])
+    val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd]).filterNot(_.isInstanceOf[EmbedCmd])
     val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])
     /*
      * 1. We create a Map from names to the pipes that *write* them.
@@ -155,12 +156,6 @@ class DataflowPlan(var operators: List[PigOperator]) {
    * @return true if the plan is connected, false otherwise
    */
   def checkConnectivity: Boolean = {
-    // we simply construct a graph and check its connectivity
-    /*
-    var graph = Graph[PigOperator,DiEdge]()
-    operators.foreach(op => op.inputs.foreach(p => graph += p.producer ~> op))
-    graph.isConnected
-    */
     /*
      * make sure that for all operators the following holds:
      * (1) all input pipes have a producer
