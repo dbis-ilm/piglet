@@ -23,6 +23,7 @@ import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.PipeNameGenerator.generate
 import dbis.pig.schema.{Field, Types}
 import org.kiama.rewriting.Rewriter._
+import org.kiama.rewriting.Strategy
 
 
 /** This object contains all the rewriting rules that are currently implemented
@@ -64,8 +65,23 @@ object Rules {
     * @return On success, an Option containing a new [[dbis.pig.op.Filter]] operator with the predicates of both input
     *         Filters, None otherwise.
     */
-  def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] =
+  def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
     Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
+  }
+
+  /** Removes a [[dbis.pig.op.Filter]] object that's a successor of a Filter with the same Predicate
+    */
+  def removeDuplicateFilters = rulefs[Filter] {
+    case op@Filter(_, _, pred, _) => {
+      topdown(
+        attempt(
+          op.outputs.flatMap(_.consumer).
+            filter(_.isInstanceOf[Filter]).
+            filter { f: PigOperator => extractPredicate(f.asInstanceOf[Filter].pred) == extractPredicate(pred) }.
+            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, removalStrategy(pigOp)
+          )}))
+    }
+  }
 
   def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
     case node@SplitInto(inPipeName, splits) =>
@@ -725,6 +741,7 @@ object Rules {
   }
 
   def registerAllRules = {
+    addStrategy(removeDuplicateFilters)
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
     reorder[OrderBy, Filter]

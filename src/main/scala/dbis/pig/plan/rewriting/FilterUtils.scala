@@ -19,6 +19,16 @@ package dbis.pig.plan.rewriting
 import dbis.pig.op._
 
 object FilterUtils {
+  /** Extract the [[dbis.pig.op.Predicate]] from one. This also extracts the Predicate from a [[dbis.pig.op.PPredicate]]
+    */
+  def extractPredicate(p: Predicate) = {
+    if (p.isInstanceOf[PPredicate]) {
+      p.asInstanceOf[PPredicate].a
+    } else {
+      p
+    }
+  }
+
   /** Extract all the [[dbis.pig.op.Ref]] values used in a [[dbis.pig.op.Expr]].
     */
   def extractFields(p: Expr): List[Ref] =
