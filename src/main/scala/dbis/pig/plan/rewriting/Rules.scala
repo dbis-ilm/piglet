@@ -65,7 +65,7 @@ object Rules {
     * @return On success, an Option containing a new [[dbis.pig.op.Filter]] operator with the predicates of both input
     *         Filters, None otherwise.
     */
-  def mergeFilters(parent: Filter, child: Filter): Option[PigOperator] = {
+  def mergeFilters(parent: Filter, child: Filter): Option[Filter] = {
     Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
   }
 
@@ -83,7 +83,7 @@ object Rules {
     }
   }
 
-  def splitIntoToFilters(node: Any): Option[List[PigOperator]] = node match {
+  def splitIntoToFilters(node: Any): Option[List[Filter]] = node match {
     case node@SplitInto(inPipeName, splits) =>
       val filters = (for (branch <- splits) yield branch.output.name -> Filter(branch.output, inPipeName, branch
         .expr)).toMap
