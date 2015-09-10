@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.flink
+package dbis.pig.backends.flink.streaming
 
 
 import org.apache.flink.configuration.Configuration

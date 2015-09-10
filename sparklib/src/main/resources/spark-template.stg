@@ -18,10 +18,12 @@ object <name> {
 
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name) ::= <<
+    val monitor = new PerfMonitor()
+
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
-        sc.addSparkListener(new PerfMonitor())
+        sc.addSparkListener(monitor)
 
 >>
 
@@ -53,7 +55,7 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element -----------
-foreach(out,in,expr) ::=<<
+foreach(out,in,expr,aggrs) ::=<<
         val <out> = <in>.map(t => <expr>)
 >>
 

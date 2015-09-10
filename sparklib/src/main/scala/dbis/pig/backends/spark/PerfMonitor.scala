@@ -1,11 +1,14 @@
 package dbis.pig.backends.spark
 
 import org.apache.spark.scheduler._
+import scala.collection.mutable.Map
 
 /**
  * Created by kai on 09.09.15.
  */
 class PerfMonitor extends SparkListener {
+  val stages: Map[Int, String] = Map()
+
   override def onJobEnd(jobEnd: SparkListenerJobEnd): Unit = {
     println("onJobEnd")
   }
@@ -15,11 +18,23 @@ class PerfMonitor extends SparkListener {
   }
 
   override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
-    println("onStageCompleted -> " + stageCompleted.stageInfo.name + " : " + stageCompleted.stageInfo.completionTime)
+    stages(stageCompleted.stageInfo.stageId) match {
+      case Some(lineage) => println("onStageCompleted -> " + lineage
+        + " : time = " + stageCompleted.stageInfo.completionTime
+        + ", #tasks = " + stageCompleted.stageInfo.numTasks
+        + ", id = " + stageCompleted.stageInfo.stageId)
+      case None => println("onStageCompleted -> " + stageCompleted.stageInfo.name
+        + " : time = " + stageCompleted.stageInfo.completionTime
+        + ", #tasks = " + stageCompleted.stageInfo.numTasks
+        + ", id = " + stageCompleted.stageInfo.stageId)
+    }
   }
 
   override def onStageSubmitted(stageSubmitted: SparkListenerStageSubmitted): Unit = {
     println("onStageSubmitted")
   }
 
+  def registerStage(stageId: Int, lineage: String): Unit = {
+    stages += (stageId -> lineage)
+  }
 }

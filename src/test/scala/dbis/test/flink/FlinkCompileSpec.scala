@@ -19,7 +19,7 @@ package dbis.test.flink
 import dbis.test.TestTools._
 
 import dbis.pig.PigCompiler._
-import dbis.pig.codegen.ScalaBackendGenCode
+import dbis.pig.codegen.BatchGenCode
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
@@ -28,17 +28,19 @@ import dbis.pig.backends.BackendManager
 
 class FlinkCompileSpec extends FlatSpec {
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = BackendManager.backend("flink").templateFile
+  val backendConf = BackendManager.backend("flink")
+  BackendManager.backend = backendConf
+  val templateFile = backendConf.templateFile
 
   "The compiler output" should "contain the Flink header & footer" in {
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport 
       + codeGenerator.emitHeader1("test") 
       + codeGenerator.emitHeader2("test") 
       + codeGenerator.emitFooter)
     val expectedCode = cleanString("""
       |import org.apache.flink.api.scala._
-      |import dbis.flink._
+      |import dbis.pig.backends.flink._
       |
       |object test {
       |    def main(args: Array[String]) {
@@ -55,7 +57,7 @@ class FlinkCompileSpec extends FlatSpec {
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     
     val op = Load(Pipe("a"), file)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}")""")
     assert(generatedCode == expectedCode)
@@ -66,7 +68,7 @@ class FlinkCompileSpec extends FlatSpec {
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     
     val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
         val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
     assert(generatedCode == expectedCode)
@@ -77,7 +79,7 @@ class FlinkCompileSpec extends FlatSpec {
     val file = new java.io.File(".").getCanonicalPath + "/file.n3"
     
     val op = Load(Pipe("a"), file, None, "RDFFileStorage")
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
@@ -86,7 +88,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for FILTER" in { 
     val op = Filter(Pipe("a"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))) 
-    val codeGenerator = new ScalaBackendGenCode(templateFile) 
+    val codeGenerator = new BatchGenCode(templateFile) 
     val generatedCode = cleanString(codeGenerator.emitNode(op)) 
     val expectedCode = cleanString("val a = b.filter(t => {t(1) < 42})") 
     assert(generatedCode == expectedCode) 
@@ -94,7 +96,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for DUMP" in {
     val op = Dump(Pipe("a"))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""a.map(_.mkString(",")).print""")
     assert(generatedCode == expectedCode)
@@ -103,7 +105,7 @@ class FlinkCompileSpec extends FlatSpec {
   it should "contain code for STORE" in {
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     val op = Store(Pipe("A"), file)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${file}")""")
     assert(generatedCode == expectedCode)
@@ -111,7 +113,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for DISTINCT" in {
     val op = Distinct(Pipe("a"), Pipe("b"))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.distinct(t => t(0))")
     assert(generatedCode == expectedCode)
@@ -119,7 +121,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for LIMIT" in {
     val op = Limit(Pipe("a"), Pipe("b"), 10)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.first(10)")
     assert(generatedCode == expectedCode)
@@ -135,7 +137,7 @@ class FlinkCompileSpec extends FlatSpec {
         RefExpr(Value("\"field2\"")),
         RefExpr(PositionalField(1)))))
       )))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(PigFuncs.toMap(\"field1\",t(0),\"field2\",t(1))))")
     assert(generatedCode == expectedCode)
@@ -147,7 +149,7 @@ class FlinkCompileSpec extends FlatSpec {
       GeneratorExpr(RefExpr(PositionalField(0))),
       GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType)))
       )))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.map(t => List(t(0),PigFuncs.count(t(1).asInstanceOf[Seq[Any]])))")
     assert(generatedCode == expectedCode)
@@ -157,7 +159,7 @@ class FlinkCompileSpec extends FlatSpec {
     // a = FOREACH b GENERATE $0#"k1", $1#"k2";
     val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
       GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\""))))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.map(t => List(t(0).asInstanceOf[Map[String,Any]]("k1"),t(1).asInstanceOf[Map[String,Any]]("k2")))""".stripMargin)
@@ -168,7 +170,7 @@ class FlinkCompileSpec extends FlatSpec {
     // a = FOREACH b GENERATE $0.$1, $2.$0;
     val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
       GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0)))))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val a = b.map(t => List(t(0).asInstanceOf[List[Any]](1),t(2).asInstanceOf[List[Any]](0)))""".stripMargin)
@@ -178,7 +180,7 @@ class FlinkCompileSpec extends FlatSpec {
   it should "contain code for a UNION operator on two relations" in {
     // a = UNION b, c;
     val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c")))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.union(c)""".stripMargin)
@@ -188,7 +190,7 @@ class FlinkCompileSpec extends FlatSpec {
   it should "contain code for a UNION operator on more than two relations" in {
     // a = UNION b, c, d;
     val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.union(c).union(d)""".stripMargin)
@@ -203,7 +205,7 @@ class FlinkCompileSpec extends FlatSpec {
     val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.join(c).where(t => t(0)).equalTo(t => t(0)).map{
@@ -221,7 +223,7 @@ class FlinkCompileSpec extends FlatSpec {
     val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.join(c).where(t => Array(t(0),t(1)).mkString).equalTo(t => Array(t(1),t(2)).mkString).map{
@@ -240,7 +242,7 @@ class FlinkCompileSpec extends FlatSpec {
     val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input3 = Pipe("d",Load(Pipe("d"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2,input3)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val a = b.join(c).where(t => t(0)).equalTo(t => t(0)).map{ 
@@ -253,7 +255,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for GROUP BY ALL" in {
     val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List()))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b"
       /*"""
@@ -267,7 +269,7 @@ class FlinkCompileSpec extends FlatSpec {
 
   it should "contain code for GROUP BY $0" in {
     val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List(PositionalField(0))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.groupBy(t => t(0))")
     assert(generatedCode == expectedCode)

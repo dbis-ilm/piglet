@@ -180,7 +180,7 @@ object Rewriter extends LazyLogging {
     val newSources = plan.sourceNodes.flatMap(
       processPigOperator(_, strategy) match {
         case op : PigOperator => List(op)
-        case ops : Seq[PigOperator] => ops
+        case ops : Seq[PigOperator @unchecked] => ops
         case e => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
           "PigOperator or " +
           "Sequence of them, namely" + e)
@@ -568,6 +568,59 @@ object Rewriter extends LazyLogging {
     newParent
   }
 
+  /** Changes inputs and outputs so that ``toBePulled`` is between ``multipleInputOp`` and ``indicator``.
+    *
+    * ``toBePulled`` has to be a consumer of ``multipleInputOp``s output pipes.
+    * @param toBePulled
+    * @param multipleInputOp
+    * @param indicator
+    * @return
+    */
+  def pullOpAcrossMultipleInputOp(toBePulled: PigOperator, multipleInputOp: PigOperator, indicator: PigOperator):
+  PigOperator = {
+    require(multipleInputOp.outputs.flatMap(_.consumer) contains toBePulled, "toBePulled is not a consumer of " +
+      "multipleInputOp")
+    // First, make the toBePulled a consumer of the correct input
+    indicator.outputs foreach { outp =>
+      if (outp.consumer contains multipleInputOp) {
+        outp.consumer = outp.consumer.filterNot(_ == multipleInputOp) :+ toBePulled
+      }
+    }
+
+    toBePulled.inputs = toBePulled.inputs.filterNot(_.producer == multipleInputOp) :+ Pipe(indicator.outPipeName,
+      indicator)
+
+    // Second, make the toBePulled an input of the multipleInputOp
+    multipleInputOp.inputs = multipleInputOp.inputs.filterNot(_.name == indicator.outPipeName) :+ Pipe(toBePulled.outPipeName, toBePulled)
+
+    // Third, replace the toBePulled in the multipleInputOps outputs with the Filters outputs
+    multipleInputOp.outputs foreach { outp =>
+      if (outp.consumer contains toBePulled) {
+        outp.consumer = outp.consumer.filterNot(_ == toBePulled) ++ toBePulled.outputs.flatMap(_.consumer)
+      }
+    }
+
+    // Fourth, make the multipleInputOp the producer of all the toBePulleds outputs inputs
+    toBePulled.outputs foreach { outp =>
+      outp.consumer foreach { cons =>
+        cons.inputs map { cinp =>
+          if (cinp.producer == toBePulled) {
+            Pipe(multipleInputOp.outPipeName, multipleInputOp)
+          } else {
+            cinp
+          }
+        }
+      }
+    }
+
+    // Fifth, make multipleInputOp the consumer of all of toBePulled output pipes
+    toBePulled.outputs foreach { outp =>
+      outp.consumer = List(multipleInputOp)
+    }
+
+    toBePulled
+  }
+
   def processMaterializations(plan: DataflowPlan, mm: MaterializationManager): DataflowPlan = {
     require(plan != null, "Plan must not be null")
     require(mm != null, "Materialization Manager must not be null")
@@ -648,8 +701,8 @@ object Rewriter extends LazyLogging {
     val walker1 = new BreadthFirstTopDownWalker
     val walker2 = new BreadthFirstBottomUpWalker
 
-    // All Window Ops: Group,Filter,Distinct,Limit,OrderBy,Foreach
-    // Two modes: Group,Filter,Limit,Foreach
+    // All Window Ops: Group,Filter,Distinct,OrderBy,Foreach
+    // Two modes: Group,Filter,Foreach
     // Terminator: Foreach, Join
  
     logger.debug(s"Searching for Window Operators")
@@ -674,7 +727,21 @@ object Rewriter extends LazyLogging {
     }
     newPlan = processWindowJoins(newPlan, joins.toList)
 
-    //TODO: Add Check for WindowOnly operators (distinct, orderBy, etc.)
+    // Checking window-only Operators
+    logger.debug(s"Checking whether window-only operators are correctly set")
+    walker1.walk(newPlan){ op => 
+      op match {
+        case o: Distinct if(o.windowMode==false) =>
+          throw new RewriterException("Distinct can oly be used within Windows")
+        case o: OrderBy if(o.windowMode==false) =>
+          throw new RewriterException("OrderBy can oly be used within Windows")
+        case o: Join if(o.timeWindow==null) =>
+          throw new RewriterException("Join has no window definition")
+        case o: Cross if(o.timeWindow==null) =>
+          throw new RewriterException("Cross has no window definition")
+        case _ =>
+      }
+    }
 
     newPlan
   }
@@ -687,18 +754,17 @@ object Rewriter extends LazyLogging {
       operator match {
         case o: Filter => {
           logger.debug(s"Rewrite Filter to WindowMode")
-          //TODO: Move before Window, not only Filter - all non-WindowOps
-          o.windowMode = true
-        }
-        case o: Limit => {
-          logger.debug(s"Rewrite Limit to WindowMode")
           o.windowMode = true
         }
         case o: Distinct => {
           logger.debug(s"Rewrite Distinct to WindowMode")
           o.windowMode = true
         }
-       case o: Grouping => {
+        case o: OrderBy => {
+          logger.debug(s"Rewrite OrderBy to WindowMode")
+          o.windowMode = true
+        }
+        case o: Grouping => {
           logger.debug(s"Rewrite Grouping to WindowMode")
           o.windowMode = true
         }

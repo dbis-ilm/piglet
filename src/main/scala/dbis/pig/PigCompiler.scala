@@ -107,6 +107,7 @@ object PigCompiler extends PigParser with LazyLogging {
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], numExecutors: Int): Unit = {
     
     val backendConf = BackendManager.backend(backend)
+    BackendManager.backend = backendConf
     
     if(backendConf.raw) {
       if(compileOnly) {
@@ -140,8 +141,8 @@ object PigCompiler extends PigParser with LazyLogging {
     }
 
     logger.debug("start processing created dataflow plans")
-    
-    
+ 
+
     val templateFile = backendConf.templateFile
     val jarFile = Conf.backendJar(backend)
     val mm = new MaterializationManager
@@ -195,7 +196,7 @@ object PigCompiler extends PigParser with LazyLogging {
       // 2. then we parse it and construct a dataflow plan
       val plan = new DataflowPlan(parseScriptFromSource(source, params, backend))
       
-      
+
       try {
         // if this does _not_ throw an exception, the schema is ok
         plan.checkSchemaConformance

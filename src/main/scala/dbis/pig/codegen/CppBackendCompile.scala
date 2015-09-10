@@ -479,12 +479,12 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
           "slide_len" -> (if (slide._2.isEmpty) throw CompilerException("Currently, row sliding is not supported")
           else (if (slide._2 == "minutes") (slide._1 * 60) else slide._1))))
       }
-      case OrderBy(out, in, orderSpec) => callST("order_by", Map("op_name" -> s"op_${out.name}",
+      case OrderBy(out, in, orderSpec, _) => callST("order_by", Map("op_name" -> s"op_${out.name}",
         "tuple_type" -> s"${in.name}_TupleType",
         "input" -> s"op_${in.name}",
         "expr" -> emitOrderExpr(node.schema, orderSpec)))
       case SocketRead(out, address, mode, _, _, _) => callST("zmq_source", Map("op_name" -> s"op_${out.name}", "endpoint" -> s"${address.protocol}${address.hostname}:${address.port}", "tuple_type" -> s"${node.outPipeName}_TupleType"))
-      case SocketWrite(in, address, mode) => {
+      case SocketWrite(in, address, mode, _) => {
         callST("zmq_sink", Map("op_name" -> s"op_zmq_sink_${in.name}",
           "input" -> in.name,
           "endpoint" -> s"${address.protocol}${address.hostname}:${address.port}",

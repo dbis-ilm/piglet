@@ -1,7 +1,7 @@
 // ----------------- header declaration ----------------- 
 init_code(includes) ::= <<
 import org.apache.flink.api.scala._
-import dbis.flink._
+import dbis.pig.backends.flink._
 
 <\n>
 >>
@@ -43,7 +43,7 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element ------------
-foreach(out,in,expr) ::=<<
+foreach(out,in,expr,aggrs) ::=<<
         val <out> = <in>.map(t => <expr>)
 >>
 

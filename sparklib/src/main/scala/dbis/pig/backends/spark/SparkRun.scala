@@ -63,6 +63,8 @@ class SparkRun extends PigletBackend with BackendConf {
   } 
   
   override def templateFile = appconf.getString("backends.spark.template")
+
+  override def defaultConnector = appconf.getString("backends.spark.connector")
   
   override def raw = false
 }

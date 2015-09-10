@@ -2,6 +2,7 @@ package dbis.pig.op
 
 import dbis.pig.schema._
 import java.net.URI
+import org.kiama.rewriting.Rewriter.everything
 import scala.collection.mutable.Map
 
 case class RDFLoad(out: Pipe, uri: URI, grouped: Option[String]) extends PigOperator {
@@ -20,11 +21,11 @@ case class RDFLoad(out: Pipe, uri: URI, grouped: Option[String]) extends PigOper
   }
 
   def BGPFilterIsReachable: Boolean = {
-    def isBGPFilter(op: PigOperator): Boolean = op match {
-      case _: BGPFilter => true
-      case _ => op.outputs.flatMap(_.consumer).map(isBGPFilter).exists(_ == true)
-    }
-    isBGPFilter(this)
+    val isBGPFilter: PartialFunction[Any, Boolean] = {case t: Any => t.isInstanceOf[BGPFilter]}
+
+    everything[Boolean] ("BGPFilterIsReachable", false) { (old: Boolean, newvalue: Boolean) =>
+      old || newvalue
+    } (isBGPFilter) (this)
   }
 }
 

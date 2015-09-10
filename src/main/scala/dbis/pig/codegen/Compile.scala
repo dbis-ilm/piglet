@@ -28,6 +28,7 @@ import org.clapper.scalasti._
  */
 case class TemplateException(msg: String) extends Exception(msg)
 
+
 trait GenCodeBase {
   
   var templateFile: String = null
@@ -82,28 +83,28 @@ trait GenCodeBase {
    * @return a string representing the helper code
    */
   def emitHelperClass(node: PigOperator): String
-
+  
   /*------------------------------------------------------------------------------------------------- */
   /*                               template handling code                                             */
   /*------------------------------------------------------------------------------------------------- */
 
-  /**
-   * Invoke a given string template without parameters.
-   *
-   * @param template the name of the string template
-   * @return the text from the template
-   */
+  /** 
+    * Invoke a given string template without parameters.
+    *
+    * @param template the name of the string template
+    * @return the text from the template
+    */
   def callST(template: String): String = callST(template, Map[String, Any]())
 
-  /**
-   * Invoke a given string template with a map of key-value pairs used for replacing
-   * the keys in the template by the string values.
-   *
-   * @param template the name of the string template
-   * @param attributes the map of key-value pairs
-   * @return the text from the template
-   */
-  def callST(template: String, attributes: Map[String, Any]): String = {
+  /** 
+    * Invoke a given string template with a map of key-value pairs used for replacing
+    * the keys in the template by the string values.
+    *
+    * @param template the name of the string template
+    * @param attributes the map of key-value pairs
+    * @return the text from the template
+    */
+  def callST(template: String, attributes: Map[String, Any]): String = { 
     val group = STGroupFile(templateFile)
     val tryST = group.instanceOf(template)
     if (tryST.isSuccess) {
@@ -112,7 +113,7 @@ trait GenCodeBase {
         attributes.foreach {
           attr => st.add(attr._1, attr._2)
         }
-      }
+      }   
       st.render()
     } else throw TemplateException(s"Template '$template' not implemented or not found")
   }
