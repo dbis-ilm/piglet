@@ -796,13 +796,14 @@ class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
       case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outPipeName, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
       case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inputs.head.name,"params"->emitParamList(node.schema, params)))
+      case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outPipeName, address, mode, func, params)
       case SocketWrite(in, address, mode) => emitSocketWrite(node.inputs.head.name, address, mode)
       case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inputs.head.name,window,slide)
       case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inputs.head.name))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case Empty(_) => ""
-           
+
       /*
        case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
        val s1 = s"""

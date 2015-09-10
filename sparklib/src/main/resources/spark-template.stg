@@ -121,6 +121,11 @@ fs(cmd,params) ::=<<
     HDFSService.process(<cmd>, <params>)
 >>
 
+// ------------------ RSCRIPT operators ----------------------------------------
+rscript(out,in,script) ::=<<
+        val <out> = RScriptOp.process(sc, <in>, <script>, "res")
+>>
+
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
     

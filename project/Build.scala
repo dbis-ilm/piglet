@@ -9,7 +9,8 @@ object PigBuild extends Build {
   lazy val commonSettings = Seq(
     version := "1.0",
     scalaVersion := "2.11.7",
-    organization := "dbis"
+    organization := "dbis",
+    unmanagedJars in Compile += file("lib_unmanaged/jvmr_2.11-2.11.2.1.jar")
   )
   
   /*
