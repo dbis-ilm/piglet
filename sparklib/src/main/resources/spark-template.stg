@@ -18,8 +18,6 @@ object <name> {
 
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name) ::= <<
-    val monitor = new PerfMonitor()
-
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)

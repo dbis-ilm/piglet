@@ -32,7 +32,7 @@ import java.net.URI
 case class Load(out: Pipe, 
                 file: URI,
                 var loadSchema: Option[Schema] = None,
-                loaderFunc: String = BackendManager.backend.defaultConnector, 
+                loaderFunc: String = BackendManager.backend.defaultConnector,
                 loaderParams: List[String] = null) extends PigOperator {
   _outputs = List(out)
   _inputs = List()

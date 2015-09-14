@@ -142,11 +142,13 @@ object PigREPL extends PigParser with LazyLogging {
     val backend = if(args.length==0) Conf.defaultBackend else args(0)
     
     logger debug s"""Running REPL with backend "$backend" """
-    
+
     val backendConf = BackendManager.backend(backend)
     if(backendConf.raw)
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
-    
+
+    BackendManager.backend = backendConf
+
     console {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
@@ -174,11 +176,10 @@ object PigREPL extends PigParser with LazyLogging {
       }
       case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
         var plan = new DataflowPlan(buf.toList)
-        
         val mm = new MaterializationManager
         plan = processMaterializations(plan, mm)
         plan = processPlan(plan)
-        
+
         try {
           plan.checkSchemaConformance
           
@@ -186,6 +187,7 @@ object PigREPL extends PigParser with LazyLogging {
           pat.findFirstIn(s) match {
             case Some(str) =>
               val alias = str.split(" ")(1)
+              println("looking for alias: " + alias)
               plan.findOperatorForAlias(alias) match {
                 case Some (op) => println (op.schemaToString)
                 case None => println (s"unknown alias '$alias'")
@@ -196,7 +198,7 @@ object PigREPL extends PigParser with LazyLogging {
         } catch {
           case e:SchemaException => println(s"schema conformance error in ${e.getMessage}")
         }
-        
+
         false
       }
       case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") ||
