@@ -18,11 +18,9 @@
 package dbis.pig.op
 
 
-/**
- * Register represents a pseudo operator for the REGISTER statement. This "operator" will
- * be eliminated during building the dataflow plan.
+/** Wraps code that is to be embedded in the compiled Scala application.
  *
- * @param jarFile the URI of the Jar file to be registered
+ * @param code The embedded code.
  */
 case class EmbedCmd(code: String) extends PigOperator
 
