@@ -23,7 +23,6 @@ begin_query(name) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
-        sc.addSparkListener(monitor)
 
 >>
 
