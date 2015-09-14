@@ -105,7 +105,7 @@ object Dependencies {
     scalaLogging,
     log4j,
     commons,
-//    slf4j,
+    slf4j,
     hadoop % "provided"
   )
 }
