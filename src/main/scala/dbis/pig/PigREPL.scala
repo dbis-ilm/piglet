@@ -187,7 +187,6 @@ object PigREPL extends PigParser with LazyLogging {
           pat.findFirstIn(s) match {
             case Some(str) =>
               val alias = str.split(" ")(1)
-              println("looking for alias: " + alias)
               plan.findOperatorForAlias(alias) match {
                 case Some (op) => println (op.schemaToString)
                 case None => println (s"unknown alias '$alias'")
