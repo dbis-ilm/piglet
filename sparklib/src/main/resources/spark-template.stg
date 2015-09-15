@@ -25,7 +25,8 @@ begin_query(name, hook) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
-        sc.addSparkListener(new PerfMonitor())
+        val perfMon = new PerfMonitor()
+        sc.addSparkListener(perfMon)
 
     <if (hook)>
     	setupHook(sc)
@@ -128,6 +129,10 @@ streamOp(out,in,op,params) ::=<<
 fs(cmd,params) ::=<<
     HDFSService.process(<cmd>, <params>)
 >>
+
+stageIdentifier(line, lineage) ::=<<
+	perfMon.register(<line>, "<lineage>")
+>>	
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name, hook) ::= <<

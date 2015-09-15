@@ -326,7 +326,7 @@ object PigCompiler extends PigParser with LazyLogging {
       
     }
     
-    entries.foreach { println }
+//    entries.foreach { println }
     
   }
 }

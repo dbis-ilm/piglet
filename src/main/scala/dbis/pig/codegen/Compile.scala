@@ -70,6 +70,8 @@ trait GenCodeBase {
    * @return a string representing the helper code
    */
   def emitHelperClass(node: PigOperator): String
+  
+  def emitStageIdentifier(line: Int, lineage: String): String
 }
 
 /**
@@ -113,7 +115,19 @@ trait Compile {
     code = code + codeGen.emitHeader2(scriptName)
 
     for (n <- plan.operators) {
-      code = code + codeGen.emitNode(n) + "\n"
+      val generatedCode = codeGen.emitNode(n)
+      
+      /* count the generated lines
+       * this is needed for the PerfMonitor to identify stages by line number
+       * 
+       * +1 is for the additional line that is inserted for the register code
+       */
+      val lines = scala.io.Source.fromBytes((code + generatedCode).getBytes).getLines().size + 1
+      
+      // register an operation with its line number and lineage  
+      val registerIdCode = codeGen.emitStageIdentifier(lines, n.lineageSignature)
+
+      code = code + registerIdCode + "\n" + generatedCode + "\n"
     }
 
     // generate the cleanup code

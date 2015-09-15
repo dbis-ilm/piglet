@@ -777,6 +777,10 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
 
+  def emitStageIdentifier(line: Int, lineage: String): String = {
+    callST("stageIdentifier", Map("line"->line, "lineage"->lineage))
+  }
+  
   /**
    * Generate code for the given Pig operator.
    *
