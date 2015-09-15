@@ -66,7 +66,7 @@ object PigCompiler extends PigParser with LazyLogging {
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
-      opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in ${Conf.programHome}")
+      opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in program home (see config file)")
       opt[Int]('n',"num-executors") optional() action { (x,c) => c.copy(numExecutors = x)  } text ("Number of executors")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
@@ -90,6 +90,9 @@ object PigCompiler extends PigParser with LazyLogging {
         return
     }
     
+    /* IMPORTANT: This must be the first call to Conf
+     * Otherwise, the config file was already loaded before we could copy the new one
+     */
     if(updateConfig)
     	Conf.copyConfigFile()
     
