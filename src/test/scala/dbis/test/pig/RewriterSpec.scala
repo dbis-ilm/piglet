@@ -870,7 +870,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val load = ops.headOption.value
     val dump = ops.last
 
-    new DataflowPlan(List(load, dump))
+    new DataflowPlan(ops)
 
     load should matchPattern {
       case OnlyFollowedByE( dump) =>
