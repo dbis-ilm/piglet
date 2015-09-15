@@ -14,15 +14,14 @@ class PerfMonitor(driver: String = "org.h2.Driver",
     pw: String = "")
   extends SparkListener {
   
+  private val progStartTime = System.currentTimeMillis()
+  
   private val lineLineageMapping = MutableMap.empty[Int, String]
   
   private val submissionTimes = MutableMap.empty[Int, Long]
-  private val b = ListBuffer.empty[(String, Long)]
+  private val b = ListBuffer.empty[(String, Long, Long)]
   
-  override def onJobEnd(jobEnd: SparkListenerJobEnd): Unit = {  }
-
-  override def onJobStart(jobStart: SparkListenerJobStart): Unit = {  }
-
+  
   override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
     
     // get the line number of the stages last operation
@@ -30,10 +29,11 @@ class PerfMonitor(driver: String = "org.h2.Driver",
 
     if(lineLineageMapping.contains(line)) {
       val startTime = submissionTimes(stageCompleted.stageInfo.stageId)
-      val duration = stageCompleted.stageInfo.completionTime.get - startTime
+      val stageDuration = stageCompleted.stageInfo.completionTime.get - startTime
+      val progDuration = stageCompleted.stageInfo.completionTime.get - progStartTime
       val opLineage = lineLineageMapping(line)
       
-      b += ((opLineage, duration))
+      b += ((opLineage, stageDuration, progDuration))
     }
   }
 
@@ -53,29 +53,19 @@ class PerfMonitor(driver: String = "org.h2.Driver",
   def flush() {
     
       
-    val entrySet = b.map{ case (l,t) => Seq('lineage -> l, 'duration -> t) }.toSeq
+    val entrySet = b.map{ case (l,s,p) => Seq('lineage -> l, 'stageduration -> s, 'progduration -> p) }.toSeq
     
     DB autoCommit { implicit session => 
-      sql"create table if not exists exectimes(lineage varchar(200), duration int)"
+      sql"create table if not exists exectimes(lineage varchar(200), stageduration bigint, progduration bigint)"
         .execute
         .apply()
   }
     
     DB localTx { implicit session =>
-      sql"insert into exectimes(lineage, duration) VALUES({lineage},{duration})"
+      sql"insert into exectimes(lineage, stageduration, progduration) VALUES({lineage},{stageduration},{progduration})"
         .batchByName(entrySet:_ *)
         .apply()
     }
-    
-//    val entries = DB readOnly { implicit session => 
-//      sql"select * from exectimes"
-//        .map{ rs => s"${rs.string("lineage")}  -->  ${rs.int("duration")}" }
-//        .list
-//        .apply()
-//    }
-//    entries.foreach { println }
-      
-    
   }
   
   private def getLineNumber(stageInfo: StageInfo) = stageInfo.name.split(":")(1).toInt
