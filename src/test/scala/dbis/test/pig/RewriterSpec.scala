@@ -20,7 +20,9 @@ import java.net.URI
 
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
+import dbis.pig.parser.PigParser
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.rewriting.Extractors.ForEachCallingFunctionE
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
@@ -838,5 +840,19 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     op3.inputs.map(_.producer) should contain only op1
     op3.outputs.flatMap(_.consumer) should contain only op2
     op2.inputs.map(_.producer) should contain only op3
+  }
+
+  "The ForEachCallingFunctionE" should "extract the function name of a function called in the only GeneratorExpr of a" +
+    " GeneratorList in a ForEach statement" in {
+    val p = new PigParser()
+    val op = p.parseScript("B = FOREACH A GENERATE myFunc(f1, f2);").head
+    op should matchPattern {
+      case ForEachCallingFunctionE("myFunc") =>
+    }
+
+    val op2 = p.parseScript("B = FOREACH A GENERATE notMyFunc(f1, f2);").head
+    op2 should not matchPattern {
+      case ForEachCallingFunctionE("myFunc") =>
+    }
   }
 }
