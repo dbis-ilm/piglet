@@ -792,8 +792,8 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
     
     val b = new StringBuilder
     
-    if(hookFile.isDefined)
-      b ++= emitBeforeHook(node) + "\n"
+//    if(hookFile.isDefined)
+//      b ++= emitBeforeHook(node) + "\n"
     
     val opCode = node match {
         /*
@@ -839,8 +839,8 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
     
     b ++= opCode
     
-    if(hookFile.isDefined)
-      b ++= "\n" + emitAfterHook(node) + "\n"
+//    if(hookFile.isDefined)
+//      b ++= "\n" + emitAfterHook(node) + "\n"
     
     
     b.toString()

@@ -55,6 +55,7 @@ class SparkCompileSpec extends FlatSpec {
         |      val perfMon = new PerfMonitor()
         |      sc.addSparkListener(perfMon)
         |      sc.stop()
+        |      perfMon.flush()
         |    }
         |}
       """.stripMargin)

@@ -136,12 +136,14 @@ stageIdentifier(line, lineage) ::=<<
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name, hook) ::= <<
-    
-	<if (hook)>
-		shutdownHook(sc)
-	<endif>
     		
         sc.stop()
+        
+    <if (hook)>
+		shutdownHook(sc, perfMon)
+	<endif>
+	
+	perfMon.flush()
     }
 }
 >>

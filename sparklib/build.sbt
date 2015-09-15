@@ -7,7 +7,10 @@ libraryDependencies ++= Seq(
     scalaTest % "test" withSources(),
     sparkCore % "provided",
     sparkSql % "provided",
-    typesafe
+    typesafe,
+    scalikejdbc,
+    scalikejdbc_config,
+    h2
 )
 
 test in assembly := {}
