@@ -28,7 +28,7 @@ import java.io.FileOutputStream
 
 class PigStorage extends java.io.Serializable {
   def load(sc: SparkContext, path: String, delim: Char = '\t'): RDD[List[String]] =
-    sc.textFile(path).map(line => line.split(delim).toList)
+    sc.textFile(path).map(line => line.split(delim.toString(), -1).toList)
 
   def write(path: String, rdd: RDD[String]) = rdd.saveAsTextFile(path)
 }
