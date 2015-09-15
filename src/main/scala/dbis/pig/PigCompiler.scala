@@ -356,16 +356,14 @@ object PigCompiler extends PigParser with LazyLogging {
         .apply()
       
     }
-//    id, cnt + {cnt} from opcount where id = {id}
     
-    val entries = DB readOnly { implicit session => 
-      sql"select * from opcount"
-        .map{ rs => s"${rs.string("id")}  -->  ${rs.int("cnt")}" }
-        .list
-        .apply()
-      
-    }
-    
+//    val entries = DB readOnly { implicit session => 
+//      sql"select * from opcount"
+//        .map{ rs => s"${rs.string("id")}  -->  ${rs.int("cnt")}" }
+//        .list
+//        .apply()
+//      
+//    }
 //    entries.foreach { println }
     
   }

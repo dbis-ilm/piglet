@@ -19,8 +19,6 @@ class PerfMonitor(driver: String = "org.h2.Driver",
   private val submissionTimes = MutableMap.empty[Int, Long]
   private val b = ListBuffer.empty[(String, Long)]
   
-  
-  
   override def onJobEnd(jobEnd: SparkListenerJobEnd): Unit = {  }
 
   override def onJobStart(jobStart: SparkListenerJobStart): Unit = {  }
@@ -53,38 +51,30 @@ class PerfMonitor(driver: String = "org.h2.Driver",
   }
   
   def flush() {
-    Class.forName(driver)
-    ConnectionPool.singleton(url, user, pw)
     
-    try {
       
-      val entrySet = b.map{ case (l,t) => Seq('lineage -> l, 'duration -> t) }.toSeq
-      
-      DB autoCommit { implicit session => 
-        sql"create table if not exists exectimes(lineage varchar(200), duration int)"
-          .execute
-          .apply()
-    }
-      
-      DB localTx { implicit session =>
-        sql"insert into exectimes(lineage, duration) VALUES({lineage},{duration})"
-          .batchByName(entrySet:_ *)
-          .apply()
-      }
-      
-      val entries = DB readOnly { implicit session => 
-      sql"select * from exectimes"
-        .map{ rs => s"${rs.string("lineage")}  -->  ${rs.int("duration")}" }
-        .list
+    val entrySet = b.map{ case (l,t) => Seq('lineage -> l, 'duration -> t) }.toSeq
+    
+    DB autoCommit { implicit session => 
+      sql"create table if not exists exectimes(lineage varchar(200), duration int)"
+        .execute
         .apply()
-      
+  }
+    
+    DB localTx { implicit session =>
+      sql"insert into exectimes(lineage, duration) VALUES({lineage},{duration})"
+        .batchByName(entrySet:_ *)
+        .apply()
     }
     
-    entries.foreach { println }
+//    val entries = DB readOnly { implicit session => 
+//      sql"select * from exectimes"
+//        .map{ rs => s"${rs.string("lineage")}  -->  ${rs.int("duration")}" }
+//        .list
+//        .apply()
+//    }
+//    entries.foreach { println }
       
-    } finally {
-      ConnectionPool.closeAll()
-    }
     
   }
   
