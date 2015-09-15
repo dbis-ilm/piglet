@@ -22,7 +22,7 @@ import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.parser.PigParser
 import dbis.pig.plan.DataflowPlan
-import dbis.pig.plan.rewriting.Extractors.ForEachCallingFunctionE
+import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
@@ -853,6 +853,27 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val op2 = p.parseScript("B = FOREACH A GENERATE notMyFunc(f1, f2);").head
     op2 should not matchPattern {
       case ForEachCallingFunctionE("myFunc") =>
+    }
+  }
+
+  "The OnlyFollowedByE" should "extract the single successor of a PigOperator" in {
+    val p = new PigParser()
+    val ops = p.parseScript(
+      """
+        | a = load 'foo' using PigStorage(':');
+        | dump a;
+      """.stripMargin)
+    val load = ops.headOption.value
+    val dump = ops.last
+
+    new DataflowPlan(List(load, dump))
+
+    load should matchPattern {
+      case OnlyFollowedByE(load, dump) =>
+    }
+
+    dump should not matchPattern {
+      case OnlyFollowedByE(dump, _) =>
     }
   }
 }

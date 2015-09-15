@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{Func, GeneratorExpr, GeneratorList, Foreach}
+import dbis.pig.op._
 
 /** Provides extractor objects for [[dbis.pig.op.PigOperator]]s.
   *
@@ -34,10 +34,24 @@ object Extractors {
     *
     * this extractor returns "myFunc".
     */
-  object ForEachCallingFunctionE{
+  object ForEachCallingFunctionE {
     def unapply(f: Foreach): Option[String] = f match {
       case f @ Foreach(_, _, GeneratorList(List(GeneratorExpr(Func(funcname, _), _))), _) => Some(funcname)
       case _ => None
+    }
+  }
+
+  /** Extracts the successor of ``op`` if there is only one.
+    *
+    */
+  object OnlyFollowedByE {
+    def unapply(op: PigOperator): Option[(PigOperator, PigOperator)] = {
+      val suc = op.outputs.flatMap(_.consumer)
+      if (suc.length == 1) {
+        Some((op, suc.head))
+      } else {
+        None
+      }
     }
   }
 }
