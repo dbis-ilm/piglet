@@ -41,6 +41,7 @@ class DataflowPlan(var operators: List[PigOperator]) {
   val udfAliases = Map[String,(String,  List[dbis.pig.op.Value])]()
 
   var code: String = ""
+  var extraRuleCode: Seq[String] = List.empty
 
   constructPlan(operators)
 
@@ -67,7 +68,10 @@ class DataflowPlan(var operators: List[PigOperator]) {
       val defineOp = op.asInstanceOf[DefineCmd]
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
     }
-    ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => code += op.asInstanceOf[EmbedCmd].code)
+    ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => {
+      code += op.asInstanceOf[EmbedCmd].code
+      extraRuleCode = extraRuleCode :+ op.asInstanceOf[EmbedCmd].ruleCode
+    })
 
     val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd]).filterNot(_.isInstanceOf[EmbedCmd])
     val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])

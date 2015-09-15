@@ -16,6 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
+import com.twitter.util.Eval
 import dbis.pig.op.{And, BinaryExpr, Filter, Load, Materialize, OrderBy, PigOperator, Pipe, Store, _}
 import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
@@ -173,9 +174,14 @@ object Rewriter extends LazyLogging {
     * @param plan The plan to process.
     * @return A rewritten [[dbis.pig.plan.DataflowPlan]]
     */
-  def processPlan(plan: DataflowPlan): DataflowPlan = processPlan(plan, ourStrategy)
+  def processPlan(plan: DataflowPlan): DataflowPlan = {
+    evalExtraRuleCode(plan.extraRuleCode)
+    processPlan(plan, ourStrategy)
+  }
 
   def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
+    evalExtraRuleCode(plan.extraRuleCode)
+
     // This looks innocent, but this is where the rewriting happens.
     val newSources = plan.sourceNodes.flatMap(
       processPigOperator(_, strategy) match {
@@ -842,6 +848,26 @@ object Rewriter extends LazyLogging {
     }
     newPlan
   }
-  
+
+
+  /** The imports that are automatically added to eval'd code
+    *
+    */
+  private val imports = """
+                  |import dbis.pig.op._
+                  |import dbis.pig.plan.rewriting.Extractors._
+                  |import dbis.pig.plan.rewriting.Rewriter._
+                """.stripMargin
+
+  /** Evals each String in ``ruleCode``
+    */
+  private def evalExtraRuleCode(ruleCode: Seq[String]): Unit = {
+    def addImports(code: String) = imports ++ code
+    for (c <- ruleCode) {
+      val evaldStrategies = (new Eval).apply[Seq[Strategy]](addImports(c))
+      evaldStrategies.map(addStrategy)
+    }
+  }
+
   registerAllRules
 }

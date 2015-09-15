@@ -24,7 +24,7 @@ import dbis.pig.parser.PigParser
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.{PipeNameGenerator, Rules}
+import dbis.pig.plan.rewriting.{Rewriter, PipeNameGenerator, Rules}
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
 import dbis.test.TestTools._
 import org.kiama.rewriting.Rewriter.{strategyf}
@@ -812,6 +812,38 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
          |GENERATE *, COUNT(r1) AS cnt1, COUNT(r2) AS cnt2;
          |};""".stripMargin))
     val rewrittenPlan = processPlan(plan)
+  }
+
+  it should "apply rules registered by embedded code" in {
+    val p = new PigParser()
+    val ops = p.parseScript(
+      """
+        |<! def myFunc(s: String): String = {
+        |   s
+        | }
+        | rules:
+        | import dbis.pig.plan.rewriting.Rewriter
+        | def rule(op: Any): Option[PigOperator] = {
+        | op match {
+        |   case ForEachCallingFunctionE("myFunc") =>
+        |     val fo = op.asInstanceOf[Foreach]
+        |     Some(Distinct(fo.outputs.head, fo.inputs.head))
+        |   case _ =>
+        |     None
+        | }
+        | }
+        | List(buildOperatorReplacementStrategy(rule))
+        |!>
+        |a = LOAD 'file.csv';
+        |b = FOREACH a GENERATE myFunc($0);
+        |dump b;
+      """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    plan.extraRuleCode should have length 1
+    val newPlan = processPlan(plan)
+    newPlan.operators should contain only(plan.sourceNodes.headOption.value,
+                                          plan.sinkNodes.headOption.value,
+                                           Distinct(Pipe("b"), Pipe("a")))
   }
 
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
