@@ -873,11 +873,11 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     new DataflowPlan(List(load, dump))
 
     load should matchPattern {
-      case OnlyFollowedByE(load, dump) =>
+      case OnlyFollowedByE( dump) =>
     }
 
     dump should not matchPattern {
-      case OnlyFollowedByE(dump, _) =>
+      case OnlyFollowedByE(_) =>
     }
   }
 

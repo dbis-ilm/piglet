@@ -45,10 +45,10 @@ object Extractors {
     *
     */
   object OnlyFollowedByE {
-    def unapply(op: PigOperator): Option[(PigOperator, PigOperator)] = {
+    def unapply(op: PigOperator): Option[PigOperator] = {
       val suc = op.outputs.flatMap(_.consumer)
       if (suc.length == 1) {
-        Some((op, suc.head))
+        Some(suc.head)
       } else {
         None
       }
