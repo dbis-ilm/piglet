@@ -24,7 +24,8 @@ import dbis.pig.parser.PigParser
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.{Rewriter, PipeNameGenerator, Rules}
+import dbis.pig.plan.rewriting.internals.PipeNameGenerator
+import dbis.pig.plan.rewriting.{Rewriter, Rules}
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
 import dbis.test.TestTools._
 import org.kiama.rewriting.Rewriter.{strategyf}

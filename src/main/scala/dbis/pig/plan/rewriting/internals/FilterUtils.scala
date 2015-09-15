@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting
+package dbis.pig.plan.rewriting.internals
 
 import dbis.pig.op._
 

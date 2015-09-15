@@ -53,6 +53,8 @@ case class RewriterException(msg:String)  extends Exception(msg)
   *  - [[buildBinaryPigOperatorStrategy]] is the same as [[addBinaryPigOperatorStrategy]] but doesn't add the
   *    strategy to this object.
   *
+  *  - [[buildRemovalStrategy]] builds a strategy to remove an operator from a [[DataflowPlan]]
+  *
   *  - [[processPlan]] applies a single strategy to a [[DataflowPlan]].
   *
   * ==Higher-level methods==
@@ -84,8 +86,8 @@ case class RewriterException(msg:String)  extends Exception(msg)
   *
   *  After a rewriting operation, the `inputs` and `outputs` attribute of operators other than the rewritten ones
   *  might be changed (for example to accommodate new or deleted operators). To help maintaining these relationships,
-  *  the method [[fixInputsAndOutputs]] in several versions is provided. Their documentation include hints in which
-  *  cases they apply.
+  *  the methods [[fixInputsAndOutputs]] and [[pullOpAcrossMultipleInputOp]] in several versions is provided. Their
+  *  documentation include hints in which cases they apply.
   *
   * @todo Not all links in this documentation link to the correct methods, most notably links to overloaded ones.
   *
@@ -389,7 +391,7 @@ object Rewriter extends LazyLogging {
    * @return
    */
   //noinspection ScalaDocMissingParameterDescription
-  def removalStrategy(rem: PigOperator): Strategy = {
+  def buildRemovalStrategy(rem: PigOperator): Strategy = {
     strategyf((op: Any) => {
       if (op == rem) {
         val pigOp = op.asInstanceOf[PigOperator]
@@ -434,7 +436,7 @@ object Rewriter extends LazyLogging {
     */
   //noinspection ScalaDocMissingParameterDescription
   def remove(plan: DataflowPlan, rem: PigOperator, removePredecessors: Boolean = false): DataflowPlan = {
-    var strat = removalStrategy(rem)
+    var strat = buildRemovalStrategy(rem)
 
     var newPlan = processPlan(plan, strat)
     if (removePredecessors) {
@@ -450,7 +452,7 @@ object Rewriter extends LazyLogging {
         }
       }
 
-      newPlan = nodes.foldLeft(newPlan) ((p: DataflowPlan, op: PigOperator) => processPlan(p, removalStrategy(op)))
+      newPlan = nodes.foldLeft(newPlan) ((p: DataflowPlan, op: PigOperator) => processPlan(p, buildRemovalStrategy(op)))
     }
     newPlan
   }

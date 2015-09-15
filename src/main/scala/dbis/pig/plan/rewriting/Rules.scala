@@ -16,12 +16,14 @@
  */
 package dbis.pig.plan.rewriting
 
+import dbis.pig.plan.rewriting.internals.{RDF, Column, PipeNameGenerator, FilterUtils}
+
 import scala.collection.mutable.ListBuffer
 import dbis.pig.op._
-import dbis.pig.plan.rewriting.Column.Column
-import dbis.pig.plan.rewriting.FilterUtils._
+import Column.Column
+import FilterUtils._
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.PipeNameGenerator.generate
+import PipeNameGenerator.generate
 import dbis.pig.schema.{Field, Types}
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
@@ -79,7 +81,7 @@ object Rules {
           op.outputs.flatMap(_.consumer).
             filter(_.isInstanceOf[Filter]).
             filter { f: PigOperator => extractPredicate(f.asInstanceOf[Filter].pred) == extractPredicate(pred) }.
-            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, removalStrategy(pigOp)
+            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, buildRemovalStrategy(pigOp)
           )}))
     }
   }
@@ -198,7 +200,7 @@ object Rules {
         }
 
         // This is the function we'll use to remove the BGPFilter
-        def remover = topdown(attempt(removalStrategy(bf.get)))
+        def remover = topdown(attempt(buildRemovalStrategy(bf.get)))
 
         val strategy = ior(replacer, remover)
         strategy
@@ -235,7 +237,7 @@ object Rules {
       } else {
         val pattern = patterns.head
         if (RDF.allUnbound(pattern)) {
-          removalStrategy(op)
+          buildRemovalStrategy(op)
         } else {
           fail
         }
