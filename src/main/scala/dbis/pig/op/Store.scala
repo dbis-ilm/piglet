@@ -22,8 +22,10 @@ import java.net.URI
 /**
  * Store represents the STORE operator of Pig.
  *
- * @param initialInPipeName the name of the input pipe
+ * @param in the input pipe
  * @param file the name of the output file
+ * @param func the name of the storage function implemented in the backend library
+ * @param params a list of parameter strings for the storage function
  */
 case class Store(in: Pipe,
                  file: URI,

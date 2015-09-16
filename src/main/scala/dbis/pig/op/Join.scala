@@ -26,12 +26,13 @@ import java.util.concurrent.TimeUnit
 /**
  * Join represents the multiway JOIN operator of Pig.
  *
- * @param outPipeName the name of the output pipe (relation).
- * @param inPipeNames the list of names of input pipes.
+ * @param out the output pipe (relation).
+ * @param in the list of input pipes.
  * @param fieldExprs  list of key expressions (list of keys) used as join expressions.
  * @param timeWindow window definition for streaming joins
  */
-case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]], timeWindow: Tuple2[Int,String]= null.asInstanceOf[Tuple2[Int,String]]) extends PigOperator {
+case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]],
+                timeWindow: Tuple2[Int,String] = null.asInstanceOf[Tuple2[Int,String]]) extends PigOperator {
   _outputs = List(out)
   _inputs = in
 

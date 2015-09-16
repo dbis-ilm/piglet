@@ -23,7 +23,7 @@ import java.net.URI
 /**
  * Load represents the LOAD operator of Pig.
  *
- * @param initialOutPipeName the name of the initial output pipe (relation).
+ * @param out the output pipe (relation).
  * @param file the name of the file to be loaded
  * @param loadSchema
  * @param loaderFunc
