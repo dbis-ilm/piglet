@@ -113,4 +113,17 @@ trait StrategyBuilders {
     })
   }
 
+  /** Given a function `f: (T => Option[T])`, return a function that applies `f` if it's input is of type `T`.
+    *
+    * @param f
+    * @tparam T
+    * @return
+    */
+  def buildTypedCaseWrapper[T <: PigOperator : ClassTag](f: (T => Option[PigOperator])): (Any => Option[PigOperator]) = {
+    val wrapper = {term: Any => term match {
+      case _ if classTag[T].runtimeClass.isInstance(term) => f(term.asInstanceOf[T])
+      case _ => None
+    }}
+    wrapper
+  }
 }
