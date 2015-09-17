@@ -87,6 +87,10 @@ trait WindowSupport extends LazyLogging {
           logger.debug(s"Rewrite Distinct to WindowMode")
           o.windowMode = true
         }
+        case o: OrderBy => {
+          logger.debug(s"Rewrite OrderBy to WindowMode")
+          o.windowMode = true
+        }
         case o: Grouping => {
           logger.debug(s"Rewrite Grouping to WindowMode")
           o.windowMode = true
