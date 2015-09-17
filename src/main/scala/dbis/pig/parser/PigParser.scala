@@ -535,8 +535,23 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def fsStmt: Parser[PigOperator] = fsKeyword ~ fsCmd ~ rep(fsParam) ^^ { case _ ~ cmd ~ params => HdfsCmd(cmd, params)}
 
-  def embeddedCode: Parser[String] = ("""(?s)(.*?)%>""").r
-  def embedStmt: Parser[PigOperator] = "<%" ~ embeddedCode ^^ { case _ ~ code => EmbedCmd(code.substring(0, code.length-2))}
+  def code = ("""(?s)(.*?)""")
+
+  def embeddedCodeNoRules: Parser[EmbedCmd] = "<%" ~ (code+"%>").r ^^ { case _ ~ code => new EmbedCmd(code
+    .substring
+    (0, code
+      .length - 2))
+  }
+
+  def codeWithRulesInit = (code + "rules:").r
+
+  def ruleCode: Parser[String] = (code + "!>").r
+
+  def embeddedCodeWithRules: Parser[EmbedCmd] = "<!" ~ codeWithRulesInit ~ ruleCode ^^ {
+    case _ ~ code ~ rules => EmbedCmd(code.substring(0, code.length - 6), rules.substring(0, rules.length - 2))
+  }
+
+  def embedStmt: Parser[PigOperator] = embeddedCodeNoRules | embeddedCodeWithRules
 
   /*
    * A statement can be one of the above delimited by a semicolon.

@@ -20,9 +20,12 @@ import java.net.URI
 
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
+import dbis.pig.parser.PigParser
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.Rules
+import dbis.pig.plan.rewriting.internals.PipeNameGenerator
+import dbis.pig.plan.rewriting.{Rewriter, Rules}
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
 import dbis.test.TestTools._
 import org.kiama.rewriting.Rewriter.{strategyf}
@@ -321,7 +324,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F2))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+        (buildTypedCaseWrapper(Rules.F2)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only p._2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
     }
@@ -333,7 +337,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
         val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
         val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
         val op3 = Dump(Pipe("b"))
-        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F2))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+          (buildTypedCaseWrapper(Rules.F2)))
 
         plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
       }
@@ -370,7 +375,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F3))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+        (buildTypedCaseWrapper(Rules.F3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only p._2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
     }
@@ -384,7 +390,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
         val op2 = Distinct(Pipe("b"), Pipe("a"))
         val op3 = BGPFilter(Pipe("c"), Pipe("b"), List(p._1))
         val op4 = Dump(Pipe("c"))
-        val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)), buildOperatorReplacementStrategy(Rules.F3))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)), buildOperatorReplacementStrategy
+          (buildTypedCaseWrapper(Rules.F3)))
 
         plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
       }
@@ -408,7 +415,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F4))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+        (buildTypedCaseWrapper(Rules.F4)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only f
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only f
     }
@@ -422,7 +430,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
           val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
           val op3 = Dump(Pipe("b"))
-          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F4))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+            (buildTypedCaseWrapper(Rules.F4)))
 
           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
           plan.operators should contain only(op1, op2, op3)
@@ -434,6 +443,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   it should "apply rewriting rule F5" in {
     assume(false, "Filters in Foreach do not yet work")
     Random.setSeed(123456789)
+    PipeNameGenerator.clearGenerated
     val patterns = Table(
       ("Pattern", "grouping column", "ForEach", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
@@ -506,6 +516,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     // (10). The tests below include the values that are generated by Random.nextString(10) after setting the seed to
     // 123456789.
     Random.setSeed(123456789)
+    PipeNameGenerator.clearGenerated
     val pattern = TriplePattern(Value("subject"),Value("predicate"), Value("object"))
     val patterns = Table(
       ("Pattern", "grouping column", "Grouping column Filter", "Other Filter"),
@@ -557,7 +568,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F7))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+        (buildTypedCaseWrapper(Rules.F7)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only f1
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only f2
     }
@@ -567,7 +579,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F7))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+        (buildTypedCaseWrapper(Rules.F7)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -577,7 +590,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p, p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F7))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+        (buildTypedCaseWrapper(Rules.F7)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -587,7 +601,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F7))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+        (buildTypedCaseWrapper(Rules.F7)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -605,7 +620,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
           val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
           val op3 = Dump(Pipe("b"))
-          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F7))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
+            (buildTypedCaseWrapper(Rules.F7)))
 
           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
           plan.operators should contain only(op1, op2, op3)
@@ -619,6 +635,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     // (10). The tests below include the values that are generated by Random.nextString(10) after setting the seed to
     // 123456789.
     Random.setSeed(123456789)
+    PipeNameGenerator.clearGenerated
     val pattern = TriplePattern(Value("subject"),Value("predicate"), Value("object"))
     val patterns = Table(
       ("Pattern", "grouping column", "Grouping column Filter", "Other Filter"),
@@ -645,7 +662,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F8))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(buildTypedCaseWrapper(Rules.F8)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only f1
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only f2
     }
@@ -655,7 +672,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F8))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(buildTypedCaseWrapper(Rules.F8)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -673,7 +690,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
         val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
         val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(f(p)))
         val op3 = Dump(Pipe("b"))
-        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F8))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(buildTypedCaseWrapper(Rules.F8)))
         plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
         plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
       }
@@ -684,7 +701,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p, p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F8))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(buildTypedCaseWrapper(Rules.F8)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -694,7 +711,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F8))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(buildTypedCaseWrapper(Rules.F8)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -702,6 +719,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
 
   it should "apply rewriting rule J1" in {
     Random.setSeed(123456789)
+    PipeNameGenerator.clearGenerated
 
     val patterns = Table(
       ("patterns", "filters", "join"),
@@ -808,11 +826,36 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val rewrittenPlan = processPlan(plan)
   }
 
-  it should "process a plan with a single operator" in {
-    val plan = new DataflowPlan(parseScript(
-      """triples = LOAD 'file' AS (sub, pred, obj);""".stripMargin))
-    val rewrittenPlan = processPlan(plan)
-    rewrittenPlan.operators.size should be (plan.operators.size)
+  it should "apply rules registered by embedded code" in {
+    val p = new PigParser()
+    val ops = p.parseScript(
+      """
+        |<! def myFunc(s: String): String = {
+        |   s
+        | }
+        | rules:
+        | import dbis.pig.plan.rewriting.Rewriter
+        | def rule(op: Any): Option[PigOperator] = {
+        | op match {
+        |   case ForEachCallingFunctionE("myFunc") =>
+        |     val fo = op.asInstanceOf[Foreach]
+        |     Some(Distinct(fo.outputs.head, fo.inputs.head))
+        |   case _ =>
+        |     None
+        | }
+        | }
+        | List(buildOperatorReplacementStrategy(rule))
+        |!>
+        |a = LOAD 'file.csv';
+        |b = FOREACH a GENERATE myFunc($0);
+        |dump b;
+      """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    plan.extraRuleCode should have length 1
+    val newPlan = processPlan(plan)
+    newPlan.operators should contain only(plan.sourceNodes.headOption.value,
+                                          plan.sinkNodes.headOption.value,
+                                           Distinct(Pipe("b"), Pipe("a")))
   }
 
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
@@ -845,5 +888,52 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     op3.inputs.map(_.producer) should contain only op1
     op3.outputs.flatMap(_.consumer) should contain only op2
     op2.inputs.map(_.producer) should contain only op3
+  }
+
+  "The ForEachCallingFunctionE" should "extract the function name of a function called in the only GeneratorExpr of a" +
+    " GeneratorList in a ForEach statement" in {
+    val p = new PigParser()
+    val op = p.parseScript("B = FOREACH A GENERATE myFunc(f1, f2);").head
+    op should matchPattern {
+      case ForEachCallingFunctionE("myFunc") =>
+    }
+
+    val op2 = p.parseScript("B = FOREACH A GENERATE notMyFunc(f1, f2);").head
+    op2 should not matchPattern {
+      case ForEachCallingFunctionE("myFunc") =>
+    }
+  }
+
+  "The OnlyFollowedByE" should "extract the single successor of a PigOperator" in {
+    val p = new PigParser()
+    val ops = p.parseScript(
+      """
+        | a = load 'foo' using PigStorage(':');
+        | dump a;
+      """.stripMargin)
+    val load = ops.headOption.value
+    val dump = ops.last
+
+    new DataflowPlan(ops)
+
+    load should matchPattern {
+      case OnlyFollowedByE( dump) =>
+    }
+
+    dump should not matchPattern {
+      case OnlyFollowedByE(_) =>
+    }
+  }
+
+  "The PipeNameGenerator" should "not generate duplicate pipe names" in {
+    val seed = 1234567890
+    Random.setSeed(seed)
+    val gen1 = PipeNameGenerator.generate()
+
+    // Reset the seed, so that the generator generates the same name again
+    Random.setSeed(seed)
+    val gen2 = PipeNameGenerator.generate()
+
+    gen1 should not equal gen2
   }
 }

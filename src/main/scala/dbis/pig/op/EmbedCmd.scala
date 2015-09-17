@@ -18,11 +18,11 @@
 package dbis.pig.op
 
 
-/**
- * EmbedCmd represents a pseudo operator embedding code (e.g. Scala) into a script. This "operator" will
- * be eliminated during building the dataflow plan.
+/** Wraps code that is to be embedded in the compiled Scala application.
  *
- * @param code a string representing the embedded code
+ * @param code The embedded code.
  */
-case class EmbedCmd(code: String) extends PigOperator
+case class EmbedCmd(code: String, ruleCode: String) extends PigOperator {
+  def this(code: String) = this(code, "")
+}
 

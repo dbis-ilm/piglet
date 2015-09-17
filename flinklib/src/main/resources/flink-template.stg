@@ -35,6 +35,8 @@ dump(in) ::=<<
 // ------------------ STORE Results on Disk -----------------------------------
 store(in,file,schema,func) ::=<<
         <in>.map(t => <schema>).writeAsText("<file>")
+        
+        env.execute()
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -94,7 +96,7 @@ orderBy(out,in,key,asc) ::=<<
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
-        env.execute("<name>")
+        
     }
 }
 >>

@@ -700,4 +700,28 @@ class PigParserSpec extends FlatSpec {
       """.stripMargin)
       assert (ops(1) == Load(Pipe("A"), new URI("file.csv")))
   }
+
+  it should "parse a script with embedded code and rules" in {
+    val ops = parseScript(
+      """
+        |<! def someFunc(s: String): String = {
+        |   s
+        | }
+        | rules:
+        | def rule(term: Any): Option[PigOperator] = None
+        | def rule2(term: Any): Option[PigOperator] = None
+        |!>
+        |A = LOAD 'file.csv';
+      """.stripMargin)
+    assert(ops(0).isInstanceOf[EmbedCmd])
+    val op = ops(0).asInstanceOf[EmbedCmd]
+    assert(op.code.stripLineEnd ==
+       """def someFunc(s: String): String = {
+          |   s
+          | }
+          | """.stripMargin)
+    assert(op.ruleCode.stripLineEnd ==
+      """def rule(term: Any): Option[PigOperator] = None
+        | def rule2(term: Any): Option[PigOperator] = None""".stripMargin.stripLineEnd)
+  }
 }

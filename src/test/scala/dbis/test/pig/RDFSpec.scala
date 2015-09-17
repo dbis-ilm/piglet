@@ -17,7 +17,7 @@
 package dbis.test.pig
 
 import dbis.pig.op.{PositionalField, NamedField, Value, TriplePattern}
-import dbis.pig.plan.rewriting.RDF
+import dbis.pig.plan.rewriting.internals.RDF
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{FlatSpec, Matchers}
 
