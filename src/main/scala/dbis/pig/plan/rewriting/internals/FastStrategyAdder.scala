@@ -33,6 +33,11 @@ trait FastStrategyAdder {
 
   def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                newChild: T): T2
+
+  def buildTypedCaseWrapper[T <: PigOperator : ClassTag](f: (T => Option[PigOperator])): (Any => Option[PigOperator])
+
+  def addStrategy(f: Any => Option[PigOperator]): Unit
+
   /** Add a new strategy for merging operators of two types.
     *
     * An example method to merge Filter operators is
@@ -108,5 +113,15 @@ trait FastStrategyAdder {
     => Option[PigOperator]): Unit = {
     val strategy = buildBinaryPigOperatorStrategy(f)
     addStrategy(strategy)
+  }
+
+  /** Given a function `f: (T => Option[T])`, add a strategy that applies `f` if the input term is of type `T`.
+    *
+    * @param f
+    * @tparam T
+    */
+  def addTypedStrategy[T <: PigOperator : ClassTag](f: (T => Option[T])): Unit = {
+    val wrapper = buildTypedCaseWrapper[T](f)
+    addStrategy(wrapper)
   }
 }

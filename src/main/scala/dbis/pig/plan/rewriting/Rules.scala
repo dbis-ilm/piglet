@@ -784,8 +784,8 @@ object Rules {
     addOperatorReplacementStrategy(buildTypedCaseWrapper(F2))
     addOperatorReplacementStrategy(buildTypedCaseWrapper(F3))
     addOperatorReplacementStrategy(buildTypedCaseWrapper(F4))
-    addStrategy(buildTypedCaseWrapper(F7))
-    addStrategy(buildTypedCaseWrapper(F8))
+    addTypedStrategy(F7)
+    addTypedStrategy(F8)
     addStrategy(strategyf(t => J1(t)))
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk _)
   }

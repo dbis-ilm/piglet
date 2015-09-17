@@ -113,7 +113,7 @@ trait StrategyBuilders {
     })
   }
 
-  /** Given a function `f: (T => Option[T])`, return a function that applies `f` if it's input is of type `T`.
+  /** Given a function `f: (T => Option[T])`, return a function that applies `f` if the input term is of type `T`.
     *
     * @param f
     * @tparam T
