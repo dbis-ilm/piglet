@@ -40,6 +40,9 @@ import dbis.pig.tools.BreadthFirstTopDownWalker
 import dbis.pig.tools.DBConnection
 import scala.collection.mutable.{Map => MutableMap}
 import scalikejdbc._
+import dbis.pig.tools.DepthFirstTopDownWalker
+import dbis.pig.mm.DataflowProfiler
+import dbis.pig.mm.MaterializationPoint
 
 object PigCompiler extends PigParser with LazyLogging {
   
@@ -181,19 +184,59 @@ object PigCompiler extends PigParser with LazyLogging {
     val jarFile = Conf.backendJar(backend)
     val mm = new MaterializationManager
    
+    val profiler = new DataflowProfiler
     
-    for(plan <- schedule) {
+    for((plan,path) <- schedule) {
     
       // 3. now, we should apply optimizations
-      var newPlan = plan._1
-      newPlan = processMaterializations(newPlan, mm)
+      var newPlan = plan
+		  newPlan = processMaterializations(newPlan, mm)
       if (backend=="flinks") newPlan = processWindows(newPlan)
-      newPlan = processPlan(newPlan)
+      newPlan = processPlan(newPlan)   
+      // find materialization points
+      
+      val walker = new DepthFirstTopDownWalker
+      walker.walk(newPlan) { op => 
+      
+        logger.debug(s"""checking database for runtime information for operator "${op.lineageSignature}" """)
+        // check for the current operator, if we have some runtime/stage information 
+        val avg = DB readOnly { implicit session => 
+          sql"select avg(progduration) as pd, avg(stageduration) as sd from exectimes where lineage = ${op.lineageSignature} group by lineage"
+            .map { rs => (rs.long("pd"), rs.long("sd")) }.single().apply()
+        }
+      
+        // if we have information, create a (potential) materialization point
+        if(avg.isDefined) {
+          val (progduration, stageduration) = avg.get
+          
+          logger.debug(s"""found runtime information: program: $progduration  stage: $stageduration""")
+          
+          /* XXX: calculate benefit
+           * Here, we do not have the parent hash information.
+           * But is it still needed? Since we have the program runtime duration 
+           * from beginning until the end the stage, we don't need to calculate
+           * the cumulative benefit?
+           */
+          val mp = MaterializationPoint(op.lineageSignature,
+                                          None, // currently, we do not consider the parent
+                                          progduration, // set the processing time
+                                          0L, // TODO: calculate loading time at this point
+                                          0L, // TODO: calculate saving time at this point
+                                          0 // no count/size information so far
+                                        )
+                                        
+          profiler.addMaterializationPoint(mp)
+          
+        } else {
+          logger.debug(s" found no runtime information")
+        }
+      }
+      
       
       logger.debug("finished optimizations")
       
   
-      val scriptName = plan._2.getFileName.toString().replace(".pig", "")
+      val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
       
       FileTools.compileToJar(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, hookFile) match {
@@ -210,7 +253,7 @@ object PigCompiler extends PigParser with LazyLogging {
         } else
           logger.info("successfully compiled program - exiting.")
           
-        case None => logger.error(s"creating jar file failed for ${plan._2}") 
+        case None => logger.error(s"creating jar file failed for ${path}") 
       } 
     }
       
