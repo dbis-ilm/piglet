@@ -21,7 +21,6 @@ begin_query(name) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
-        sc.addSparkListener(new PerfMonitor())
 
 >>
 
@@ -53,7 +52,7 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element -----------
-foreach(out,in,expr) ::=<<
+foreach(out,in,expr,aggrs) ::=<<
         val <out> = <in>.map(t => <expr>)
 >>
 
@@ -119,6 +118,11 @@ streamOp(out,in,op,params) ::=<<
 // ----------------------- FS commands ----------------------------------------
 fs(cmd,params) ::=<<
     HDFSService.process(<cmd>, <params>)
+>>
+
+// ------------------ RSCRIPT operators ----------------------------------------
+rscript(out,in,script) ::=<<
+        val <out> = RScriptOp.process(sc, <in>, <script>, "res")
 >>
 
 // ----------------- END of the code implementing the query -------------------

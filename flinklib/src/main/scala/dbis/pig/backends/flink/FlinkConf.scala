@@ -1,14 +1,14 @@
-package dbis.flink.streaming
+package dbis.pig.backends.flink
 
 import dbis.pig.backends.BackendConf
-import dbis.flink.FlinkRun
-import dbis.pig.backends.PigletBackend
 import com.typesafe.config.ConfigFactory
+import dbis.pig.backends.PigletBackend
 
 /**
  * @author hage
  */
-class FlinksConf extends BackendConf {
+class FlinkConf extends BackendConf {
+  
   // loads the default configuration file in resources/application.conf
   private val appconf = ConfigFactory.load()
   
@@ -17,7 +17,7 @@ class FlinksConf extends BackendConf {
    * 
    * @return Returns the name of this backend
    */
-  override def name: String = appconf.getString("backends.flinks.name")
+  override def name: String = appconf.getString("backends.flink.name")
   
   /**
    * Get the path to the runner class that implements the PigletBackend interface
@@ -26,7 +26,9 @@ class FlinksConf extends BackendConf {
     new FlinkRun
   } 
   
-  override def templateFile: String = appconf.getString("backends.flinks.template")
+  override def templateFile: String = appconf.getString("backends.flink.template")
+
+  override def defaultConnector: String = appconf.getString("backends.flink.connector")
   
   override def raw = false
 }

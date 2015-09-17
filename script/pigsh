@@ -8,6 +8,10 @@ echo '
 |_|   |_|\__, | |____/|_| |_|\___|_|_|
          |___/
 '
+
+# TODO: we should find our jar file the same way we do for spark
+PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
+
 if [ -z "$PIG_LIB" ]; then
     echo "Please set PIG_LIB to your PigCompiler jar file"
     exit 1
@@ -51,8 +55,7 @@ while getopts ":b:" opt; do
 done
 
 case $BACKEND in
-    "spark") ;&
-    "sparks")
+    "spark" | "sparks")
         if [ -z "$SPARK_JAR" ]; then
             echo "Please set SPARK_JAR to your Spark-assembly-hadoop jar file"
             exit 1
@@ -60,8 +63,7 @@ case $BACKEND in
             CP=$SPARK_JAR:$CP
         fi
         ;;
-    "flink") ;&
-    "flinks")
+    "flink" | "flinks")
         if [ -z "$FLINK_JAR" ]; then
             echo "Please set FLINK_JAR to your Flink jar file (built with scala 2.11)"
             exit 1

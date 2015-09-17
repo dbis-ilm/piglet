@@ -16,6 +16,8 @@
  */
 package dbis.pig.op
 
+import dbis.pig.backends.BackendManager
+
 /**
  * Store represents the STORE operator of Pig.
  *
@@ -23,9 +25,12 @@ package dbis.pig.op
  * @param addr the socket address to write to
  * @param mode empty for standard socket or currently also possible "zmq"
  */
-case class SocketWrite(in: Pipe, addr: SocketAddress, mode: String) extends PigOperator {
+case class SocketWrite(in: Pipe,
+                       addr: SocketAddress,
+                       mode: String,
+                       func: String = BackendManager.backend.defaultConnector) extends PigOperator {
   _outputs = List()
-  _inputs = List()
+  _inputs = List(in)
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

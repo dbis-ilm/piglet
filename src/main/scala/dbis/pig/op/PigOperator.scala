@@ -93,6 +93,11 @@ trait PigOperator extends Rewritable {
 
   def outPipeNames: List[String] = outputs.map(p => p.name)
 
+  def inPipeName: String = if (inputs.nonEmpty) inputs.head.name else ""
+
+  def inPipeNames: List[String] = inputs.map(p => p.name)
+
+
   def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 
   def preparePlan: Unit = {}
@@ -141,7 +146,7 @@ trait PigOperator extends Rewritable {
      */
     schema match {
       case Some(s) => s"$outPipeName: ${s.element.descriptionString}"
-      case None => s"Schema for $outPipeName unknown."
+      case None => s"Schema for '$outPipeName' unknown."
     }
   }
 

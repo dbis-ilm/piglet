@@ -14,38 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package dbis.pig.op
 
-package dbis.flink
+import dbis.pig.schema.Schema
 
-import org.apache.flink.api.scala._
+/**
+ * Created by kai on 13.07.15.
+ */
+case class RScript(out: Pipe, in: Pipe, script: String, var loadSchema: Option[Schema] = None) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
+  schema = loadSchema
 
-class PigStorage extends java.io.Serializable {
-  def load(env: ExecutionEnvironment, path: String, delim: Char = ' '): DataSet[List[String]] = {
-    env.readTextFile(path).map(line => line.split(delim).toList)
+  override def lineageString: String = s"""STREAM%""" + super.lineageString
+
+  override def constructSchema: Option[Schema] = {
+    // TODO
+    schema
   }
 }
 
-object PigStorage {
-  def apply(): PigStorage = {
-    new PigStorage
-  }
-}
-
-class RDFFileStorage extends java.io.Serializable {
-  val pattern = "([^\"]\\S*|\".+?\")\\s*".r
-
-  def rdfize(line: String): Array[String] = {
-    val fields = pattern.findAllIn(line).map(_.trim)
-    fields.toArray.slice(0, 3)
-  }
-
-  def load(env: ExecutionEnvironment, path: String): DataSet[Array[String]] = {
-    env.readTextFile(path).map(line => rdfize(line))
-  }
-}
-
-object RDFFileStorage {
-  def apply(): RDFFileStorage = {
-    new RDFFileStorage
-  }
-}

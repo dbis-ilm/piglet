@@ -209,6 +209,5 @@ object Rewriter extends LazyLogging
     newPlan
   }
 
-
   registerAllRules
 }

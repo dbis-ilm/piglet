@@ -1,3 +1,6 @@
+import sbt.Keys._
+import sbt._
+
 name := "Piglet"
 
 libraryDependencies ++= Dependencies.rootDeps

@@ -11,6 +11,15 @@ import java.net.URLClassLoader
 object BackendManager extends LazyLogging {
  
   /**
+   * Loaded backend
+   */
+  private var _backend: BackendConf = _
+
+  def backend = _backend
+
+  def backend_= (conf: BackendConf) = _backend = conf
+
+  /**
    * Get the runner class for the backend with the given name
    * 
    * @param backend The name of the backend. 
@@ -24,4 +33,5 @@ object BackendManager extends LazyLogging {
     
     Class.forName(className).newInstance().asInstanceOf[BackendConf]
   }
+
 }

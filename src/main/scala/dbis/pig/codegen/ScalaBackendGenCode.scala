@@ -24,6 +24,7 @@ import dbis.pig.schema._
 import dbis.pig.udf._
 
 import java.net.URI
+import scala.collection.mutable.ListBuffer
 
 
 // import scala.collection.mutable.Map
@@ -37,9 +38,9 @@ import java.net.URI
  * supported in Pig. This requires to always map the output of any backend transformation back
  * to such a list.
  *
- * @param templateFile the name of the backend-specific template fle
+ * @param template the name of the backend-specific template fle
  */
-class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging {
+abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging {
 
    templateFile = template 
   /*------------------------------------------------------------------------------------------------- */
@@ -191,9 +192,6 @@ class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
-    case DerefTuple(r1, r2) => 
-      if (aggregate) s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]].map(e => e${emitRef(tupleSchema(schema, r1), r2, "", false)})"
-      else s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
     case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
     case _ => { "" }
   }
@@ -393,23 +391,23 @@ class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging
     }
 
     node match {
-      case OrderBy(out, in, orderSpec) => {
+      case OrderBy(out, in, orderSpec, _) => {
         var params = Map[String,Any]()
         //Spark
-        params += "cname" -> s"custKey_${node.outPipeName}_${node.inputs.head.name}"
+        params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
         var col = 0
         params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
         params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
 
         //Flink
         params += "out"->node.outPipeName
-        params += "key"->s"(${orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")})"
+        params += "key"->orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse"->true
 
         callST("orderHelper", Map("params"->params))
       }
       case Store(in, file,_,params) => { s"""
-        |def tuple${node.inputs.head.name}ToString(t: List[Any]): String = {
+        |def tuple${node.inPipeName}ToString(t: List[Any]): String = {
         |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
         |
         |  val sb = new StringBuilder
@@ -417,84 +415,7 @@ class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging
         |  sb.toString
         |}""".stripMargin
       }
-      case Distinct(out, in, windowMode) => {
-        //TODO: Maybe outsource as there are no variables
-        if (windowMode)
-          s"""
-          |  def distinct(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
-          |    ts.toList.distinct.foreach{ x => out.collect(x) }
-          |  }
-          """.stripMargin
-        else ""
-      }
-      case Grouping(out, in, groupExpr, windowMode) => { 
-        if (windowMode)
-          s"""
-          |  def custom${node.outPipeName}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-          |    out.collect(ts.groupBy(t => ${emitGroupExpr(node.inputSchema,groupExpr)}).flatMap(x => List(x._1,x._2)).toList)
-          |  }""".stripMargin
-        else ""
-      }
-      case Foreach(out, in, gen, windowMode) => { 
-        if (windowMode)
-          s"""
-          |  def custom${node.outPipeName}Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-          |    ts.foreach { t => out.collect(${emitForeachExpr(node, gen)})}
-          |  }""".stripMargin
-        else ""
-      }
       case _ => ""
-    }
-  }
-
-  /**
-   * Generates Scala code for a nested plan, i.e. statements within nested FOREACH.
-   *
-   * @param schema the input schema of the FOREACH statement
-   * @param plan the dataflow plan representing the nested statements
-   * @return the generated code
-   */
-  def emitNestedPlan(schema: Option[Schema], plan: DataflowPlan): String = {
-    "{\n" + plan.operators.map {
-      case Generate(expr) => s"""( ${emitGenerator(schema, expr)} )"""
-      case n@ConstructBag(out, ref) => ref match {
-        case DerefTuple(r1, r2) => {
-          val p1 = findFieldPosition(schema, r1)
-          val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
-          require(p1 >= 0 && p2 >= 0)
-          s"""val ${n.outputs.head.name} = t($p1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]]($p2))"""
-        }
-        case _ => "" // should not happen
-      }
-      case n@Distinct(out, in, windowMode) => {
-        if (templateFile.contains("flinks"))
-          s"""val ${n.outputs.head.name} = ${n.inputs.head.name}.distinct"""
-        else
-          callST("distinct", Map("out"->n.outputs.head.name,"in"->n.inputs.head.name))  
-      }
-      case n@Filter(out, in, pred, windowMode) => callST("filter", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "pred" -> emitPredicate(n.schema, pred),"windowMode"->windowMode))
-      case n@Limit(out, in, num, windowMode) => callST("limit", Map("out" -> n.outputs.head.name, "in" -> n.inputs.head.name, "num" -> num,"windowMode"->windowMode))
-      case OrderBy(out, in, orderSpec) => "" // TODO!!!!
-      case _ => ""
-    }.mkString("\n") + "}"
-  }
-
-  def emitForeachExpr(node: PigOperator, gen: ForeachGenerator): String = {
-    // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
-    val requiresPlainFlatten =  node.asInstanceOf[Foreach].containsFlatten(onBag = false)
-    val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
-    gen match {
-      case GeneratorList(expr) => {
-        if (requiresFlatMap) emitBagFlattenGenerator(node.inputSchema, expr)
-        else {
-          if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
-          else emitGenerator(node.inputSchema, expr)
-        }
-      }
-      case GeneratorPlan(plan) => {
-        val subPlan = node.asInstanceOf[Foreach].subPlan.get
-        emitNestedPlan(node.inputSchema, subPlan)
-      }
     }
   }
 
@@ -503,139 +424,6 @@ class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging
   /*                                   Node code generators                                           */
   /*------------------------------------------------------------------------------------------------- */
  
-  /**
-   * Generates code for the CROSS operator.
-   *
-   * @param node the Cross Operator node
-   * @param out name of the output bag
-   * @param rels list of Pipes to cross
-   * @param window window information for Cross' on streams
-   * @return the Scala code implementing the CROSS operator
-   */
-  def emitCross(node: PigOperator, out: String, rels: List[Pipe], window: Tuple2[Int,String]): String = {
-    if(window!=null)
-      callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name),"window"->window._1,"wUnit"->window._2))
-    else
-      callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name)))
-  }
-
-  /**
-   * Generates code for the DISTINCT Operator
-   *
-   * @param out name of the output bag
-   * @param in name of the input bag
-   * @param windowMode true if operator is called within a window environment
-   * @return the Scala code implementing the DISTINCT operator
-   */
-  def emitDistinct(out: String, in: String, windowMode: Boolean): String = {
-    //TODO: Kind of ugly
-    if (templateFile.contains("flinks") && !windowMode)
-      throw new TemplateException(s"Distinct not supported outside of windows")
-    else
-      callST("distinct", Map("out"->out,"in"->in))
-  }
- 
-  /**
-   * Generates code for the FILTER Operator
-   *
-   * @param schema the nodes schema
-   * @param out name of the output bag
-   * @param in name of the input bag
-   * @param pred the filter predicate
-   * @param windowMode true if operator is called within a window environment
-   * @return the Scala code implementing the FILTER operator
-   */
-  def emitFilter(schema: Option[Schema], out: String, in: String, pred: Predicate, windowMode: Boolean): String = {
-    if (windowMode)
-      callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(schema, pred),"windowMode"->windowMode))
-    else
-      callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(schema, pred)))
-  }
- 
-  /**
-   * Generates code for the FOREACH Operator
-   *
-   * @param node the FOREACH Operator node
-   * @param out name of the output bag
-   * @param in name of the input bag
-   * @param gen the generate expression
-   * @param windowMode true if operator is called within a window environment
-   * @return the Scala code implementing the FOREACH operator
-   */
-  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator, windowMode: Boolean): String = {
-    // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
-    val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
-    if (requiresFlatMap)
-      if (windowMode)
-        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->emitForeachExpr(node, gen),"windowMode"->windowMode))
-      else
-        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->emitForeachExpr(node, gen)))
-    else
-      if (windowMode)
-        callST("foreach", Map("out"->out,"in"->in,"expr"->emitForeachExpr(node, gen),"windowMode"->windowMode))
-      else
-        callST("foreach", Map("out"->out,"in"->in,"expr"->emitForeachExpr(node, gen)))
-  }
-  
-  /**
-   * Generates code for the GROUPING Operator
-   *
-   * @param schema the nodes input schema
-   * @param out name of the output bag
-   * @param in name of the input bag
-   * @param groupExpr the grouping expression
-   * @param windowMode true if operator is called within a window environment
-   * @return the Scala code implementing the GROUPING operator
-   */
-  def emitGrouping(schema: Option[Schema], out: String, in: String, groupExpr: GroupingExpression, windowMode: Boolean): String = {
-    if (groupExpr.keyList.isEmpty) 
-      if (windowMode)
-        callST("groupBy", Map("out"->out,"in"->in,"windowMode"->windowMode))
-      else 
-        callST("groupBy", Map("out"->out,"in"->in))
-    else
-      if (windowMode)
-        callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGroupExpr(schema, groupExpr),"windowMode"->windowMode))
-      else
-        callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGroupExpr(schema, groupExpr)))
-  }
-
-  /**
-   * Generates code for the JOIN operator.
-   *
-   * @param node the Join Operator node
-   * @param out name of the output bag
-   * @param rels list of Pipes to join
-   * @param exprs list of join keys
-   * @param window window information for Joins on streams
-   * @return the Scala code implementing the JOIN operator
-   */
-  def emitJoin(node: PigOperator, out: String, rels: List[Pipe], exprs: List[List[Ref]], window: Tuple2[Int,String]): String = {
-    val res = node.inputs.zip(exprs)
-    val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
-    if(window!=null)
-      callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail,"window"->window._1,"wUnit"->window._2))
-    else
-      callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
-  }
- 
-  /**
-   * Generates code for the LIMIT Operator
-   *
-   * @param out name of the output bag
-   * @param in name of the input bag
-   * @param num amount of retruned records
-   * @param windowMode true if operator is called within a window environment
-   * @return the Scala code implementing the LIMIT operator
-   */
-  def emitLimit(out: String, in: String, num: Int, windowMode: Boolean): String = {
-    if(windowMode)
-      callST("limit", Map("out"->out,"in"->in,"num"->num,"windowMode"->windowMode))
-    else
-      callST("limit", Map("out"->out,"in"->in,"num"->num))
-
-  }
-  
   private def getFieldTypes(s: Schema): String = {
       val fieldList = s.fields.zipWithIndex
       val castList = fieldList.map { case (f, i) => ( 
@@ -686,46 +474,6 @@ class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging
   }
 
   /**
-   * Generates code for the SOCKET_READ Operator
-   *
-   * @param out name of the output bag
-   * @param addr the socket address to connect to
-   * @param mode the connection mode, e.g. zmq or empty for standard sockets
-   * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
-   * @param streamParams an optional list of parameters to a stream function (e.g. separators)
-   * @return the Scala code implementing the SOCKET_READ operator
-   */
-  def emitSocketRead(out: String, addr: SocketAddress, mode: String, streamFunc: String, streamParams: List[String]): String ={
-    if(streamFunc == ""){
-      if(mode!="")
-        callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode))
-      else
-        callST("socketRead", Map("out"->out,"addr"->addr))
-    } else {
-      val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
-      if(mode!="")
-        callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->streamFunc,"params"->params))
-      else
-        callST("socketRead", Map("out"->out,"addr"->addr,"func"->streamFunc,"params"->params))
-    }
-  }
- 
-  /**
-   * Generates code for the SOCKET_WRITE Operator
-   *
-   * @param in name of the input bag
-   * @param addr the socket address to connect to
-   * @param mode the connection mode, e.g. zmq or empty for standard sockets
-   * @return the Scala code implementing the SOCKET_WRITE operator
-   */
-  def emitSocketWrite(in: String, addr: SocketAddress, mode: String): String = {
-    if(mode!="")
-      callST("socketWrite", Map("in"->in,"addr"->addr,"mode"->mode))
-    else
-      callST("socketWrite", Map("in"->in,"addr"->addr))
-  }
- 
-  /**
    * Generates code for the STORE operator.
    *
    * @param in name of the input bag
@@ -744,25 +492,6 @@ class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging
       callST("store", Map("in"->in,"file"->file.toString(),"schema"->s"tuple${in}ToString(t)","func"->func))
   }
 
-  /**
-   * Generates code for the WINDOW Operator
-   *
-   * @param out name of the output bag
-   * @param in name of the input bag
-   * @param window window size information (Num, Unit)
-   * @param slide window slider information (Num, Unit)
-   * @return the Scala code implementing the WINDOW operator
-   */
-  def emitWindow(out: String, in: String, window: Tuple2[Int, String], slide: Tuple2[Int, String]): String = {
-    if(window._2==""){
-      if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1))
-      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1, "sUnit"->slide._2))
-    } 
-    else {
-      if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1))
-      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1, "sUnit"->slide._2))
-    }
-  }
 
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
@@ -775,46 +504,21 @@ class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging
    * @return a string representing the code
    */
   def emitNode(node: PigOperator): String = {
-    //val group = STGroupFile(templateFile) ??
     node match {
         /*
          * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
          *       after changing the pipe name. Instead, use node.outPipeName
          */
       case Load(out, file, schema, func, params) => emitLoad(node, file, func, params)
-      case Dump(in) => callST("dump", Map("in"->node.inputs.head.name))
-      case Store(in, file, func, params) => emitStore(node.inputs.head.name, file, func)
+      case Dump(in) => callST("dump", Map("in"->node.inPipeName))
+      case Store(in, file, func, params) => emitStore(node.inPipeName, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""
-      case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outPipeName, node.inputs.head.name, pred, windowMode)
-      case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outPipeName, node.inputs.head.name, gen, windowMode)
-      case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outPipeName, node.inputs.head.name, groupExpr, windowMode)
-      case Distinct(out, in, windowMode) => emitDistinct(node.outPipeName, node.inputs.head.name, windowMode)
-      case Limit(out, in, num, windowMode) => emitLimit(node.outPipeName, node.inputs.head.name, num, windowMode)
-      case Join(out, rels, exprs, window) => emitJoin(node, node.outPipeName, rels, exprs, window)
-      case Cross(out, rels, window) => emitCross(node, node.outPipeName, node.inputs, window) 
-      case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->rels.head.name,"others"->rels.tail.map(_.name)))
-      case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"expr"->emitExpr(node.schema, expr)))
-      case OrderBy(out, in, orderSpec) => callST("orderBy", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"key"->emitSortKey(node.schema, orderSpec, node.outPipeName, node.inputs.head.name),"asc"->ascendingSortOrder(orderSpec.head)))
-      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inputs.head.name,"params"->emitParamList(node.schema, params)))
-      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outPipeName, address, mode, func, params)
-      case SocketWrite(in, address, mode) => emitSocketWrite(node.inputs.head.name, address, mode)
-      case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inputs.head.name,window,slide)
-      case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inputs.head.name))
+      case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))
+      case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->node.inPipeName,"others"->node.inPipeNames.tail))
+      case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
+      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inPipeName,"params"->emitParamList(node.schema, params)))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case Empty(_) => ""
-           
-      /*
-       case Split(out, rels, expr) => {  //TODO: emitExpr depends on how pig++ will call this OP
-       val s1 = s"""
-       |val split = ${rels.head}.split(${emitExpr(node.schema, expr)} match {
-           |  case true => List("1st")
-           |  case false => List("2nd")
-           |})
-         """.stripMargin
-         val s2 = rels.tail.map{rel => s"""val ${rel} = split.select("1st")"""}.mkString
-         s1 + s2
-       }
-       */
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
   }
@@ -854,9 +558,4 @@ class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging
    */
   def emitFooter: String = callST("end_query", Map("name" -> "Starting Query"))
 
-  
-}
-
-class ScalaBackendCompile(templateFile: String) extends Compile {
-  override val codeGen = new ScalaBackendGenCode(templateFile)
 }

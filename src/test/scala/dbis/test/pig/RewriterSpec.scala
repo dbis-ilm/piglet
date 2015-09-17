@@ -847,6 +847,13 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
                                            Distinct(Pipe("b"), Pipe("a")))
   }
 
+  it should "process a plan with a single operator" in {
+    val plan = new DataflowPlan(parseScript(
+      """triples = LOAD 'file' AS (sub, pred, obj);""".stripMargin))
+    val rewrittenPlan = processPlan(plan)
+    rewrittenPlan.operators.size should be (plan.operators.size)
+  }
+
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))

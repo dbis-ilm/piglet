@@ -231,6 +231,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val splitKeyword = "split".ignoreCase
   lazy val ifKeyword = "if".ignoreCase
   lazy val materializeKeyword = "materialize".ignoreCase
+  lazy val rscriptKeyword = "rscript".ignoreCase
   lazy val rdfLoadKeyword = "rdfload".ignoreCase
   lazy val groupedOnKeyword = "grouped on".ignoreCase
   lazy val trueKeyword = "true".ignoreCase
@@ -522,6 +523,10 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   def materializeStmt: Parser[PigOperator] = materializeKeyword ~ bag ^^ { case _ ~ b => Materialize(Pipe(b))}
 
+  def rscriptStmt: Parser[PigOperator] = bag ~ "=" ~ rscriptKeyword ~ bag ~ usingKeyword ~ pigStringLiteral ~ (loadSchemaClause?) ^^{
+    case out ~ _ ~ _ ~ in ~ _ ~ script ~ schema => new RScript(Pipe(out), Pipe(in), script, schema)
+  }
+
   /*
    * fs -cmd params
    */
@@ -553,7 +558,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   def undelimStmt: Parser[PigOperator] = embedStmt

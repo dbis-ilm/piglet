@@ -19,7 +19,7 @@ package dbis.test.spark
 import dbis.test.TestTools._
 
 import dbis.pig.PigCompiler._
-import dbis.pig.codegen.ScalaBackendGenCode
+import dbis.pig.codegen.BatchGenCode
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
@@ -33,9 +33,12 @@ class SparkCompileSpec extends FlatSpec {
   
   
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val templateFile = BackendManager.backend("spark").templateFile
+  val backendConf = BackendManager.backend("spark") 
+  BackendManager.backend = backendConf 
+  val templateFile = backendConf.templateFile
+
   "The compiler output" should "contain the Spark header & footer" in {
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test")
@@ -64,7 +67,7 @@ class SparkCompileSpec extends FlatSpec {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Load(Pipe("a"), file)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
@@ -74,7 +77,7 @@ class SparkCompileSpec extends FlatSpec {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     val op = Load(Pipe("a"), file)
     op.outputs = List(Pipe("b"))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val b = PigStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
@@ -85,7 +88,7 @@ class SparkCompileSpec extends FlatSpec {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}", ',')""")
     assert(generatedCode == expectedCode)
@@ -96,7 +99,7 @@ class SparkCompileSpec extends FlatSpec {
     val file = new java.io.File(".").getCanonicalPath + "/file.n3"
     
     val op = Load(Pipe("a"), file, None, "RDFFileStorage")
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(sc, "${file}")""")
     assert(generatedCode == expectedCode)
@@ -104,7 +107,7 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for FILTER" in {
     val op = Filter(Pipe("aa"), Pipe("bb"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.filter(t => {t(1) < 42})")
     assert(generatedCode == expectedCode)
@@ -114,7 +117,7 @@ class SparkCompileSpec extends FlatSpec {
     val ops = parseScript("b = LOAD 'file' AS (x: double, y:double, z1:int, z2: int); c = FILTER b BY x > 0 AND (y < 0 OR (NOT z1 == z2));")
     val plan = new DataflowPlan(ops)
     val op = ops(1)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val c = b.filter(t => {t(0).asInstanceOf[Double] > 0 && (t(1).asInstanceOf[Double] < 0 || (!(t(2).asInstanceOf[Int] == t(3).asInstanceOf[Int])))})")
     assert(generatedCode == expectedCode)
@@ -124,7 +127,7 @@ class SparkCompileSpec extends FlatSpec {
     val op = Filter(Pipe("a"), Pipe("b"), Gt(
         Func("aFunc", List(RefExpr(PositionalField(0)), RefExpr(PositionalField(1)))),
         RefExpr(Value("0"))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.filter(t => {aFunc(t(0),t(1)) > 0})")
     assert(generatedCode == expectedCode)
@@ -136,7 +139,7 @@ class SparkCompileSpec extends FlatSpec {
             Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),false)
     op.schema = Some(new Schema(BagType(TupleType(Array(Field("x", Types.IntType),
                                                         Field("y", Types.DoubleType)), "t"), "s")))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val a = b.filter(t => {aFunc(t(0).asInstanceOf[Int],t(1).asInstanceOf[Double]) == true && 
@@ -147,7 +150,7 @@ class SparkCompileSpec extends FlatSpec {
   
   it should "contain code for DUMP" in {
     val op = Dump(Pipe("a"))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""a.collect.map(t => println(t.mkString(",")))""")
     assert(generatedCode == expectedCode)
@@ -158,7 +161,7 @@ class SparkCompileSpec extends FlatSpec {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Store(Pipe("A"), file)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
 //    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
     val expectedCode = cleanString(s"""val A_storehelper = A.map(t => tupleAToString(t)).coalesce(1, true) PigStorage().write("$file", A_storehelper)""")
@@ -172,7 +175,7 @@ class SparkCompileSpec extends FlatSpec {
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
     ), "t"), "s")))
 
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitHelperClass(op))
     val expectedCode = cleanString("""
         |def tupleAToString(t: List[Any]): String = {
@@ -193,7 +196,7 @@ class SparkCompileSpec extends FlatSpec {
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
     ), "t"), "s")))
 
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitHelperClass(op))
     val expectedCode = cleanString("""
         |def tupleAToString(t: List[Any]): String = {
@@ -211,7 +214,7 @@ class SparkCompileSpec extends FlatSpec {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Store(Pipe("A"), file, "BinStorage")
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     
     val expectedCode = cleanString(s"""val A_storehelper = A BinStorage().write("$file", A_storehelper)""")
@@ -221,7 +224,7 @@ class SparkCompileSpec extends FlatSpec {
   
   it should "contain code for GROUP BY ALL" in {
     val op = Grouping(Pipe("aa"), Pipe("bb"), GroupingExpression(List()))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.glom")
     assert(generatedCode == expectedCode)
@@ -229,7 +232,7 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for GROUP BY $0" in {
     val op = Grouping(Pipe("aa"), Pipe("bb"), GroupingExpression(List(PositionalField(0))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.groupBy(t => {t(0)}).map{case (k,v) => List(k,v)}")
     assert(generatedCode == expectedCode)
@@ -237,7 +240,7 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for GROUP BY with multiple keys" in {
     val op = Grouping(Pipe("aa"), Pipe("bb"), GroupingExpression(List(PositionalField(0), PositionalField(1))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.groupBy(t => {(t(0),t(1))}).map{case (k,v) => List(k,v)}")
     assert(generatedCode == expectedCode)
@@ -245,7 +248,7 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for DISTINCT" in {
     val op = Distinct(Pipe("aa"), Pipe("bb"))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.distinct")
     assert(generatedCode == expectedCode)
@@ -253,7 +256,7 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "contain code for Limit" in {
     val op = Limit(Pipe("aa"), Pipe("bb"), 10)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = sc.parallelize(bb.take(10))")
     assert(generatedCode == expectedCode)
@@ -267,7 +270,7 @@ class SparkCompileSpec extends FlatSpec {
     val input1 = Pipe("bb",Load(Pipe("bb"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("cc",Load(Pipe("cc"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs = List(input1,input2)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val bb_kv = bb.map(t => (t(0),t))
@@ -285,7 +288,7 @@ class SparkCompileSpec extends FlatSpec {
     val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (Array(t(0),t(1)).mkString,t))
@@ -304,7 +307,7 @@ class SparkCompileSpec extends FlatSpec {
     val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
     op.inputs=List(input1,input2,input3)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (t(0),t))
@@ -323,7 +326,7 @@ class SparkCompileSpec extends FlatSpec {
         RefExpr(Value("\"field2\"")),
         RefExpr(PositionalField(1)))))
     )))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.map(t => List(PigFuncs.toMap(\"field1\",t(0),\"field2\",t(1))))")
     assert(generatedCode == expectedCode)
@@ -335,7 +338,7 @@ class SparkCompileSpec extends FlatSpec {
         GeneratorExpr(RefExpr(PositionalField(0))),
         GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType)))
       )))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.map(t => List(t(0),PigFuncs.count(t(1).asInstanceOf[Seq[Any]])))")
     assert(generatedCode == expectedCode)
@@ -345,7 +348,7 @@ class SparkCompileSpec extends FlatSpec {
     // aa = FOREACH bb GENERATE $0, distance($1, $2, 1.0, 2.0) AS dist;
     val plan = parseScript("aa = FOREACH bb GENERATE $0, Distances.spatialDistance($1, $2, 1.0, 2.0) AS dist;")
     val op = plan.head
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.map(t => List(t(0),Distances.spatialDistance(t(1),t(2),1.0,2.0)))")
     assert(generatedCode == expectedCode)
@@ -360,7 +363,7 @@ class SparkCompileSpec extends FlatSpec {
         |""".stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa")
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     // this is just a hack for this test: normally, the udfAliases map is set in compile
     codeGenerator.udfAliases = Some(plan.udfAliases.toMap)
     val generatedCode = cleanString(codeGenerator.emitNode(op.get))
@@ -372,7 +375,7 @@ class SparkCompileSpec extends FlatSpec {
     // a = FOREACH b GENERATE $0#"k1", $1#"k2";
     val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
       GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\""))))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val a = b.map(t => List(t(0).asInstanceOf[Map[String,Any]]("k1"),t(1).asInstanceOf[Map[String,Any]]("k2")))""".stripMargin)
@@ -383,7 +386,7 @@ class SparkCompileSpec extends FlatSpec {
     // a = FOREACH b GENERATE $0.$1, $2.$0;
     val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
       GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0)))))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.map(t => List(t(0).asInstanceOf[List[Any]](1),t(2).asInstanceOf[List[Any]](0)))""".stripMargin)
@@ -400,7 +403,7 @@ class SparkCompileSpec extends FlatSpec {
         |           generate group, COUNT(uniq_sym);
         |};""".stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("uniqcnt").get))
 
     val expectedCode = cleanString(
@@ -415,7 +418,7 @@ class SparkCompileSpec extends FlatSpec {
       """data = load 'file' as (f1: int, f2: int, name:chararray);
         |out = foreach data generate (f1, f2), {f1, f2}, [name, f1];""".stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("out").get))
 
     val expectedCode = cleanString(
@@ -427,7 +430,7 @@ class SparkCompileSpec extends FlatSpec {
   it should "contain code for a union operator on two relations" in {
     // a = UNION b, c;
     val op = Union(Pipe("aa"), List(Pipe("bb"), Pipe("cc")))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val aa = bb.union(cc)""".stripMargin)
@@ -437,7 +440,7 @@ class SparkCompileSpec extends FlatSpec {
   it should "contain code for a union operator on more than two relations" in {
     // a = UNION b, c, d;
     val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.union(c).union(d)""".stripMargin)
@@ -447,7 +450,7 @@ class SparkCompileSpec extends FlatSpec {
   it should "contain code for the sample operator with a literal value" in {
     // aa = SAMPLE bb 0.01;
     val op = Sample(Pipe("aa"), Pipe("bb"), RefExpr(Value("0.01")))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val aa = bb.sample(0.01)""".stripMargin)
@@ -457,7 +460,7 @@ class SparkCompileSpec extends FlatSpec {
   it should "contain code for the sample operator with an expression" in {
     // a = SAMPLE b 100 / $3
     val op = Sample(Pipe("a"), Pipe("b"), Div(RefExpr(Value("100")), RefExpr(PositionalField(3))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.sample(100 / t(3))""".stripMargin)
@@ -467,7 +470,7 @@ class SparkCompileSpec extends FlatSpec {
   it should "contain code for the stream through statement without parameters" in {
     // aa = STREAM bb THROUGH myOp
     val op = StreamOp(Pipe("aa"), Pipe("bb"), "myOp")
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val aa = myOp(sc, bb)""".stripMargin)
@@ -477,7 +480,7 @@ class SparkCompileSpec extends FlatSpec {
   it should "contain code for the stream through statement with parameters" in {
     // a = STREAM b THROUGH package.myOp(1, 42.0)
     val op = StreamOp(Pipe("a"), Pipe("b"), "package.myOp", Some(List(Value("1"), Value(42.0))))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = package.myOp(sc, b,1,42.0)""".stripMargin)
@@ -487,7 +490,7 @@ class SparkCompileSpec extends FlatSpec {
   it should "contain code for simple ORDER BY" in {
     // aa = ORDER bb BY $0
     val op = OrderBy(Pipe("aa"), Pipe("bb"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val aa = bb.keyBy(t => t(0)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
@@ -504,7 +507,7 @@ class SparkCompileSpec extends FlatSpec {
     ), "t"), "s"))
 
     op.schema = Some(schema)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.keyBy(t => custKey_a_b(t(0).asInstanceOf[String],t(2).asInstanceOf[Int])).sortByKey(true).map{case (k,v) => v}""".stripMargin)
@@ -529,7 +532,7 @@ class SparkCompileSpec extends FlatSpec {
     ), "t"), "s"))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
         |val a = b.map(t => PigFuncs.flatTuple(List(t(0),t(1))))""".stripMargin)
@@ -541,7 +544,7 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType)))))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
         |val a = b.flatMap(t => PigFuncs.tokenize(t(0))).map(t => List(t))""".stripMargin)
@@ -555,7 +558,7 @@ class SparkCompileSpec extends FlatSpec {
                                                                 Array(Field("ff1", Types.IntType)), "s"), "b"))), "t"), "s"))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
         |val a = b.flatMap(t => List(t(1).asInstanceOf[Seq[Any]].map(s => (List(t(0)), s))).map(t => List(t))""".stripMargin)
@@ -564,7 +567,7 @@ class SparkCompileSpec extends FlatSpec {
 
   it should "not contain code for EMPTY operators" in {
     val op = Empty(Pipe(""))
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
 
     assert(codeGenerator.emitNode(op) == "")
   }
@@ -579,7 +582,7 @@ class SparkCompileSpec extends FlatSpec {
         |A = LOAD 'file.csv';
       """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new ScalaBackendGenCode(templateFile)
+    val codeGenerator = new BatchGenCode(templateFile)
     assert(cleanString(codeGenerator.emitHeader1("test", plan.code)) ==
       cleanString("""
         |object test {

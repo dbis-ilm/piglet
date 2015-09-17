@@ -83,10 +83,6 @@ trait WindowSupport extends LazyLogging {
           //TODO: Move before Window, not only Filter - all non-WindowOps
           o.windowMode = true
         }
-        case o: Limit => {
-          logger.debug(s"Rewrite Limit to WindowMode")
-          o.windowMode = true
-        }
         case o: Distinct => {
           logger.debug(s"Rewrite Distinct to WindowMode")
           o.windowMode = true

@@ -142,11 +142,13 @@ object PigREPL extends PigParser with LazyLogging {
     val backend = if(args.length==0) Conf.defaultBackend else args(0)
     
     logger debug s"""Running REPL with backend "$backend" """
-    
+
     val backendConf = BackendManager.backend(backend)
     if(backendConf.raw)
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
-    
+
+    BackendManager.backend = backendConf
+
     console {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
@@ -174,11 +176,9 @@ object PigREPL extends PigParser with LazyLogging {
       }
       case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
         var plan = new DataflowPlan(buf.toList)
-        
         val mm = new MaterializationManager
         plan = processMaterializations(plan, mm)
-        plan = processPlan(plan)
-        
+
         try {
           plan.checkSchemaConformance
           
@@ -186,9 +186,21 @@ object PigREPL extends PigParser with LazyLogging {
           pat.findFirstIn(s) match {
             case Some(str) =>
               val alias = str.split(" ")(1)
-              plan.findOperatorForAlias(alias) match {
+              val op = plan.findOperatorForAlias(alias)
+              plan = processPlan(plan)
+              val op_after_rewriting = plan.findOperatorForAlias(alias)
+              op match {
                 case Some (op) => println (op.schemaToString)
                 case None => println (s"unknown alias '$alias'")
+              }
+              op_after_rewriting match {
+                case Some(_) => op match {
+                  case Some(o) if (o.schema != op_after_rewriting.get.schema) =>
+                    val r_schema = op_after_rewriting.get.schema.toString
+                    println(s"After rewriting, '$alias''s schema is '$r_schema'.")
+                  case _ => ()
+                }
+                case None => println(s"Rewriting will remove '$alias'.")
               }
             case None => println("invalid describe command")
           }
@@ -196,7 +208,7 @@ object PigREPL extends PigParser with LazyLogging {
         } catch {
           case e:SchemaException => println(s"schema conformance error in ${e.getMessage}")
         }
-        
+
         false
       }
       case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") ||

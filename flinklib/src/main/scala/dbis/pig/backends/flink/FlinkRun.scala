@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.flink
+package dbis.pig.backends.flink
 
 import scala.sys.process._
 import java.security._
@@ -27,6 +27,7 @@ import java.nio.file.Path
 import java.io.File
 import org.apache.flink.client.program.PackagedProgram
 import org.apache.flink.configuration.Configuration
+import org.apache.flink.configuration.ConfigConstants
 import org.apache.flink.client.program.Client
 import org.apache.flink.client.program.ProgramInvocationException
 import java.net.URI
@@ -39,32 +40,42 @@ class FlinkRun extends PigletBackend with LazyLogging {
   
   override def execute(master: String, className: String, jarFile: Path, numExecutors: Int){
     if (master.startsWith("local") && !master.startsWith("localhost")){
-//      val cli = new CliFrontend
-//      val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
+      //val cli = new CliFrontend
+      //val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
       submitJar("localhost:6123", numExecutors, jarFile, className)
     }
     else {
-//      val cli = new CliFrontend
-//      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
+      //val cli = new CliFrontend
+      //val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
       submitJar(master, numExecutors, jarFile, className)
     }
   }
 
   override def executeRaw(file: Path, master: String, numExecutors: Int) = ???
-  
-  def submitJar(master: String, numExecutors: Int, path: Path, className: String, args: String*) = { 
+
+  def submitJar(master: String, numExecutors: Int, path: Path, className: String, args: String*) = {
+
     val file = path.toFile().getAbsoluteFile()
     val parallelism = if(numExecutors <= 0) 1 else numExecutors 
     val wait = true
+
     try { 
+
       logger.debug(s"submitting $file")
+
       val program = new PackagedProgram(file, className, args:_*)
+
+      val configuration = new Configuration()
       val jobManagerAddress = getInetFromHostport(master)
-      logger.debug(s"using job manager at $jobManagerAddress  for name $master")
-      val client = new Client(jobManagerAddress, new Configuration(), program.getUserCodeClassLoader(), 1)
+      logger.debug(s"using job manager at $jobManagerAddress for name $master")
+      configuration.setString(ConfigConstants.JOB_MANAGER_IPC_ADDRESS_KEY, jobManagerAddress.getHostName())
+      configuration.setInteger(ConfigConstants.JOB_MANAGER_IPC_PORT_KEY, jobManagerAddress.getPort())
+
+      val client = new Client(configuration, program.getUserCodeClassLoader(), 1)
       logger.debug(s"created job client: $client")
-      println(s"Executing ${path.toString}"); 
-      client.run(program, parallelism, wait); 
+      println(s"Executing ${path.toString}") 
+      client.run(program, parallelism, wait)
+
     } catch {
       case e: ProgramInvocationException => e.printStackTrace()
     }   
