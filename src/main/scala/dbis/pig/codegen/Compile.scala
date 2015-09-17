@@ -154,7 +154,9 @@ trait Compile {
 
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
-      code = code + codeGen.emitHelperClass(n) + "\n"
+      
+      val genCode = codeGen.emitHelperClass(n)
+      code = code + genCode  + (if(genCode.nonEmpty) "\n" else "")
     }
 
     // generate the object definition representing the script
