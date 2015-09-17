@@ -146,7 +146,7 @@ trait PigOperator extends Rewritable {
      */
     schema match {
       case Some(s) => s"$outPipeName: ${s.element.descriptionString}"
-      case None => s"Schema for $outPipeName unknown."
+      case None => s"Schema for '$outPipeName' unknown."
     }
   }
 

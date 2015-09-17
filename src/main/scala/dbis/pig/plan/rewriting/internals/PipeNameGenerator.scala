@@ -14,8 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting
+package dbis.pig.plan.rewriting.internals
 
+import scala.collection.mutable.{Set => MutableSet}
 import scala.util.Random
 
 /** Implements generating random pipe names.
@@ -42,12 +43,27 @@ object PipeNameGenerator {
     */
   final val prefix = "pipe"
 
+  private val generated: MutableSet[String] = MutableSet.empty
+
+  /** Clears the internal set of already generated pipenames.
+    *
+    * Note that this means that a future call to [[generate()]] can now return a previously returned value
+    */
+  def clearGenerated = generated.clear
+
   /** Generate a pipe name of the specified `length`.
     *
     * @param length
     * @return
     */
-  def generate(length: Int): String = prefix ++ recGenerate(length)
+  def generate(length: Int): String = {
+    var generatedName = prefix ++ recGenerate(length)
+    while(generated contains generatedName) {
+      generatedName = prefix ++ recGenerate(length)
+    }
+    generated += generatedName
+    generatedName
+  }
 
   private def recGenerate(length: Int): String = {
     length match {

@@ -14,10 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting
+package dbis.pig.plan.rewriting.internals
 
 import dbis.pig.op._
-import dbis.pig.plan.rewriting.Column.Column
+import dbis.pig.op.Value
+
 import scala.collection.mutable.Map
 
 /** An enumeration of the three columns in RDF data - subject, predicate and object.
@@ -27,7 +28,7 @@ object Column extends Enumeration {
   type Column = Value
   val Subject, Predicate, Object = Value
 
-  /** Maps [[dbis.pig.plan.rewriting.Column]]s to [[dbis.pig.op.NamedField]]s.
+  /** Maps [[Column]]s to [[dbis.pig.op.NamedField]]s.
     *
     * @param c
     * @return
@@ -40,13 +41,15 @@ object Column extends Enumeration {
 }
 
 object RDF {
+  import Column.Column
   /** Returns true if no variable is bound by ``pattern``, false otherwise.
     *
     * @param pattern
     * @return
     */
   def allUnbound(pattern: TriplePattern): Boolean =
-    (!pattern.subj.isInstanceOf[Value] && !pattern.pred.isInstanceOf[Value] && !pattern.obj.isInstanceOf[Value])
+    (!pattern.subj.isInstanceOf[Value] && !pattern.pred.isInstanceOf[Value] && !pattern.obj
+      .isInstanceOf[Value])
 
   /** Given a [[TriplePattern]] return the [[Column]] that's bound by a variable in it.
     *
@@ -115,7 +118,7 @@ object RDF {
     variableInPosition
   }
 
-  /** Returns the [[dbis.pig.plan.rewriting.Column.Column]] and [[dbis.pig.op.NamedField]] of the star join column in ``patterns`` or None if it's not a star join.
+  /** Returns the [[Column.Column]] and [[dbis.pig.op.NamedField]] of the star join column in ``patterns`` or None if it's not a star join.
     *
     * If two variables appear in the same position in all ``patterns``, None will be returned
     * @param patterns

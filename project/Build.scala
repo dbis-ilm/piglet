@@ -88,6 +88,7 @@ object Dependencies {
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
   val commons = "org.apache.commons" % "commons-exec" % "1.3"
+  val twitterUtil = "com.twitter" %% "util-eval" % "6.27.0"
 
   val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10-SNAPSHOT.jar"
   
@@ -106,6 +107,7 @@ object Dependencies {
     log4j,
     commons,
     slf4j,
-    hadoop % "provided"
+    hadoop % "provided",
+    twitterUtil
   )
 }

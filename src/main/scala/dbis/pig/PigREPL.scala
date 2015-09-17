@@ -178,7 +178,6 @@ object PigREPL extends PigParser with LazyLogging {
         var plan = new DataflowPlan(buf.toList)
         val mm = new MaterializationManager
         plan = processMaterializations(plan, mm)
-        plan = processPlan(plan)
 
         try {
           plan.checkSchemaConformance
@@ -187,9 +186,21 @@ object PigREPL extends PigParser with LazyLogging {
           pat.findFirstIn(s) match {
             case Some(str) =>
               val alias = str.split(" ")(1)
-              plan.findOperatorForAlias(alias) match {
+              val op = plan.findOperatorForAlias(alias)
+              plan = processPlan(plan)
+              val op_after_rewriting = plan.findOperatorForAlias(alias)
+              op match {
                 case Some (op) => println (op.schemaToString)
                 case None => println (s"unknown alias '$alias'")
+              }
+              op_after_rewriting match {
+                case Some(_) => op match {
+                  case Some(o) if (o.schema != op_after_rewriting.get.schema) =>
+                    val r_schema = op_after_rewriting.get.schema.toString
+                    println(s"After rewriting, '$alias''s schema is '$r_schema'.")
+                  case _ => ()
+                }
+                case None => println(s"Rewriting will remove '$alias'.")
               }
             case None => println("invalid describe command")
           }

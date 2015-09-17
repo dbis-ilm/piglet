@@ -16,12 +16,14 @@
  */
 package dbis.pig.plan.rewriting
 
+import dbis.pig.plan.rewriting.internals.{RDF, Column, PipeNameGenerator, FilterUtils}
+
 import scala.collection.mutable.ListBuffer
 import dbis.pig.op._
-import dbis.pig.plan.rewriting.Column.Column
-import dbis.pig.plan.rewriting.FilterUtils._
+import Column.Column
+import FilterUtils._
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.PipeNameGenerator.generate
+import PipeNameGenerator.generate
 import dbis.pig.schema.{Field, Types}
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
@@ -79,7 +81,7 @@ object Rules {
           op.outputs.flatMap(_.consumer).
             filter(_.isInstanceOf[Filter]).
             filter { f: PigOperator => extractPredicate(f.asInstanceOf[Filter].pred) == extractPredicate(pred) }.
-            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, removalStrategy(pigOp)
+            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, buildRemovalStrategy(pigOp)
           )}))
     }
   }
@@ -147,24 +149,22 @@ object Rules {
     * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
     */
   //noinspection ScalaDocMissingParameterDescription
-  def R1(term: Any): Option[Load] = {
-    term match {
-      case op@RDFLoad(_, uri, None) =>
-        // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
-        if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
-          return None
-        }
+  def R1(op: RDFLoad): Option[Load] = {
+    // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
+    if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
+      return None
+    }
 
-        if (op.BGPFilterIsReachable) {
-          return None
-        }
+    if (op.BGPFilterIsReachable) {
+      return None
+    }
 
-        if (uri.getScheme == "http" || uri.getScheme == "https") {
-          Some(Load(op.outputs.head, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
-        } else {
-          None
-        }
-      case _ => None
+    val uri = op.uri
+
+    if (uri.getScheme == "http" || uri.getScheme == "https") {
+      Some(Load(op.outputs.head, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
+    } else {
+      None
     }
   }
 
@@ -198,7 +198,7 @@ object Rules {
         }
 
         // This is the function we'll use to remove the BGPFilter
-        def remover = topdown(attempt(removalStrategy(bf.get)))
+        def remover = topdown(attempt(buildRemovalStrategy(bf.get)))
 
         val strategy = ior(replacer, remover)
         strategy
@@ -214,14 +214,12 @@ object Rules {
     * @return Some Load operator, if `term` was an RDFLoad operator loading a resource from hdfs
     */
   //noinspection ScalaDocMissingParameterDescription
-  def L2(term: Any): Option[Load] = term match {
-    case op@RDFLoad(p, uri, grouped : Some[String]) =>
-      if (uri.getScheme == "hdfs") {
-        Some(Load(p, uri, op.schema, "BinStorage"))
-      } else {
-        None
-      }
-    case _ => None
+  def L2(op: RDFLoad): Option[Load] = {
+    if (op.schema.isEmpty) {
+      return None
+    }
+
+    Some(Load(op.out, op.uri, op.schema, "BinStorage"))
   }
 
   /** Applies rewriting rule F1 of the paper [[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -235,7 +233,7 @@ object Rules {
       } else {
         val pattern = patterns.head
         if (RDF.allUnbound(pattern)) {
-          removalStrategy(op)
+          buildRemovalStrategy(op)
         } else {
           fail
         }
@@ -248,41 +246,40 @@ object Rules {
     * @param term
     * @return Some Filter operator, if `term` was an BGPFilter operator with only one bound variable
     */
-  def F2(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(_, _, patterns) =>
-      val in = op.inputs.head
-      val out = op.outputs.head
-      if (op.inputSchema != RDFLoad.plainSchema) {
-        return None
-      }
+  def F2(op: BGPFilter): Option[Filter] = {
+    val in = op.inputs.head
+    val out = op.outputs.head
+    val patterns = op.patterns
+    if (op.inputSchema != RDFLoad.plainSchema) {
+                                             return None
+                                             }
 
-      if (patterns.length != 1) {
-        return None
-      }
+    if (patterns.length != 1) {
+                            return None
+                            }
 
-      val pattern = patterns.head
-      var filter : Option[Filter] = None
-      val bound_column = RDF.getBoundColumn(pattern)
+    val pattern = patterns.head
+    var filter : Option[Filter] = None
+    val bound_column = RDF.getBoundColumn(pattern)
 
-      filter = bound_column.flatMap { col: Column =>
-        if (col == Column.Subject) {
-          Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
-        } else if (col == Column.Predicate) {
-          Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
-        } else if (col == Column.Object) {
-          Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
-        } else {
-          // In reality, one of the above cases should always match
-          None
-        }
-      }
+    filter = bound_column.flatMap { col: Column =>
+                                if (col == Column.Subject) {
+                                Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+                                } else if (col == Column.Predicate) {
+                                Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+                                } else if (col == Column.Object) {
+                                Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+                                } else {
+                                // In reality, one of the above cases should always match
+                                None
+                                }
+                                }
 
-      if (filter.isDefined) {
-        in.removeConsumer(op)
-      }
+    if (filter.isDefined) {
+                        in.removeConsumer(op)
+                        }
 
-      return filter
-    case _ => None
+    return filter
   }
 
   /** Applies rewriting rule F3 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -290,43 +287,42 @@ object Rules {
     * @param term
     * @return Some Filter operator, if `term` was an BGPFilter operator with multiple bound variables
     */
-  def F3(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(_, _, patterns) =>
-      val in = op.inputs.head
-      val out = op.outputs.head
-      if (op.inputSchema != RDFLoad.plainSchema) {
-        return None
-      }
+  def F3(op: BGPFilter): Option[Filter] = {
+    val patterns = op.patterns
+    val in = op.inputs.head
+    val out = op.outputs.head
+    if (op.inputSchema != RDFLoad.plainSchema) {
+      return None
+    }
 
-      if (patterns.length != 1) {
-        return None
-      }
+    if (patterns.length != 1) {
+      return None
+    }
 
-      // We'll reuse in later on, so we need to remove `op` from its consumers
-      in.removeConsumer(op)
+    // We'll reuse in later on, so we need to remove `op` from its consumers
+    in.removeConsumer(op)
 
-      patterns.head match {
-        case TriplePattern(s@Value(_), p@Value(_), o@Value(_)) => Some(
-          Filter(out, in, And(
-            Eq(RefExpr(NamedField("subject")), RefExpr(s)),
-            And(
-              Eq(RefExpr(NamedField("predicate")), RefExpr(p)),
-              Eq(RefExpr(NamedField("object")), RefExpr(o))))))
-        case TriplePattern(s@Value(_), p@Value(_), _) => Some(
-          Filter(out, in, And(
-            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))))
-        case TriplePattern(s@Value(_), _, o@Value(_)) => Some(
-          Filter(out, in, And(
-            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-            Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
-        case TriplePattern(_, p@Value(_), o@Value(_)) => Some(
-          Filter(out, in, And(
-            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
-            Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
-        case _ => None
-      }
-    case _ => None
+    patterns.head match {
+      case TriplePattern(s@Value(_), p@Value(_), o@Value(_)) => Some(
+        Filter(out, in, And(
+          Eq(RefExpr(NamedField("subject")), RefExpr(s)),
+          And(
+            Eq(RefExpr(NamedField("predicate")), RefExpr(p)),
+            Eq(RefExpr(NamedField("object")), RefExpr(o))))))
+      case TriplePattern(s@Value(_), p@Value(_), _) => Some(
+        Filter(out, in, And(
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))))
+      case TriplePattern(s@Value(_), _, o@Value(_)) => Some(
+        Filter(out, in, And(
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+          Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+      case TriplePattern(_, p@Value(_), o@Value(_)) => Some(
+        Filter(out, in, And(
+          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
+          Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+      case _ => None
+    }
   }
 
   /** Applies rewriting rule F4 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -335,51 +331,50 @@ object Rules {
     * @return Some Filter operator if `term` was a BGPFilter with a single Pattern filtering on the grouping column
     *         of data in the triple group format
     */
-  def F4(term: Any): Option[Filter] = term match {
-    case op @ BGPFilter(_, _, patterns) =>
-      val in = op.inputs.head
-      val out = op.outputs.head
-      if (op.inputSchema == RDFLoad.plainSchema) {
-        return None
+  def F4(op: BGPFilter): Option[Filter] = {
+    val patterns = op.patterns
+    val in = op.inputs.head
+    val out = op.outputs.head
+    if (op.inputSchema == RDFLoad.plainSchema) {
+      return None
+    }
+
+    if (op.inputSchema.isEmpty
+      || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+      return None
+    }
+
+    if (patterns.length != 1) {
+      return None
+    }
+    // TODO we make a lot of assumptions about Options and Array lengths here
+    val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+
+    val pattern = patterns.head
+    var filter: Option[Filter] = None
+    val bound_column = RDF.getBoundColumn(pattern)
+
+    filter = bound_column.flatMap { col: Column =>
+      if (col == Column.Subject
+        && grouped_by == "subject") {
+        Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+      } else if (col == Column.Predicate
+        && grouped_by == "predicate") {
+        Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+      } else if (col == Column.Object
+        && grouped_by == "object") {
+        Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+      } else {
+        // In reality, one of the above cases should always match
+        None
       }
+    }
 
-      if (op.inputSchema.isEmpty
-        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
-        return None
-      }
+    if (filter.isDefined) {
+      in.removeConsumer(op)
+    }
 
-      if (patterns.length != 1) {
-        return None
-      }
-      // TODO we make a lot of assumptions about Options and Array lengths here
-      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
-
-      val pattern = patterns.head
-      var filter : Option[Filter] = None
-      val bound_column = RDF.getBoundColumn(pattern)
-
-      filter = bound_column.flatMap { col: Column =>
-        if (col == Column.Subject
-          && grouped_by == "subject") {
-          Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
-        } else if (col == Column.Predicate
-          && grouped_by == "predicate") {
-          Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
-        } else if (col == Column.Object
-          && grouped_by == "object") {
-          Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
-        } else {
-          // In reality, one of the above cases should always match
-          None
-        }
-      }
-
-      if (filter.isDefined) {
-        in.removeConsumer(op)
-      }
-
-      return filter
-    case _ => None
+    return filter
   }
 
   def F5(term: Any): Option[Foreach] = term match {
@@ -474,107 +469,106 @@ object Rules {
     * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with two bound variables of which
     *         one is the grouping column
     */
-  def F7(term: Any): Option[BGPFilter] = term match {
-    case op @ BGPFilter(_, _, patterns) =>
-      val in = op.inputs.head
-      val out = op.outputs.head
-      if (op.inputSchema == RDFLoad.plainSchema) {
-        return None
+  def F7(op: BGPFilter): Option[BGPFilter] = {
+    val patterns = op.patterns
+    val in = op.inputs.head
+    val out = op.outputs.head
+    if (op.inputSchema == RDFLoad.plainSchema) {
+      return None
+    }
+
+    if (op.inputSchema.isEmpty
+      || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+      return None
+    }
+
+    if (patterns.length != 1) {
+      return None
+    }
+
+    // TODO we make a lot of assumptions about Options and Array lengths here
+    val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+
+    val pattern = patterns.head
+
+    // Check if the column that's grouped by is bound in this pattern
+    val bound_columns = RDF.getAllBoundColumns(pattern)
+    val applies = grouped_by match {
+      case "subject" if bound_columns contains Column.Subject => true
+      case "predicate" if bound_columns contains Column.Predicate => true
+      case "object" if bound_columns contains Column.Object => true
+      case _ => false
+    }
+
+    // If not, this rule doesn't apply
+    if (!(applies && bound_columns.length == 2)) {
+      return None
+    }
+
+    val internalPipeName = generate
+    var group_filter: Option[BGPFilter] = None
+    var other_filter_pattern: Option[TriplePattern] = None
+
+    // The first pattern in the next 3 pattern matches is for the case where the column that the data is grouped by
+    // is bound as a variable in the pattern, but the other two column are as well.
+    if (grouped_by == "subject") {
+      group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(pattern.subj, PositionalField(1)
+        , PositionalField(2)))))
+      other_filter_pattern = pattern match {
+        case TriplePattern(_, Value(_), Value(_)) => None
+        case TriplePattern(_, pred@Value(_), _) => Some(TriplePattern(PositionalField(0), pred, PositionalField(2)))
+        case TriplePattern(_, _, obj@Value(_)) => Some(TriplePattern(PositionalField(0), PositionalField(1), obj))
       }
-
-      if (op.inputSchema.isEmpty
-        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
-        return None
+    } else if (grouped_by == "predicate") {
+      group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0), pattern
+        .pred, PositionalField(2)))))
+      other_filter_pattern = pattern match {
+        case TriplePattern(Value(_), _, Value(_)) => None
+        case TriplePattern(subj@Value(_), _, _) => Some(TriplePattern(subj, PositionalField(1), PositionalField
+          (2)))
+        case TriplePattern(_, _, obj@Value(_)) => Some(TriplePattern(PositionalField(0), PositionalField(1), obj))
       }
-
-      if (patterns.length != 1) {
-        return None
+    } else if (grouped_by == "object") {
+      group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0),
+        PositionalField(1), pattern.obj))))
+      other_filter_pattern = pattern match {
+        case TriplePattern(Value(_), Value(_), _) => None
+        case TriplePattern(subj@Value(_), _, _) => Some(TriplePattern(subj, PositionalField(1), PositionalField
+          (2)))
+        case TriplePattern(_, pred@Value(_), _) => Some(TriplePattern(PositionalField(0), pred, PositionalField(2)))
       }
+    }
 
-      // TODO we make a lot of assumptions about Options and Array lengths here
-      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+    if (other_filter_pattern.isEmpty) {
+      // The grouping column is bound and the other two are as well - this rule doesn't apply.
+      return None
+    }
 
-      val pattern = patterns.head
+    val other_filter = BGPFilter(out, Pipe(internalPipeName, group_filter.get), List(other_filter_pattern.get))
 
-      // Check if the column that's grouped by is bound in this pattern
-      val bound_columns = RDF.getAllBoundColumns(pattern)
-      val applies =  grouped_by match {
-        case "subject" if bound_columns contains Column.Subject => true
-        case "predicate" if bound_columns contains Column.Predicate => true
-        case "object" if bound_columns contains Column.Object => true
-        case _ => false
-      }
-
-      // If not, this rule doesn't apply
-      if (!(applies && bound_columns.length == 2)) {
-        return None
-      }
-
-      val internalPipeName = generate
-      var group_filter : Option[BGPFilter] = None
-      var other_filter_pattern : Option[TriplePattern] = None
-
-      // The first pattern in the next 3 pattern matches is for the case where the column that the data is grouped by
-      // is bound as a variable in the pattern, but the other two column are as well.
-      if (grouped_by == "subject") {
-        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(pattern.subj, PositionalField(1)
-          , PositionalField(2)))))
-        other_filter_pattern = pattern match {
-          case TriplePattern(_, Value(_), Value(_)) => None
-          case TriplePattern(_, pred @ Value(_), _) => Some(TriplePattern(PositionalField(0), pred, PositionalField(2)))
-          case TriplePattern(_, _, obj @ Value(_)) => Some(TriplePattern(PositionalField(0), PositionalField(1), obj))
-        }
-      } else if (grouped_by == "predicate") {
-        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0), pattern
-          .pred, PositionalField(2)))))
-        other_filter_pattern = pattern match {
-          case TriplePattern(Value(_), _, Value(_)) => None
-          case TriplePattern(subj @ Value(_), _ , _) => Some(TriplePattern(subj, PositionalField(1), PositionalField
-            (2)))
-          case TriplePattern(_, _, obj @ Value(_)) => Some(TriplePattern(PositionalField(0), PositionalField(1), obj))
-        }
-      } else if (grouped_by == "object") {
-        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0),
-          PositionalField(1), pattern.obj))))
-        other_filter_pattern = pattern match {
-          case TriplePattern(Value(_), Value(_), _) => None
-          case TriplePattern(subj @ Value(_), _ , _) => Some(TriplePattern(subj, PositionalField(1), PositionalField
-            (2)))
-          case TriplePattern(_, pred @ Value(_), _) => Some(TriplePattern(PositionalField(0), pred, PositionalField(2)))
-        }
-      }
-
-      if (other_filter_pattern.isEmpty) {
-        // The grouping column is bound and the other two are as well - this rule doesn't apply.
-        return None
-      }
-
-      val other_filter = BGPFilter(out, Pipe(internalPipeName, group_filter.get), List(other_filter_pattern.get))
-
-      other_filter.outputs foreach { output =>
-        output.consumer foreach { consumer =>
-          consumer.inputs foreach { input =>
-            // If `op` (the old term) is the producer of any of the input pipes of `other_filter` (the new terms)
-            // successors, replace it with `other_filter` in that attribute. Replacing `op` with `other_filter` in
-            // the pipes on `other_filter` itself is not necessary because the setters of `inputs` and `outputs` do
-            // that.
-            if (input.producer == op) {
-              input.producer = other_filter
-            }
+    other_filter.outputs foreach { output =>
+      output.consumer foreach { consumer =>
+        consumer.inputs foreach { input =>
+          // If `op` (the old term) is the producer of any of the input pipes of `other_filter` (the new terms)
+          // successors, replace it with `other_filter` in that attribute. Replacing `op` with `other_filter` in
+          // the pipes on `other_filter` itself is not necessary because the setters of `inputs` and `outputs` do
+          // that.
+          if (input.producer == op) {
+            input.producer = other_filter
           }
         }
       }
+    }
 
-      group_filter foreach {
-        _.outputs.head.consumer = List(other_filter)
-      }
+    group_filter foreach {
+      _.outputs.head.consumer = List(other_filter)
+    }
 
-      if (group_filter.isDefined) {
-        in.removeConsumer(op)
-      }
+    if (group_filter.isDefined) {
+      in.removeConsumer(op)
+    }
 
-      group_filter
-    case _ => None
+    group_filter
   }
 
   /** Applies rewriting rule F8 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -582,83 +576,82 @@ object Rules {
     * @param term
     * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with only bound variables.
     */
-  def F8(term: Any): Option[BGPFilter] = term match {
-    case op @ BGPFilter(_, _, patterns) =>
-      val in = op.inputs.head
-      val out = op.outputs.head
-      if (op.inputSchema == RDFLoad.plainSchema) {
-        return None
-      }
+  def F8(op: BGPFilter): Option[BGPFilter] = {
+    val patterns = op.patterns
+    val in = op.inputs.head
+    val out = op.outputs.head
+    if (op.inputSchema == RDFLoad.plainSchema) {
+      return None
+    }
 
-      if (op.inputSchema.isEmpty
-        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
-        return None
-      }
+    if (op.inputSchema.isEmpty
+      || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+      return None
+    }
 
-      if (patterns.length != 1) {
-        return None
-      }
+    if (patterns.length != 1) {
+      return None
+    }
 
-      // TODO we make a lot of assumptions about Options and Array lengths here
-      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+    // TODO we make a lot of assumptions about Options and Array lengths here
+    val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
 
-      val pattern = patterns.head
+    val pattern = patterns.head
 
-      if (!pattern.subj.isInstanceOf[Value]
-        || !pattern.pred.isInstanceOf[Value]
-        || !pattern.obj.isInstanceOf[Value]) {
-        // The rule only applies if all variables are bound
-        return None
-      }
+    if (!pattern.subj.isInstanceOf[Value]
+      || !pattern.pred.isInstanceOf[Value]
+      || !pattern.obj.isInstanceOf[Value]) {
+      // The rule only applies if all variables are bound
+      return None
+    }
 
-      val internalPipeName = generate
-      var group_filter : Option[BGPFilter] = None
-      var other_filter : Option[BGPFilter] = None
+    val internalPipeName = generate
+    var group_filter: Option[BGPFilter] = None
+    var other_filter: Option[BGPFilter] = None
 
-      if (grouped_by == "subject") {
-        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(pattern.subj, PositionalField(1),
-          PositionalField(2)))))
-        other_filter = Some(BGPFilter(out, Pipe(internalPipeName), List(TriplePattern(PositionalField(0), pattern.pred,
-          pattern.obj))))
-      } else if (grouped_by == "predicate") {
-        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0), pattern.pred,
-          PositionalField(2)))))
-        other_filter = Some(BGPFilter(out, Pipe(internalPipeName), List(TriplePattern(pattern.subj, PositionalField(1),
-          pattern.obj))))
-      } else if (grouped_by == "object") {
-        group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0),
-          PositionalField(1),
-          pattern.obj))))
-        other_filter = Some(BGPFilter(out, Pipe(internalPipeName), List(TriplePattern(pattern.subj, pattern.pred,
-          PositionalField(2)))))
-      }
+    if (grouped_by == "subject") {
+      group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(pattern.subj, PositionalField(1),
+        PositionalField(2)))))
+      other_filter = Some(BGPFilter(out, Pipe(internalPipeName), List(TriplePattern(PositionalField(0), pattern.pred,
+        pattern.obj))))
+    } else if (grouped_by == "predicate") {
+      group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0), pattern.pred,
+        PositionalField(2)))))
+      other_filter = Some(BGPFilter(out, Pipe(internalPipeName), List(TriplePattern(pattern.subj, PositionalField(1),
+        pattern.obj))))
+    } else if (grouped_by == "object") {
+      group_filter = Some(BGPFilter(Pipe(internalPipeName), in, List(TriplePattern(PositionalField(0),
+        PositionalField(1),
+        pattern.obj))))
+      other_filter = Some(BGPFilter(out, Pipe(internalPipeName), List(TriplePattern(pattern.subj, pattern.pred,
+        PositionalField(2)))))
+    }
 
-      other_filter foreach {
-        _.outputs foreach { output =>
-          output.consumer foreach { consumer =>
-            consumer.inputs foreach { input =>
-              // If `op` (the old term) is the producer of any of the input pipes of `other_filter` (the new terms)
-              // successors, replace it with `other_filter` in that attribute. Replacing `op` with `other_filter` in
-              // the pipes on `other_filter` itself is not necessary because the setters of `inputs` and `outputs` do
-              // that.
-              if (input.producer == op) {
-                input.producer = other_filter.get
-              }
+    other_filter foreach {
+      _.outputs foreach { output =>
+        output.consumer foreach { consumer =>
+          consumer.inputs foreach { input =>
+            // If `op` (the old term) is the producer of any of the input pipes of `other_filter` (the new terms)
+            // successors, replace it with `other_filter` in that attribute. Replacing `op` with `other_filter` in
+            // the pipes on `other_filter` itself is not necessary because the setters of `inputs` and `outputs` do
+            // that.
+            if (input.producer == op) {
+              input.producer = other_filter.get
             }
           }
         }
       }
+    }
 
-      group_filter foreach {
-        _.outputs.head.consumer = List(other_filter.get)
-      }
+    group_filter foreach {
+      _.outputs.head.consumer = List(other_filter.get)
+    }
 
-      if (group_filter.isDefined) {
-        in.removeConsumer(op)
-      }
+    if (group_filter.isDefined) {
+      in.removeConsumer(op)
+    }
 
-      group_filter
-    case _ => None
+    group_filter
   }
 
   /** Applies rewriting rule F8 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -667,7 +660,7 @@ object Rules {
     * @return Some BGPFilter objects if the input filters BGP is a star join.
     */
   def J1(term: Any): Option[List[BGPFilter]] = term match {
-    case op @ BGPFilter(_, _, patterns) =>
+    case op@BGPFilter(_, _, patterns) =>
       val out = op.outputs.head
       val in = op.inputs.head
       if (op.inputSchema != RDFLoad.plainSchema) {
@@ -679,7 +672,7 @@ object Rules {
       }
 
       def isNamed(r: Ref): Option[NamedField] = r match {
-        case n @ NamedField(_) => Some(n)
+        case n@NamedField(_) => Some(n)
         case _ => None
       }
 
@@ -701,13 +694,13 @@ object Rules {
       in.removeConsumer(op)
 
       val fieldname = RDF.starJoinColumn(patterns).get._2
-      val filters = patterns map {p => BGPFilter(Pipe(generate), in, List(p))}
+      val filters = patterns map { p => BGPFilter(Pipe(generate), in, List(p)) }
       val join = Join(out,
-                      filters map {f => Pipe(f.outPipeName, f)},
-                      // Use map here to make sure the amount of field expressions is the same as the amount of filters
-                      filters map {_ => List(fieldname)})
+        filters map { f => Pipe(f.outPipeName, f) },
+        // Use map here to make sure the amount of field expressions is the same as the amount of filters
+        filters map { _ => List(fieldname) })
 
-      filters foreach {f => f.outputs.head.consumer = List(join)}
+      filters foreach { f => f.outputs.head.consumer = List(join) }
 
       return Some(filters)
 
@@ -746,7 +739,7 @@ object Rules {
 
   def foreachGenerateWithAsterisk(term: Any): Option[PigOperator] = {
     term match {
-      case op @Foreach(_, _, gen, _) => gen match {
+      case op@Foreach(_, _, gen, _) => gen match {
         case GeneratorList(exprs) => {
           val (genExprs, foundStar) = constructGeneratorList(exprs, op)
           if (foundStar) {
@@ -759,7 +752,7 @@ object Rules {
             return None
         }
         case _ => None
-        }
+      }
       case op@Generate(exprs) => {
         val (genExprs, foundStar) = constructGeneratorList(exprs, op)
         if (foundStar) {
@@ -784,15 +777,15 @@ object Rules {
     addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
-    addOperatorReplacementStrategy(R1)
+    addOperatorReplacementStrategy(buildTypedCaseWrapper(R1))
     addStrategy(R2)
-    addOperatorReplacementStrategy(L2)
+    addOperatorReplacementStrategy(buildTypedCaseWrapper(L2))
     addStrategy(F1)
-    addOperatorReplacementStrategy(F2)
-    addOperatorReplacementStrategy(F3)
-    addOperatorReplacementStrategy(F4)
-    addStrategy(F7 _)
-    addStrategy(F8 _)
+    addOperatorReplacementStrategy(buildTypedCaseWrapper(F2))
+    addOperatorReplacementStrategy(buildTypedCaseWrapper(F3))
+    addOperatorReplacementStrategy(buildTypedCaseWrapper(F4))
+    addTypedStrategy(F7)
+    addTypedStrategy(F8)
     addStrategy(strategyf(t => J1(t)))
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk _)
   }
