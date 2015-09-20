@@ -45,10 +45,10 @@ class FlinkCompileSpec extends FlatSpec {
       |object test {
       |    def main(args: Array[String]) {
       |        val env = ExecutionEnvironment.getExecutionEnvironment
-      |        env.execute("Starting Query")
       |    }
       |}
     """.stripMargin)
+//         |        env.execute("Starting Query")
   assert(generatedCode == expectedCode)
   }
 
@@ -107,7 +107,10 @@ class FlinkCompileSpec extends FlatSpec {
     val op = Store(Pipe("A"), file)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).writeAsText("${file}")""")
+    val expectedCode = cleanString(s"""
+      | A.map(t => tupleAToString(t)).writeAsText("${file}")
+      | env.execute()
+      """.stripMargin)
     assert(generatedCode == expectedCode)
   }
 
