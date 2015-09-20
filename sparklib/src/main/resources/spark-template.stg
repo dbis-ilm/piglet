@@ -125,6 +125,11 @@ streamOp(out,in,op,params) ::=<<
         val <out> = <op>(sc, <in><params>)
 >>
 
+// ------------------ DELAY operator ----------------------------------------
+delay(out,in,op,size,wait) ::=<<
+        val <out> = <in>.map(t => {Thread.sleep(<wait> * 1000); t}).sample(true, <size>)
+>>
+
 // ----------------------- FS commands ----------------------------------------
 fs(cmd,params) ::=<<
     HDFSService.process(<cmd>, <params>)

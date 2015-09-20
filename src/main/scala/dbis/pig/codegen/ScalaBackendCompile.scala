@@ -820,6 +820,8 @@ class ScalaBackendGenCode(templateFile: String, hookFile: Option[Path] = None) e
       case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inputs.head.name,window,slide)
       case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inputs.head.name))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
+      case Delay(out, in, size, wtime) => callST("delay", Map("in"->node.inputs.head.name, "out"->node.outPipeName,
+        "size"->size, "wait"->wtime))
       case Empty(_) => ""
            
       /*

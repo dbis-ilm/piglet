@@ -237,6 +237,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val falseKeyword = "false".ignoreCase
   lazy val fsKeyword = "fs".ignoreCase
   lazy val setKeyword = "set".ignoreCase
+  lazy val delayKeyword = "delay".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -405,6 +406,13 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def limitStmt: Parser[PigOperator] = bag ~ "=" ~ limitKeyword ~ bag ~ num ^^ { case out ~ _ ~ _ ~ in ~ num => new Limit(Pipe(out), Pipe(in), num) }
 
   /*
+   * <A> = DELAY <B> <Size> , <Wait>
+   */
+  def delayStmt: Parser[PigOperator] = bag ~ "=" ~ delayKeyword ~ bag ~ floatingPointNumber ~ "," ~ num ^^ {
+    case out ~ _ ~ _ ~ in ~ size ~ _ ~ wait => new Delay(Pipe(out), Pipe(in), size.toDouble, wait.toInt)
+  }
+
+  /*
    * <A> = WINDOW <B> ROWS  <Num> SLIDE ROWS <Num>
    * <A> = WINDOW <B> ROWS  <Num> SLIDE RANGE <Num> <Unit>
    * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE ROWS <Num>
@@ -538,7 +546,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | fsStmt | defineStmt | setStmt | delayStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   def undelimStmt: Parser[PigOperator] = embedStmt
@@ -573,7 +581,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
+    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt | delayStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
 
