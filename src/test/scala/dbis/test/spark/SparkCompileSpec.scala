@@ -226,7 +226,7 @@ class SparkCompileSpec extends FlatSpec {
     val op = Grouping(Pipe("aa"), Pipe("bb"), GroupingExpression(List()))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.glom")
+    val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map(t => List("all", t.toList))""")
     assert(generatedCode == expectedCode)
   }
 
