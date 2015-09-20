@@ -526,7 +526,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   }
 
   /*
-   * MATERIALIE <A>
+   * MATERIALIZE <A>
    */
   def materializeStmt: Parser[PigOperator] = materializeKeyword ~ bag ^^ { case _ ~ b => Materialize(Pipe(b))}
 

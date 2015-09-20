@@ -76,7 +76,7 @@ groupBy(out,in,expr) ::=<<
 <if (expr)>
         val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(k,v)}
 <else>
-        val <out> = <in>.glom
+        val <out> = <in>.coalesce(1).glom.map(t => List("all", t.toList))
 <endif>
 >>
 
