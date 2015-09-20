@@ -52,7 +52,10 @@ class SparkCompileSpec extends FlatSpec {
         |    def main(args: Array[String]) {
         |      val conf = new SparkConf().setAppName("test_App")
         |      val sc = new SparkContext(conf)
+        |      val perfMon = new PerfMonitor()
+        |      sc.addSparkListener(perfMon)
         |      sc.stop()
+        |      perfMon.flush()
         |    }
         |}
       """.stripMargin)

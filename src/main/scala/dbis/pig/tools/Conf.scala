@@ -17,12 +17,10 @@ object Conf extends LazyLogging {
   
 	val programHome = Paths.get(System.getProperty("user.home"), ".piglet")
   
-  private val confFileName = "piglet.conf"
-  
   /**
    * The path to the config file. It will resolve to $USER_HOME/.piglet/application.conf
    */
-  private val configFile = programHome.resolve(confFileName)
+  private val configFile = "piglet.conf"
   
   /**
    * Load the configuration.
@@ -35,27 +33,26 @@ object Conf extends LazyLogging {
    */
   private def loadConf: Config = {
     
-    // 1. check if the config file in the user's home directory exists
-    if(!Files.exists(configFile)) {
+	  val userConf = programHome.resolve(configFile)
+	  
+    if(Files.exists(userConf)) {
       
-      // 2. if not, create parent directory if necessary
-      if(!Files.exists(configFile.getParent)) {
-        Files.createDirectories(configFile.getParent)
-        logger.info(s"""created program directory at ${configFile.getParent}""")
-      }
+      // if the config file exists in the program home, use this one
+      logger.debug(s"using $userConf as config file")
+      ConfigFactory.parseFile(userConf.toFile())
       
-      // 3. copy config file
-      copyConfigFile()
+    } else {
+      // Otherwise, use the packaged one 
+      logger.debug(s"loading default packaged config file")
+      ConfigFactory.load(configFile)
     }
-  
-    // 4. parse the newly created config file
-    ConfigFactory.parseFile(configFile.toFile())
   }
 
   protected[pig] def copyConfigFile() = {
-    val source = Conf.getClass.getClassLoader.getResourceAsStream(confFileName)
-    Files.copy(source, configFile, StandardCopyOption.REPLACE_EXISTING)
-    logger.debug(s"copied config file to $configFile")
+    val source = Conf.getClass.getClassLoader.getResourceAsStream(configFile)
+    val dest = programHome.resolve(configFile)
+    Files.copy(source, dest, StandardCopyOption.REPLACE_EXISTING)
+    logger.debug(s"copied config file to $dest")
   }
   
   // loads the configuration file 
@@ -72,6 +69,10 @@ object Conf extends LazyLogging {
   def backendJar(backend: String): Path = Paths.get(appconf.getString(s"backends.$backend.jar")) 
   
   def backendConf(backend: String) = appconf.getString(s"backends.$backend.conf")
+  
+  def backendGenerator(backend: String) = appconf.getString(s"backends.$backend.generator.class")
+  def backendExtension(backend: String) = appconf.getString(s"backends.$backend.generator.extension")
+  def backendCompileConf(backend: String) = appconf.getString(s"backends.$backend.compileconf")
   
   def hdfsCoreSiteFile = Paths.get(appconf.getString("hdfs.coresite"))
   def hdfsHdfsSiteFile = Paths.get(appconf.getString("hdfs.hdfssite"))

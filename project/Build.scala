@@ -88,7 +88,7 @@ object Dependencies {
   val pig = "org.apache.pig" % "pig" % "0.15.0"
   val scalikejdbc = "org.scalikejdbc" %% "scalikejdbc" % "2.2.7"
   val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
-  val h2 = "com.h2database"  %  "h2" % "1.4.187"
+  val h2 = "com.h2database"  %  "h2" % "1.4.189"
 
   val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.9.0.jar"
   
