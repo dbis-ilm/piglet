@@ -351,11 +351,12 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
     * @return the Scala code implementing the SOCKET_WRITE operator
     */
-  def emitSocketWrite(in: String, addr: SocketAddress, mode: String, streamFunc: String): String = {
+  def emitSocketWrite(in: String, addr: SocketAddress, mode: String, streamFunc: Option[String]): String = {
+    val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
     if(mode!="")
-      callST("socketWrite", Map("in"->in,"addr"->addr,"mode"->mode,"func"->streamFunc))
+      callST("socketWrite", Map("in"->in,"addr"->addr,"mode"->mode,"func"->func))
     else
-      callST("socketWrite", Map("in"->in,"addr"->addr,"func"->streamFunc))
+      callST("socketWrite", Map("in"->in,"addr"->addr,"func"->func))
   }
 
   /**

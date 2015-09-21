@@ -336,7 +336,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
+        |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
         |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
@@ -355,7 +355,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => Array(t(0),t(1)).mkString).equalTo(t => Array(t(1),t(2)).mkString).map{
+        |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => Array(t(0).asInstanceOf[String],t(1).asInstanceOf[Double]).mkString).equalTo(t => Array(t(1).asInstanceOf[Double],t(2).asInstanceOf[Int]).mkString).map{
         |t => t._1 ++ t._2
         |}""".stripMargin)
     assert(generatedCode == expectedCode)
@@ -375,9 +375,9 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{ 
+      |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{ 
       |t => t._1 ++ t._2
-      |}.join(d).onWindow(5, TimeUnit.SECONDS).where(t => t(0)).equalTo(t => t(0)).map{
+      |}.join(d).onWindow(5, TimeUnit.SECONDS).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
       |t => t._1 ++ t._2
       |}""".stripMargin)
     assert(generatedCode == expectedCode)
