@@ -188,7 +188,13 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       }
       case None => throw new SchemaException(s"unknown schema for field $f")
     } // TODO: should be position of field
-    case PositionalField(pos) => s"$tuplePrefix($pos)"
+    case PositionalField(pos) =>
+      if (requiresTypeCast && schema.isDefined) {
+        val field = schema.get.field(pos)
+        val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
+        s"$tuplePrefix($pos).asInstanceOf[${typeCast}]"
+      }
+      else s"$tuplePrefix($pos)"
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
