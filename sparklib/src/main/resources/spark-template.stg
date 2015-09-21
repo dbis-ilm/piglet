@@ -127,7 +127,7 @@ streamOp(out,in,op,params) ::=<<
 
 // ------------------ DELAY operator ----------------------------------------
 delay(out,in,op,size,wait) ::=<<
-        val <out> = <in>.map(t => {Thread.sleep(<wait> * 1000); t}).sample(true, <size>)
+        val <out> = <in>.map(t => {Thread.sleep(<wait>); t}).sample(true, <size>)
 >>
 
 // ----------------------- FS commands ----------------------------------------
