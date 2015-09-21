@@ -51,9 +51,9 @@ class PigParserSpec extends FlatSpec {
     val uri1 = new URI("file.data")
     val uri2 = new URI("file.n3")
     assert(parseScript("""a = LOAD 'file.data' using PigStorage(',');""") ==
-      List(Load(Pipe("a"), uri1, None, "PigStorage", List("""','"""))))
+      List(Load(Pipe("a"), uri1, None, Some("PigStorage"), List("""','"""))))
     assert(parseScript("""a = LOAD 'file.n3' using RDFFileStorage();""") ==
-      List(Load(Pipe("a"), uri2, None, "RDFFileStorage")))
+      List(Load(Pipe("a"), uri2, None, Some("RDFFileStorage"))))
   }
 
   it should "parse a load statement with typed schema specification" in {
@@ -90,7 +90,7 @@ class PigParserSpec extends FlatSpec {
       Field("b", Types.CharArrayType),
       Field("c", Types.DoubleType))))
     assert(parseScript("""a = load 'file.data' using PigStorage() as (a:int, b:chararray, c:double); """) ==
-      List(Load(Pipe("a"), uri, Some(Schema(schema)), "PigStorage")))
+      List(Load(Pipe("a"), uri, Some(Schema(schema)), Some("PigStorage"))))
   }
 
   it should "parse a load statement with untyped schema specification" in {
@@ -489,9 +489,9 @@ class PigParserSpec extends FlatSpec {
 
   it should "parse a socket read statement in standard mode with using clause" in {
     assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');", LanguageFeature.StreamingPig)
-      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "PigStream",List("""','"""))))
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("PigStream"),List("""','"""))))
     assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();", LanguageFeature.StreamingPig)
-      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, "RDFStream")))
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("RDFStream"))))
   }
 
   it should "parse a socket read statement in zmq mode" in {

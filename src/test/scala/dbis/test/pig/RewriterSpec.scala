@@ -258,7 +258,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op2 = Dump(Pipe("a"))
       val plan = processPlan(new DataflowPlan(List(op1, op2)))
       val source = plan.sourceNodes.headOption.value
-      source shouldBe Load(Pipe("a"), url, op1.schema, "pig.SPARQLLoader",
+      source shouldBe Load(Pipe("a"), url, op1.schema, Some("pig.SPARQLLoader"),
         List("SELECT * WHERE { ?s ?p ?o }"))
     }
   }
@@ -275,7 +275,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val op4 = Dump(Pipe("c"))
     val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
-    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, "pig.SPARQLLoader",
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("pig.SPARQLLoader"),
       List("""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }"""))
     plan.operators should not contain op3
   }
@@ -287,7 +287,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op2 = Dump(Pipe("a"))
       val plan = processPlan(new DataflowPlan(List(op1, op2)))
       val source = plan.sourceNodes.headOption.value
-      source shouldBe Load(Pipe("a"), "hdfs://somewhere", op1.schema, "BinStorage")
+      source shouldBe Load(Pipe("a"), "hdfs://somewhere", op1.schema, Some("BinStorage"))
     }
   }
 

@@ -67,7 +67,7 @@ class FlinkCompileSpec extends FlatSpec {
     
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     
-    val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
+    val op = Load(Pipe("a"), file, None, Some("PigStorage"), List("""','"""))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
         val expectedCode = cleanString(s"""val a = PigStorage().load(env, "${file}", ',')""")
@@ -78,7 +78,7 @@ class FlinkCompileSpec extends FlatSpec {
     
     val file = new java.io.File(".").getCanonicalPath + "/file.n3"
     
-    val op = Load(Pipe("a"), file, None, "RDFFileStorage")
+    val op = Load(Pipe("a"), file, None, Some("RDFFileStorage"))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     
@@ -205,8 +205,8 @@ class FlinkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -223,8 +223,8 @@ class FlinkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -241,9 +241,9 @@ class FlinkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input3 = Pipe("d",Load(Pipe("d"), "file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input3 = Pipe("d",Load(Pipe("d"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs=List(input1,input2,input3)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))

@@ -95,7 +95,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
 
   it should "contain code for LOAD with PigStream" in {
     val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
-    val op = Load(Pipe("a"), file, None, "PigStream", List("""','"""))
+    val op = Load(Pipe("a"), file, None, Some("PigStream"), List("""','"""))
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = PigStream().load(env, "${file}", ',')""")
@@ -104,7 +104,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
 
   it should "contain code for LOAD with RDFStream" in {
     val file = new URI(new java.io.File(".").getCanonicalPath + "/file.n3")
-    val op = Load(Pipe("a"), file, None, "RDFStream")
+    val op = Load(Pipe("a"), file, None, Some("RDFStream"))
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = RDFStream().load(env, "${file}")""")
@@ -123,7 +123,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
   }
 
   it should "contain code for SOCKET_READ with PigStream" in {
-    val op = SocketRead(Pipe("a"), SocketAddress("", "localhost", "9999"), "", None, "PigStream", List("""','"""))
+    val op = SocketRead(Pipe("a"), SocketAddress("", "localhost", "9999"), "", None, Some("PigStream"), List("""','"""))
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = PigStream().connect(env, "localhost", 9999, ',')""")
@@ -131,7 +131,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
   }
 
   it should "contain code for SOCKET_READ with RDFStream" in {
-    val op = SocketRead(Pipe("a"), SocketAddress("", "localhost", "9999"), "", None, "RDFStream")
+    val op = SocketRead(Pipe("a"), SocketAddress("", "localhost", "9999"), "", None, Some("RDFStream"))
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""val a = RDFStream().connect(env, "localhost", 9999)""")
@@ -330,8 +330,8 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), Some("PigStream"), List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -349,8 +349,8 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), Some("PigStream"), List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -368,9 +368,9 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), "PigStorage", List("\",\"")))
-    val input3 = Pipe("d",Load(Pipe("d"), file, Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    val input3 = Pipe("d",Load(Pipe("d"), file, Some(schema), Some("PigStream"), List("\",\"")))
     op.inputs=List(input1,input2,input3)
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -488,7 +488,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                     Field("f2", Types.IntType)))))
     val file = new java.net.URI("input/file.csv")
-    val input = Pipe("b",Load(Pipe("b"), file, Some(schema), "PigStream", List("\",\"")))
+    val input = Pipe("b",Load(Pipe("b"), file, Some(schema), Some("PigStream"), List("\",\"")))
     op.inputs=List(input)
     
     val codeGenerator = new StreamingGenCode(templateFile)

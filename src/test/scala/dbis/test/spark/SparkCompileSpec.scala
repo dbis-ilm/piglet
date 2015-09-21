@@ -87,7 +87,7 @@ class SparkCompileSpec extends FlatSpec {
     
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
-    val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
+    val op = Load(Pipe("a"), file, None, Some("PigStorage"), List("""','"""))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}", ',')""")
@@ -98,7 +98,7 @@ class SparkCompileSpec extends FlatSpec {
     
     val file = new java.io.File(".").getCanonicalPath + "/file.n3"
     
-    val op = Load(Pipe("a"), file, None, "RDFFileStorage")
+    val op = Load(Pipe("a"), file, None, Some("RDFFileStorage"))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(sc, "${file}")""")
@@ -190,7 +190,7 @@ class SparkCompileSpec extends FlatSpec {
   }
   
   it should "contain code for the STORE helper function with delimiter" in {
-    val op = Store(Pipe("A"), "input/file.csv", "PigStorage", List("'#'"))
+    val op = Store(Pipe("A"), "input/file.csv", Some("PigStorage"), List("'#'"))
     op.schema = Some(new Schema(BagType(TupleType(Array(
       Field("f1", Types.IntType),
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
@@ -213,7 +213,7 @@ class SparkCompileSpec extends FlatSpec {
   it should "containt code for STORE with using clause" in {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
-    val op = Store(Pipe("A"), file, "BinStorage")
+    val op = Store(Pipe("A"), file, Some("BinStorage"))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     
@@ -267,8 +267,8 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)), "t"), "s"))
-    val input1 = Pipe("bb",Load(Pipe("bb"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("cc",Load(Pipe("cc"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("bb",Load(Pipe("bb"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("cc",Load(Pipe("cc"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs = List(input1,input2)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -285,8 +285,8 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)), "t"), "s"))
-    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -303,9 +303,9 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)), "t"), "s"))
-    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs=List(input1,input2,input3)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))

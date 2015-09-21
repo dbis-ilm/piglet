@@ -20,6 +20,7 @@ import dbis.pig.op._
 import dbis.pig.udf._
 import dbis.pig.schema._
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.backends.BackendManager
 
 import scala.collection.mutable.ListBuffer
 
@@ -332,12 +333,13 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     * @param streamParams an optional list of parameters to a stream function (e.g. separators)
     * @return the Scala code implementing the SOCKET_READ operator
     */
-  def emitSocketRead(out: String, addr: SocketAddress, mode: String, streamFunc: String, streamParams: List[String]): String ={
+  def emitSocketRead(out: String, addr: SocketAddress, mode: String, streamFunc: Option[String], streamParams: List[String]): String ={
     val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
+    val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
     if(mode!="")
-      callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->streamFunc,"params"->params))
+      callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->func,"params"->params))
     else
-      callST("socketRead", Map("out"->out,"addr"->addr,"func"->streamFunc,"params"->params))
+      callST("socketRead", Map("out"->out,"addr"->addr,"func"->func,"params"->params))
   }
 
   /**

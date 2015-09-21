@@ -34,7 +34,7 @@ case class SocketRead(private val out: Pipe,
                       addr: SocketAddress,
                       mode: String,
                       var streamSchema: Option[Schema] = None,
-                      streamFunc: String = BackendManager.backend.defaultConnector,
+                      streamFunc: Option[String] = None, //BackendManager.backend.defaultConnector,
                       streamParams: List[String] = null) extends PigOperator{
   _outputs = List(out)
   _inputs = List()
