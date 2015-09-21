@@ -61,4 +61,6 @@ object PigFuncs {
     case tup: List[Any] =>  flatTuple(tup)
     case c => List(c)
   }
+  
+  def toDouble(s: String): Double = s.split('^')(0).replaceAll("\"", "").toDouble
 }
