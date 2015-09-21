@@ -96,7 +96,7 @@ union(out,in,others) ::=<<
 
 // ------------------ Returns a SAMPLE of the data ----------------------------
 sample(out,in,expr) ::=<<
-        val <out> = <in>.sample(<expr>)
+        val <out> = <in>.sample(false, <expr>)
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------
