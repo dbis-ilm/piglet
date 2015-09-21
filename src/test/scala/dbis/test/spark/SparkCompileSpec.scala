@@ -273,8 +273,8 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val bb_kv = bb.map(t => (t(0),t))
-      |val cc_kv = cc.map(t => (t(0),t))
+      |val bb_kv = bb.map(t => (t(0).asInstanceOf[String],t))
+      |val cc_kv = cc.map(t => (t(0).asInstanceOf[String],t))
       |val aa = bb_kv.join(cc_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
@@ -291,8 +291,8 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val b_kv = b.map(t => (Array(t(0),t(1)).mkString,t))
-      |val c_kv = c.map(t => (Array(t(1),t(2)).mkString,t))
+      |val b_kv = b.map(t => (Array(t(0).asInstanceOf[String],t(1).asInstanceOf[Double]).mkString,t))
+      |val c_kv = c.map(t => (Array(t(1).asInstanceOf[Double],t(2).asInstanceOf[Int]).mkString,t))
       |val a = b_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
@@ -310,9 +310,9 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val b_kv = b.map(t => (t(0),t))
-      |val c_kv = c.map(t => (t(0),t))
-      |val d_kv = d.map(t => (t(0),t))
+      |val b_kv = b.map(t => (t(0).asInstanceOf[String],t))
+      |val c_kv = c.map(t => (t(0).asInstanceOf[String],t))
+      |val d_kv = d.map(t => (t(0).asInstanceOf[String],t))
       |val a = b_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.join(d_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
@@ -453,7 +453,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val aa = bb.sample(0.01)""".stripMargin)
+        |val aa = bb.sample(false, 0.01)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -463,7 +463,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.sample(100 / t(3))""".stripMargin)
+        |val a = b.sample(false, 100 / t(3))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -547,7 +547,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.flatMap(t => PigFuncs.tokenize(t(0))).map(t => List(t))""".stripMargin)
+        |val a = b.flatMap(t => PigFuncs.tokenize(t(0).asInstanceOf[String])).map(t => List(t))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 

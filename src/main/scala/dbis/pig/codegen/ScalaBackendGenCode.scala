@@ -297,7 +297,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
         }
       }
     }
-    case FlattenExpr(e) => emitExpr(schema, e)
+    case FlattenExpr(e) => emitExpr(schema, e, false)
     case ConstructTupleExpr(exprs) => s"PigFuncs.toTuple(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case ConstructBagExpr(exprs) => s"PigFuncs.toBag(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case ConstructMapExpr(exprs) => s"PigFuncs.toMap(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
