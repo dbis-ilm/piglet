@@ -86,11 +86,6 @@ join_key_map(rels,keys) ::=<<
         }>
 >>
 
-        //val <rel1>_kv = <rel1>.map(t => (<key1>,t))
-        //<rel2,key2:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
-        //}>
-
-
 join(out,rel1,key1,rel2,key2) ::=<<
         val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => (k, v ++ w)\}}>.map{case (k,v) => v}
 
