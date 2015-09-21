@@ -28,17 +28,15 @@ import dbis.pig.tools.{HDFSService, FileTools, Conf}
 import dbis.pig.backends.BackendManager
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
-
 import jline.console.ConsoleReader
-
 import scala.collection.mutable.ListBuffer
 import java.nio.file.Paths
 import jline.console.history.FileHistory
 import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
-
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.tools.DBConnection
 
 sealed trait JLineEvent
 case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
@@ -147,6 +145,11 @@ object PigREPL extends PigParser with LazyLogging {
     if(backendConf.raw)
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
     
+    try {
+
+		  // initialize database driver and connection pool
+		  DBConnection.init(Conf.databaseSetting)
+    
     console {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
@@ -235,6 +238,9 @@ object PigREPL extends PigParser with LazyLogging {
         case iae: IllegalArgumentException => println(iae.getMessage); false
       }
       case _ => false
+    }
+    } finally {
+      DBConnection.exit()
     }
   }
 }
