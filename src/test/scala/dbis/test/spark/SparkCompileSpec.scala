@@ -317,6 +317,39 @@ class SparkCompileSpec extends FlatSpec {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for multiple joins" in {
+    val ops = parseScript(
+      """a = load 'file' as (a: chararray);
+        |b = load 'file' as (a: chararray);
+        |c = load 'file' as (a: chararray);
+        |j1 = join a by $0, b by $0;
+        |j2 = join a by $0, c by $0;
+        |j = join j1 by $0, j2 by $0;
+        |""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new BatchGenCode(templateFile)
+    val generatedCode1 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j1").get))
+    val generatedCode2 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j2").get))
+    val generatedCode3 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j").get))
+
+    val expectedCode1 = cleanString(
+      """val a_kv = a.map(t => (t(0).asInstanceOf[String],t))
+        |val b_kv = b.map(t => (t(0).asInstanceOf[String],t))
+        |val j1 = a_kv.join(b_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
+    assert(generatedCode1 == expectedCode1)
+
+    val expectedCode2 = cleanString(
+      """val c_kv = c.map(t => (t(0).asInstanceOf[String],t))
+        |val j2 = a_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
+    assert(generatedCode2 == expectedCode2)
+
+    val expectedCode3 = cleanString(
+      """val j1_kv = j1.map(t => (t(0).asInstanceOf[String],t))
+        |val j2_kv = j2.map(t => (t(0).asInstanceOf[String],t))
+        |val j = j1_kv.join(j2_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
+    assert(generatedCode3 == expectedCode3)
+  }
+
   it should "contain code a foreach statement with function expressions" in {
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
     val op = Foreach(Pipe("aa"), Pipe("bb"), GeneratorList(List(
