@@ -70,7 +70,8 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     }
     ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => {
       code += op.asInstanceOf[EmbedCmd].code
-      extraRuleCode = extraRuleCode :+ op.asInstanceOf[EmbedCmd].ruleCode
+      val castedOp = op.asInstanceOf[EmbedCmd]
+      castedOp.ruleCode.foreach { c: String => extraRuleCode = extraRuleCode :+ c}
     })
 
     val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd]).filterNot(_.isInstanceOf[EmbedCmd])

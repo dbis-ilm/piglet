@@ -539,8 +539,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def embeddedCodeNoRules: Parser[EmbedCmd] = "<%" ~ (code+"%>").r ^^ { case _ ~ code => new EmbedCmd(code
     .substring
-    (0, code
-      .length - 2))
+    (0, code .length - 2))
   }
 
   def codeWithRulesInit = (code + "rules:").r
@@ -548,7 +547,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def ruleCode: Parser[String] = (code + "!>").r
 
   def embeddedCodeWithRules: Parser[EmbedCmd] = "<!" ~ codeWithRulesInit ~ ruleCode ^^ {
-    case _ ~ code ~ rules => EmbedCmd(code.substring(0, code.length - 6), rules.substring(0, rules.length - 2))
+    case _ ~ code ~ rules => EmbedCmd(code.substring(0, code.length - 6), Some(rules.substring(0, rules.length - 2)))
   }
 
   def embedStmt: Parser[PigOperator] = embeddedCodeNoRules | embeddedCodeWithRules

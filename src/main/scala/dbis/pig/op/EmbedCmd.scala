@@ -22,7 +22,7 @@ package dbis.pig.op
  *
  * @param code The embedded code.
  */
-case class EmbedCmd(code: String, ruleCode: String) extends PigOperator {
-  def this(code: String) = this(code, "")
+case class EmbedCmd(code: String, ruleCode: Option[String]) extends PigOperator {
+  def this(code: String) = this(code, None)
 }
 
