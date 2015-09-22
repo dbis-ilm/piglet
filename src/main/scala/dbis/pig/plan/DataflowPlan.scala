@@ -75,7 +75,6 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
 
     val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd]).filterNot(_.isInstanceOf[EmbedCmd])
     val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])
-    println("step 1")
     /*
      * 1. We create a Map from names to the pipes that *write* them.
      */
@@ -97,13 +96,11 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
      * 2. We add operators that *read* from a pipe to this pipe
      */
     // TODO: replace by PigOperator.addConsumer
-    println("step 2")
     var varCnt = 1
     val newOps = ListBuffer[(PigOperator,PigOperator)]()
     planOps.foreach(op => {
         for (p <- op.inputs) {
           if (! pipes.contains(p.name)) {
-            println(" TRY TO RESOLVE: " + p.name)
             val outerPipe = resolvePipeFromContext(p.name)
             outerPipe match {
               case Some(oPipe) => {
@@ -126,15 +123,14 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     })
 
     /*
-     * If new operators were constructed we have to insert them now.
+     * 3. If new operators were constructed we have to insert them now.
      */
     val resolvedPlanOps = insertOperators(planOps, newOps.toList, pipes)
 
     /*
-     * 3. Because we have completed only the pipes from the operator outputs
+     * 4. Because we have completed only the pipes from the operator outputs
      *    we have to replace the inputs list of each operator
      */
-    println("step 3")
     try {
       resolvedPlanOps.foreach(op => {
         val newPipes = op.inputs.map(p => pipes(p.name))

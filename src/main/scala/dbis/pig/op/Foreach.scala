@@ -75,7 +75,6 @@ case class Foreach(out: Pipe,
          * Nested foreach require special handling: we construct a subplan for the operator list
          * and add our input pipe to the context of the plan.
          */
-        println("========> " + inputs.head.name)
         val plan = new DataflowPlan(opList, Some(List(inputs.head)))
         opList.foreach(op => if (op.isInstanceOf[Generate]) {
           // we extract the input pipes of the GENERATE statements (which are hidden

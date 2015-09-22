@@ -815,7 +815,6 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "replace GENERATE * in a nested FOREACH" in {
-    println("================================================================")
     val plan = new DataflowPlan(parseScript(
       """triples = LOAD 'file' AS (sub, pred, obj);
          |stmts = GROUP triples BY sub;
