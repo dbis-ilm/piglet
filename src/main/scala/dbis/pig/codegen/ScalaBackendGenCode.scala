@@ -526,6 +526,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
       case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inPipeName,"params"->emitParamList(node.schema, params)))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
+      case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case Empty(_) => ""
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
