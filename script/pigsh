@@ -77,5 +77,4 @@ case $BACKEND in
         exit 1
         ;;
 esac
-
 java -Dscala.usejavacp=true -classpath $CP dbis.pig.PigREPL $*

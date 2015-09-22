@@ -47,7 +47,21 @@ case object EOF extends JLineEvent
 
 object PigREPL extends PigParser with LazyLogging {
   val consoleReader = new ConsoleReader()
-  
+  val defaultScriptName = "__my_script"
+
+  def cleanupResult(dir: String): Unit = {
+    import scalax.file.Path
+
+    val path: Path = Path(dir)
+    try {
+      path.deleteRecursively(continueOnFailure = false)
+    }
+    catch {
+      case e: java.io.IOException => // some file could not be deleted
+    }
+
+  }
+
   private def unbalancedBrackets(s: String): Boolean = {
     val leftBrackets = s.count(_ == '{')
     val rightBrackets = s.count(_ == '}')
@@ -118,6 +132,8 @@ object PigREPL extends PigParser with LazyLogging {
       }
     }
     } finally {
+      // remove directory $defaultScriptName
+      cleanupResult(defaultScriptName)
       logger.debug("flushing history file")
       consoleReader.getHistory.asInstanceOf[FileHistory].flush()
     }
@@ -225,10 +241,10 @@ object PigREPL extends PigParser with LazyLogging {
         val jobJar = Conf.backendJar(backend)
  
         
-        FileTools.compilePlan(plan, "script", Paths.get("."), false, jobJar, templateFile, backend) match {
+        FileTools.compilePlan(plan, defaultScriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
           case Some(jarFile) =>
             val runner = backendConf.runnerClass
-            runner.execute("local", "script", jarFile)
+            runner.execute("local", defaultScriptName, jarFile)
           
           case None => println("failed to build jar file for job")  
         }

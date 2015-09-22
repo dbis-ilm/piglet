@@ -177,7 +177,30 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
   def emitJoin(node: PigOperator, out: String, rels: List[Pipe], exprs: List[List[Ref]]): String = {
     val res = node.inputs.zip(exprs)
     val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
-    callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
+
+    /*
+     * We don't generate key-value RDDs which we have already created and registered in joinKeyVars.
+     * Thus, we build a list of 1 and 0's where 1 stands for a relation name for which we have already
+     * created a _kv variable.
+     */
+    val duplicates = rels.map(r => if (joinKeyVars.contains(r.name)) 1 else 0)
+
+    /*
+     * Now we build lists for rels and keys by removing the elements corresponding to 1's in the duplicate
+     * list.
+     */
+    val drels = rels.zipWithIndex.filter{r => duplicates(r._2) == 0}.map(_._1)
+    val dkeys = keys.zipWithIndex.filter{k => duplicates(k._2) == 0}.map(_._1)
+
+    /*
+     * And finally, create the join kv vars for them.
+     */
+    var str = callST("join_key_map", Map("rels"->drels.map(_.name), "keys"->dkeys))
+    str += callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
+
+    joinKeyVars += rels.head.name
+    joinKeyVars ++= rels.tail.map(_.name)
+    str
   }
 
   /**

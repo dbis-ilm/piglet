@@ -35,6 +35,8 @@ dump(in) ::=<<
 // ------------------ STORE Results on Disk -----------------------------------
 store(in,file,schema,func) ::=<<
         <in>.map(t => <schema>).writeAsText("<file>")
+        
+        env.execute()
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -73,6 +75,9 @@ limit(out,in,num) ::=<<
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
+join_key_map(rels,keys) ::=<<
+>>
+
 join(out,rel1,key1,rel2,key2) ::=<<
         val <out> = <rel1><rel2,key2:{ r,k |<\\>
         .join(<r>).where(t => <key1>).equalTo(t => <k>)<\\>
@@ -94,7 +99,7 @@ orderBy(out,in,key,asc) ::=<<
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
-        env.execute("<name>")
+        
     }
 }
 >>

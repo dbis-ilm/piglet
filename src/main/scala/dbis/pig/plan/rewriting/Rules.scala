@@ -163,7 +163,7 @@ object Rules {
     val uri = op.uri
 
     if (uri.getScheme == "http" || uri.getScheme == "https") {
-      Some(Load(op.outputs.head, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
+      Some(Load(op.outputs.head, uri, op.schema, Some("pig.SPARQLLoader"), List("SELECT * WHERE { ?s ?p ?o }")))
     } else {
       None
     }
@@ -192,7 +192,7 @@ object Rules {
         // This is the function we'll use for replacing RDFLoad with Load
         def replacer = buildOperatorReplacementStrategy { sop: Any =>
           if (sop == op) {
-            Some(Load(op.outputs.head, op.uri, op.schema, "pig.SPARQLLoader",
+            Some(Load(op.outputs.head, op.uri, op.schema, Some("pig.SPARQLLoader"),
               List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(bf.get.patterns))))
           } else {
             None
@@ -221,7 +221,7 @@ object Rules {
       return None
     }
 
-    Some(Load(op.out, op.uri, op.schema, "BinStorage"))
+    Some(Load(op.out, op.uri, op.schema, Some("BinStorage")))
   }
 
   /** Applies rewriting rule F1 of the paper [[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].

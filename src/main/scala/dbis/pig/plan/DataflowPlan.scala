@@ -29,7 +29,7 @@ import scala.collection.mutable.{ListBuffer, Map}
  */
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
-class DataflowPlan(var operators: List[PigOperator]) {
+class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) {
   /**
    * A list of JAR files specified by the REGISTER statement
    */
@@ -70,7 +70,8 @@ class DataflowPlan(var operators: List[PigOperator]) {
     }
     ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => {
       code += op.asInstanceOf[EmbedCmd].code
-      extraRuleCode = extraRuleCode :+ op.asInstanceOf[EmbedCmd].ruleCode
+      val castedOp = op.asInstanceOf[EmbedCmd]
+      castedOp.ruleCode.foreach { c: String => extraRuleCode = extraRuleCode :+ c}
     })
 
     val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd]).filterNot(_.isInstanceOf[EmbedCmd])
@@ -96,23 +97,43 @@ class DataflowPlan(var operators: List[PigOperator]) {
      * 2. We add operators that *read* from a pipe to this pipe
      */
     // TODO: replace by PigOperator.addConsumer
+    var varCnt = 1
+    val newOps = ListBuffer[(PigOperator,PigOperator)]()
     planOps.foreach(op => {
         for (p <- op.inputs) {
-          val element = pipes(p.name)
-          // Pipes already have their consumers set up after rewriting, therefore this step is not necessary. In
-          // fact, it would create duplicate elements in `consumer`.
-          if (!(element.consumer contains op)) {
-            element.consumer = element.consumer :+ op
+          if (! pipes.contains(p.name)) {
+            val outerPipe = resolvePipeFromContext(p.name)
+            outerPipe match {
+              case Some(oPipe) => {
+                val cbOp = ConstructBag(Pipe(s"${p.name}_${varCnt}"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
+                newOps += ((cbOp, op))
+                varCnt += 1
+              }
+              case None => throw new InvalidPlanException("invalid pipe: " + p.name)
+            }
+          }
+          else {
+            val element = pipes(p.name)
+            // Pipes already have their consumers set up after rewriting, therefore this step is not necessary. In
+            // fact, it would create duplicate elements in `consumer`.
+            if (!(element.consumer contains op)) {
+              element.consumer = element.consumer :+ op
+            }
           }
         }
     })
 
     /*
-     * 3. Because we have completed only the pipes from the operator outputs
+     * 3. If new operators were constructed we have to insert them now.
+     */
+    val resolvedPlanOps = insertOperators(planOps, newOps.toList, pipes)
+
+    /*
+     * 4. Because we have completed only the pipes from the operator outputs
      *    we have to replace the inputs list of each operator
      */
     try {
-      planOps.foreach(op => {
+      resolvedPlanOps.foreach(op => {
         val newPipes = op.inputs.map(p => pipes(p.name))
         op.inputs = newPipes
         op.preparePlan
@@ -122,7 +143,75 @@ class DataflowPlan(var operators: List[PigOperator]) {
     catch {
       case e: java.util.NoSuchElementException => throw new InvalidPlanException("invalid pipe: " + e.getMessage)
     }
-    operators = planOps
+    operators = resolvedPlanOps.toList
+  }
+
+  /**
+   *
+   * @param opList
+   * @param newOps
+   * @param pipes
+   * @return
+   */
+  def insertOperators(opList: List[PigOperator], newOps: List[(PigOperator, PigOperator)], pipes: Map[String, Pipe]): List[PigOperator] = {
+
+    /*
+     * Replace the name of the pipe with the oName by the name of the pipe.
+     * Note, that it isn't necessary to fix all references here, because we
+     * do this in constructPlan anyway.
+     */
+    def replacePipe(op: PigOperator, oName: String, pipe: Pipe): Unit = {
+      op.inputs.foreach(p => if (p.name == oName) { p.name = pipe.name})
+    }
+
+    if (newOps.nonEmpty) {
+      val newOpList = opList.to[ListBuffer]
+      newOps.foreach(pair => {
+        val op = pair._1
+        val consumer = pair._2
+        /*
+         * Update the pipe
+         */
+        val pipe = op.outputs.head
+        pipe.addConsumer(consumer)
+        pipe.producer = op
+        pipes(pipe.name) = pipe
+        /*
+         * Replace the input pipe
+         */
+        val oldPipeName = pipe.name.substring(0, pipe.name.lastIndexOf("_"))
+        replacePipe(consumer, oldPipeName, pipe)
+        /*
+         * Insert the new operator before the consumer
+         */
+        val pos = newOpList.indexOf(consumer)
+        newOpList.insert(pos, op)
+      })
+      newOpList.toList
+    }
+    else
+      opList
+  }
+
+  /**
+   * Try to find the pipe in the context, i.e. as an element of an relation of the outer
+   * operator. This is used only for nested statements.
+   *
+   * @param pName the name of the pipe we are trying to find
+   * @return the pipe if it exists
+   */
+  def resolvePipeFromContext(pName: String): Option[Pipe] = {
+    if (ctx.isEmpty) None
+    else {
+      var res: Option[Pipe] = None
+      for (pipe <- ctx.get) {
+        pipe.inputSchema match {
+          case Some(schema) => if (schema.indexOfField(pName) != -1) res = Some(pipe)
+          case None => None
+        }
+      }
+      res
+    }
   }
 
   /**

@@ -87,7 +87,7 @@ class SparkCompileSpec extends FlatSpec {
     
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
-    val op = Load(Pipe("a"), file, None, "PigStorage", List("""','"""))
+    val op = Load(Pipe("a"), file, None, Some("PigStorage"), List("""','"""))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = PigStorage().load(sc, "${file}", ',')""")
@@ -98,7 +98,7 @@ class SparkCompileSpec extends FlatSpec {
     
     val file = new java.io.File(".").getCanonicalPath + "/file.n3"
     
-    val op = Load(Pipe("a"), file, None, "RDFFileStorage")
+    val op = Load(Pipe("a"), file, None, Some("RDFFileStorage"))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(sc, "${file}")""")
@@ -190,7 +190,7 @@ class SparkCompileSpec extends FlatSpec {
   }
   
   it should "contain code for the STORE helper function with delimiter" in {
-    val op = Store(Pipe("A"), "input/file.csv", "PigStorage", List("'#'"))
+    val op = Store(Pipe("A"), "input/file.csv", Some("PigStorage"), List("'#'"))
     op.schema = Some(new Schema(BagType(TupleType(Array(
       Field("f1", Types.IntType),
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
@@ -213,7 +213,7 @@ class SparkCompileSpec extends FlatSpec {
   it should "containt code for STORE with using clause" in {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
-    val op = Store(Pipe("A"), file, "BinStorage")
+    val op = Store(Pipe("A"), file, Some("BinStorage"))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     
@@ -226,7 +226,7 @@ class SparkCompileSpec extends FlatSpec {
     val op = Grouping(Pipe("aa"), Pipe("bb"), GroupingExpression(List()))
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.glom")
+    val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map(t => List("all", t.toList))""")
     assert(generatedCode == expectedCode)
   }
 
@@ -267,14 +267,14 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)), "t"), "s"))
-    val input1 = Pipe("bb",Load(Pipe("bb"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("cc",Load(Pipe("cc"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("bb",Load(Pipe("bb"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("cc",Load(Pipe("cc"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs = List(input1,input2)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val bb_kv = bb.map(t => (t(0),t))
-      |val cc_kv = cc.map(t => (t(0),t))
+      |val bb_kv = bb.map(t => (t(0).asInstanceOf[String],t))
+      |val cc_kv = cc.map(t => (t(0).asInstanceOf[String],t))
       |val aa = bb_kv.join(cc_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
@@ -285,14 +285,14 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)), "t"), "s"))
-    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs=List(input1,input2)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val b_kv = b.map(t => (Array(t(0),t(1)).mkString,t))
-      |val c_kv = c.map(t => (Array(t(1),t(2)).mkString,t))
+      |val b_kv = b.map(t => (Array(t(0).asInstanceOf[String],t(1).asInstanceOf[Double]).mkString,t))
+      |val c_kv = c.map(t => (Array(t(1).asInstanceOf[Double],t(2).asInstanceOf[Int]).mkString,t))
       |val a = b_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
@@ -303,18 +303,51 @@ class SparkCompileSpec extends FlatSpec {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)), "t"), "s"))
-    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
-    val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), "PigStorage", List("\",\"")))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs=List(input1,input2,input3)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val b_kv = b.map(t => (t(0),t))
-      |val c_kv = c.map(t => (t(0),t))
-      |val d_kv = d.map(t => (t(0),t))
+      |val b_kv = b.map(t => (t(0).asInstanceOf[String],t))
+      |val c_kv = c.map(t => (t(0).asInstanceOf[String],t))
+      |val d_kv = d.map(t => (t(0).asInstanceOf[String],t))
       |val a = b_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.join(d_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for multiple joins" in {
+    val ops = parseScript(
+      """a = load 'file' as (a: chararray);
+        |b = load 'file' as (a: chararray);
+        |c = load 'file' as (a: chararray);
+        |j1 = join a by $0, b by $0;
+        |j2 = join a by $0, c by $0;
+        |j = join j1 by $0, j2 by $0;
+        |""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new BatchGenCode(templateFile)
+    val generatedCode1 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j1").get))
+    val generatedCode2 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j2").get))
+    val generatedCode3 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j").get))
+
+    val expectedCode1 = cleanString(
+      """val a_kv = a.map(t => (t(0).asInstanceOf[String],t))
+        |val b_kv = b.map(t => (t(0).asInstanceOf[String],t))
+        |val j1 = a_kv.join(b_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
+    assert(generatedCode1 == expectedCode1)
+
+    val expectedCode2 = cleanString(
+      """val c_kv = c.map(t => (t(0).asInstanceOf[String],t))
+        |val j2 = a_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
+    assert(generatedCode2 == expectedCode2)
+
+    val expectedCode3 = cleanString(
+      """val j1_kv = j1.map(t => (t(0).asInstanceOf[String],t))
+        |val j2_kv = j2.map(t => (t(0).asInstanceOf[String],t))
+        |val j = j1_kv.join(j2_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
+    assert(generatedCode3 == expectedCode3)
   }
 
   it should "contain code a foreach statement with function expressions" in {
@@ -453,7 +486,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val aa = bb.sample(0.01)""".stripMargin)
+        |val aa = bb.sample(false, 0.01)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -463,7 +496,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.sample(100 / t(3))""".stripMargin)
+        |val a = b.sample(false, 100 / t(3))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -547,7 +580,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.flatMap(t => PigFuncs.tokenize(t(0))).map(t => List(t))""".stripMargin)
+        |val a = b.flatMap(t => PigFuncs.tokenize(t(0).asInstanceOf[String])).map(t => List(t))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 

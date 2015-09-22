@@ -66,7 +66,7 @@ groupBy(out,in,expr) ::=<<
 <if (expr)>
         val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(k,v)}
 <else>
-        val <out> = <in>.glom
+        val <out> = <in>.coalesce(1).glom.map(t => List("all", t.toList))
 <endif>
 >>
 
@@ -81,10 +81,12 @@ limit(out,in,num) ::=<<
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
-join(out,rel1,key1,rel2,key2) ::=<<
-        val <rel1>_kv = <rel1>.map(t => (<key1>,t))
-        <rel2,key2:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
+join_key_map(rels,keys) ::=<<
+        <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
         }>
+>>
+
+join(out,rel1,key1,rel2,key2) ::=<<
         val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => (k, v ++ w)\}}>.map{case (k,v) => v}
 
 >>
@@ -96,7 +98,7 @@ union(out,in,others) ::=<<
 
 // ------------------ Returns a SAMPLE of the data ----------------------------
 sample(out,in,expr) ::=<<
-        val <out> = <in>.sample(<expr>)
+        val <out> = <in>.sample(false, <expr>)
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------

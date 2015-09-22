@@ -23,7 +23,7 @@ import java.net.URI
 /**
  * Load represents the LOAD operator of Pig.
  *
- * @param initialOutPipeName the name of the initial output pipe (relation).
+ * @param out the output pipe (relation).
  * @param file the name of the file to be loaded
  * @param loadSchema
  * @param loaderFunc
@@ -32,7 +32,7 @@ import java.net.URI
 case class Load(out: Pipe, 
                 file: URI,
                 var loadSchema: Option[Schema] = None,
-                loaderFunc: String = BackendManager.backend.defaultConnector,
+                loaderFunc: Option[String] = None, //BackendManager.backend.defaultConnector,
                 loaderParams: List[String] = null) extends PigOperator {
   _outputs = List(out)
   _inputs = List()

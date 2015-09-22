@@ -18,10 +18,9 @@ package dbis.pig.op
 
 /**
  *
- * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
- *                           can be changed later.
- * @param initialInPipeName
- * @param expr
+ * @param out the output pipe (relation).
+ * @param in the input pipe.
+ * @param expr an expression producing the sample size.
  */
 case class Sample(out: Pipe, in: Pipe, expr: ArithmeticExpr) extends PigOperator {
 

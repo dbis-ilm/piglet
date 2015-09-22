@@ -19,6 +19,7 @@ package dbis.pig.codegen
 import com.typesafe.scalalogging.LazyLogging
 
 import dbis.pig.op._
+import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import dbis.pig.udf._
@@ -188,7 +189,13 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       }
       case None => throw new SchemaException(s"unknown schema for field $f")
     } // TODO: should be position of field
-    case PositionalField(pos) => s"$tuplePrefix($pos)"
+    case PositionalField(pos) =>
+      if (requiresTypeCast && schema.isDefined) {
+        val field = schema.get.field(pos)
+        val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
+        s"$tuplePrefix($pos).asInstanceOf[${typeCast}]"
+      }
+      else s"$tuplePrefix($pos)"
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
@@ -291,7 +298,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
         }
       }
     }
-    case FlattenExpr(e) => emitExpr(schema, e)
+    case FlattenExpr(e) => emitExpr(schema, e, false)
     case ConstructTupleExpr(exprs) => s"PigFuncs.toTuple(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case ConstructBagExpr(exprs) => s"PigFuncs.toBag(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case ConstructMapExpr(exprs) => s"PigFuncs.toMap(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
@@ -443,12 +450,12 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
    * @return the Scala code implementing the LOAD operator
    */
-  def emitLoader(out: String, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
-    if (loaderFunc == "")
-      callST("loader", Map("out"->out,"file"->file.toString()))
+  def emitLoader(out: String, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
+    if (loaderFunc.isEmpty)
+      callST("loader", Map("out"->out,"file"->file.toString(), "func"-> BackendManager.backend.defaultConnector))
     else {
       val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams.mkString(",") else ""
-      callST("loader", Map("out"->out,"file"->file.toString(),"func"->loaderFunc,"params"->params))
+      callST("loader", Map("out"->out,"file"->file.toString(),"func"->loaderFunc.get,"params"->params))
     }
   }
   
@@ -461,7 +468,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
    * @return the Scala code implementing the LOAD operator
    */
-  def emitLoad(node: PigOperator, file: URI, loaderFunc: String, loaderParams: List[String]): String = {
+  def emitLoad(node: PigOperator, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
     node.schema match {
       case Some(s) => {
         val op = emitLoader(s"${node.outPipeName}_", file, loaderFunc, loaderParams) 
@@ -481,11 +488,12 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @param func a storage function
    * @return the Scala code implementing the STORE operator
    */
-  def emitStore(in: String, file: URI, func: String): String = {
+  def emitStore(in: String, file: URI, storeFunc: Option[String]): String = {
     
     /* for BinStorage we do not convert the tuple into a string because
      * we want to keep our fields as is
      */
+    val func = storeFunc.getOrElse(BackendManager.backend.defaultConnector)
     if(func == "BinStorage")
       callST("store", Map("in"->in,"file"->file.toString(),"func"->func))
     else

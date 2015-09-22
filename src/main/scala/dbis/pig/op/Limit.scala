@@ -19,9 +19,9 @@ package dbis.pig.op
 /**
  * Limit represents the LIMIT operator of Pig.
  *
- * @param initialOutPipeName the name of the output pipe (relation).
- * @param initialInPipeName the name of the input pipe.
- * @param num
+ * @param out the output pipe (relation).
+ * @param in the input pipe.
+ * @param num the maximum number of tuples produced by this operator
  */
 case class Limit(out: Pipe, in: Pipe, num: Int) extends PigOperator {
   _outputs = List(out)

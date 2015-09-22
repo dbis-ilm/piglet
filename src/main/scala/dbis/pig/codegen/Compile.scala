@@ -19,6 +19,7 @@ package dbis.pig.codegen
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.DataflowPlan
 import scala.collection.immutable.Map
+import scala.collection.mutable.Set
 import org.clapper.scalasti._
 
 /**
@@ -30,10 +31,22 @@ case class TemplateException(msg: String) extends Exception(msg)
 
 
 trait GenCodeBase {
-  
+
+  /**
+   * The name of the template file used for code generation.
+   */
   var templateFile: String = null
-  
+
+  /**
+   * A map of alias names for user-defined functions.
+   */
   var udfAliases: Option[Map[String, (String, List[dbis.pig.op.Value])]] = None
+
+  /**
+   * The set of _KV variables refering to RDDs which are created for joins.
+   *
+   */
+  val joinKeyVars = Set[String]()
 
   /**
    * Generate code for the given Pig operator.
@@ -154,7 +167,9 @@ trait Compile {
 
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
-      code = code + codeGen.emitHelperClass(n) + "\n"
+      
+      val genCode = codeGen.emitHelperClass(n)
+      code = code + genCode  + (if(genCode.nonEmpty) "\n" else "")
     }
 
     // generate the object definition representing the script
