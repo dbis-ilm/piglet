@@ -27,11 +27,11 @@ import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.schema._
-import org.scalatest.FlatSpec
+import org.scalatest.{OptionValues, FlatSpec}
 
 import scala.util.Random
 
-class PigParserSpec extends FlatSpec {
+class PigParserSpec extends FlatSpec with OptionValues {
   "The parser" should "parse a simple load statement" in  {
     val uri = new URI("file.csv")
     assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), uri)))
@@ -720,7 +720,7 @@ class PigParserSpec extends FlatSpec {
           |   s
           | }
           | """.stripMargin)
-    assert(op.ruleCode.stripLineEnd ==
+    assert(op.ruleCode.headOption.value.stripLineEnd ==
       """def rule(term: Any): Option[PigOperator] = None
         | def rule2(term: Any): Option[PigOperator] = None""".stripMargin.stripLineEnd)
   }
