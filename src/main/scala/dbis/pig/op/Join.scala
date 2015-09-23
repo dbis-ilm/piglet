@@ -16,7 +16,7 @@
  */
 package dbis.pig.op
 
-import dbis.pig.schema.{TupleType, BagType, Field, Schema}
+import dbis.pig.schema._
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -44,7 +44,7 @@ case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]],
     val newFields = ArrayBuffer[Field]()
     inputs.foreach(p => p.producer.schema match {
       case Some(s) => newFields ++= s.fields
-      case None => ???
+      case None => newFields += Field("", Types.ByteArrayType)
     })
     schema = Some(new Schema(BagType(TupleType(newFields.toArray))))
     schema
