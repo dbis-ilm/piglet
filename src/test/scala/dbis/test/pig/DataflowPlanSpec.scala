@@ -210,6 +210,44 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     }
   }
 
+  it should "infer the schema for group by on strings" in {
+    val plan = new DataflowPlan(parseScript("""
+                                              |a = load 'file.csv' as (f1: chararray, f2: double, f3:map[]);
+                                              |b = group a by f1;
+                                              |""".stripMargin))
+    val schema = plan.operators(1).schema
+    schema match {
+      case Some(s) => {
+        s.fields.length should equal (2)
+        s.field(0) should equal(Field("group", Types.CharArrayType))
+        s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+          Field("f2", Types.DoubleType),
+          Field("f3", MapType(Types.ByteArrayType))
+        )))))
+      }
+      case None => fail()
+    }
+  }
+
+  it should "infer the schema for group by on multiple keys" in {
+    val plan = new DataflowPlan(parseScript("""
+                                              |a = load 'file.csv' as (f1: chararray, f2: int, f3:map[]);
+                                              |b = group a by (f1, f2);
+                                              |""".stripMargin))
+    val schema = plan.operators(1).schema
+    schema match {
+      case Some(s) => {
+        s.fields.length should equal (2)
+        s.field(0) should equal(Field("group", TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.IntType)))))
+        s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+          Field("f2", Types.IntType),
+          Field("f3", MapType(Types.ByteArrayType))
+        )))))
+      }
+      case None => fail()
+    }
+  }
+
   it should "infer the schema for group all" in {
     val plan = new DataflowPlan(parseScript("""
                                               |a = load 'file.csv' as (f1: int, f2: double, f3:map[]);
@@ -219,7 +257,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.IntType))
+        s.field(0) should equal(Field("group", Types.CharArrayType))
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.IntType),
           Field("f2", Types.DoubleType),
           Field("f3", MapType(Types.ByteArrayType))

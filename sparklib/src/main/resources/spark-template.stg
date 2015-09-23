@@ -62,9 +62,9 @@ foreachFlatMap(out,in,expr) ::=<<
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
-groupBy(out,in,expr) ::=<<
+groupBy(out,in,expr,keyExtr) ::=<<
 <if (expr)>
-        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(k,v)}
+        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(<keyExtr>,v)}
 <else>
         val <out> = <in>.coalesce(1).glom.map(t => List("all", t.toList))
 <endif>

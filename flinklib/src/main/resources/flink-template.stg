@@ -56,7 +56,7 @@ foreachFlatMap(out,in,expr) ::=<<
 
 
 // ------------------ GROUPS elements on an expression ------------------------
-groupBy(out,in,expr) ::=<<
+groupBy(out,in,expr,keyExtr) ::=<<
 <if (expr)>
         val <out> = <in>.groupBy(t => <expr>)
 <else>
