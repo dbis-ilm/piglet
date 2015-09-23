@@ -25,7 +25,7 @@ begin_query(name, hook) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
-        val perfMon = new PerfMonitor()
+        val perfMon = new PerfMonitor("<name>_App")
         sc.addSparkListener(perfMon)
 
     <if (hook)>
@@ -48,7 +48,7 @@ dump(in) ::=<<
 
 store(in,file,schema,func) ::=<<
 	<if (schema)>
-    	val <in>_storehelper = <in>.map(t => <schema>).coalesce(1, true)
+    	val <in>_storehelper = <in>.map(t => <schema>) //.coalesce(1, true)
 	<else>
 		val <in>_storehelper = <in>
 	<endif>

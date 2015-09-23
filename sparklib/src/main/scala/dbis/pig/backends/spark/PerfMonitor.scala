@@ -8,7 +8,7 @@ import scalikejdbc._
 /**
  * Created by kai on 09.09.15.
  */
-class PerfMonitor(driver: String = "org.h2.Driver",
+class PerfMonitor(appName: String, driver: String = "org.h2.Driver",
     url: String = "jdbc:h2:tcp://cloud01.prakinf.tu-ilmenau.de/data/stha1in/pigletdb",
     user: String = "sa",
     pw: String = "")
@@ -31,9 +31,22 @@ class PerfMonitor(driver: String = "org.h2.Driver",
       val startTime = submissionTimes(stageCompleted.stageInfo.stageId)
       val stageDuration = stageCompleted.stageInfo.completionTime.get - startTime
       val progDuration = stageCompleted.stageInfo.completionTime.get - progStartTime
-      val opLineage = lineLineageMapping(line)
+      val lineage = lineLineageMapping(line)
       
-      b += ((opLineage, stageDuration, progDuration))
+//      b += ((opLineage, stageDuration, progDuration))
+
+     DB localTx { implicit session =>
+      sql"""insert into exectimes(appname, stageid, stagename, lineage, stageduration, progduration) VALUES(
+              ${appName},
+              ${stageCompleted.stageInfo.stageId},
+              ${stageCompleted.stageInfo.name},
+              ${lineage},
+              ${stageDuration},
+              ${progDuration}
+            )"""
+        .update
+        .apply()
+    }
     }
   }
 
@@ -51,25 +64,25 @@ class PerfMonitor(driver: String = "org.h2.Driver",
   }
   
   def flush() {
-//        Class.forName(driver)
-//    ConnectionPool.singleton(url, user, pw)
-//      try {
-    val entrySet = b.map{ case (l,s,p) => Seq('lineage -> l, 'stageduration -> s, 'progduration -> p) }.toSeq
-    
-    DB autoCommit { implicit session => 
-      sql"create table if not exists exectimes(lineage varchar(200), stageduration bigint, progduration bigint)"
-        .execute
-        .apply()
-    }
-    
-    DB localTx { implicit session =>
-      sql"insert into exectimes(lineage, stageduration, progduration) VALUES({lineage},{stageduration},{progduration})"
-        .batchByName(entrySet:_ *)
-        .apply()
-    }
-//    } finally {
-//      ConnectionPool.closeAll()
+////        Class.forName(driver)
+////    ConnectionPool.singleton(url, user, pw)
+////      try {
+//    val entrySet = b.map{ case (l,s,p) => Seq('lineage -> l, 'stageduration -> s, 'progduration -> p) }.toSeq
+//    
+//    DB autoCommit { implicit session => 
+//      sql"create table if not exists exectimes(lineage varchar(200) primary key, stageduration bigint, progduration bigint, ts timestamp default current_timestamp())"
+//        .execute
+//        .apply()
 //    }
+//    
+//    DB localTx { implicit session =>
+//      sql"insert into exectimes(lineage, stageduration, progduration) VALUES({lineage},{stageduration},{progduration})"
+//        .batchByName(entrySet:_ *)
+//        .apply()
+//    }
+////    } finally {
+////      ConnectionPool.closeAll()
+////    }
   }
   
   private def getLineNumber(stageInfo: StageInfo) = stageInfo.name.split(":")(1).toInt
