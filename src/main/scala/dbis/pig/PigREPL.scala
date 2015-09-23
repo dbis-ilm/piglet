@@ -264,23 +264,27 @@ object PigREPL extends PigParser with LazyLogging {
       case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") ||
                             s.toLowerCase().startsWith(s"store ") ||
                             s.toLowerCase.startsWith(s"socket_write "))=> {
-        buf ++= parseScript(s)
-        var plan = new DataflowPlan(buf.toList)
-        
-        val mm = new MaterializationManager
-        plan = processMaterializations(plan, mm)
-        plan = processPlan(plan)
+        try {
+          buf ++= parseScript(s)
+          var plan = new DataflowPlan(buf.toList)
 
-        val templateFile = backendConf.templateFile
-        val jobJar = Conf.backendJar(backend)
- 
-        
-        FileTools.compilePlan(plan, defaultScriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
-          case Some(jarFile) =>
-            val runner = backendConf.runnerClass
-            runner.execute(master, defaultScriptName, jarFile, numExecutors)
-          
-          case None => println("failed to build jar file for job")  
+          val mm = new MaterializationManager
+          plan = processMaterializations(plan, mm)
+          plan = processPlan(plan)
+
+          val templateFile = backendConf.templateFile
+          val jobJar = Conf.backendJar(backend)
+
+          FileTools.compilePlan(plan, defaultScriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
+            case Some(jarFile) =>
+              val runner = backendConf.runnerClass
+              runner.execute(master, defaultScriptName, jarFile, numExecutors)
+
+            case None => println("failed to build jar file for job")
+          }
+        }
+        catch {
+          case e : Throwable => println(s"error while executing: ${e.getMessage}")
         }
 
         // buf.clear()
