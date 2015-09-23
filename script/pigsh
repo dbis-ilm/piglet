@@ -36,6 +36,8 @@ echo "Including backends in $BACKEND_DIR"
 
 CP=$CP:$BACKEND_DIR:$CLASSPATH
 
+ALLARGS=$*
+
 BACKEND=""
 while getopts ":b:" opt; do
     case $opt in
@@ -43,14 +45,14 @@ while getopts ":b:" opt; do
             BACKEND=$OPTARG
             shift
             ;;
-        \?)
-            echo "Invalid option: -$OPTARG" >&2w
-            exit 1
-            ;;
-        :)
-            echo "Option -$OPTARG requires an argument." >&2
-            exit 1
-            ;;
+#        \?)
+#            echo "Invalid option: -$OPTARG" >&2w
+#            exit 1
+#            ;;
+#        :)
+#            echo "Option -$OPTARG requires an argument." >&2
+#            exit 1
+#            ;;
     esac
 done
 
@@ -71,10 +73,10 @@ case $BACKEND in
             CP=$FLINK_JAR:$CP
         fi
         ;;
-    "mapreduce") ;;
-    *)
-        echo "Unsupported backend $BACKEND. Please specify your backend via the -b option (spark or flink)."
-        exit 1
-        ;;
+#    "mapreduce") ;;
+#    *)
+#        echo "Unsupported backend $BACKEND. Please specify your backend via the -b option (spark or flink)."
+#        exit 1
+#        ;;
 esac
-java -Dscala.usejavacp=true -classpath $CP dbis.pig.PigREPL $*
+java -Dscala.usejavacp=true -classpath $CP dbis.pig.PigREPL $ALLARGS
