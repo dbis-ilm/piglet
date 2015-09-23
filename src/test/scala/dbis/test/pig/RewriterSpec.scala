@@ -441,49 +441,52 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F5" in {
-    assume(false, "Filters in Foreach do not yet work")
-    Random.setSeed(123456789)
-    PipeNameGenerator.clearGenerated
     val patterns = Table(
       ("Pattern", "grouping column", "ForEach", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
         "subject",
-        Foreach(Pipe("random"), Pipe("a"), GeneratorPlan(List(
-          Filter(Pipe("random2"), Pipe("stmts"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")))),
+        Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")
+          ))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
               GeneratorExpr(Func("COUNT",
-                                List(RefExpr(NamedField("t")))),
+                                List(RefExpr(NamedField("pipevHyYGvOfsZ")))),
                                 Some(Field("cnt", Types.ByteArrayType)))))))),
-        Filter(Pipe("b"), Pipe("random"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
+        Filter(Pipe("b"), Pipe("pipePClecYbNXF"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
       (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
         "predicate",
-        Foreach(Pipe("random"), Pipe("a"), GeneratorPlan(List(
-          Filter(Pipe("random2"), Pipe("stmts"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))),
+        Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value
+            ("predicate")))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
               GeneratorExpr(Func("COUNT",
-                List(RefExpr(NamedField("t")))),
+                List(RefExpr(NamedField("pipevHyYGvOfsZ")))),
                 Some(Field("cnt", Types.ByteArrayType)))))))),
-        Filter(Pipe("b"), Pipe("random"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
+        Filter(Pipe("b"), Pipe("pipePClecYbNXF"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
       (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
         "object",
-        Foreach(Pipe("random"), Pipe("a"), GeneratorPlan(List(
-          Filter(Pipe("random2"), Pipe("stmts"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
+        Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
               GeneratorExpr(Func("COUNT",
-                List(RefExpr(NamedField("t")))),
+                List(RefExpr(NamedField("pipevHyYGvOfsZ")))),
                 Some(Field("cnt", Types.ByteArrayType)))))))),
-        Filter(Pipe("b"), Pipe("random"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))))
+        Filter(Pipe("b"), Pipe("pipePClecYbNXF"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))))
 
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
 
     forAll (possibleGroupers) { (g: String) =>
       forAll(patterns) { (p: TriplePattern, grouped_by: String, fo: Foreach, fi: Filter) =>
+        // We generate multiple pipe names for each `p`, therefore we need to reset the random generators state not
+        // at the beginning of this function, but before processing each combination of pattern and grouping column.
+        Random.setSeed(123456789)
+        PipeNameGenerator.clearGenerated
         // Test that F5 is only applied if the BGP does not filter by the grouping column
         whenever(g != grouped_by) {
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))

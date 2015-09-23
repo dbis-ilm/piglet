@@ -428,12 +428,9 @@ object Rules {
         case Column.Object => pattern.obj
       }
 
-      val bagConstructor = ConstructBag(Pipe("stmts"), DerefTuple(NamedField(in.name), NamedField("stmts")))
-
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
-          bagConstructor,
-          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(filter_value))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
