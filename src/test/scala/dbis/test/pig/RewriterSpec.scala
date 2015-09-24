@@ -151,33 +151,6 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(op4, op2)
   }
 
-  it should "rewrite SplitInto operators into multiple Filter ones" in {
-    val plan = new DataflowPlan(parseScript( s"""
-                                                |a = LOAD 'file' AS (x, y);
-                                                |SPLIT a INTO b IF x < 100, c IF x >= 100;
-                                                |STORE b INTO 'res1.data';
-                                                |STORE c INTO 'res2.data';""".stripMargin))
-
-    val filter1 = parseScript("b = filter a by x < 100;").head
-    val filter2 = parseScript("c = filter a by x >= 100;").head
-    val newPlan = processPlan(plan)
-
-    newPlan.sourceNodes.headOption.value.outputs.head.consumer should have length 2
-    newPlan.sourceNodes.headOption.value.outputs.head.consumer should contain allOf(filter1, filter2)
-
-    newPlan.sinkNodes should have size 2
-    newPlan.sinkNodes.foreach(node => {
-      node.inputs should have length 1
-    })
-
-    val sink1 = newPlan.sinkNodes.head
-    val sink2 = newPlan.sinkNodes.last
-
-    sink1.inputs.head.producer should be(if (sink1.inputs.head.name == "b") filter1 else filter2)
-    sink2.inputs.head.producer should be(if (sink2.inputs.head.name == "c") filter2 else filter1)
-
-  }
-
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -938,5 +911,50 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val gen2 = PipeNameGenerator.generate()
 
     gen1 should not equal gen2
+  }
+
+  "The SplitIntoToFilters rule" should "rewrite SplitInto operators into multiple Filter ones" in {
+    val plan = new DataflowPlan(parseScript( s"""
+                                                |a = LOAD 'file' AS (x, y);
+                                                |SPLIT a INTO b IF x < 100, c IF x >= 100;
+                                                |STORE b INTO 'res1.data';
+                                                |STORE c INTO 'res2.data';""".stripMargin))
+
+    val filter1 = parseScript("b = filter a by x < 100;").head
+    val filter2 = parseScript("c = filter a by x >= 100;").head
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should have length 2
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should contain allOf(filter1, filter2)
+
+    newPlan.sinkNodes should have size 2
+    newPlan.sinkNodes.foreach(node => {
+      node.inputs should have length 1
+    })
+
+    val sink1 = newPlan.sinkNodes.head
+    val sink2 = newPlan.sinkNodes.last
+
+    sink1.inputs.head.producer should be(if (sink1.inputs.head.name == "b") filter1 else filter2)
+    sink2.inputs.head.producer should be(if (sink2.inputs.head.name == "c") filter2 else filter1)
+  }
+
+  it should "not behave unreasonably if the next operator is a join" in {
+    val plan = new DataflowPlan(parseScript( s"""
+                                                |a = LOAD 'file' AS (x, y);
+                                                |SPLIT a INTO b IF x < 100, c IF x >= 100;
+                                                |d = JOIN b by x, c by x;
+                                                |store d into 'res.data';""".stripMargin))
+
+    var dOp = plan.findOperatorForAlias("d").value
+    dOp.inputs should have length 2
+    dOp.inputs.map(_.producer) should have length 2
+
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should have length 2
+    dOp = newPlan.findOperatorForAlias("d").value
+    dOp.inputs should have length 2
+    dOp.inputs.map(_.producer) should have length 2
   }
 }
