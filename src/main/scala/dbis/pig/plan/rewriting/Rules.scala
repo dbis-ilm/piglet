@@ -102,7 +102,15 @@ object Rules {
           // Check if the relation name is one of the names our SplitBranches write
           if (filters contains input.name) {
             // Replace SplitInto with the appropriate Filter
-            output.inputs = output.inputs.filter(_.producer != node) :+ Pipe(input.name, filters(input.name))
+            output.inputs = output.inputs.
+              // First, remove the SplitInto operator
+              filter(_.producer != node).
+              // Second, remove the filter if it has already been added to this input once. This can happen if a Join
+              // reads from multiple branches of a single SplitInto operator because of the nested loop nature of
+              // this code because we then iterate over the Joins inputs more than once (the Join is the consumer of
+              // multiple node.outputs).
+              filter(_.producer != filters(input.name)) :+
+              Pipe(input.name, filters(input .name))
             filters(input.name).inputs = node.inputs
           }
         })
@@ -428,12 +436,9 @@ object Rules {
         case Column.Object => pattern.obj
       }
 
-      val bagConstructor = ConstructBag(Pipe("stmts"), DerefTuple(NamedField(in.name), NamedField("stmts")))
-
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
-          bagConstructor,
-          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(filter_value))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
