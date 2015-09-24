@@ -802,38 +802,6 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val rewrittenPlan = processPlan(plan)
   }
 
-  it should "apply rules registered by embedded code" in {
-    val p = new PigParser()
-    val ops = p.parseScript(
-      """
-        |<! def myFunc(s: String): String = {
-        |   s
-        | }
-        | rules:
-        | import dbis.pig.plan.rewriting.Rewriter
-        | def rule(op: Any): Option[PigOperator] = {
-        | op match {
-        |   case ForEachCallingFunctionE("myFunc") =>
-        |     val fo = op.asInstanceOf[Foreach]
-        |     Some(Distinct(fo.outputs.head, fo.inputs.head))
-        |   case _ =>
-        |     None
-        | }
-        | }
-        | List(buildOperatorReplacementStrategy(rule))
-        |!>
-        |a = LOAD 'file.csv';
-        |b = FOREACH a GENERATE myFunc($0);
-        |dump b;
-      """.stripMargin)
-    val plan = new DataflowPlan(ops)
-    plan.extraRuleCode should have length 1
-    val newPlan = processPlan(plan)
-    newPlan.operators should contain only(plan.sourceNodes.headOption.value,
-                                          plan.sinkNodes.headOption.value,
-                                           Distinct(Pipe("b"), Pipe("a")))
-  }
-
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -957,4 +925,39 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     dOp.inputs should have length 2
     dOp.inputs.map(_.producer) should have length 2
   }
+
+  // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
+  // other test results :-)
+  "Embedsupport" should "apply rules registered by embedded code" in {
+    val p = new PigParser()
+    val ops = p.parseScript(
+      """
+        |<! def myFunc(s: String): String = {
+        |   s
+        | }
+        | rules:
+        | import dbis.pig.plan.rewriting.Rewriter
+        | def rule(op: Any): Option[PigOperator] = {
+        | op match {
+        |   case ForEachCallingFunctionE("myFunc") =>
+        |     val fo = op.asInstanceOf[Foreach]
+        |     Some(Distinct(fo.outputs.head, fo.inputs.head))
+        |   case _ =>
+        |     None
+        | }
+        | }
+        | List(buildOperatorReplacementStrategy(rule))
+        |!>
+        |a = LOAD 'file.csv';
+        |b = FOREACH a GENERATE myFunc($0);
+        |dump b;
+      """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    plan.extraRuleCode should have length 1
+    val newPlan = processPlan(plan)
+    newPlan.operators should contain only(plan.sourceNodes.headOption.value,
+      plan.sinkNodes.headOption.value,
+      Distinct(Pipe("b"), Pipe("a")))
+  }
+
 }
