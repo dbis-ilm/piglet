@@ -16,6 +16,8 @@
  */
 package dbis.test.pig
 
+import java.net.URI
+
 import dbis.pig.op._
 import dbis.pig.PigCompiler._
 import dbis.pig.parser.LanguageFeature
@@ -87,6 +89,49 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       """.stripMargin, LanguageFeature.SparqlPig) )
       val bgpfilter = plan.findOperatorForAlias("B").value
       bgpfilter.schema.value shouldBe RDFLoad.groupedSchemas(g)
+    }
+  }
+
+  it should "not conform to schemas that are neither plain nor grouped RDF data" in {
+    val asSchemas = Table(
+      ("schema"),
+      "",
+      "as (x: chararray, y: chararray, z: chararray)",
+      "as (x: int, y: int)",
+      "as (x: int, y: int, z: int, a: chararray)"
+    )
+    forAll(asSchemas) { asSchema =>
+      val plan = new DataflowPlan(parseScript(
+        s"""A = Load 'file' $asSchema;
+           |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
+           |DUMP B;
+        """.stripMargin, LanguageFeature.SparqlPig) )
+      val bgpfilter = plan.findOperatorForAlias("B").value
+      bgpfilter.checkSchemaConformance shouldBe false
+      }
+  }
+
+  it should "conform to plain RDF data" in {
+    val plan = new DataflowPlan(parseScript(
+      s"""A = Load 'file' as (subject: chararray, predicate: chararray, object: chararray);
+         |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
+         |DUMP B;
+        """.stripMargin, LanguageFeature.SparqlPig))
+    val bgpfilter = plan.findOperatorForAlias("B").value
+    bgpfilter.checkSchemaConformance shouldBe true
+  }
+
+  it should "conform to grouped RDF data" in {
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    forAll (possibleGroupers) { (g: String) =>
+      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+      val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
+      val op3 = Dump(Pipe("b"))
+      val plan = new DataflowPlan(List(op1, op2, op3))
+
+      op2.inputs.map(_.producer) should have size 1
+
+      plan.findOperatorForAlias("b").value.checkSchemaConformance shouldBe true
     }
   }
 }
