@@ -72,9 +72,9 @@ foreachFlatMap(out,in,expr) ::=<<
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
-groupBy(out,in,expr) ::=<<
+groupBy(out,in,expr,keyExtr) ::=<<
 <if (expr)>
-        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(k,v)}
+        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(<keyExtr>,v)}
 <else>
         val <out> = <in>.coalesce(1).glom.map(t => List("all", t.toList))
 <endif>
@@ -95,11 +95,6 @@ join_key_map(rels,keys) ::=<<
         <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
         }>
 >>
-
-        //val <rel1>_kv = <rel1>.map(t => (<key1>,t))
-        //<rel2,key2:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
-        //}>
-
 
 join(out,rel1,key1,rel2,key2) ::=<<
         val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => (k, v ++ w)\}}>.map{case (k,v) => v}

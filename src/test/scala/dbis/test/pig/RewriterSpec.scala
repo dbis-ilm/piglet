@@ -151,33 +151,6 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(op4, op2)
   }
 
-  it should "rewrite SplitInto operators into multiple Filter ones" in {
-    val plan = new DataflowPlan(parseScript( s"""
-                                                |a = LOAD 'file' AS (x, y);
-                                                |SPLIT a INTO b IF x < 100, c IF x >= 100;
-                                                |STORE b INTO 'res1.data';
-                                                |STORE c INTO 'res2.data';""".stripMargin))
-
-    val filter1 = parseScript("b = filter a by x < 100;").head
-    val filter2 = parseScript("c = filter a by x >= 100;").head
-    val newPlan = processPlan(plan)
-
-    newPlan.sourceNodes.headOption.value.outputs.head.consumer should have length 2
-    newPlan.sourceNodes.headOption.value.outputs.head.consumer should contain allOf(filter1, filter2)
-
-    newPlan.sinkNodes should have size 2
-    newPlan.sinkNodes.foreach(node => {
-      node.inputs should have length 1
-    })
-
-    val sink1 = newPlan.sinkNodes.head
-    val sink2 = newPlan.sinkNodes.last
-
-    sink1.inputs.head.producer should be(if (sink1.inputs.head.name == "b") filter1 else filter2)
-    sink2.inputs.head.producer should be(if (sink2.inputs.head.name == "c") filter2 else filter1)
-
-  }
-
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -258,7 +231,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op2 = Dump(Pipe("a"))
       val plan = processPlan(new DataflowPlan(List(op1, op2)))
       val source = plan.sourceNodes.headOption.value
-      source shouldBe Load(Pipe("a"), url, op1.schema, "pig.SPARQLLoader",
+      source shouldBe Load(Pipe("a"), url, op1.schema, Some("pig.SPARQLLoader"),
         List("SELECT * WHERE { ?s ?p ?o }"))
     }
   }
@@ -275,7 +248,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val op4 = Dump(Pipe("c"))
     val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
-    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, "pig.SPARQLLoader",
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("pig.SPARQLLoader"),
       List("""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }"""))
     plan.operators should not contain op3
   }
@@ -287,7 +260,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op2 = Dump(Pipe("a"))
       val plan = processPlan(new DataflowPlan(List(op1, op2)))
       val source = plan.sourceNodes.headOption.value
-      source shouldBe Load(Pipe("a"), "hdfs://somewhere", op1.schema, "BinStorage")
+      source shouldBe Load(Pipe("a"), "hdfs://somewhere", op1.schema, Some("BinStorage"))
     }
   }
 
@@ -441,49 +414,52 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F5" in {
-    assume(false, "Filters in Foreach do not yet work")
-    Random.setSeed(123456789)
-    PipeNameGenerator.clearGenerated
     val patterns = Table(
       ("Pattern", "grouping column", "ForEach", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
         "subject",
-        Foreach(Pipe("random"), Pipe("a"), GeneratorPlan(List(
-          Filter(Pipe("random2"), Pipe("stmts"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")))),
+        Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")
+          ))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
               GeneratorExpr(Func("COUNT",
-                                List(RefExpr(NamedField("t")))),
+                                List(RefExpr(NamedField("pipevHyYGvOfsZ")))),
                                 Some(Field("cnt", Types.ByteArrayType)))))))),
-        Filter(Pipe("b"), Pipe("random"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
+        Filter(Pipe("b"), Pipe("pipePClecYbNXF"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
       (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
         "predicate",
-        Foreach(Pipe("random"), Pipe("a"), GeneratorPlan(List(
-          Filter(Pipe("random2"), Pipe("stmts"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))),
+        Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value
+            ("predicate")))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
               GeneratorExpr(Func("COUNT",
-                List(RefExpr(NamedField("t")))),
+                List(RefExpr(NamedField("pipevHyYGvOfsZ")))),
                 Some(Field("cnt", Types.ByteArrayType)))))))),
-        Filter(Pipe("b"), Pipe("random"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
+        Filter(Pipe("b"), Pipe("pipePClecYbNXF"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))),
       (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
         "object",
-        Foreach(Pipe("random"), Pipe("a"), GeneratorPlan(List(
-          Filter(Pipe("random2"), Pipe("stmts"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
+        Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
               GeneratorExpr(Func("COUNT",
-                List(RefExpr(NamedField("t")))),
+                List(RefExpr(NamedField("pipevHyYGvOfsZ")))),
                 Some(Field("cnt", Types.ByteArrayType)))))))),
-        Filter(Pipe("b"), Pipe("random"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))))
+        Filter(Pipe("b"), Pipe("pipePClecYbNXF"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))))
 
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
 
     forAll (possibleGroupers) { (g: String) =>
       forAll(patterns) { (p: TriplePattern, grouped_by: String, fo: Foreach, fi: Filter) =>
+        // We generate multiple pipe names for each `p`, therefore we need to reset the random generators state not
+        // at the beginning of this function, but before processing each combination of pattern and grouping column.
+        Random.setSeed(123456789)
+        PipeNameGenerator.clearGenerated
         // Test that F5 is only applied if the BGP does not filter by the grouping column
         whenever(g != grouped_by) {
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
@@ -826,38 +802,6 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val rewrittenPlan = processPlan(plan)
   }
 
-  it should "apply rules registered by embedded code" in {
-    val p = new PigParser()
-    val ops = p.parseScript(
-      """
-        |<! def myFunc(s: String): String = {
-        |   s
-        | }
-        | rules:
-        | import dbis.pig.plan.rewriting.Rewriter
-        | def rule(op: Any): Option[PigOperator] = {
-        | op match {
-        |   case ForEachCallingFunctionE("myFunc") =>
-        |     val fo = op.asInstanceOf[Foreach]
-        |     Some(Distinct(fo.outputs.head, fo.inputs.head))
-        |   case _ =>
-        |     None
-        | }
-        | }
-        | List(buildOperatorReplacementStrategy(rule))
-        |!>
-        |a = LOAD 'file.csv';
-        |b = FOREACH a GENERATE myFunc($0);
-        |dump b;
-      """.stripMargin)
-    val plan = new DataflowPlan(ops)
-    plan.extraRuleCode should have length 1
-    val newPlan = processPlan(plan)
-    newPlan.operators should contain only(plan.sourceNodes.headOption.value,
-                                          plan.sinkNodes.headOption.value,
-                                           Distinct(Pipe("b"), Pipe("a")))
-  }
-
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -936,4 +880,84 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
 
     gen1 should not equal gen2
   }
+
+  "The SplitIntoToFilters rule" should "rewrite SplitInto operators into multiple Filter ones" in {
+    val plan = new DataflowPlan(parseScript( s"""
+                                                |a = LOAD 'file' AS (x, y);
+                                                |SPLIT a INTO b IF x < 100, c IF x >= 100;
+                                                |STORE b INTO 'res1.data';
+                                                |STORE c INTO 'res2.data';""".stripMargin))
+
+    val filter1 = parseScript("b = filter a by x < 100;").head
+    val filter2 = parseScript("c = filter a by x >= 100;").head
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should have length 2
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should contain allOf(filter1, filter2)
+
+    newPlan.sinkNodes should have size 2
+    newPlan.sinkNodes.foreach(node => {
+      node.inputs should have length 1
+    })
+
+    val sink1 = newPlan.sinkNodes.head
+    val sink2 = newPlan.sinkNodes.last
+
+    sink1.inputs.head.producer should be(if (sink1.inputs.head.name == "b") filter1 else filter2)
+    sink2.inputs.head.producer should be(if (sink2.inputs.head.name == "c") filter2 else filter1)
+  }
+
+  it should "not behave unreasonably if the next operator is a join" in {
+    val plan = new DataflowPlan(parseScript( s"""
+                                                |a = LOAD 'file' AS (x, y);
+                                                |SPLIT a INTO b IF x < 100, c IF x >= 100;
+                                                |d = JOIN b by x, c by x;
+                                                |store d into 'res.data';""".stripMargin))
+
+    var dOp = plan.findOperatorForAlias("d").value
+    dOp.inputs should have length 2
+    dOp.inputs.map(_.producer) should have length 2
+
+    val newPlan = processPlan(plan)
+
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should have length 2
+    dOp = newPlan.findOperatorForAlias("d").value
+    dOp.inputs should have length 2
+    dOp.inputs.map(_.producer) should have length 2
+  }
+
+  // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
+  // other test results :-)
+  "Embedsupport" should "apply rules registered by embedded code" in {
+    val p = new PigParser()
+    val ops = p.parseScript(
+      """
+        |<! def myFunc(s: String): String = {
+        |   s
+        | }
+        | rules:
+        | import dbis.pig.plan.rewriting.Rewriter
+        | def rule(op: Any): Option[PigOperator] = {
+        | op match {
+        |   case ForEachCallingFunctionE("myFunc") =>
+        |     val fo = op.asInstanceOf[Foreach]
+        |     Some(Distinct(fo.outputs.head, fo.inputs.head))
+        |   case _ =>
+        |     None
+        | }
+        | }
+        | List(buildOperatorReplacementStrategy(rule))
+        |!>
+        |a = LOAD 'file.csv';
+        |b = FOREACH a GENERATE myFunc($0);
+        |dump b;
+      """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    plan.extraRuleCode should have length 1
+    val newPlan = processPlan(plan)
+    newPlan.operators should contain only(plan.sourceNodes.headOption.value,
+      plan.sinkNodes.headOption.value,
+      Distinct(Pipe("b"), Pipe("a")))
+  }
+
 }

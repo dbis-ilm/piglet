@@ -20,6 +20,7 @@ import dbis.pig.op._
 import dbis.pig.udf._
 import dbis.pig.schema._
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.backends.BackendManager
 
 import scala.collection.mutable.ListBuffer
 
@@ -335,12 +336,13 @@ class StreamingGenCode(template: String, hookFile: Option[Path] = None) extends 
     * @param streamParams an optional list of parameters to a stream function (e.g. separators)
     * @return the Scala code implementing the SOCKET_READ operator
     */
-  def emitSocketRead(out: String, addr: SocketAddress, mode: String, streamFunc: String, streamParams: List[String]): String ={
+  def emitSocketRead(out: String, addr: SocketAddress, mode: String, streamFunc: Option[String], streamParams: List[String]): String ={
     val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
+    val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
     if(mode!="")
-      callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->streamFunc,"params"->params))
+      callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->func,"params"->params))
     else
-      callST("socketRead", Map("out"->out,"addr"->addr,"func"->streamFunc,"params"->params))
+      callST("socketRead", Map("out"->out,"addr"->addr,"func"->func,"params"->params))
   }
 
   /**
@@ -352,11 +354,12 @@ class StreamingGenCode(template: String, hookFile: Option[Path] = None) extends 
     * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
     * @return the Scala code implementing the SOCKET_WRITE operator
     */
-  def emitSocketWrite(in: String, addr: SocketAddress, mode: String, streamFunc: String): String = {
+  def emitSocketWrite(in: String, addr: SocketAddress, mode: String, streamFunc: Option[String]): String = {
+    val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
     if(mode!="")
-      callST("socketWrite", Map("in"->in,"addr"->addr,"mode"->mode,"func"->streamFunc))
+      callST("socketWrite", Map("in"->in,"addr"->addr,"mode"->mode,"func"->func))
     else
-      callST("socketWrite", Map("in"->in,"addr"->addr,"func"->streamFunc))
+      callST("socketWrite", Map("in"->in,"addr"->addr,"func"->func))
   }
 
   /**

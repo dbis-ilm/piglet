@@ -25,7 +25,37 @@ import dbis.pig.schema._
  *
  * @param keyList a list of keys used for grouping
  */
-case class GroupingExpression(val keyList: List[Ref])
+case class GroupingExpression(val keyList: List[Ref]) {
+  /**
+   * Construct the type of the grouping expression
+   *
+   * @param schema the optional input schema
+   * @return the expression type
+   */
+  def resultType(schema: Option[Schema]): PigType = {
+    def typeForRef(r: Ref): (String, PigType) = {
+       /*
+        * We create a temporary expression, because the result type construction is already
+        * implemented there.
+        */
+      val ex = RefExpr(r)
+      ex.resultType(schema)
+    }
+
+    if (keyList.size == 0) {
+      // GROUP ALL
+      Types.CharArrayType
+    }
+    else if (keyList.size == 1) {
+      val res = typeForRef(keyList.head)
+      res._2
+    }
+    else {
+      val resList = keyList.map(r => typeForRef(r)).map(pair => Field(pair._1, pair._2))
+      TupleType(resList.toArray)
+    }
+  }
+}
 
 /**
  * Grouping represents the GROUP ALL / GROUP BY operator of Pig.
@@ -54,7 +84,7 @@ case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var wind
       case Some(s) => s.element.valueType
       case None => TupleType(Array(Field("", Types.ByteArrayType)))
     }
-    val groupingType = Types.IntType
+    val groupingType = groupExpr.resultType(inputSchema)
     val fields = Array(Field("group", groupingType),
       Field(inputs.head.name, BagType(inputType)))
     schema = Some(new Schema(new BagType(new TupleType(fields), outPipeName)))

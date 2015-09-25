@@ -64,7 +64,7 @@ trait MaterializationSupport extends LazyLogging {
       if(data.isDefined) {
         logger.debug(s"found materialized data for materialize operator $materialize")
 
-        val loader = Load(materialize.inputs.head, new URI(data.get), materialize.constructSchema, "BinStorage")
+        val loader = Load(materialize.inputs.head, new URI(data.get), materialize.constructSchema, Some("BinStorage"))
         val matInput = materialize.inputs.head.producer
 
         for (inPipe <- matInput.inputs) {
@@ -88,7 +88,7 @@ trait MaterializationSupport extends LazyLogging {
         logger.debug(s"did not find materialized data for materialize operator $materialize")
 
         val file = mm.saveMapping(materialize.lineageSignature)
-        val storer = new Store(materialize.inputs.head, file, "BinStorage")
+        val storer = new Store(materialize.inputs.head, file, Some("BinStorage"))
 
         newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
         newPlan = newPlan.remove(materialize)

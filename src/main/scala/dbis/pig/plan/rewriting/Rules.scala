@@ -82,7 +82,8 @@ object Rules {
             filter(_.isInstanceOf[Filter]).
             filter { f: PigOperator => extractPredicate(f.asInstanceOf[Filter].pred) == extractPredicate(pred) }.
             foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, buildRemovalStrategy(pigOp)
-          )}))
+          )
+          }))
     }
   }
 
@@ -101,7 +102,15 @@ object Rules {
           // Check if the relation name is one of the names our SplitBranches write
           if (filters contains input.name) {
             // Replace SplitInto with the appropriate Filter
-            output.inputs = output.inputs.filter(_.producer != node) :+ Pipe(input.name, filters(input.name))
+            output.inputs = output.inputs.
+              // First, remove the SplitInto operator
+              filter(_.producer != node).
+              // Second, remove the filter if it has already been added to this input once. This can happen if a Join
+              // reads from multiple branches of a single SplitInto operator because of the nested loop nature of
+              // this code because we then iterate over the Joins inputs more than once (the Join is the consumer of
+              // multiple node.outputs).
+              filter(_.producer != filters(input.name)) :+
+              Pipe(input.name, filters(input .name))
             filters(input.name).inputs = node.inputs
           }
         })
@@ -162,7 +171,7 @@ object Rules {
     val uri = op.uri
 
     if (uri.getScheme == "http" || uri.getScheme == "https") {
-      Some(Load(op.outputs.head, uri, op.schema, "pig.SPARQLLoader", List("SELECT * WHERE { ?s ?p ?o }")))
+      Some(Load(op.outputs.head, uri, op.schema, Some("pig.SPARQLLoader"), List("SELECT * WHERE { ?s ?p ?o }")))
     } else {
       None
     }
@@ -173,13 +182,14 @@ object Rules {
   //noinspection ScalaDocMissingParameterDescription
   def R2 = rulefs[RDFLoad] {
     case op =>
+
       /** Finds the next BGPFilter object reachable from ``op``.
         */
       def nextBGPFilter(op: PigOperator): Option[BGPFilter] = op match {
         case bf@BGPFilter(_, _, _) => Some(bf)
         // We need to make sure that each intermediate operator has only one successor - if it has multiple, we can't
         // pull up the BGPFilter because its patterns don't apply to all successors of the RDFLoad
-        case _ : OrderBy | _ :Distinct | _ : Limit | _ : RDFLoad
+        case _: OrderBy | _: Distinct | _: Limit | _: RDFLoad
           if op.outputs.flatMap(_.consumer).length == 1 => op.outputs.flatMap(_.consumer).map(nextBGPFilter).head
         case _ => None
       }
@@ -190,7 +200,7 @@ object Rules {
         // This is the function we'll use for replacing RDFLoad with Load
         def replacer = buildOperatorReplacementStrategy { sop: Any =>
           if (sop == op) {
-            Some(Load(op.outputs.head, op.uri, op.schema, "pig.SPARQLLoader",
+            Some(Load(op.outputs.head, op.uri, op.schema, Some("pig.SPARQLLoader"),
               List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(bf.get.patterns))))
           } else {
             None
@@ -219,7 +229,7 @@ object Rules {
       return None
     }
 
-    Some(Load(op.out, op.uri, op.schema, "BinStorage"))
+    Some(Load(op.out, op.uri, op.schema, Some("BinStorage")))
   }
 
   /** Applies rewriting rule F1 of the paper [[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -250,34 +260,35 @@ object Rules {
     val in = op.inputs.head
     val out = op.outputs.head
     val patterns = op.patterns
+
     if (op.inputSchema != RDFLoad.plainSchema) {
-                                             return None
-                                             }
+      return None
+    }
 
     if (patterns.length != 1) {
-                            return None
-                            }
+      return None
+    }
 
     val pattern = patterns.head
-    var filter : Option[Filter] = None
+    var filter: Option[Filter] = None
     val bound_column = RDF.getBoundColumn(pattern)
 
     filter = bound_column.flatMap { col: Column =>
-                                if (col == Column.Subject) {
-                                Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
-                                } else if (col == Column.Predicate) {
-                                Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
-                                } else if (col == Column.Object) {
-                                Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
-                                } else {
-                                // In reality, one of the above cases should always match
-                                None
-                                }
-                                }
+      if (col == Column.Subject) {
+        Some(Filter(out, in, Eq(RefExpr(NamedField("subject")), RefExpr(pattern.subj))))
+      } else if (col == Column.Predicate) {
+        Some(Filter(out, in, Eq(RefExpr(NamedField("predicate")), RefExpr(pattern.pred))))
+      } else if (col == Column.Object) {
+        Some(Filter(out, in, Eq(RefExpr(NamedField("object")), RefExpr(pattern.obj))))
+      } else {
+        // In reality, one of the above cases should always match
+        None
+      }
+    }
 
     if (filter.isDefined) {
-                        in.removeConsumer(op)
-                        }
+      in.removeConsumer(op)
+    }
 
     return filter
   }
@@ -378,7 +389,7 @@ object Rules {
   }
 
   def F5(term: Any): Option[Foreach] = term match {
-    case op @ BGPFilter(_, _, patterns) =>
+    case op@BGPFilter(_, _, patterns) =>
       val in = op.inputs.head
       val out = op.outputs.head
 
@@ -402,7 +413,7 @@ object Rules {
       // Check if the column that's grouped by is not bound in this pattern
       val bound_column = RDF.getBoundColumn(pattern)
 
-      val applies =  grouped_by match {
+      val applies = grouped_by match {
         case "subject" if bound_column contains Column.Subject => false
         case "predicate" if bound_column contains Column.Predicate => false
         case "object" if bound_column contains Column.Object => false
@@ -425,12 +436,9 @@ object Rules {
         case Column.Object => pattern.obj
       }
 
-      val bagConstructor = ConstructBag(Pipe("stmts"), DerefTuple(NamedField(in.name), NamedField("stmts")))
-
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
-          bagConstructor,
-          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(Value(filter_value)))),
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(filter_value))),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
@@ -439,7 +447,7 @@ object Rules {
                 Some(Field("cnt", Types.ByteArrayType))))))))
 
       val filter = Filter(out, Pipe(internalPipeName, foreach),
-                    Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
+        Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
 
       foreach.outputs foreach (_.addConsumer(filter))
 

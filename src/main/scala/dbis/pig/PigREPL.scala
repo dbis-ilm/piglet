@@ -32,7 +32,7 @@ import dbis.pig.plan.rewriting.Rewriter
 import jline.console.ConsoleReader
 
 import scala.collection.mutable.ListBuffer
-import java.nio.file.Paths
+import java.nio.file.{Path, Paths}
 import jline.console.history.FileHistory
 import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
@@ -41,14 +41,35 @@ import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.tools.DBConnection
 
+import scopt.OptionParser
+
 sealed trait JLineEvent
 case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
 case object EmptyLine extends JLineEvent
 case object EOF extends JLineEvent
 
 object PigREPL extends PigParser with LazyLogging {
+  case class REPLConfig(master: String = "local",
+                        outDir: String = ".",
+                        backend: String = Conf.defaultBackend,
+                        numExecutors: Int = 0)
+
   val consoleReader = new ConsoleReader()
-  
+  val defaultScriptName = "__my_script"
+
+  def cleanupResult(dir: String): Unit = {
+    import scalax.file.Path
+
+    val path: Path = Path(dir)
+    try {
+      path.deleteRecursively(continueOnFailure = false)
+    }
+    catch {
+      case e: java.io.IOException => // some file could not be deleted
+    }
+
+  }
+
   private def unbalancedBrackets(s: String): Boolean = {
     val leftBrackets = s.count(_ == '{')
     val rightBrackets = s.count(_ == '}')
@@ -119,6 +140,8 @@ object PigREPL extends PigParser with LazyLogging {
       }
     }
     } finally {
+      // remove directory $defaultScriptName
+      cleanupResult(defaultScriptName)
       logger.debug("flushing history file")
       consoleReader.getHistory.asInstanceOf[FileHistory].flush()
     }
@@ -140,7 +163,34 @@ object PigREPL extends PigParser with LazyLogging {
   }
 
   def main(args: Array[String]): Unit = {
-    val backend = if(args.length==0) Conf.defaultBackend else args(0)
+    var master: String = "local"
+    var outDir: Path = null
+    var backend: String = Conf.defaultBackend
+    var numExecutors = 1
+
+    val parser = new OptionParser[REPLConfig]("PigShell") {
+      head("PigShell", "0.2")
+      opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
+      opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
+      opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
+      opt[Int]('n',"num-executors") optional() action { (x,c) => c.copy(numExecutors = x)  } text ("Number of executors")
+      help("help") text ("prints this usage text")
+      version("version") text ("prints this version info")
+    }
+    parser.parse(args, REPLConfig()) match {
+      case Some(config) => {
+        // do stuff
+        master = config.master
+        outDir = Paths.get(config.outDir)
+        backend = config.backend
+        numExecutors = config.numExecutors
+      }
+      case None =>
+        // arguments are bad, error message will have been displayed
+        return
+    }
+
+   //  val backend = if(args.length==0) Conf.defaultBackend else args(0)
     
     logger debug s"""Running REPL with backend "$backend" """
     
@@ -220,30 +270,33 @@ object PigREPL extends PigParser with LazyLogging {
       case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") ||
                             s.toLowerCase().startsWith(s"store ") ||
                             s.toLowerCase.startsWith(s"socket_write "))=> {
-        buf ++= parseScript(s)
-        var plan = new DataflowPlan(buf.toList)
-        
-        val mm = new MaterializationManager
-        plan = processMaterializations(plan, mm)
-        plan = processPlan(plan)
+        try {
+          buf ++= parseScript(s)
+          var plan = new DataflowPlan(buf.toList)
 
-        val templateFile = backendConf.templateFile
-        val jobJar = Conf.backendJar(backend)
-        
-        FileTools.compilePlan(plan, "script", Paths.get("."), false, jobJar, templateFile, backend) match {
-          case Some(jarFile) =>
-            val runner = backendConf.runnerClass
-            runner.execute("local", "script", jarFile)
-          
-          case None => println("failed to build jar file for job")  
+          val mm = new MaterializationManager
+          plan = processMaterializations(plan, mm)
+          plan = processPlan(plan)
+
+          val templateFile = backendConf.templateFile
+          val jobJar = Conf.backendJar(backend)
+
+          FileTools.compilePlan(plan, defaultScriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
+            case Some(jarFile) =>
+              val runner = backendConf.runnerClass
+              runner.execute(master, defaultScriptName, jarFile, numExecutors)
+
+            case None => println("failed to build jar file for job")
+          }
+        }
+        catch {
+          case e : Throwable => println(s"error while executing: ${e.getMessage}")
         }
 
         // buf.clear()
         false
       }
       case Line(s, buf) if (s.toLowerCase().startsWith(s"fs ")) => {
-        // TODO: handle fs command directly
-        println("fs ---> " + s)
         processFsCmd(s)
       }
       case Line(s, buf) => try {

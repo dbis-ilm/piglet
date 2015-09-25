@@ -165,8 +165,13 @@ class BatchGenCode(template: String/*, hookFile: Option[Path] = None*/) extends 
   def emitGrouping(schema: Option[Schema], out: String, in: String, groupExpr: GroupingExpression): String = {
     if (groupExpr.keyList.isEmpty)
       callST("groupBy", Map("out"->out,"in"->in))
-    else
-      callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGroupExpr(schema, groupExpr)))
+    else {
+      val keyExtr = if (groupExpr.keyList.size > 1)
+        "List(" + (for (i <- 1 to groupExpr.keyList.size) yield s"k._$i").mkString(", ") + ")"
+      else "k"
+
+      callST("groupBy", Map("out" -> out, "in" -> in, "expr" -> emitGroupExpr(schema, groupExpr), "keyExtr" -> keyExtr))
+    }
   }
 
   /**

@@ -167,6 +167,9 @@ windowFlatten(out,in) ::=<<
 >>
 
 // ------------------ Joins two or more streams on the specified keys ---------
+join_key_map(rels,keys) ::=<<
+>>
+
 join(out,rel1,key1,rel2,key2,window,wUnit) ::=<<
     val <out> = <rel1><rel2,key2:{ r,k |<\\>
     .join(<r>).onWindow(<window>, TimeUnit.<wUnit>).where(t => <key1>).equalTo(t => <k>)<\\>

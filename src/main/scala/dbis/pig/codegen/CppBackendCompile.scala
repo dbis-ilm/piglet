@@ -3,6 +3,7 @@ package dbis.pig.codegen
 import dbis.pig.op._
 import dbis.pig.schema._
 import dbis.pig.udf._
+import dbis.pig.backends.BackendManager
 import org.clapper.scalasti.STGroupFile
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -239,11 +240,12 @@ class CppBackendGenCode(template: String/*, hookFile: Option[Path] = None*/) ext
    * @return the C++ code implementing the LOAD operator
    */
 
-  private def emitLoader(out: String, storage: String, loaderFunc: String, params: List[String], node: PigOperator): String = {
+  private def emitLoader(out: String, storage: String, loaderFunc: Option[String], params: List[String], node: PigOperator): String = {
     var loaderParams = params // replace ' character with empty character
     if (loaderParams != null)
       loaderParams = params.map(_.replace("'", ""))
-    loaderFunc match {
+    
+    loaderFunc.getOrElse(BackendManager.backend.defaultConnector) match {
       case LoadFuncs.PigStorage() =>
         val path = if (storage.startsWith("/")) "" else new java.io.File(".").getCanonicalPath + "/"
         callST("file_source", Map("op_name" -> s"op_${out}",

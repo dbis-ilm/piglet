@@ -300,7 +300,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
       val uri = new URI(f)
       
       u match {
-        case Some(p) => new Load(Pipe(b), uri, s, p._1, if (p._2.isEmpty) null else p._2)
+        case Some(p) => new Load(Pipe(b), uri, s, Some(p._1), if (p._2.isEmpty) null else p._2)
         case None => new Load(Pipe(b), uri, s)
       }
   }
@@ -331,7 +331,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
     case _ ~ b ~  _ ~ f ~ u => 
       val uri = new URI(f)
       u match {
-        case Some(p) => new Store(Pipe(b), uri, p._1, if(p._2.isEmpty) null else p._2)
+        case Some(p) => new Store(Pipe(b), uri, Some(p._1), if(p._2.isEmpty) null else p._2)
         case None => new Store(Pipe(b), uri)
       }
   }
@@ -547,8 +547,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def embeddedCodeNoRules: Parser[EmbedCmd] = "<%" ~ (code+"%>").r ^^ { case _ ~ code => new EmbedCmd(code
     .substring
-    (0, code
-      .length - 2))
+    (0, code .length - 2))
   }
 
   def codeWithRulesInit = (code + "rules:").r
@@ -556,7 +555,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def ruleCode: Parser[String] = (code + "!>").r
 
   def embeddedCodeWithRules: Parser[EmbedCmd] = "<!" ~ codeWithRulesInit ~ ruleCode ^^ {
-    case _ ~ code ~ rules => EmbedCmd(code.substring(0, code.length - 6), rules.substring(0, rules.length - 2))
+    case _ ~ code ~ rules => EmbedCmd(code.substring(0, code.length - 6), Some(rules.substring(0, rules.length - 2)))
   }
 
   def embedStmt: Parser[PigOperator] = embeddedCodeNoRules | embeddedCodeWithRules
@@ -640,13 +639,13 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def socketReadStmt: Parser[PigOperator] =
     bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
       case out ~ _ ~ _ ~ addr ~ u ~ schema => u match {
-        case Some(p) => SocketRead(Pipe(out), addr, "", schema, p._1, if (p._2.isEmpty) null else p._2)
+        case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2)
         case None =>  SocketRead(Pipe(out), addr, "", schema)
       }
     } |
       bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
         case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema => u match {
-          case Some(p) => SocketRead(Pipe(out), addr, mode, schema, p._1, if (p._2.isEmpty) null else p._2)
+          case Some(p) => SocketRead(Pipe(out), addr, mode, schema, Some(p._1), if (p._2.isEmpty) null else p._2)
           case None => SocketRead(Pipe(out), addr, mode, schema)
         }
       }

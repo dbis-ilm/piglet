@@ -29,7 +29,7 @@ import java.net.URI
  */
 case class Store(in: Pipe,
                  file: URI,
-                 func: String = BackendManager.backend.defaultConnector,
+                 func: Option[String] = None, //BackendManager.backend.defaultConnector,
                  params: List[String] = null) extends PigOperator {
   _outputs = List()
   _inputs = List(in)
