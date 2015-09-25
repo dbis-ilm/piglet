@@ -114,7 +114,7 @@ object RDF {
 
   /** Build a map of ([[Column]], [[NamedField]]) to the number of their occurences in ``patterns``.
     */
-  private def buildStarJoinMap(patterns: List[TriplePattern]): Map[(Column.Value, NamedField), Int] = {
+  private def buildStarJoinMap(patterns: Seq[TriplePattern]): Map[(Column.Value, NamedField), Int] = {
     // We count how often each (Column, NamedField) tuple appears in each pattern. If, at the end, a single tuple
     // appears as often as patterns is long, the same variable appears in the same position in each pattern,
     // therefore patterns form a star join.
@@ -145,7 +145,7 @@ object RDF {
     * @param patterns
     * @return
     */
-  def starJoinColumn(patterns: List[TriplePattern]): Option[(Column, NamedField)] = {
+  def starJoinColumn(patterns: Seq[TriplePattern]): Option[(Column, NamedField)] = {
     val variableInPosition = buildStarJoinMap(patterns)
     var column: Option[(Column, NamedField)] = None
 
@@ -168,7 +168,7 @@ object RDF {
       * ``patterns`` form a star join if the same [[dbis.pig.op.NamedField]] is used in the same position in each
       * pattern.
       */
-  def isStarJoin(patterns: List[TriplePattern]): Boolean = {
+  def isStarJoin(patterns: Seq[TriplePattern]): Boolean = {
     buildStarJoinMap(patterns).foldLeft(false) { case (old, ((_, _), count)) =>
       old || count == patterns.length
     }
