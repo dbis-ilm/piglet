@@ -91,6 +91,27 @@ object RDF {
       isBound(pattern.obj, Column.Object)
   }
 
+  /** Extracts all variables as [[dbis.pig.op.NamedField]] objects used in `patterns`.
+    *
+    * The order of the fields returned is '''arbitrary'''.
+    *
+    * @param patterns
+    * @return
+    */
+  def getAllVariables(patterns: Seq[TriplePattern]): Set[NamedField] = {
+    def isNamedField(r: Ref): Set[NamedField] = r match {
+      case f @ NamedField(_) => Set(f)
+      case _ => Set.empty
+    }
+
+    def namedFieldsOf(p: TriplePattern): Set[NamedField] =
+      isNamedField(p.subj) ++
+        isNamedField(p.pred) ++
+        isNamedField(p.obj)
+
+    patterns flatMap namedFieldsOf toSet
+  }
+
   /** Build a map of ([[Column]], [[NamedField]]) to the number of their occurences in ``patterns``.
     */
   private def buildStarJoinMap(patterns: List[TriplePattern]): Map[(Column.Value, NamedField), Int] = {

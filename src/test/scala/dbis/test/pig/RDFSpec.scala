@@ -16,12 +16,16 @@
  */
 package dbis.test.pig
 
-import dbis.pig.op.{PositionalField, NamedField, Value, TriplePattern}
+import dbis.pig.op._
+import dbis.pig.PigCompiler._
+import dbis.pig.parser.LanguageFeature
+import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.internals.RDF
+import dbis.pig.schema._
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{OptionValues, FlatSpec, Matchers}
 
-class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks {
+class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with OptionValues {
   "TriplePatterns" should "be convertible to strings" in {
     val patterns = Table(
       ("patterns", "string"),
@@ -38,6 +42,51 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks {
 
     forAll(patterns) {(patterns: List[TriplePattern], bgpstring: String) =>
       RDF.triplePatternsToString(patterns) shouldBe bgpstring
+    }
+  }
+
+  "A BGPFilters schema" should "contain named fields for all variables if there is more than one pattern" in {
+    val plan = new DataflowPlan(parseScript(
+      s"""A = RDFLOAD('file.rdf');
+         |B = BGP_FILTER A by { ?b "firstName" "Wieland" . ?b "lastName" "Hoffmann" .  ?b "birthDate" ?a};
+         |DUMP B;
+       """.stripMargin, LanguageFeature.SparqlPig))
+    val bgpfilter = plan.findOperatorForAlias("B").value
+    val shouldSchema: Some[Schema] = Some(
+    Schema(
+      BagType(
+        TupleType(
+          Array(
+            Field("a", Types.CharArrayType),
+            Field("b", Types.CharArrayType))))))
+    bgpfilter.schema shouldBe shouldSchema
+  }
+
+  it should "be the plain RDF schema if there is only one pattern and the BGPFilter reads plain data" in {
+    val plan = new DataflowPlan(parseScript(
+      s"""A = RDFLOAD('file.rdf');
+         |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
+         |DUMP B;
+       """.stripMargin, LanguageFeature.SparqlPig))
+    val bgpfilter = plan.findOperatorForAlias("B").value
+    bgpfilter.schema shouldBe RDFLoad.plainSchema
+  }
+
+  it should "be the grouped RDF schema if there is only one pattern and the BGPFilter reads grouped data" in {
+    val groupers = Table(
+      ("grouping column"),
+      "subject",
+      "predicate",
+      "object"
+    )
+    forAll(groupers) { g =>
+      val plan = new DataflowPlan(parseScript(
+      s"""A = RDFLOAD('file.rdf') grouped on $g;
+        |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
+        |DUMP B;
+      """.stripMargin, LanguageFeature.SparqlPig) )
+      val bgpfilter = plan.findOperatorForAlias("B").value
+      bgpfilter.schema.value shouldBe RDFLoad.groupedSchemas(g)
     }
   }
 }
