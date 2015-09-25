@@ -22,6 +22,10 @@ import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import scala.io.Source
 import scalax.file.Path
+import java.nio.file.Files
+import scala.collection.mutable.ListBuffer
+
+import scala.collection.JavaConversions._
 
 class SparkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
@@ -73,7 +77,20 @@ class SparkCompileIt extends FlatSpec with Matchers {
       println("execute: " + script)
 
       // 3. load the output file and the truth file
-      val result = Source.fromFile(resultDir + "/part-00000").getLines()
+
+      /* Since we do not use coalesce for STORE, we probably end up with multiple result files
+       * named with schema part-xxxxx. 
+       * 
+       * To retreive the complete output, we search the result folder for all files starting with "part-",
+       * sort, this list in ascending order, and read the file contents line by line into a list of strings
+       */
+      val result = Path(resultDir).descendants().view
+                    .filter { _.name.toLowerCase().startsWith("part-") }
+                    .toList
+                    .sortBy { _.name }
+                    .foldLeft(ListBuffer.empty[String])( (lines, path) => lines ++= Source.fromFile(path.jfile).getLines())
+      
+
       val truth = Source.fromFile(resourcePath + truthFile).getLines()
       // 4. compare both files
       if (inOrder)
