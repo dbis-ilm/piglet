@@ -231,6 +231,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val splitKeyword = "split".ignoreCase
   lazy val ifKeyword = "if".ignoreCase
   lazy val materializeKeyword = "materialize".ignoreCase
+  lazy val rscriptKeyword = "rscript".ignoreCase
   lazy val rdfLoadKeyword = "rdfload".ignoreCase
   lazy val groupedOnKeyword = "grouped on".ignoreCase
   lazy val trueKeyword = "true".ignoreCase
@@ -530,6 +531,10 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   def materializeStmt: Parser[PigOperator] = materializeKeyword ~ bag ^^ { case _ ~ b => Materialize(Pipe(b))}
 
+  def rscriptStmt: Parser[PigOperator] = bag ~ "=" ~ rscriptKeyword ~ bag ~ usingKeyword ~ pigStringLiteral ~ (loadSchemaClause?) ^^{
+    case out ~ _ ~ _ ~ in ~ _ ~ script ~ schema => new RScript(Pipe(out), Pipe(in), script, schema)
+  }
+
   /*
    * fs -cmd params
    */
@@ -538,15 +543,30 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def fsStmt: Parser[PigOperator] = fsKeyword ~ fsCmd ~ rep(fsParam) ^^ { case _ ~ cmd ~ params => HdfsCmd(cmd, params)}
 
-  def embeddedCode: Parser[String] = ("""(?s)(.*?)%>""").r
-  def embedStmt: Parser[PigOperator] = "<%" ~ embeddedCode ^^ { case _ ~ code => EmbedCmd(code.substring(0, code.length-2))}
+  def code = ("""(?s)(.*?)""")
+
+  def embeddedCodeNoRules: Parser[EmbedCmd] = "<%" ~ (code+"%>").r ^^ { case _ ~ code => new EmbedCmd(code
+    .substring
+    (0, code
+      .length - 2))
+  }
+
+  def codeWithRulesInit = (code + "rules:").r
+
+  def ruleCode: Parser[String] = (code + "!>").r
+
+  def embeddedCodeWithRules: Parser[EmbedCmd] = "<!" ~ codeWithRulesInit ~ ruleCode ^^ {
+    case _ ~ code ~ rules => EmbedCmd(code.substring(0, code.length - 6), rules.substring(0, rules.length - 2))
+  }
+
+  def embedStmt: Parser[PigOperator] = embeddedCodeNoRules | embeddedCodeWithRules
 
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | fsStmt | defineStmt | setStmt | delayStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | delayStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   def undelimStmt: Parser[PigOperator] = embedStmt

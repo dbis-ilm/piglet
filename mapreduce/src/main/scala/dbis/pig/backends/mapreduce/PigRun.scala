@@ -34,6 +34,8 @@ class PigRun extends PigletBackend with BackendConf {
   override def runnerClass: PigletBackend = this
   
   override def templateFile = null
+
+  override def defaultConnector = "PigStorage"
   
   override def raw = true
   

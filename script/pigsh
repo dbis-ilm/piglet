@@ -8,6 +8,8 @@ echo '
 |_|   |_|\__, | |____/|_| |_|\___|_|_|
          |___/
 '
+
+# TODO: we should find our jar file the same way we do for spark
 PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
 
 if [ -z "$PIG_LIB" ]; then

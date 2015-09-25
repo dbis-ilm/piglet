@@ -125,6 +125,7 @@ object PigCompiler extends PigParser with LazyLogging {
 		  DBConnection.init(Conf.databaseSetting)
 
 		  val backendConf = BackendManager.backend(backend)
+		  BackendManager.backend = backendConf
 
 		  if(backendConf.raw) {
 			  if(compileOnly) {
@@ -239,11 +240,11 @@ object PigCompiler extends PigParser with LazyLogging {
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
       
-      FileTools.compileToJar(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, hookFile) match {
+      FileTools.compilePlan(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, backend, hookFile) match {
         // the file was created --> execute it
         case Some(jarFile) =>  
           if (!compileOnly) {
-          // 4. and finally deploy/submit  
+          // 4. and finally deploy/submit          
           val runner = backendConf.runnerClass 
           logger.debug(s"using runner class ${runner.getClass.toString()}")
           
@@ -256,7 +257,6 @@ object PigCompiler extends PigParser with LazyLogging {
         case None => logger.error(s"creating jar file failed for ${path}") 
       } 
     }
-      
   }
 
   /**
@@ -275,7 +275,7 @@ object PigCompiler extends PigParser with LazyLogging {
       // 2. then we parse it and construct a dataflow plan
       val plan = new DataflowPlan(parseScriptFromSource(source, params, backend))
       
-
+      
       try {
         // if this does _not_ throw an exception, the schema is ok
         plan.checkSchemaConformance

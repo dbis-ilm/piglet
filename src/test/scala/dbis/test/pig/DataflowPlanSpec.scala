@@ -364,7 +364,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     plan.checkConnectivity should be (true)
   }
 
-  it should "check detect an invalid plan with a nested FOREACH" in {
+  it should "detect an invalid plan with a nested FOREACH" in {
     val ops = parseScript(
       """daily = load 'data.csv' as (exchange, symbol);
         |grpd  = group daily by exchange;
@@ -376,7 +376,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     an [SchemaException] should be thrownBy new DataflowPlan(ops)
   }
 
-  it should "check detect another invalid plan with a nested FOREACH" in {
+  it should "detect another invalid plan with a nested FOREACH" in {
     val ops = parseScript(
       """daily = load 'data.csv' as (exchange, symbol);
         |grpd  = group daily by exchange;
@@ -388,7 +388,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     an [InvalidPlanException] should be thrownBy new DataflowPlan(ops)
   }
 
-  it should "check detect a third invalid plan with a nested FOREACH" in {
+  it should "detect a third invalid plan with a nested FOREACH" in {
     val ops = parseScript(
       """daily = load 'data.csv' as (exchange, symbol);
         |grpd  = group daily by exchange;
@@ -401,7 +401,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
-  it should "check detect a fourth invalid plan with a nested FOREACH" in {
+  it should "detect a fourth invalid plan with a nested FOREACH" in {
     val ops = parseScript(
       """daily = load 'data.csv' as (exchange, symbol);
         |grpd  = group daily by exchange;
@@ -517,5 +517,14 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     opD.get.configParams should contain key ("some")
     opD.get.configParams("parallelismHint") should be (Value("3"))
     opD.get.configParams("some") should be (Value("\"thing\""))
+  }
+
+  it should "find an alias in a plan" in {
+    val plan = new DataflowPlan(parseScript(
+      """triples = LOAD 'file' AS (sub, pred, obj);
+        |stmts = GROUP triples BY sub;
+      """.stripMargin))
+    val op = plan.findOperatorForAlias("stmts")
+    op shouldBe defined
   }
 }

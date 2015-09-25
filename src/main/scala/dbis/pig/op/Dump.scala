@@ -19,7 +19,7 @@ package dbis.pig.op
 /**
  * Dump represents the DUMP operator of Pig.
  *
- * @param initialInPipeName the name of the input pipe
+ * @param in the input pipe
  */
 case class Dump(in: Pipe) extends PigOperator {
   _outputs = List()

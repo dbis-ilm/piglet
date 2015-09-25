@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.spark.test
+package dbis.pig.backends.spark.test
 
 import dbis.pig.backends.spark.PigFuncs
 import org.scalatest._

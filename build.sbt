@@ -1,3 +1,6 @@
+import sbt.Keys._
+import sbt._
+
 name := "Piglet"
 
 libraryDependencies ++= Dependencies.rootDeps
@@ -23,3 +26,4 @@ testOptions in IntegrationTest += Tests.Argument("-oDF")
 testOptions in IntegrationTest := Seq(Tests.Filter(s => itTests.contains(s)))
 
 sourcesInBase := false
+EclipseKeys.skipParents in ThisBuild := false  // to enable piglet (parent not only children) eclispe import

@@ -30,9 +30,10 @@ case class GroupingExpression(val keyList: List[Ref])
 /**
  * Grouping represents the GROUP ALL / GROUP BY operator of Pig.
  *
- * @param initialOutPipeName the name of the output pipe (relation).
- * @param initialInPipeName the name of the input pipe
+ * @param out the output pipe (relation).
+ * @param in the input pipe
  * @param groupExpr the expression (a key or a list of keys) used for grouping
+ * @param windowMode true if processed on a window on a data stream
  */
 case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)

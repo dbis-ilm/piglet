@@ -20,9 +20,10 @@ package dbis.pig.op
 /**
  * Filter represents the FILTER operator of Pig.
  *
- * @param initialOutPipeName the name of the output pipe (relation).
- * @param initialInPipeName the name of the input pipe
+ * @param out the output pipe (relation).
+ * @param in the input pipe
  * @param pred the predicate used for filtering tuples from the input pipe
+ * @param windowMode true if processed on a window on a data stream
  */
 case class Filter(out: Pipe, in: Pipe, pred: Predicate, var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)

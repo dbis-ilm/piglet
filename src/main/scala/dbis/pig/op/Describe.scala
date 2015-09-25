@@ -19,7 +19,7 @@ package dbis.pig.op
 /**
 * Describe represents the DESCRIBE operator of Pig.
 *
-* @param initialInPipeName the name of the input pipe
+* @param in the input pipe
 */
 case class Describe(in: Pipe) extends PigOperator {
   _inputs = List(in)

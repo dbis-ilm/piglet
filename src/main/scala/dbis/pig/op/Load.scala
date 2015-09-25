@@ -16,21 +16,24 @@
  */
 package dbis.pig.op
 
+import dbis.pig.backends.BackendManager
 import dbis.pig.schema.Schema
 import java.net.URI
 
 /**
  * Load represents the LOAD operator of Pig.
  *
- * @param initialOutPipeName the name of the initial output pipe (relation).
+ * @param out the output pipe (relation).
  * @param file the name of the file to be loaded
  * @param loadSchema
  * @param loaderFunc
  * @param loaderParams
  */
-case class Load(out: Pipe, file: URI,
+case class Load(out: Pipe, 
+                file: URI,
                 var loadSchema: Option[Schema] = None,
-                loaderFunc: String = "PigStorage", loaderParams: List[String] = null) extends PigOperator {
+                loaderFunc: String = BackendManager.backend.defaultConnector,
+                loaderParams: List[String] = null) extends PigOperator {
   _outputs = List(out)
   _inputs = List()
   schema = loadSchema

@@ -9,7 +9,8 @@ object PigBuild extends Build {
   lazy val commonSettings = Seq(
     version := "1.0",
     scalaVersion := "2.11.7",
-    organization := "dbis"
+    organization := "dbis",
+    unmanagedJars in Compile += file("lib_unmanaged/jvmr_2.11-2.11.2.1.jar")
   )
   
   /*
@@ -75,7 +76,7 @@ object Dependencies {
   val graphCore = "com.assembla.scala-incubator" %% "graph-core" % "1.9.2"
   val sparkCore = "org.apache.spark" %% "spark-core" % "1.4.1"
   val sparkSql = "org.apache.spark" %% "spark-sql" % "1.4.1"
-  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.9.0"
+  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10-SNAPSHOT"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
@@ -86,11 +87,13 @@ object Dependencies {
   val slf4j= "org.slf4j" % "slf4j-simple" % "1.6.4"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
+  val commons = "org.apache.commons" % "commons-exec" % "1.3"
+  val twitterUtil = "com.twitter" %% "util-eval" % "6.27.0"
   val scalikejdbc = "org.scalikejdbc" %% "scalikejdbc" % "2.2.7"
   val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val h2 = "com.h2database"  %  "h2" % "1.4.189"
 
-  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.9.0.jar"
+  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10-SNAPSHOT.jar"
   
   // Projects
   val rootDeps = Seq(
@@ -109,6 +112,8 @@ object Dependencies {
     scalikejdbc,
     scalikejdbc_config,
     h2,
-    hadoop % "provided"
+    hadoop % "provided",
+    commons,
+    twitterUtil
   )
 }

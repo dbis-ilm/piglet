@@ -1,7 +1,7 @@
 // ----------------- header declaration ----------------- 
 init_code(includes) ::= <<
 import org.apache.flink.api.scala._
-import dbis.flink._
+import dbis.pig.backends.flink._
 
 <if (includes)>
 <includes>
@@ -18,7 +18,7 @@ object <name> {
 
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name) ::= <<
-    def main(args: Array[String]) {
+        def main(args: Array[String]) {
         val env = ExecutionEnvironment.getExecutionEnvironment<\n>
         
     <if (hook)>
@@ -43,6 +43,8 @@ dump(in) ::=<<
 // ------------------ STORE Results on Disk -----------------------------------
 store(in,file,schema,func) ::=<<
         <in>.map(t => <schema>).writeAsText("<file>")
+        
+        env.execute()
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -102,9 +104,7 @@ orderBy(out,in,key,asc) ::=<<
 stageIdentifier(line,lineage) ::=<< >>
 
 // ----------------- END of the code implementing the query -------------------
-end_query(name, hook) ::= <<
-        env.execute("<name>")
-        
+end_query(name, hook) ::= <<        
     <if (hook)>
 		shutdownHook()
 	<endif>

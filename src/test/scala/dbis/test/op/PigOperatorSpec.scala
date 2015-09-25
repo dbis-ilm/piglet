@@ -60,7 +60,7 @@ class PigOperatorSpec extends FlatSpec with Matchers {
     splitOp.value.arity shouldBe 3
   }
 
-  "PigOperators" should "return useful lieage strings" in {
+  "PigOperators" should "return useful lineage strings" in {
     val plan = new DataflowPlan(parseScript(s"""
          |A = LOAD 'file' AS (x, y, z);
          |B = FILTER A BY x > 0;

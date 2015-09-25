@@ -28,12 +28,15 @@ import dbis.pig.tools.{HDFSService, FileTools, Conf}
 import dbis.pig.backends.BackendManager
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
+
 import jline.console.ConsoleReader
+
 import scala.collection.mutable.ListBuffer
 import java.nio.file.Paths
 import jline.console.history.FileHistory
 import dbis.pig.tools.Conf
 import com.typesafe.scalalogging.LazyLogging
+
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.tools.DBConnection
@@ -147,6 +150,8 @@ object PigREPL extends PigParser with LazyLogging {
     
     try {
 
+    BackendManager.backend = backendConf
+
 		  // initialize database driver and connection pool
 		  DBConnection.init(Conf.databaseSetting)
     
@@ -180,8 +185,6 @@ object PigREPL extends PigParser with LazyLogging {
         
         val mm = new MaterializationManager
         plan = processMaterializations(plan, mm)
-        plan = processPlan(plan)
-        
         try {
           plan.checkSchemaConformance
           
@@ -189,9 +192,21 @@ object PigREPL extends PigParser with LazyLogging {
           pat.findFirstIn(s) match {
             case Some(str) =>
               val alias = str.split(" ")(1)
-              plan.findOperatorForAlias(alias) match {
+              val op = plan.findOperatorForAlias(alias)
+              plan = processPlan(plan)
+              val op_after_rewriting = plan.findOperatorForAlias(alias)
+              op match {
                 case Some (op) => println (op.schemaToString)
                 case None => println (s"unknown alias '$alias'")
+              }
+              op_after_rewriting match {
+                case Some(_) => op match {
+                  case Some(o) if (o.schema != op_after_rewriting.get.schema) =>
+                    val r_schema = op_after_rewriting.get.schema.toString
+                    println(s"After rewriting, '$alias''s schema is '$r_schema'.")
+                  case _ => ()
+                }
+                case None => println(s"Rewriting will remove '$alias'.")
               }
             case None => println("invalid describe command")
           }
@@ -215,7 +230,7 @@ object PigREPL extends PigParser with LazyLogging {
         val templateFile = backendConf.templateFile
         val jobJar = Conf.backendJar(backend)
         
-        FileTools.compileToJar(plan, "script", Paths.get("."), false, jobJar, templateFile) match {
+        FileTools.compilePlan(plan, "script", Paths.get("."), false, jobJar, templateFile, backend) match {
           case Some(jarFile) =>
             val runner = backendConf.runnerClass
             runner.execute("local", "script", jarFile)

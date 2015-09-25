@@ -38,7 +38,7 @@ case class OrderBySpec(field: Ref, dir: OrderByDirection)
  * @param initialInPipeName
  * @param orderSpec
  */
-case class OrderBy(out: Pipe, in: Pipe, orderSpec: List[OrderBySpec]) extends PigOperator {
+case class OrderBy(out: Pipe, in: Pipe, orderSpec: List[OrderBySpec], var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 

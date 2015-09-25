@@ -70,6 +70,7 @@ object Conf extends LazyLogging {
   
   def backendConf(backend: String) = appconf.getString(s"backends.$backend.conf")
   
+  // TODO: shouldn't we move this to the backend config? (not in Piglet itself)
   def backendGenerator(backend: String) = appconf.getString(s"backends.$backend.generator.class")
   def backendExtension(backend: String) = appconf.getString(s"backends.$backend.generator.extension")
   def backendCompileConf(backend: String) = appconf.getString(s"backends.$backend.compileconf")
