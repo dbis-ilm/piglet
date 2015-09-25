@@ -31,8 +31,6 @@ import scala.collection.mutable.ListBuffer
 
 import org.clapper.scalasti._
 
-// import scala.collection.mutable.Map
-
 /**
  * Implements a code generator for Scala-based backends such as Spark or Flink which use
  * a template file for the backend-specific code.
@@ -44,7 +42,7 @@ import org.clapper.scalasti._
  *
  * @param template the name of the backend-specific template fle
  */
-abstract class ScalaBackendGenCode(template: String, hookFile: Option[Path] = None) extends GenCodeBase with LazyLogging {
+abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging {
 
    templateFile = template 
   /*------------------------------------------------------------------------------------------------- */
@@ -571,13 +569,6 @@ abstract class ScalaBackendGenCode(template: String, hookFile: Option[Path] = No
    *
    * @return a string representing the end of the code.
    */
-  def emitFooter: String = {
-    var m = Map("name" -> "Starting Query")
-    
-    if(hookFile.isDefined)
-      m = m + ("hook" -> "true") 
-    
-    callST("end_query",m)
-  }
+  def emitFooter: String = callST("end_query",Map("name" -> "Starting Query"))
 
 }

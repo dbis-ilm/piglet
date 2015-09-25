@@ -23,7 +23,7 @@ import dbis.pig.plan.DataflowPlan
 import java.nio.file.Path
 
 
-class BatchGenCode(template: String/*, hookFile: Option[Path] = None*/) extends ScalaBackendGenCode(template/*, hookFile*/) {
+class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
 
 
   /*------------------------------------------------------------------------------------------------- */
@@ -269,7 +269,7 @@ class BatchGenCode(template: String/*, hookFile: Option[Path] = None*/) extends 
   }
 }
 
-class BatchCompile(templateFile: String/*, hookFile: Option[Path] = None*/) extends Compile {
-  override val codeGen = new BatchGenCode(templateFile/*, hookFile*/)
+class BatchCompile(templateFile: String) extends Compile {
+  override val codeGen = new BatchGenCode(templateFile)
 }
 

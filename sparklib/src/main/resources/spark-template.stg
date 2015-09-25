@@ -21,17 +21,13 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name, hook) ::= <<
+begin_query(name) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
         val perfMon = new PerfMonitor("<name>_App")
         sc.addSparkListener(perfMon)
-
-    <if (hook)>
-    	setupHook(sc)
-    <endif>
-
+        
 >>
 
 // ----------------- LOAD text file -------------------------------------------
@@ -146,14 +142,10 @@ stageIdentifier(line, lineage) ::=<<
 >>	
 
 // ----------------- END of the code implementing the query -------------------
-end_query(name, hook) ::= <<
+end_query(name) ::= <<
     		
         sc.stop()
-        
-    <if (hook)>
-		shutdownHook(sc, perfMon)
-	<endif>
-	
+    
     }
 }
 >>

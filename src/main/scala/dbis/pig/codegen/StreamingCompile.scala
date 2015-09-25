@@ -27,7 +27,7 @@ import scala.collection.mutable.ListBuffer
 import java.nio.file.Path
 
 
-class StreamingGenCode(template: String, hookFile: Option[Path] = None) extends ScalaBackendGenCode(template, hookFile) {
+class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
 
 
   /*------------------------------------------------------------------------------------------------- */
@@ -416,6 +416,6 @@ class StreamingGenCode(template: String, hookFile: Option[Path] = None) extends 
 
 }
 
-class StreamingCompile(templateFile: String/*, hookFile: Option[Path] = None*/) extends Compile {
+class StreamingCompile(templateFile: String) extends Compile {
   override val codeGen = new StreamingGenCode(templateFile)
 }

@@ -66,7 +66,7 @@ object FileTools extends LazyLogging {
     }
   }
 
-  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, templateFile: String, backend: String, hookFile: Option[Path] = None): Option[Path] = {
+  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, templateFile: String, backend: String): Option[Path] = {
     // 4. compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)
     logger.debug(s"using generator class: $generatorClass")
@@ -117,18 +117,6 @@ object FileTools extends LazyLogging {
 
       val sources = ListBuffer(outputFile)
       
-      if(hookFile.isDefined) {
-        val in = hookFile.get.toAbsolutePath().toFile()
-        val out = outputDirectory.resolve(hookFile.get.getFileName)
-        
-        logger.debug(s"copying hook file from '$in' to '$out'")
-        FileTools.copyStream(new FileInputStream(in), new FileOutputStream(out.toFile()))
-        
-        // add the hook file to the list of files to
-        sources += out
-        
-      }
-
       // 9. compile the scala code
       if (!ScalaCompiler.compile(outputDirectory, sources))
         return None
