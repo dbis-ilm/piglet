@@ -388,6 +388,11 @@ object Rules {
     return filter
   }
 
+  /** Applies rewriting rule F5 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    * @param term
+    * @return
+    */
   def F5(term: Any): Option[Foreach] = term match {
     case op@BGPFilter(_, _, patterns) =>
       val in = op.inputs.head
@@ -471,6 +476,11 @@ object Rules {
     case _ => None
   }
 
+  /** Applies rewriting rule F6 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    * @param term
+    * @return
+    */
   def F6(term: Any): Option[Foreach] = term match {
     case op@BGPFilter(_, _, patterns) =>
       val in = op.inputs.head
