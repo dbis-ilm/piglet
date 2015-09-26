@@ -471,6 +471,101 @@ object Rules {
     case _ => None
   }
 
+  def F6(term: Any): Option[Foreach] = term match {
+    case op@BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
+
+      if (op.inputSchema == RDFLoad.plainSchema) {
+        return None
+      }
+
+      if (op.inputSchema.isEmpty
+        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+        return None
+      }
+
+      if (patterns.length != 1) {
+        return None
+      }
+
+      // TODO we make a lot of assumptions about Options and Array lengths here
+      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+      val pattern = patterns.head
+
+      // Check if the column that's grouped by is not bound in this pattern
+      val bound_columns = RDF.getAllBoundColumns(pattern)
+
+      // If the number of bound variables in the pattern isn't 2, this rule doesn't apply.
+      if (bound_columns.length != 2) {
+        return None
+      }
+
+      val applies = grouped_by match {
+        case "subject" if bound_columns contains Column.Subject => false
+        case "predicate" if bound_columns contains Column.Predicate => false
+        case "object" if bound_columns contains Column.Object => false
+        // Just in case there's no bound column
+        case _ if bound_columns.isEmpty => false
+        case _ => true
+      }
+
+      // If not, this rule doesn't apply
+      if (!applies) {
+        return None
+      }
+
+      val internalPipeName = generate
+      val intermediateResultName = generate
+
+      def columnToConstraint(column: Column, p: TriplePattern): Eq = {
+        val filter_by = Column.columnToNamedField(column)
+        val filter_value = column match {
+          case Column.Subject => pattern.subj
+          case Column.Predicate => pattern.pred
+          case Column.Object => pattern.obj
+        }
+        return Eq(RefExpr(filter_by), RefExpr(filter_value))
+      }
+
+      val eq_1 = columnToConstraint(bound_columns.head, pattern)
+      val eq_2 = columnToConstraint(bound_columns.last, pattern)
+
+      val foreach =
+        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), And(eq_1, eq_2)),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField(intermediateResultName)))),
+                Some(Field("cnt", Types.ByteArrayType))))))))
+
+      val filter = Filter(out, Pipe(internalPipeName, foreach),
+        Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
+
+      foreach.outputs foreach (_.addConsumer(filter))
+
+      filter.outputs foreach { output =>
+        output.consumer foreach { consumer =>
+          consumer.inputs foreach { input =>
+            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
+            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
+            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
+            // that.
+            if (input.producer == op) {
+              input.producer = filter
+            }
+          }
+        }
+      }
+
+      in.removeConsumer(op)
+
+      Some(foreach)
+    case _ => None
+  }
+
   /** Applies rewriting rule F7 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
