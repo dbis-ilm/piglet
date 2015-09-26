@@ -338,7 +338,7 @@ object Rules {
 
   /** Applies rewriting rule F4 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Filter operator if `term` was a BGPFilter with a single Pattern filtering on the grouping column
     *         of data in the triple group format
     */
