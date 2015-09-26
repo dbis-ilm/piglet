@@ -24,8 +24,8 @@ object PigBuild extends Build {
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
     dependsOn(mapreduce % "test;it").
-    dependsOn(zeppelin).
-    aggregate(common, sparklib, flinklib, mapreduce, zeppelin) // remove this if you don't want to automatically build these projects when building piglet 
+    // dependsOn(zeppelin).
+    aggregate(common, sparklib, flinklib, mapreduce) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -45,7 +45,8 @@ object PigBuild extends Build {
 
   lazy val zeppelin = (project in file("zeppelin")).
     settings(commonSettings: _*).
-    dependsOn(common)
+    dependsOn(common).
+    dependsOn(root)
         
   /*
    * define the backend for the compiler: currently we support spark and flink
