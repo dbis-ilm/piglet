@@ -24,7 +24,7 @@ import Column.Column
 import FilterUtils._
 import dbis.pig.plan.rewriting.Rewriter._
 import PipeNameGenerator.generate
-import dbis.pig.schema.{Field, Types}
+import dbis.pig.schema.{Schema, Field, Types}
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
@@ -336,6 +336,23 @@ object Rules {
     }
   }
 
+  /** True, if `schema` is one of the grouped schemas, false otherwise.
+    *
+    * @param schema
+    * @return
+    */
+  private def groupedSchemaEarlyAbort(schema: Option[Schema]): Boolean = {
+    if (schema == RDFLoad.plainSchema) {
+      return true
+    }
+
+    if (schema.isEmpty
+      || !RDFLoad.groupedSchemas.values.toList.contains(schema.get)) {
+      return true
+    }
+    false
+  }
+
   /** Applies rewriting rule F4 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param op
@@ -346,12 +363,8 @@ object Rules {
     val patterns = op.patterns
     val in = op.inputs.head
     val out = op.outputs.head
-    if (op.inputSchema == RDFLoad.plainSchema) {
-      return None
-    }
 
-    if (op.inputSchema.isEmpty
-      || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+    if (groupedSchemaEarlyAbort(op.inputSchema)) {
       return None
     }
 
@@ -398,12 +411,7 @@ object Rules {
       val in = op.inputs.head
       val out = op.outputs.head
 
-      if (op.inputSchema == RDFLoad.plainSchema) {
-        return None
-      }
-
-      if (op.inputSchema.isEmpty
-        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+      if (groupedSchemaEarlyAbort(op.inputSchema)) {
         return None
       }
 
@@ -481,12 +489,7 @@ object Rules {
       val in = op.inputs.head
       val out = op.outputs.head
 
-      if (op.inputSchema == RDFLoad.plainSchema) {
-        return None
-      }
-
-      if (op.inputSchema.isEmpty
-        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+      if (groupedSchemaEarlyAbort(op.inputSchema)) {
         return None
       }
 
@@ -571,12 +574,8 @@ object Rules {
     val patterns = op.patterns
     val in = op.inputs.head
     val out = op.outputs.head
-    if (op.inputSchema == RDFLoad.plainSchema) {
-      return None
-    }
 
-    if (op.inputSchema.isEmpty
-      || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+    if (groupedSchemaEarlyAbort(op.inputSchema)) {
       return None
     }
 
@@ -678,12 +677,8 @@ object Rules {
     val patterns = op.patterns
     val in = op.inputs.head
     val out = op.outputs.head
-    if (op.inputSchema == RDFLoad.plainSchema) {
-      return None
-    }
 
-    if (op.inputSchema.isEmpty
-      || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+    if (groupedSchemaEarlyAbort(op.inputSchema)) {
       return None
     }
 
