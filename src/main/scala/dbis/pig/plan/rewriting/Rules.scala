@@ -434,16 +434,11 @@ object Rules {
 
       val internalPipeName = generate
       val intermediateResultName = generate
-      val filter_by = Column.columnToNamedField(bound_column.get)
-      val filter_value = bound_column.get match {
-        case Column.Subject => pattern.subj
-        case Column.Predicate => pattern.pred
-        case Column.Object => pattern.obj
-      }
+      val eq = RDF.columnToConstraint(bound_column.get, pattern)
 
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
-          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(filter_value))),
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), eq),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
@@ -528,18 +523,8 @@ object Rules {
       val internalPipeName = generate
       val intermediateResultName = generate
 
-      def columnToConstraint(column: Column, p: TriplePattern): Eq = {
-        val filter_by = Column.columnToNamedField(column)
-        val filter_value = column match {
-          case Column.Subject => pattern.subj
-          case Column.Predicate => pattern.pred
-          case Column.Object => pattern.obj
-        }
-        return Eq(RefExpr(filter_by), RefExpr(filter_value))
-      }
-
-      val eq_1 = columnToConstraint(bound_columns.head, pattern)
-      val eq_2 = columnToConstraint(bound_columns.last, pattern)
+      val eq_1 = RDF.columnToConstraint(bound_columns.head, pattern)
+      val eq_2 = RDF.columnToConstraint(bound_columns.last, pattern)
 
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(

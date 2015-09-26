@@ -189,4 +189,21 @@ object RDF {
       columnToString(p.subj) + " " + columnToString(p.pred) + " " + columnToString(p.obj)
     }.mkString(" . ") + " }"
   }
+
+  /** Builds a new [[dbis.pig.op.Eq]] constraint that filters by the value of `column` in `p`.
+    *
+    * @param column
+    * @param p
+    * @return
+    */
+  def columnToConstraint(column: Column, p: TriplePattern): Eq = {
+    val filter_by = Column.columnToNamedField(column)
+    val filter_value = column match {
+      case Column.Subject => p.subj
+      case Column.Predicate => p.pred
+      case Column.Object => p.obj
+    }
+    return Eq(RefExpr(filter_by), RefExpr(filter_value))
+  }
+
 }
