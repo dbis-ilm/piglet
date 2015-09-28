@@ -118,6 +118,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     load_1.outputs.headOption.value.consumer should contain only filter
     load_2.outputs.headOption.value.consumer should contain only join
     filter.outputs.headOption.value.consumer should contain only join
+    join.outputs.headOption.value.consumer should contain only dump
 
     load_1.outputs should have length 1
     load_2.outputs should have length 1
@@ -144,6 +145,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     load_1.outputs.headOption.value.consumer should contain only filter
     load_2.outputs.headOption.value.consumer should contain only cross
     filter.outputs.headOption.value.consumer should contain only cross
+    cross.outputs.headOption.value.consumer should contain only dump
 
     load_1.outputs should have length 1
     load_2.outputs should have length 1
