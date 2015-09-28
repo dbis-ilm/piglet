@@ -38,33 +38,34 @@ import com.typesafe.scalalogging.LazyLogging
 
 class FlinkRun extends PigletBackend with LazyLogging {
   
-  override def execute(master: String, className: String, jarFile: Path, numExecutors: Int){
+  override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]){
     if (master.startsWith("local") && !master.startsWith("localhost")){
       //val cli = new CliFrontend
       //val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
-      submitJar("localhost:6123", numExecutors, jarFile, className)
+      submitJar("localhost:6123", jarFile, backendArgs, className)
     }
     else {
       //val cli = new CliFrontend
       //val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
-      submitJar(master, numExecutors, jarFile, className)
+      submitJar(master, jarFile, backendArgs, className)
     }
   }
 
-  override def executeRaw(file: Path, master: String, numExecutors: Int) = ???
+  override def executeRaw(file: Path, master: String, backendArgs: Map[String,String]) = ???
 
-  def submitJar(master: String, numExecutors: Int, path: Path, className: String, args: String*) = {
+  def submitJar(master: String, path: Path, backendArgs: Map[String,String], className: String, args: String*) = {
 
     val file = path.toFile().getAbsoluteFile()
-    val parallelism = if(numExecutors <= 0) 1 else numExecutors 
     val wait = true
-
+    
+    val parallelism = backendArgs.getOrElse("parallelism", "1").toInt
+    
     try { 
 
       logger.debug(s"submitting $file")
 
       val program = new PackagedProgram(file, className, args:_*)
-
+      
       val configuration = new Configuration()
       val jobManagerAddress = getInetFromHostport(master)
       logger.debug(s"using job manager at $jobManagerAddress for name $master")
