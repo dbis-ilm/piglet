@@ -119,6 +119,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     load_2.outputs.headOption.value.consumer should contain only join
     filter.outputs.headOption.value.consumer should contain only join
     join.outputs.headOption.value.consumer should contain only dump
+    filter.schema shouldBe load_1.schema
 
     load_1.outputs should have length 1
     load_2.outputs should have length 1
@@ -146,6 +147,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     load_2.outputs.headOption.value.consumer should contain only cross
     filter.outputs.headOption.value.consumer should contain only cross
     cross.outputs.headOption.value.consumer should contain only dump
+    filter.schema shouldBe load_1.schema
 
     load_1.outputs should have length 1
     load_2.outputs should have length 1
@@ -915,7 +917,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val op3 = plan.findOperatorForAlias("C").value
     val op4 = plan.sinkNodes.head
 
-    val newPlan = processPlan(plan, buildBinaryPigOperatorStrategy[Join, Filter](Rules.filterBeforeMultipleInputOp))
+    pullOpAcrossMultipleInputOp(op3, op2, op1)
 
     // A -> C, from both sides
     op1.outputs.flatMap(_.consumer) should contain only op3
@@ -927,6 +929,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     // X -> DUMP, from both sides
     op2.outputs.flatMap(_.consumer) should contain only op4
     op4.inputs.map(_.producer) should contain only op2
+
+    op3.schema shouldBe op1.schema
   }
 
   "The ForEachCallingFunctionE" should "extract the function name of a function called in the only GeneratorExpr of a" +

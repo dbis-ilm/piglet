@@ -136,6 +136,9 @@ trait Fixers {
       outp.consumer = List(multipleInputOp)
     }
 
+    // Now that toBePulled doesn't read from multipleInputOp anymore, its schema needs an update.
+    toBePulled.constructSchema
+
     toBePulled
   }
 }
