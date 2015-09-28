@@ -900,21 +900,29 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "pull up toBePulled if it's a consumer of multipleInputOps output pipes" in {
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
-    val op4 = Dump(Pipe("c"))
+    val plan = new DataflowPlan(
+      parseScript("""A = LOAD '$inbase/input/joinInput.csv' USING PigStorage(',') AS (a1:int,a2:int, a3:int);
+                  | B = LOAD '$inbase/input/joinInput.csv' USING PigStorage(',') AS (b1:int,b2:int,b3:int);
+                  | X = JOIN A BY a1, B BY b1;
+                  | C = FILTER X by a1 > 2;
+                  | DUMP C;""".stripMargin))
 
-    // This sets up pipes etc.
-    new DataflowPlan(List(op1, op2, op3, op4))
+    val op1 = plan.findOperatorForAlias("A").value
+    val op1_2 = plan.findOperatorForAlias("B").value
+    val op2 = plan.findOperatorForAlias("X").value
+    val op3 = plan.findOperatorForAlias("C").value
+    val op4 = plan.sinkNodes.head
 
-    pullOpAcrossMultipleInputOp(op3, op2, op1)
+    val newPlan = processPlan(plan, buildBinaryPigOperatorStrategy[Join, Filter](Rules.filterBeforeMultipleInputOp))
 
+    // A -> C, from both sides
     op1.outputs.flatMap(_.consumer) should contain only op3
     op3.inputs.map(_.producer) should contain only op1
+    // C -> X, from both sides ...
     op3.outputs.flatMap(_.consumer) should contain only op2
-    op2.inputs.map(_.producer) should contain only op3
+    // ... and B -> X
+    op2.inputs.map(_.producer) should contain only (op3, op1_2)
+    // X -> DUMP, from both sides
     op2.outputs.flatMap(_.consumer) should contain only op4
     op4.inputs.map(_.producer) should contain only op2
   }
