@@ -13,11 +13,15 @@ import org.apache.pig.PigRunner
  */
 class PigRun extends PigletBackend with BackendConf {
 
-  override def execute(master: String, className: String, jarFile: Path, numExecutors: Int) = ???
+  override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]) = ???
   
-  override def executeRaw(program: Path, master: String, numExecutors: Int) {
-    // TODO: set number of executors/parallelism
-    val stats = PigRunner.run(Array("-x", execType(master), program.toAbsolutePath().toString() ), null)
+  override def executeRaw(program: Path, master: String, backendArgs: Map[String,String]) {
+    
+    val ba = backendArgs.flatMap{ case (k,v) => Array(k,v)}
+    
+    val args = Array("-x", execType(master), program.toAbsolutePath().toString() ) ++ ba  
+    
+    val stats = PigRunner.run(args, null)
     
   }
   
