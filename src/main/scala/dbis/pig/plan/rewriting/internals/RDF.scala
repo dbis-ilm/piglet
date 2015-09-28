@@ -91,9 +91,30 @@ object RDF {
       isBound(pattern.obj, Column.Object)
   }
 
+  /** Extracts all variables as [[dbis.pig.op.NamedField]] objects used in `patterns`.
+    *
+    * The order of the fields returned is '''arbitrary'''.
+    *
+    * @param patterns
+    * @return
+    */
+  def getAllVariables(patterns: Seq[TriplePattern]): Set[NamedField] = {
+    def isNamedField(r: Ref): Set[NamedField] = r match {
+      case f @ NamedField(_) => Set(f)
+      case _ => Set.empty
+    }
+
+    def namedFieldsOf(p: TriplePattern): Set[NamedField] =
+      isNamedField(p.subj) ++
+        isNamedField(p.pred) ++
+        isNamedField(p.obj)
+
+    patterns flatMap namedFieldsOf toSet
+  }
+
   /** Build a map of ([[Column]], [[NamedField]]) to the number of their occurences in ``patterns``.
     */
-  private def buildStarJoinMap(patterns: List[TriplePattern]): Map[(Column.Value, NamedField), Int] = {
+  private def buildStarJoinMap(patterns: Seq[TriplePattern]): Map[(Column.Value, NamedField), Int] = {
     // We count how often each (Column, NamedField) tuple appears in each pattern. If, at the end, a single tuple
     // appears as often as patterns is long, the same variable appears in the same position in each pattern,
     // therefore patterns form a star join.
@@ -124,7 +145,7 @@ object RDF {
     * @param patterns
     * @return
     */
-  def starJoinColumn(patterns: List[TriplePattern]): Option[(Column, NamedField)] = {
+  def starJoinColumn(patterns: Seq[TriplePattern]): Option[(Column, NamedField)] = {
     val variableInPosition = buildStarJoinMap(patterns)
     var column: Option[(Column, NamedField)] = None
 
@@ -147,7 +168,7 @@ object RDF {
       * ``patterns`` form a star join if the same [[dbis.pig.op.NamedField]] is used in the same position in each
       * pattern.
       */
-  def isStarJoin(patterns: List[TriplePattern]): Boolean = {
+  def isStarJoin(patterns: Seq[TriplePattern]): Boolean = {
     buildStarJoinMap(patterns).foldLeft(false) { case (old, ((_, _), count)) =>
       old || count == patterns.length
     }
@@ -168,4 +189,21 @@ object RDF {
       columnToString(p.subj) + " " + columnToString(p.pred) + " " + columnToString(p.obj)
     }.mkString(" . ") + " }"
   }
+
+  /** Builds a new [[dbis.pig.op.Eq]] constraint that filters by the value of `column` in `p`.
+    *
+    * @param column
+    * @param p
+    * @return
+    */
+  def columnToConstraint(column: Column, p: TriplePattern): Eq = {
+    val filter_by = Column.columnToNamedField(column)
+    val filter_value = column match {
+      case Column.Subject => p.subj
+      case Column.Predicate => p.pred
+      case Column.Object => p.obj
+    }
+    return Eq(RefExpr(filter_by), RefExpr(filter_value))
+  }
+
 }
