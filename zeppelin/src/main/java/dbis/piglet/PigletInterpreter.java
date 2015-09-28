@@ -22,25 +22,12 @@ public class PigletInterpreter extends SparkInterpreter {
 
     public void open() {
         logger.info("PigletInterpreter.open");
+        super.open();
     }
 
     public void close() {
         logger.info("PigletInterpreter.close");
-    }
-
-    public void cancel(InterpreterContext context) {
-    }
-
-    public FormType getFormType() {
-        return FormType.SIMPLE;
-    }
-
-    public int getProgress(InterpreterContext context) {
-        return 100;
-    }
-
-    public List<String> completion(String buf, int cursor) {
-        return new ArrayList<String>();
+        super.close();
     }
 
     public InterpreterResult interpret(String line, InterpreterContext context) {
