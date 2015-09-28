@@ -916,8 +916,10 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val op2 = plan.findOperatorForAlias("X").value
     val op3 = plan.findOperatorForAlias("C").value
     val op4 = plan.sinkNodes.head
+    val indexOfPipeFromLoadToJoin = op2.inputs.indexWhere(_.producer == op1)
 
     pullOpAcrossMultipleInputOp(op3, op2, op1)
+    val indexOfPipeFromLoadToFilter = op2.inputs.indexWhere(_.producer == op3)
 
     // A -> C, from both sides
     op1.outputs.flatMap(_.consumer) should contain only op3
@@ -930,6 +932,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     op2.outputs.flatMap(_.consumer) should contain only op4
     op4.inputs.map(_.producer) should contain only op2
 
+    // The pipe from the (now pulled up) filter operation should be at the same position as the one from op1 was
+    indexOfPipeFromLoadToFilter shouldBe indexOfPipeFromLoadToJoin
     op3.schema shouldBe op1.schema
   }
 

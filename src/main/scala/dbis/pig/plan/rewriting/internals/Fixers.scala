@@ -107,7 +107,10 @@ trait Fixers {
       indicator)
 
     // Second, make the toBePulled an input of the multipleInputOp
-    multipleInputOp.inputs = multipleInputOp.inputs.filterNot(_.name == indicator.outPipeName) :+ Pipe(toBePulled.outPipeName, toBePulled)
+    // Put the new pipe to toBePulled at the same position as the old one to indicator so the position of fields
+    // still matches
+    val index = multipleInputOp.inputs.indexWhere(_.name == indicator.outPipeName)
+    multipleInputOp.inputs = multipleInputOp.inputs.updated(index, Pipe(toBePulled.outPipeName, toBePulled))
 
     val oldOutPipeName = multipleInputOp.outPipeName
 
