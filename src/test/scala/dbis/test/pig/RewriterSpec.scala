@@ -94,6 +94,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     pPlan.findOperatorForAlias("b").value shouldBe op3
     pPlan.sinkNodes.headOption.value shouldBe op4
     pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
+    op2.outputs.flatMap(_.consumer) should contain only op4
+    op4.inputs.map(_.producer) should contain only op2
   }
 
   it should "order Filter operations before Joins if only NamedFields are used" in {
@@ -913,6 +915,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     op3.inputs.map(_.producer) should contain only op1
     op3.outputs.flatMap(_.consumer) should contain only op2
     op2.inputs.map(_.producer) should contain only op3
+    op2.outputs.flatMap(_.consumer) should contain only op4
+    op4.inputs.map(_.producer) should contain only op2
   }
 
   "The ForEachCallingFunctionE" should "extract the function name of a function called in the only GeneratorExpr of a" +
