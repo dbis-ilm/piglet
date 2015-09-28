@@ -52,7 +52,7 @@ object PigREPL extends PigParser with LazyLogging {
   case class REPLConfig(master: String = "local",
                         outDir: String = ".",
                         backend: String = Conf.defaultBackend,
-                        numExecutors: Int = 0)
+                        backendArgs: Map[String,String] = null)
 
   val consoleReader = new ConsoleReader()
   val defaultScriptName = "__my_script"
@@ -166,14 +166,14 @@ object PigREPL extends PigParser with LazyLogging {
     var master: String = "local"
     var outDir: Path = null
     var backend: String = Conf.defaultBackend
-    var numExecutors = 1
+    var backendArgs: Map[String, String] = null 
 
     val parser = new OptionParser[REPLConfig]("PigShell") {
       head("PigShell", "0.2")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
-      opt[Int]('n',"num-executors") optional() action { (x,c) => c.copy(numExecutors = x)  } text ("Number of executors")
+      opt[Map[String,String]]("<backend-arguments>...") optional() action { (x, c) => c.copy(backendArgs = x) } text ("Pig script files to execute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
     }
@@ -183,7 +183,7 @@ object PigREPL extends PigParser with LazyLogging {
         master = config.master
         outDir = Paths.get(config.outDir)
         backend = config.backend
-        numExecutors = config.numExecutors
+        backendArgs = config.backendArgs
       }
       case None =>
         // arguments are bad, error message will have been displayed
@@ -284,7 +284,7 @@ object PigREPL extends PigParser with LazyLogging {
           FileTools.compilePlan(plan, defaultScriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
             case Some(jarFile) =>
               val runner = backendConf.runnerClass
-              runner.execute(master, defaultScriptName, jarFile, numExecutors)
+              runner.execute(master, defaultScriptName, jarFile, backendArgs)
 
             case None => println("failed to build jar file for job")
           }

@@ -53,7 +53,8 @@ object PigCompiler extends PigParser with LazyLogging {
                             params: Map[String,String] = Map(),
                             backend: String = Conf.defaultBackend,
                             updateConfig: Boolean = false,
-			                      numExecutors: Int = 0) 
+                            backendArgs: Map[String, String] = Map()
+                          )
 
   def main(args: Array[String]): Unit = {
     var master: String = "local"
@@ -63,7 +64,7 @@ object PigCompiler extends PigParser with LazyLogging {
     var params: Map[String,String] = null
     var backend: String = null
     var updateConfig = false
-    var numExecutors = 0
+    var backendArgs: Map[String, String] = null
 
     val parser = new OptionParser[CompilerConfig]("PigCompiler") {
       head("PigCompiler", "0.2")
@@ -73,7 +74,7 @@ object PigCompiler extends PigParser with LazyLogging {
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
       opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in program home (see config file)")
-      opt[Int]('n',"num-executors") optional() action { (x,c) => c.copy(numExecutors = x)  } text ("Number of executors")
+      opt[Map[String,String]]("backend-args") valueName("key1==value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text("parameter(s) to subsitute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
       arg[File]("<file>...") unbounded() required() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
@@ -89,7 +90,7 @@ object PigCompiler extends PigParser with LazyLogging {
         params = config.params
         backend = config.backend
         updateConfig = config.updateConfig
-        numExecutors = config.numExecutors
+        backendArgs = config.backendArgs
       }
       case None =>
         // arguments are bad, error message will have been displayed
@@ -103,17 +104,17 @@ object PigCompiler extends PigParser with LazyLogging {
     	Conf.copyConfigFile()
     
     // start processing
-    run(inputFiles, outDir, compileOnly, master, backend, params, numExecutors)
+    run(inputFiles, outDir, compileOnly, master, backend, params, backendArgs)
   }
 
-  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], numExecutors: Int): Unit = {
-    run(Seq(inputFile), outDir, compileOnly, master, backend, params, numExecutors)
+  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendArgs: Map[String, String]): Unit = {
+    run(Seq(inputFile), outDir, compileOnly, master, backend, params, backendArgs)
   }
   
   /**
    * Start compiling the Pig script into a the desired program
    */
-  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], numExecutors: Int): Unit = {
+  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendArgs: Map[String, String]): Unit = {
 
 	  try {
 
@@ -129,10 +130,10 @@ object PigCompiler extends PigParser with LazyLogging {
 				  return
 			  }
 
-			  inputFiles.foreach { file => runRaw(file, master, backendConf, numExecutors) }
+			  inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
 
 		  } else {
-			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf, numExecutors)
+			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf, backendArgs)
 		  }
 
 	  } catch {
@@ -145,13 +146,13 @@ object PigCompiler extends PigParser with LazyLogging {
 	  }
   }
   
-  private def runRaw(file: Path, master: String, backendConf: BackendConf, numExecutors: Int) {
-    logger.debug(s"executing in raw mode: $file with master $master for backend ${backendConf.name}")    
+  def runRaw(file: Path, master: String, backendConf: BackendConf, backendArgs: Map[String,String]) {
+    logger.debug(s"executing in raw mode: $file with master $master for backend ${backendConf.name} with arguments ${backendArgs.mkString(" ")}")    
     val runner = backendConf.runnerClass
-    runner.executeRaw(file, master, numExecutors)
+    runner.executeRaw(file, master, backendArgs)
   }
   
-  private def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf, numExecutors: Int) {
+  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf, backendArgs: Map[String,String]) {
     logger.debug("start parsing input files")
     
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
@@ -240,13 +241,12 @@ object PigCompiler extends PigParser with LazyLogging {
         // the file was created --> execute it
         case Some(jarFile) =>  
           if (!compileOnly) {
-          // 4. and finally deploy/submit          
+          // 4. and finally deploy/submit  
           val runner = backendConf.runnerClass 
           logger.debug(s"using runner class ${runner.getClass.toString()}")
           
           logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
-          
-          runner.execute(master, scriptName, jarFile, numExecutors)
+          runner.execute(master, scriptName, jarFile, backendArgs)
         } else
           logger.info("successfully compiled program - exiting.")
           
@@ -271,7 +271,7 @@ object PigCompiler extends PigParser with LazyLogging {
       // 2. then we parse it and construct a dataflow plan
       val plan = new DataflowPlan(parseScriptFromSource(source, params, backend))
       
-      
+
       try {
         // if this does _not_ throw an exception, the schema is ok
         plan.checkSchemaConformance
