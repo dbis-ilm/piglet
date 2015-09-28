@@ -2,12 +2,13 @@ package dbis.piglet;
 
 import org.apache.zeppelin.interpreter.*;
 import org.apache.zeppelin.interpreter.InterpreterResult.Code;
+import org.apache.zeppelin.spark.SparkInterpreter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.util.*;
-import dbis.pig.PigCompiler;
+// import dbis.pig.PigCompiler;
 
-public class PigletInterpreter extends Interpreter {
+public class PigletInterpreter extends SparkInterpreter {
     Logger logger = LoggerFactory.getLogger(PigletInterpreter.class);
 
     static {
@@ -46,10 +47,13 @@ public class PigletInterpreter extends Interpreter {
         if (line == null || line.trim().length() == 0) {
             return new InterpreterResult(Code.SUCCESS);
         }
+        return super.interpret(line, context);
+        /*
         String[] params = { "--backend", "spark", "--master", "local[2]" };
         PigCompiler.main(params);
         InterpreterResult result = new InterpreterResult(Code.SUCCESS, "%tableCol1\tCol2\nAAA\t42\nBBB\t14\nCCC\t18");
 
         return result;
+        */
     }
 }
