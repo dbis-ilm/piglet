@@ -109,6 +109,8 @@ trait Fixers {
     // Second, make the toBePulled an input of the multipleInputOp
     multipleInputOp.inputs = multipleInputOp.inputs.filterNot(_.name == indicator.outPipeName) :+ Pipe(toBePulled.outPipeName, toBePulled)
 
+    val oldOutPipeName = multipleInputOp.outPipeName
+
     // Third, replace the toBePulled in the multipleInputOps outputs with the Filters outputs
     multipleInputOp.outputs foreach { outp =>
       if (outp.consumer contains toBePulled) {
@@ -119,9 +121,9 @@ trait Fixers {
     // Fourth, make the multipleInputOp the producer of all the toBePulleds outputs inputs
     toBePulled.outputs foreach { outp =>
       outp.consumer foreach { cons =>
-        cons.inputs map { cinp =>
+        cons.inputs = cons.inputs map { cinp =>
           if (cinp.producer == toBePulled) {
-            Pipe(multipleInputOp.outPipeName, multipleInputOp)
+            Pipe(oldOutPipeName, multipleInputOp)
           } else {
             cinp
           }
