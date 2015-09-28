@@ -99,58 +99,58 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "order Filter operations before Joins if only NamedFields are used" in {
-    val op1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
+    val load_1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
     ))))
-    val op2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
+    val load_2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
       ("bid", Types.IntType)))
     ))))
     val predicate1 = Lt(RefExpr(NamedField("a")), RefExpr(Value("42")))
 
     // ops before reordering
-    val op3 = Join(Pipe("c"), List(Pipe("a"), Pipe("b")),
+    val join = Join(Pipe("c"), List(Pipe("a"), Pipe("b")),
       List(List(NamedField("aid")),
            List(NamedField("bid"))
       ))
-    val op4 = Filter(Pipe("d"), Pipe("c"), predicate1)
-    val op5 = Dump(Pipe("d"))
+    val filter = Filter(Pipe("d"), Pipe("c"), predicate1)
+    val dump = Dump(Pipe("d"))
 
-    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4, op5)))
-    op1.outputs.headOption.value.consumer should contain only op4
-    op2.outputs.headOption.value.consumer should contain only op3
-    op4.outputs.headOption.value.consumer should contain only(op3, op5)
+    val plan = processPlan(new DataflowPlan(List(load_1, load_2, join, filter, dump)))
+    load_1.outputs.headOption.value.consumer should contain only filter
+    load_2.outputs.headOption.value.consumer should contain only join
+    filter.outputs.headOption.value.consumer should contain only join
 
-    op1.outputs should have length 1
-    op2.outputs should have length 1
-    op3.outputs should have length 1
-    op4.outputs should have length 1
+    load_1.outputs should have length 1
+    load_2.outputs should have length 1
+    join.outputs should have length 1
+    filter.outputs should have length 1
 
-    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(op4, op2)
+    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(filter, load_2)
   }
 
   it should "order Filter operations before Cross operators if only NamedFields are used" in {
-    val op1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
+    val load_1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
     ))))
-    val op2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
+    val load_2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
       ("bid", Types.IntType)))
     ))))
     val predicate1 = Lt(RefExpr(NamedField("a")), RefExpr(Value("42")))
 
     // ops before reordering
-    val op3 = Cross(Pipe("c"), List(Pipe("a"), Pipe("b")))
-    val op4 = Filter(Pipe("d"), Pipe("c"), predicate1)
-    val op5 = Dump(Pipe("d"))
+    val cross = Cross(Pipe("c"), List(Pipe("a"), Pipe("b")))
+    val filter = Filter(Pipe("d"), Pipe("c"), predicate1)
+    val dump = Dump(Pipe("d"))
 
-    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4, op5)))
-    op1.outputs.headOption.value.consumer should contain only op4
-    op2.outputs.headOption.value.consumer should contain only op3
-    op4.outputs.headOption.value.consumer should contain only(op3, op5)
+    val plan = processPlan(new DataflowPlan(List(load_1, load_2, cross, filter, dump)))
+    load_1.outputs.headOption.value.consumer should contain only filter
+    load_2.outputs.headOption.value.consumer should contain only cross
+    filter.outputs.headOption.value.consumer should contain only cross
 
-    op1.outputs should have length 1
-    op2.outputs should have length 1
-    op3.outputs should have length 1
-    op4.outputs should have length 1
+    load_1.outputs should have length 1
+    load_2.outputs should have length 1
+    cross.outputs should have length 1
+    filter.outputs should have length 1
 
-    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(op4, op2)
+    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(filter, load_2)
   }
 
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
