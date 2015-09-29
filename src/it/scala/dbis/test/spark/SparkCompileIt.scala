@@ -29,6 +29,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("load.pig", "result1.out", "truth/result1.data", true),
     ("load2.pig", "result2.out", "truth/result2.data", true),
     ("selfjoin.pig", "joined.out", "truth/joined.data", true),
+    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true),
     ("sort.pig", "sorted.out", "truth/sorted.data", true),
     ("filter.pig", "filtered.out", "truth/filtered.data", true),
     ("foreach1.pig", "distances.out", "truth/distances.data", true),

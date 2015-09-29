@@ -29,6 +29,7 @@ class FlinkCompileIt extends FlatSpec with Matchers with LazyLogging {
     ("load.pig", "result1.out", "truth/result1.data", true),
     ("load2.pig", "result2.out", "truth/result2.data", true),
     ("selfjoin.pig", "joined.out", "truth/joined.data", false),
+    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true),
 //    ("sort.pig", "sorted.out", "sorted.data", true),
     ("foreach1.pig", "distances.out", "truth/distances.data", true),
 //    ("nforeach.pig", "nested.out", "nested.data", true),
