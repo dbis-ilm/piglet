@@ -276,6 +276,27 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
+  it should "infer the schema for cross" in {
+    val plan = new DataflowPlan(parseScript( """
+                                               |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
+                                               |b = load 'file.csv' as (f10:int, f11:double, f12:bytearray);
+                                               |c = cross a, b;
+                                               | """.stripMargin))
+    val schema = plan.operators.last.schema
+    schema match {
+      case Some(s) => {
+        s.fields.length should equal (6)
+        s.field(0) should equal(Field("f1", Types.IntType, List("a")))
+        s.field(1) should equal(Field("f2", Types.CharArrayType, List("a")))
+        s.field(2) should equal(Field("f3", Types.DoubleType, List("a")))
+        s.field(3) should equal(Field("f10", Types.IntType, List("b")))
+        s.field(4) should equal(Field("f11", Types.DoubleType, List("b")))
+        s.field(5) should equal(Field("f12", Types.ByteArrayType, List("b")))
+      }
+      case None => fail()
+    }
+  }
+
   it should "infer the schema for join" in {
     val plan = new DataflowPlan(parseScript("""
         |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
@@ -286,12 +307,12 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (6)
-        s.field(0) should equal(Field("f1", Types.IntType))
-        s.field(1) should equal(Field("f2", Types.CharArrayType))
-        s.field(2) should equal(Field("f3", Types.DoubleType))
-        s.field(3) should equal(Field("f10", Types.IntType))
-        s.field(4) should equal(Field("f11", Types.DoubleType))
-        s.field(5) should equal(Field("f12", Types.ByteArrayType))
+        s.field(0) should equal(Field("f1", Types.IntType, List("a")))
+        s.field(1) should equal(Field("f2", Types.CharArrayType, List("a")))
+        s.field(2) should equal(Field("f3", Types.DoubleType, List("a")))
+        s.field(3) should equal(Field("f10", Types.IntType, List("b")))
+        s.field(4) should equal(Field("f11", Types.DoubleType, List("b")))
+        s.field(5) should equal(Field("f12", Types.ByteArrayType, List("b")))
       }
       case None => fail()
     }

@@ -100,7 +100,7 @@ object RDF {
     */
   def getAllVariables(patterns: Seq[TriplePattern]): Set[NamedField] = {
     def isNamedField(r: Ref): Set[NamedField] = r match {
-      case f @ NamedField(_) => Set(f)
+      case f @ NamedField(_, _) => Set(f)
       case _ => Set.empty
     }
 
@@ -181,7 +181,7 @@ object RDF {
     */
   def triplePatternsToString(patterns: Seq[TriplePattern]): String = {
     def columnToString(column: Ref): String = column match {
-      case NamedField(n) => s"?$n"
+      case NamedField(n, _) => s"?$n"
       case PositionalField(p) => s"$$$p"
       case Value(v) => s"""$v"""
     }

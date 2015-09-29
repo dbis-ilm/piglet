@@ -16,9 +16,27 @@
  */
 package dbis.pig.op
 
+import dbis.pig.schema.Field
+
 sealed abstract class Ref
 
-case class NamedField(name: String) extends Ref
+case class NamedField(name: String, lineage: List[String] = List.empty) extends Ref
+
+object NamedField {
+  def fromString(s: String): NamedField = {
+    val split = s.split(Field.lineageSeparator)
+    NamedField(split.last, split.init.toList)
+  }
+
+  def fromStringList(s: List[String]): NamedField = {
+    require(s.length != 0, "s has to contain at least once element, the name of the field")
+    if (s.length == 1) {
+      NamedField(s.head)
+    } else {
+      fromString(s.mkString(Field.lineageSeparator))
+    }
+  }
+}
 
 case class PositionalField(pos: Int) extends Ref
 
