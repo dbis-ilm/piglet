@@ -373,7 +373,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
         // first, we determine the field in the schema
         val field = refExpr match {
           case DerefTuple(t, r) => t match {
-            case NamedField(n, _) => s.field(n)
+            case nf @ NamedField(_, _) => s.field(nf)
             case PositionalField(p) => s.field(p)
             case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
           }

@@ -730,10 +730,14 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     val ops = parseScript(
       """
          B = ORDER A BY A::B::foo;
+         C = ORDER B BY B::foo;
       """.
         stripMargin)
     val nf = ops.headOption.value.asInstanceOf[OrderBy].orderSpec.headOption.value.field.asInstanceOf[NamedField]
     nf.name shouldBe "foo"
     nf.lineage shouldBe List("A", "B")
+    val nf2 = ops.lastOption.value.asInstanceOf[OrderBy].orderSpec.headOption.value.field.asInstanceOf[NamedField]
+    nf2.name shouldBe "foo"
+    nf2.lineage shouldBe List("B")
   }
 }

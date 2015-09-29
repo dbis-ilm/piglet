@@ -79,7 +79,7 @@ object Expr {
    */
   def checkExpressionConformance(schema: Schema, ex: Expr): Boolean = ex match {
     case RefExpr(r) => r match {
-      case NamedField(n, _) => schema.indexOfField(n) != -1 // TODO: we should produce an error message
+      case nf @ NamedField(_, _) => schema.indexOfField(nf) != -1 // TODO: we should produce an error message
       case _ => true
     }
     case _ => true

@@ -16,12 +16,21 @@
  */
 package dbis.pig.schema
 
+import dbis.pig.op.NamedField
+
 /**
  * An exception indicating failures in schema handling.
  *
- * @param msg a message describing the exeption.
+ * @param msg a message describing the exception.
  */
 case class SchemaException(private val msg: String) extends Exception(msg)
+
+/**
+ * An exception indicating that a field name is ambiguous
+ *
+ * @param msg a message describing the exception
+ */
+case class AmbiguousFieldnameException(private val msg: String) extends  Exception(msg)
 
 /**
  * A schema describes the structure of the output relation of an operator.
@@ -40,11 +49,50 @@ case class Schema(var element: BagType) {
    * @return the position in the field list
    */
   @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
-  def indexOfField(name: String) : Int = {
+  @throws[AmbiguousFieldnameException]("if the NamedField doesn't contain enough information to find the index " +
+    "unambiguously")
+  def indexOfField(name: String) : Int = indexOfField(NamedField(name))
+
+  /**
+   * Returns the index of the field in the schema.
+   *
+   * @param nf A [[dbis.pig.op.NamedField]] object describing the field
+   * @return the position in the field list
+   */
+  @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
+  @throws[AmbiguousFieldnameException]("if the NamedField doesn't contain enough information to find the index " +
+    "unambiguously")
+  def indexOfField(nf: NamedField): Int = {
     if (! element.valueType.isInstanceOf[TupleType])
       throw new SchemaException("schema type isn't a bag of tuples")
     val tupleType = element.valueType.asInstanceOf[TupleType]
-    tupleType.fields.indexWhere(_.name == name)
+    tupleType.fields.count(_.name == nf.name) match {
+      case 0 => -1
+      case 1 =>
+        // There's only one field that has the requested name but it could still happen that the lineage information
+        // doesn't match
+        val idx = tupleType.fields.indexWhere(_.name == nf.name)
+        if (nf.lineage.isEmpty) {
+          // If the NamedField doesn't have lineage information and there's only one possible field, return its index
+          idx
+        } else {
+          val field = tupleType.fields(idx)
+          if (field.lineage == nf.lineage) {
+            idx
+          } else {
+            -1
+          }
+        }
+      case _ =>
+        val possibleField = tupleType.fields.filter(f => nf.name == f.name && nf.lineage == f.lineage)
+        if (possibleField.length == 1) {
+          tupleType.fields.indexOf(possibleField.head)
+        } else {
+          throw new AmbiguousFieldnameException(s"""
+          | there is more than one field called ${nf.name} in $this
+          | and ${nf.lineage} was not enough to disambiguate it""".stripMargin)
+        }
+    }
   }
 
   /**
@@ -69,9 +117,26 @@ case class Schema(var element: BagType) {
    */
   @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
   @throws[SchemaException]("if the schema doesn't contain a field with the given name")
+  @throws[AmbiguousFieldnameException]("if the NamedField doesn't contain enough information to find the index " +
+    "unambiguously")
   def field(name: String): Field = {
     val idx = indexOfField(name)
     if (idx == -1) throw SchemaException("unknown field '" + name + "' in "+ this)
+    field(idx)
+  }
+
+  /**
+   * Returns the field corresponding to the given [[dbis.pig.op.NamedField]]
+   * @param nf
+   * @return
+   */
+  @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
+  @throws[SchemaException]("if the schema doesn't contain a field with the given name")
+  @throws[AmbiguousFieldnameException]("if the NamedField doesn't contain enough information to find the index " +
+    "unambiguously")
+  def field(nf: NamedField): Field = {
+    val idx = indexOfField(nf)
+    if (idx == -1) throw SchemaException("unknown field '" + nf.name + "' in "+ this)
     field(idx)
   }
 
