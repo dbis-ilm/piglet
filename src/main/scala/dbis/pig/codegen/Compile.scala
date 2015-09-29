@@ -151,9 +151,11 @@ trait Compile {
    *
    * @param scriptName the name of the Pig script.
    * @param plan the dataflow plan.
+   * @param forREPL generate code for the Scala/Spark interactive REPL, i.e. without
+   *                Header2 and Footer
    * @return the string representation of the code
    */
-  def compile(scriptName: String, plan: DataflowPlan): String = {
+  def compile(scriptName: String, plan: DataflowPlan, forREPL: Boolean = false): String = {
     require(codeGen != null, "code generator undefined")
 
     if (plan.udfAliases != null) {
@@ -172,14 +174,15 @@ trait Compile {
       code = code + genCode  + (if(genCode.nonEmpty) "\n" else "")
     }
 
-    // generate the object definition representing the script
-    code = code + codeGen.emitHeader2(scriptName)
+    if (!forREPL)
+      // generate the object definition representing the script
+      code = code + codeGen.emitHeader2(scriptName)
 
     for (n <- plan.operators) {
       code = code + codeGen.emitNode(n) + "\n"
     }
 
     // generate the cleanup code
-    code + codeGen.emitFooter
+    if (forREPL) code else code + codeGen.emitFooter
   }
 }

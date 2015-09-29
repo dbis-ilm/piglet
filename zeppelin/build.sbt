@@ -7,6 +7,7 @@ unmanagedJars in Compile += file("zeppelin/lib_unmanaged/zeppelin-spark-0.6.0-in
 libraryDependencies ++= Seq(
     sparkCore % "provided",
     sparkSql % "provided",
+    "org.apache.spark" %% "spark-repl" % "1.5.0",
     "org.apache.zeppelin" % "zeppelin-interpreter" % "0.5.0-incubating"
 )
 

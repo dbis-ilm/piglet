@@ -19,6 +19,7 @@ package dbis.pig
 
 
 import java.io.File
+import dbis.pig.codegen.Compile
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.parser.LanguageFeature._
@@ -130,13 +131,31 @@ object PigCompiler extends PigParser with LazyLogging {
       runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf, backendArgs)
     }
   }
-  
+
+  /**
+   *
+   * @param file
+   * @param master
+   * @param backendConf
+   * @param backendArgs
+   */
   def runRaw(file: Path, master: String, backendConf: BackendConf, backendArgs: Map[String,String]) {
     logger.debug(s"executing in raw mode: $file with master $master for backend ${backendConf.name} with arguments ${backendArgs.mkString(" ")}")    
     val runner = backendConf.runnerClass
     runner.executeRaw(file, master, backendArgs)
   }
-  
+
+  /**
+   *
+   * @param inputFiles
+   * @param outDir
+   * @param compileOnly
+   * @param master
+   * @param backend
+   * @param params
+   * @param backendConf
+   * @param backendArgs
+   */
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf, backendArgs: Map[String,String]) {
     logger.debug("start parsing input files")
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
@@ -187,6 +206,49 @@ object PigCompiler extends PigParser with LazyLogging {
         case None => logger.error(s"creating jar file failed for ${plan._2}") 
       } 
     }
+  }
+
+  /**
+   * Create Scala code for the given backend from the source string.
+   * This method is provided mainly for Zeppelin.
+   *
+   * @param source
+   * @param backend
+   * @return
+   */
+  def createCodeFromInput(source: String, backend: String): String = {
+    val plan = new DataflowPlan(parseScript(source))
+
+    try {
+      // if this does _not_ throw an exception, the schema is ok
+      plan.checkSchemaConformance
+    } catch {
+      case e:SchemaException => {
+        logger.error(s"schema conformance error in ${e.getMessage}")
+        return ""
+      }
+    }
+
+    if (!plan.checkConnectivity) {
+      logger.error(s"dataflow plan not connected")
+      return ""
+    }
+
+    logger.debug(s"successfully created dataflow plan")
+
+    // compile it into Scala code for Spark
+    val backendConf = BackendManager.backend(backend)
+    val generatorClass = Conf.backendGenerator(backend)
+    val extension = Conf.backendExtension(backend)
+    val templateFile = backendConf.templateFile
+    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
+    val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[Compile]
+
+    // 5. generate the Scala code
+    val code = compiler.compile("blubs", plan, true)
+
+    logger.debug("successfully generated scala program")
+    code
   }
 
   /**
