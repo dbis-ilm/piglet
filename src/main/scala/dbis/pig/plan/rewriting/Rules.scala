@@ -24,7 +24,7 @@ import Column.Column
 import FilterUtils._
 import dbis.pig.plan.rewriting.Rewriter._
 import PipeNameGenerator.generate
-import dbis.pig.schema.{Field, Types}
+import dbis.pig.schema.{Schema, Field, Types}
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
@@ -336,9 +336,26 @@ object Rules {
     }
   }
 
+  /** True, if `schema` is one of the grouped schemas, false otherwise.
+    *
+    * @param schema
+    * @return
+    */
+  private def groupedSchemaEarlyAbort(schema: Option[Schema]): Boolean = {
+    if (schema == RDFLoad.plainSchema) {
+      return true
+    }
+
+    if (schema.isEmpty
+      || !RDFLoad.groupedSchemas.values.toList.contains(schema.get)) {
+      return true
+    }
+    false
+  }
+
   /** Applies rewriting rule F4 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Filter operator if `term` was a BGPFilter with a single Pattern filtering on the grouping column
     *         of data in the triple group format
     */
@@ -346,12 +363,8 @@ object Rules {
     val patterns = op.patterns
     val in = op.inputs.head
     val out = op.outputs.head
-    if (op.inputSchema == RDFLoad.plainSchema) {
-      return None
-    }
 
-    if (op.inputSchema.isEmpty
-      || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+    if (groupedSchemaEarlyAbort(op.inputSchema)) {
       return None
     }
 
@@ -388,17 +401,17 @@ object Rules {
     return filter
   }
 
+  /** Applies rewriting rule F5 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    * @param term
+    * @return
+    */
   def F5(term: Any): Option[Foreach] = term match {
     case op@BGPFilter(_, _, patterns) =>
       val in = op.inputs.head
       val out = op.outputs.head
 
-      if (op.inputSchema == RDFLoad.plainSchema) {
-        return None
-      }
-
-      if (op.inputSchema.isEmpty
-        || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+      if (groupedSchemaEarlyAbort(op.inputSchema)) {
         return None
       }
 
@@ -429,16 +442,96 @@ object Rules {
 
       val internalPipeName = generate
       val intermediateResultName = generate
-      val filter_by = Column.columnToNamedField(bound_column.get)
-      val filter_value = bound_column.get match {
-        case Column.Subject => pattern.subj
-        case Column.Predicate => pattern.pred
-        case Column.Object => pattern.obj
-      }
+      val eq = RDF.columnToConstraint(bound_column.get, pattern)
 
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
-          Filter(Pipe(intermediateResultName), Pipe("stmts"), Eq(RefExpr(filter_by), RefExpr(filter_value))),
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), eq),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField(intermediateResultName)))),
+                Some(Field("cnt", Types.ByteArrayType))))))))
+
+      val filter = Filter(out, Pipe(internalPipeName, foreach),
+        Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
+
+      foreach.outputs foreach (_.addConsumer(filter))
+
+      filter.outputs foreach { output =>
+        output.consumer foreach { consumer =>
+          consumer.inputs foreach { input =>
+            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
+            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
+            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
+            // that.
+            if (input.producer == op) {
+              input.producer = filter
+            }
+          }
+        }
+      }
+
+      in.removeConsumer(op)
+
+      Some(foreach)
+    case _ => None
+  }
+
+  /** Applies rewriting rule F6 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    * @param term
+    * @return
+    */
+  def F6(term: Any): Option[Foreach] = term match {
+    case op@BGPFilter(_, _, patterns) =>
+      val in = op.inputs.head
+      val out = op.outputs.head
+
+      if (groupedSchemaEarlyAbort(op.inputSchema)) {
+        return None
+      }
+
+      if (patterns.length != 1) {
+        return None
+      }
+
+      // TODO we make a lot of assumptions about Options and Array lengths here
+      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+      val pattern = patterns.head
+
+      // Check if the column that's grouped by is not bound in this pattern
+      val bound_columns = RDF.getAllBoundColumns(pattern)
+
+      // If the number of bound variables in the pattern isn't 2, this rule doesn't apply.
+      if (bound_columns.length != 2) {
+        return None
+      }
+
+      val applies = grouped_by match {
+        case "subject" if bound_columns contains Column.Subject => false
+        case "predicate" if bound_columns contains Column.Predicate => false
+        case "object" if bound_columns contains Column.Object => false
+        // Just in case there's no bound column
+        case _ if bound_columns.isEmpty => false
+        case _ => true
+      }
+
+      // If not, this rule doesn't apply
+      if (!applies) {
+        return None
+      }
+
+      val internalPipeName = generate
+      val intermediateResultName = generate
+
+      val eq_1 = RDF.columnToConstraint(bound_columns.head, pattern)
+      val eq_2 = RDF.columnToConstraint(bound_columns.last, pattern)
+
+      val foreach =
+        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), And(eq_1, eq_2)),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
@@ -481,12 +574,8 @@ object Rules {
     val patterns = op.patterns
     val in = op.inputs.head
     val out = op.outputs.head
-    if (op.inputSchema == RDFLoad.plainSchema) {
-      return None
-    }
 
-    if (op.inputSchema.isEmpty
-      || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+    if (groupedSchemaEarlyAbort(op.inputSchema)) {
       return None
     }
 
@@ -588,12 +677,8 @@ object Rules {
     val patterns = op.patterns
     val in = op.inputs.head
     val out = op.outputs.head
-    if (op.inputSchema == RDFLoad.plainSchema) {
-      return None
-    }
 
-    if (op.inputSchema.isEmpty
-      || !RDFLoad.groupedSchemas.values.toList.contains(op.inputSchema.get)) {
+    if (groupedSchemaEarlyAbort(op.inputSchema)) {
       return None
     }
 
