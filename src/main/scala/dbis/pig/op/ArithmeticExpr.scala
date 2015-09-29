@@ -28,7 +28,7 @@ case class RefExpr(r: Ref) extends ArithmeticExpr {
 
   override def resultType(schema: Option[Schema]): (String, PigType) = schema match {
     case Some(s) => r match {
-      case NamedField(n) => try {
+      case NamedField(n, _) => try {
         val f = s.field(n)
         (n, f.fType)
       }

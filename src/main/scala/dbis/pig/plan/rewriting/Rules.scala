@@ -765,7 +765,7 @@ object Rules {
       }
 
       def isNamed(r: Ref): Option[NamedField] = r match {
-        case n@NamedField(_) => Some(n)
+        case n@NamedField(_, _) => Some(n)
         case _ => None
       }
 

@@ -49,7 +49,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
             case Some(udf) if (udf.isAggregate) => {
               if(node.inputSchema == None) throw new SchemaException(s"unknown input schema for node $node")
                 val newExpr = params.head.asInstanceOf[RefExpr].r match {
-                case NamedField(f) => {
+                case NamedField(f, _) => {
                   udfs += s"""("${udf.name}" ,List(${node.inputSchema.get.indexOfField(f)}))"""
                   PositionalField(node.inputSchema.get.fields.size + posCounter)
                 }

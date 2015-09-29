@@ -1062,5 +1062,4 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       plan.sinkNodes.headOption.value,
       Distinct(Pipe("b"), Pipe("a")))
   }
-
 }

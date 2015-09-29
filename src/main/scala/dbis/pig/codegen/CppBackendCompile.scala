@@ -82,7 +82,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * @return
    */
   private def emitRef(schema: Option[Schema], ref: Ref, tuple: String = "tp"): String = ref match {
-    case NamedField(f) => schema match {
+    case NamedField(f, _) => schema match {
       case Some(s) => {
         val idx = s.indexOfField(f)
         if (idx == -1)
@@ -106,7 +106,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    */
   def tupleSchema(schema: Option[Schema], ref: Ref): Option[Schema] = {
     val tp = ref match {
-      case NamedField(f) => schema match {
+      case NamedField(f, _) => schema match {
         case Some(s) => s.field(f).fType
         case None    => throw new SchemaException(s"unknown schema for field $f")
       }
@@ -125,7 +125,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
   private def getFieldInfo(schema: Option[Schema], ref: Ref): (Int, PigType) = schema match {
     case Some(s) => {
       ref match {
-        case NamedField(f) => {
+        case NamedField(f, _) => {
           val idx = s.indexOfField(f)
           if (idx == -1)
             throw SchemaException(s"unknown $f in schema")

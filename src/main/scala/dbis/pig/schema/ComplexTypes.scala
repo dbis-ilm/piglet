@@ -18,8 +18,6 @@
 package dbis.pig.schema
 
 case class Field(name: String, fType: PigType = Types.ByteArrayType, lineage: List[String] = List.empty) {
-  final val lineageSeparator = "::"
-
   override def toString = s"${nameWithLineage}: ${fType.descriptionString}"
   def isBagType = fType.isInstanceOf[BagType]
 
@@ -27,9 +25,13 @@ case class Field(name: String, fType: PigType = Types.ByteArrayType, lineage: Li
     if (lineage.isEmpty) {
       name
     } else {
-      lineage :+ name mkString(lineageSeparator)
+      lineage :+ name mkString(Field.lineageSeparator)
     }
   }
+}
+
+object Field {
+  final val lineageSeparator = "::"
 }
 
 /**
