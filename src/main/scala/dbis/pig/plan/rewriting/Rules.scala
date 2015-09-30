@@ -16,7 +16,8 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.plan.rewriting.internals.{RDF, Column, PipeNameGenerator, FilterUtils}
+import dbis.pig.plan.PipeNameGenerator
+import dbis.pig.plan.rewriting.internals.{RDF, Column, FilterUtils}
 
 import scala.collection.mutable.ListBuffer
 import dbis.pig.op._

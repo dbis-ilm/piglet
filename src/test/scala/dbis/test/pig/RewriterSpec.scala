@@ -21,10 +21,9 @@ import java.net.URI
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.parser.PigParser
-import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.{PipeNameGenerator, DataflowPlan}
 import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.internals.PipeNameGenerator
 import dbis.pig.plan.rewriting.{Rewriter, Rules}
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
 import dbis.test.TestTools._
