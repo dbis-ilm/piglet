@@ -238,6 +238,7 @@ object PigCompiler extends PigParser with LazyLogging {
 
     // compile it into Scala code for Spark
     val backendConf = BackendManager.backend(backend)
+    BackendManager.backend = backendConf
     val generatorClass = Conf.backendGenerator(backend)
     val extension = Conf.backendExtension(backend)
     val templateFile = backendConf.templateFile
@@ -246,7 +247,6 @@ object PigCompiler extends PigParser with LazyLogging {
 
     // 5. generate the Scala code
     val code = compiler.compile("blubs", plan, true)
-
     logger.debug("successfully generated scala program")
     code
   }

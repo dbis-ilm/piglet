@@ -165,7 +165,8 @@ trait Compile {
     // generate import statements
     var code = codeGen.emitImport
 
-    code = code + codeGen.emitHeader1(scriptName, plan.code)
+    if (!forREPL)
+      code = code + codeGen.emitHeader1(scriptName, plan.code)
 
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
