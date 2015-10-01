@@ -153,6 +153,17 @@ object Rules {
   //noinspection ScalaDocMissingParameterDescription
   def mergeWithEmpty(parent: PigOperator, child: Empty): Option[PigOperator] = Some(child)
 
+  /** Finds the next BGPFilter object reachable from ``op``.
+    */
+  private def nextBGPFilter(op: PigOperator): Option[BGPFilter] = op match {
+    case bf@BGPFilter(_, _, _) => Some(bf)
+    // We need to make sure that each intermediate operator has only one successor - if it has multiple, we can't
+    // pull up the BGPFilter because its patterns don't apply to all successors of the RDFLoad
+    case _: OrderBy | _: Distinct | _: Limit | _: RDFLoad
+      if op.outputs.flatMap(_.consumer).length == 1 => op.outputs.flatMap(_.consumer).map(nextBGPFilter).head
+    case _ => None
+  }
+
   /** Applies rewriting rule R1 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
@@ -161,11 +172,8 @@ object Rules {
   //noinspection ScalaDocMissingParameterDescription
   def R1(op: RDFLoad): Option[Load] = {
     // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
-    if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
-      return None
-    }
-
-    if (op.BGPFilterIsReachable) {
+    val next_bgpfilter = nextBGPFilter(op)
+    if (next_bgpfilter.isDefined && next_bgpfilter.get.schema == op.schema) {
       return None
     }
 
@@ -184,20 +192,10 @@ object Rules {
   def R2 = rulefs[RDFLoad] {
     case op =>
 
-      /** Finds the next BGPFilter object reachable from ``op``.
-        */
-      def nextBGPFilter(op: PigOperator): Option[BGPFilter] = op match {
-        case bf@BGPFilter(_, _, _) => Some(bf)
-        // We need to make sure that each intermediate operator has only one successor - if it has multiple, we can't
-        // pull up the BGPFilter because its patterns don't apply to all successors of the RDFLoad
-        case _: OrderBy | _: Distinct | _: Limit | _: RDFLoad
-          if op.outputs.flatMap(_.consumer).length == 1 => op.outputs.flatMap(_.consumer).map(nextBGPFilter).head
-        case _ => None
-      }
 
       val bf = nextBGPFilter(op)
 
-      if (bf.isDefined) {
+      if (bf.isDefined && bf.get.schema == op.schema) {
         // This is the function we'll use for replacing RDFLoad with Load
         def replacer = buildOperatorReplacementStrategy { sop: Any =>
           if (sop == op) {

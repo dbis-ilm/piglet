@@ -258,6 +258,26 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     plan.operators should not contain op3
   }
 
+  it should "not apply rewriting rule R2 if the schema of the next BGPFilter does not match the RDFLoads schema" in {
+    val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List(OrderBySpec(NamedField("subject"), OrderByDirection.DescendingOrder)))
+    val op3 = BGPFilter(Pipe("c"), Pipe("b"),
+      List(
+        TriplePattern(
+          PositionalField(0),
+          Value(""""firstName""""),
+          Value(""""Wieland"""")),
+        TriplePattern(
+          PositionalField(0),
+          Value(""""lastName""""),
+          Value(""""Hoffmann""""))))
+    val op4 = Dump(Pipe("c"))
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
+    val source = plan.sourceNodes.headOption.value
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("pig.SPARQLLoader"),
+      List("""SELECT * WHERE { ?s ?p ?o }"""))
+  }
+
   it should "apply rewriting rule L2" in {
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
     forAll (possibleGroupers) { (g: String) =>
