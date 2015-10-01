@@ -500,7 +500,10 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       callST("store", Map("in"->in,"file"->file.toString(),"schema"->s"tuple${in}ToString(t)","func"->func))
   }
 
-
+  def tableHeader(schema: Option[Schema]): String = schema match {
+    case Some(s) => s.fields.map(f => f.name).mkString("\t")
+    case None => ""
+  }
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
@@ -519,6 +522,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
          */
       case Load(out, file, schema, func, params) => emitLoad(node, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inPipeName))
+      case Display(in) => callST("display", Map("in"->node.inPipeName, "tableHeader"->tableHeader(node.inputSchema)))
       case Store(in, file, func, params) => emitStore(node.inPipeName, file, func)
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))

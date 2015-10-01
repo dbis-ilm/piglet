@@ -130,6 +130,7 @@ object Rules {
     // Store and Dump are ok
     case Store(_, _, _, _) => None
     case Dump(_) => None
+    case Display(_) => None
     // To prevent recursion, empty is ok as well
     case Empty(_) => None
     case op: PigOperator =>

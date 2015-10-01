@@ -34,6 +34,11 @@ dump(in) ::=<<
         <in>.collect.map(t => println(t.mkString(",")))
 >>
 
+// ------------------ DISPLAY results in Zeppelin -----------------------------
+display(in, tableHeader) ::=<<
+        println("%table <tableHeader>\n" + <in>.collect.map(t => t.mkString("\t")).mkString("\n") + "\n\n")
+>>
+
 // ------------------ STORE Results on disk -----------------------------------
 
 store(in,file,schema,func) ::=<<

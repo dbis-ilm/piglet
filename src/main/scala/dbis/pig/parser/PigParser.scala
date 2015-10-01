@@ -192,6 +192,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   lazy val loadKeyword = "load".ignoreCase
   lazy val dumpKeyword = "dump".ignoreCase
+  lazy val displayKeyword = "display".ignoreCase
   lazy val storeKeyword = "store".ignoreCase
   lazy val intoKeyword = "into".ignoreCase
   lazy val filterKeyword = "filter".ignoreCase
@@ -322,6 +323,11 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * DUMP <A>
    */
   def dumpStmt: Parser[PigOperator] = dumpKeyword ~ bag ^^ { case _ ~ b => new Dump(Pipe(b)) }
+
+  /*
+   * DISPLAY <A>
+   */
+  def displayStmt: Parser[PigOperator] = displayKeyword ~ bag ^^ { case _ ~ b => new Display(Pipe(b)) }
 
   /*
    * STORE <A> INTO "<FileName>"
@@ -557,7 +563,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | displayStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   def undelimStmt: Parser[PigOperator] = embedStmt
