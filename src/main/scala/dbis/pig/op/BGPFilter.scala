@@ -17,7 +17,8 @@
 
 package dbis.pig.op
 
-import dbis.pig.schema.Schema
+import dbis.pig.plan.rewriting.internals.RDF
+import dbis.pig.schema._
 
 
 case class TriplePattern(subj: Ref, pred: Ref, obj: Ref)
@@ -37,13 +38,32 @@ case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends
   override def lineageString: String = s"""BGPFilter%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
-    // TODO
-    true
+    if (schema.isEmpty) {
+      return false
+    }
+
+    if (schema == RDFLoad.plainSchema) {
+      return true
+    }
+    if (RDFLoad.groupedSchemas.values.toList contains schema.get) {
+      return true
+    }
+
+    false
   }
 
-  schema = inputSchema
-
   override def constructSchema: Option[Schema] = {
+    if (patterns.length < 2) {
+      schema = inputSchema
+    } else {
+      val variables = RDF.getAllVariables(patterns)
+      var fields = List[Field]()
+      variables foreach { v =>
+        fields = fields :+ Field(v.name, Types.CharArrayType)
+      }
+      fields = fields.sortWith((f1, f2) => f2.name.compareTo(f2.name) >= 0)
+      schema = Some(Schema(BagType(TupleType(fields.toArray))))
+    }
     schema
   }
 }

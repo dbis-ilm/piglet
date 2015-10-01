@@ -37,9 +37,11 @@ case class Cross(out: Pipe, in: List[Pipe], timeWindow: Tuple2[Int,String]= null
   override def constructSchema: Option[Schema] = {
     val newFields = ArrayBuffer[Field]()
     inputs.foreach(p => p.producer.schema match {
-        case Some(s) => newFields ++= s.fields
-        case None => ??? 
-      })  
+      case Some(s) => newFields ++= s.fields map { f =>
+        Field(f.name, f.fType, p.name :: f.lineage)
+      }
+      case None => ???
+    })
     schema = Some(new Schema(BagType(TupleType(newFields.toArray))))
     schema
   }

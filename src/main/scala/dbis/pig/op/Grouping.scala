@@ -95,7 +95,7 @@ case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var wind
     inputSchema match {
       case Some(s) => {
         // if we know the schema we check all named fields
-        ! groupExpr.keyList.filter(_.isInstanceOf[NamedField]).exists(f => s.indexOfField(f.asInstanceOf[NamedField].name) == -1)
+        ! groupExpr.keyList.filter(_.isInstanceOf[NamedField]).exists(f => s.indexOfField(f.asInstanceOf[NamedField]) == -1)
       }
       case None => {
         // if we don't have a schema all expressions should contain only positional fields
