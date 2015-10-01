@@ -134,4 +134,62 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       plan.findOperatorForAlias("b").value.checkSchemaConformance shouldBe true
     }
   }
+
+  "patternsToConstraint" should "return None if no column is bound by the pattern" in {
+    val pattern = TriplePattern(PositionalField(0), PositionalField(1), PositionalField(2))
+    RDF.patternToConstraint(pattern) shouldBe None
+  }
+
+  it should "return a single Eq constraint if only one column is bound" in {
+    val patterns = Table(
+      ("pattern", "constraint"),
+      (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
+        Some(Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))))),
+      (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
+        Some(Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))),
+      (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
+        Some(Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))
+    )
+
+    forAll(patterns) ((p, c) =>
+      RDF.patternToConstraint(p) shouldBe c
+    )
+  }
+
+  it should "return And'ed constraints if multiple columns are bound" in {
+    val patterns = Table(
+      ("pattern", "constraint"),
+      (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
+        Some(
+          And(
+            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))))
+          ),
+      (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
+        Some(
+          And(
+            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))
+        ),
+      (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
+        Some(
+          And(
+            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))
+        ),
+      (TriplePattern(Value("subject"), Value("predicate"), Value("object")),
+        Some(
+          And(
+            And(
+              Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+              Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))
+            ),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))
+        )
+    )
+
+    forAll(patterns) ((p, c) =>
+      RDF.patternToConstraint(p) shouldBe c
+    )
+  }
 }

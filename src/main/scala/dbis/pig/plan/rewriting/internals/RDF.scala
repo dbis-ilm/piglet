@@ -206,4 +206,18 @@ object RDF {
     return Eq(RefExpr(filter_by), RefExpr(filter_value))
   }
 
+  /** Builds a [[dbis.pig.op.Predicate]] that checks for all the bound columns in `p`.
+   *
+   * @param p
+   * @return None, if no columns are bound.
+   */
+  def patternToConstraint(p: TriplePattern): Option[Predicate] = {
+    val bound_columns = getAllBoundColumns(p)
+    val constraints = bound_columns map {c => columnToConstraint(c, p)}
+    constraints.length match {
+      case 0 => None
+      case 1 => Some(constraints.head)
+      case _ => Some(constraints reduceLeft And)
+    }
+  }
 }

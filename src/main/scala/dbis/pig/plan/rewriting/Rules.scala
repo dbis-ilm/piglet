@@ -441,7 +441,7 @@ object Rules {
 
       val internalPipeName = generate
       val intermediateResultName = generate
-      val eq = RDF.columnToConstraint(bound_column.get, pattern)
+      val eq = RDF.patternToConstraint(pattern).get
 
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
@@ -524,13 +524,12 @@ object Rules {
 
       val internalPipeName = generate
       val intermediateResultName = generate
+      val constraint = RDF.patternToConstraint(pattern).get
 
-      val eq_1 = RDF.columnToConstraint(bound_columns.head, pattern)
-      val eq_2 = RDF.columnToConstraint(bound_columns.last, pattern)
 
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
-          Filter(Pipe(intermediateResultName), Pipe("stmts"), And(eq_1, eq_2)),
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), constraint),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
