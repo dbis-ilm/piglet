@@ -51,7 +51,7 @@ class PigParserSpec extends FlatSpec with OptionValues {
     val uri1 = new URI("file.data")
     val uri2 = new URI("file.n3")
     assert(parseScript("""a = LOAD 'file.data' using PigStorage(',');""") ==
-      List(Load(Pipe("a"), uri1, None, Some("PigStorage"), List("""','"""))))
+      List(Load(Pipe("a"), uri1, None, Some("PigStorage"), List("""",""""))))
     assert(parseScript("""a = LOAD 'file.n3' using RDFFileStorage();""") ==
       List(Load(Pipe("a"), uri2, None, Some("RDFFileStorage"))))
   }

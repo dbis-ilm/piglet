@@ -434,11 +434,12 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   private def getFieldTypes(s: Schema): String = {
       val fieldList = s.fields.zipWithIndex
       val castList = fieldList.map { case (f, i) => ( 
-          if (f.fType == Types.CharArrayType || f.fType == Types.ByteArrayType) 
+          if (f.fType == Types.CharArrayType || f.fType == Types.ByteArrayType || f.fType.isInstanceOf[ComplexType])
             s"t($i)" 
-          else  
+          else
             s"t($i).to${scalaTypeMappingTable(f.fType)}"
-      ) }
+         // s"t($i).asInstanceOf[${scalaTypeMappingTable(f.fType)}]"
+        ) }
       castList.mkString(",")
   }
   /**

@@ -24,8 +24,7 @@ object PigBuild extends Build {
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
     dependsOn(mapreduce % "test;it").
-    dependsOn(zeppelin).
-    aggregate(common, sparklib, flinklib, mapreduce, zeppelin) // remove this if you don't want to automatically build these projects when building piglet 
+    aggregate(common, sparklib, flinklib, mapreduce) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -39,11 +38,6 @@ object PigBuild extends Build {
     dependsOn(common)
 
   lazy val mapreduce = (project in file("mapreduce")).
-    settings(commonSettings: _*).
-    dependsOn(common)
-        
-
-  lazy val zeppelin = (project in file("zeppelin")).
     settings(commonSettings: _*).
     dependsOn(common)
         

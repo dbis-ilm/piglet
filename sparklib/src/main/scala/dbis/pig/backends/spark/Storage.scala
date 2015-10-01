@@ -27,8 +27,8 @@ import java.io.FileOutputStream
 
 
 class PigStorage extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, delim: Char = '\t'): RDD[List[String]] =
-    sc.textFile(path).map(line => line.split(delim.toString(), -1).toList)
+  def load(sc: SparkContext, path: String, delim: String = "\t"): RDD[List[String]] =
+    sc.textFile(path).map(line => line.split(delim, -1).toList)
 
   def write(path: String, rdd: RDD[String]) = rdd.saveAsTextFile(path)
 }
@@ -77,10 +77,24 @@ class JsonStorage extends java.io.Serializable {
   def load(sc: SparkContext, path: String): RDD[List[Any]] = {
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     // TODO: convert a DataFrame to a RDD with generic components
-    sqlContext.read.json(path).rdd.map(_.toSeq.toList)
+    sqlContext.read.json(path).rdd.map(_.toSeq.map(v => v.toString).toList)
   }
 }
 
 object JsonStorage {
   def apply(): JsonStorage = new JsonStorage
+}
+
+//-----------------------------------------------------------------------------------------------------
+
+class JdbcStorage extends java.io.Serializable {
+  def load(sc: SparkContext, table: String, driver: String): RDD[List[String]] = {
+    val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+    // TODO: convert a DataFrame to a RDD with generic components
+    sqlContext.load("jdbc", Map("url" -> driver, "dbtable" -> table)).rdd.map(_.toSeq.map(v => v.toString).toList)
+  }
+}
+
+object JdbcStorage {
+  def apply(): JdbcStorage = new JdbcStorage
 }

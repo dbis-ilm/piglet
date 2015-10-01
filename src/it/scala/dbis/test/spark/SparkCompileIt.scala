@@ -40,10 +40,11 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("union.pig", "united.out", "truth/united.data", true),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false),
-    ("embedded.pig", "embedded.out", "truth/embedded.data", true),
-    ("rscript.pig", "cluster.out", "truth/cluster.data", true)
+    ("embedded.pig", "embedded.out", "truth/embedded.data", true)
+    //("rscript.pig", "cluster.out", "truth/cluster.data", true),
+    //("json.pig", "json.out", "json.data", true),
+    // ("jdbc.pig", "jdbc-data.out", "truth/jdbc-data.data", true)
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
-    // ("json.pig", "json.out", "json.data", true)
   )
 
   def cleanupResult(dir: String): Unit = {
