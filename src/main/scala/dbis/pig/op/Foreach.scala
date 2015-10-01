@@ -235,7 +235,7 @@ class NamedFieldExtractor {
 
   def collectNamedFields(schema: Schema, ex: Expr): Boolean = ex match {
     case RefExpr(r) => r match {
-      case NamedField(n) => fields += r.asInstanceOf[NamedField]; true
+      case NamedField(n, _) => fields += r.asInstanceOf[NamedField]; true
       case _ => true
     }
     case _ => true
@@ -312,7 +312,7 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
     exprs.foreach(e => e.expr.traverseAnd(null, traverse.collectRefExprs))
     // then we have to handle the different kinds of RefExprs
     traverse.exprs.foreach(rex => rex.r match {
-      case NamedField(n) => {
+      case NamedField(n, _) => {
         // case 1: n refers to a pipe
         if (parentOp.findOperatorInSubplan(n).isEmpty &&
           // case 2: n refers to a field of the input schema
@@ -373,7 +373,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
         // first, we determine the field in the schema
         val field = refExpr match {
           case DerefTuple(t, r) => t match {
-            case NamedField(n) => s.field(n)
+            case nf @ NamedField(_, _) => s.field(nf)
             case PositionalField(p) => s.field(p)
             case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
           }
@@ -386,7 +386,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
 
         val componentType = refExpr match {
           case DerefTuple(t, r) => r match {
-            case NamedField(n) => fieldType.typeOfComponent(n)
+            case NamedField(n, _) => fieldType.typeOfComponent(n)
             case PositionalField(p) => fieldType.typeOfComponent(p)
             case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
           }

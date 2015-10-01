@@ -43,7 +43,9 @@ case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]],
   override def constructSchema: Option[Schema] = {
     val newFields = ArrayBuffer[Field]()
     inputs.foreach(p => p.producer.schema match {
-      case Some(s) => newFields ++= s.fields
+      case Some(s) => newFields ++= s.fields map { f =>
+        Field(f.name, f.fType, p.name :: f.lineage)
+      }
       case None => newFields += Field("", Types.ByteArrayType)
     })
     schema = Some(new Schema(BagType(TupleType(newFields.toArray))))
