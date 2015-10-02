@@ -16,7 +16,8 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.plan.rewriting.internals.{RDF, Column, PipeNameGenerator, FilterUtils}
+import dbis.pig.plan.PipeNameGenerator
+import dbis.pig.plan.rewriting.internals.{RDF, Column, FilterUtils}
 
 import scala.collection.mutable.ListBuffer
 import dbis.pig.op._
@@ -765,7 +766,7 @@ object Rules {
       }
 
       def isNamed(r: Ref): Option[NamedField] = r match {
-        case n@NamedField(_) => Some(n)
+        case n@NamedField(_, _) => Some(n)
         case _ => None
       }
 

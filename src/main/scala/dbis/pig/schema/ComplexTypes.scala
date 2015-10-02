@@ -17,9 +17,21 @@
 
 package dbis.pig.schema
 
-case class Field(name: String, fType: PigType = Types.ByteArrayType) {
-  override def toString = s"${name}: ${fType.descriptionString}"
+case class Field(name: String, fType: PigType = Types.ByteArrayType, lineage: List[String] = List.empty) {
+  override def toString = s"${nameWithLineage}: ${fType.descriptionString}"
   def isBagType = fType.isInstanceOf[BagType]
+
+  def nameWithLineage: String = {
+    if (lineage.isEmpty) {
+      name
+    } else {
+      lineage :+ name mkString(Field.lineageSeparator)
+    }
+  }
+}
+
+object Field {
+  final val lineageSeparator = "::"
 }
 
 /**

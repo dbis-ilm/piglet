@@ -78,11 +78,18 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * A reference can be a named field, a positional field (e.g $0, $1, ...) or a literal.
    */
   def posField: Parser[Ref] = """\$[0-9]*""".r ^^ { p => PositionalField(p.substring(1, p.length).toInt) }
-  def namedField: Parser[Ref] = not(boolean) ~> ident ^^ { i => NamedField(i) }
+  /*
+   * A NamedField is either just the field name or the field name with lineage information prepended.
+   */
+  def namedField: Parser[Ref] = not(boolean) ~>  (namedFieldWithLineage | namedFieldWithoutLineage)
+  def namedFieldWithoutLineage: Parser[NamedField] =  ident ^^ { case i => NamedField(i) }
+  def namedFieldWithLineage: Parser[NamedField] = rep1sep(ident, Field.lineageSeparator) ^^
+    { case l  => NamedField.fromStringList(l) }
+
   def literalField: Parser[Ref] = (floatingPointNumber ^^ { n => Value(n) } | stringLiteral ^^ { s => Value(s) } | boolean ^^ { b => Value(b) })
   def fieldSpec: Parser[Ref] = (posField | namedField | literalField)
   /*
-   * It can be also a dereference operator for tuples, bags or maps.
+   * A reference can be also a dereference operator for tuples, bags or maps.
    */
   def derefBagOrTuple: Parser[Ref] = (posField | namedField) ~ "." ~ (posField | namedField) ^^ { case r1 ~ _ ~ r2 => DerefTuple(r1, r2) }
   def derefMap: Parser[Ref] = (posField | namedField) ~ "#" ~ stringLiteral ^^ { case m ~ _ ~ k => DerefMap(m, k) }
@@ -300,7 +307,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
       val uri = new URI(f)
       
       u match {
-        case Some(p) => new Load(Pipe(b), uri, s, Some(p._1), if (p._2.isEmpty) null else p._2)
+        case Some(p) => new Load(Pipe(b), uri, s, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
         case None => new Load(Pipe(b), uri, s)
       }
   }
