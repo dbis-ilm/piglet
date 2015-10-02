@@ -29,6 +29,10 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("load.pig", "result1.out", "truth/result1.data", true),
     ("load2.pig", "result2.out", "truth/result2.data", true),
     ("selfjoin.pig", "joined.out", "truth/joined.data", true),
+    ("selfjoin_ambiguous_fieldnames.pig", "joined_ambiguous_fieldnames.out", "truth/joined_ambiguous_fieldnames.data",
+      // Pigs OrderBy is not a stable sort
+      false),
+    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true),
     ("sort.pig", "sorted.out", "truth/sorted.data", true),
     ("filter.pig", "filtered.out", "truth/filtered.data", true),
     ("foreach1.pig", "distances.out", "truth/distances.data", true),
@@ -40,10 +44,11 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("union.pig", "united.out", "truth/united.data", true),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false),
-    ("embedded.pig", "embedded.out", "truth/embedded.data", true),
-    ("rscript.pig", "cluster.out", "truth/cluster.data", true)
+    ("embedded.pig", "embedded.out", "truth/embedded.data", true)
+    //("rscript.pig", "cluster.out", "truth/cluster.data", true),
+    //("json.pig", "json.out", "json.data", true),
+    // ("jdbc.pig", "jdbc-data.out", "truth/jdbc-data.data", true)
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
-    // ("json.pig", "json.out", "json.data", true)
   )
 
   def cleanupResult(dir: String): Unit = {

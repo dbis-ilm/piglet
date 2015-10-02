@@ -56,8 +56,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    */
   def tupleSchema(schema: Option[Schema], ref: Ref): Option[Schema] = {
     val tp = ref match {
-      case NamedField(f) => schema match {
-        case Some(s) => s.field(f).fType
+      case nf @ NamedField(f, _) => schema match {
+        case Some(s) => s.field(nf).fType
         case None => throw new SchemaException(s"unknown schema for field $f")
       }
       case PositionalField(p) => schema match {
@@ -111,7 +111,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       case Some(s) => {
         field match {
           case PositionalField(f) => scalaTypeMappingTable(s.field(f).fType)
-          case NamedField(n) => scalaTypeMappingTable(s.field(n).fType)
+          case nf @ NamedField(_, _) => scalaTypeMappingTable(s.field(nf).fType)
           case _ => "String"
         }
       }
@@ -143,8 +143,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return the index of the field
    */
   def findFieldPosition(schema: Option[Schema], field: Ref): Int = field match {
-    case NamedField(f) => schema match {
-      case Some(s) => s.indexOfField(f)
+    case nf @ NamedField(f, _) => schema match {
+      case Some(s) => s.indexOfField(nf)
       case None => -1
     }
     case PositionalField(p) => p
@@ -165,9 +165,9 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return
    */
   def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = ref match {
-    case NamedField(f) => schema match {
+    case nf @ NamedField(f, _) => schema match {
       case Some(s) => {
-        val idx = s.indexOfField(f)
+        val idx = s.indexOfField(nf)
         if (idx == -1) {
           // TODO: field name not found, for now we assume that it refers to a bag (relation)
           f
@@ -434,11 +434,12 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   private def getFieldTypes(s: Schema): String = {
       val fieldList = s.fields.zipWithIndex
       val castList = fieldList.map { case (f, i) => ( 
-          if (f.fType == Types.CharArrayType || f.fType == Types.ByteArrayType) 
+          if (f.fType == Types.CharArrayType || f.fType == Types.ByteArrayType || f.fType.isInstanceOf[ComplexType])
             s"t($i)" 
-          else  
+          else
             s"t($i).to${scalaTypeMappingTable(f.fType)}"
-      ) }
+         // s"t($i).asInstanceOf[${scalaTypeMappingTable(f.fType)}]"
+        ) }
       castList.mkString(",")
   }
   /**

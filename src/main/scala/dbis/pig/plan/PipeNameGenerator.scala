@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting.internals
+package dbis.pig.plan
 
 import scala.collection.mutable.{Set => MutableSet}
 import scala.util.Random

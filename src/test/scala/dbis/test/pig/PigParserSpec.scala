@@ -27,11 +27,11 @@ import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.schema._
-import org.scalatest.{OptionValues, FlatSpec}
+import org.scalatest.{Matchers, OptionValues, FlatSpec}
 
 import scala.util.Random
 
-class PigParserSpec extends FlatSpec with OptionValues {
+class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   "The parser" should "parse a simple load statement" in  {
     val uri = new URI("file.csv")
     assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), uri)))
@@ -51,7 +51,7 @@ class PigParserSpec extends FlatSpec with OptionValues {
     val uri1 = new URI("file.data")
     val uri2 = new URI("file.n3")
     assert(parseScript("""a = LOAD 'file.data' using PigStorage(',');""") ==
-      List(Load(Pipe("a"), uri1, None, Some("PigStorage"), List("""','"""))))
+      List(Load(Pipe("a"), uri1, None, Some("PigStorage"), List("""",""""))))
     assert(parseScript("""a = LOAD 'file.n3' using RDFFileStorage();""") ==
       List(Load(Pipe("a"), uri2, None, Some("RDFFileStorage"))))
   }
@@ -723,5 +723,21 @@ class PigParserSpec extends FlatSpec with OptionValues {
     assert(op.ruleCode.headOption.value.stripLineEnd ==
       """def rule(term: Any): Option[PigOperator] = None
         | def rule2(term: Any): Option[PigOperator] = None""".stripMargin.stripLineEnd)
+  }
+
+
+  it should "parse lineage information for NamedFields" in {
+    val ops = parseScript(
+      """
+         B = ORDER A BY A::B::foo;
+         C = ORDER B BY B::foo;
+      """.
+        stripMargin)
+    val nf = ops.headOption.value.asInstanceOf[OrderBy].orderSpec.headOption.value.field.asInstanceOf[NamedField]
+    nf.name shouldBe "foo"
+    nf.lineage shouldBe List("A", "B")
+    val nf2 = ops.lastOption.value.asInstanceOf[OrderBy].orderSpec.headOption.value.field.asInstanceOf[NamedField]
+    nf2.name shouldBe "foo"
+    nf2.lineage shouldBe List("B")
   }
 }

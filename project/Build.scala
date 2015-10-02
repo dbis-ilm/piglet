@@ -24,7 +24,7 @@ object PigBuild extends Build {
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
     dependsOn(mapreduce % "test;it").
-    aggregate(common, sparklib, flinklib,mapreduce) // remove this if you don't want to automatically build these projects when building piglet 
+    aggregate(common, sparklib, flinklib, mapreduce) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -41,7 +41,6 @@ object PigBuild extends Build {
     settings(commonSettings: _*).
     dependsOn(common)
         
-
   /*
    * define the backend for the compiler: currently we support spark and flink
    */
@@ -84,7 +83,7 @@ object Dependencies {
   val typesafe = "com.typesafe" % "config" % "1.3.0"
   val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0" 
   val log4j = "log4j" % "log4j" % "1.2.17"
-  val slf4j= "org.slf4j" % "slf4j-simple" % "1.6.4"
+  val slf4j = "org.slf4j" % "slf4j-simple" % "1.7.5"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
   val commons = "org.apache.commons" % "commons-exec" % "1.3"

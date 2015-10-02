@@ -33,7 +33,6 @@ else
 fi
 
 echo "Including backends in $BACKEND_DIR"
-
 CP=$CP:$BACKEND_DIR:$CLASSPATH
 
 ALLARGS=$*
