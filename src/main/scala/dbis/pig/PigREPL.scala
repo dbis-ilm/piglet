@@ -104,6 +104,7 @@ object PigREPL extends PigParser with LazyLogging {
     val planBuffer = ListBuffer[PigOperator]()
     var lineBuffer = ""
     var prompt = "pigsh> "
+    var insideEmbeddedCode = false
 
     val history = new FileHistory(Conf.replHistoryFile.toFile().getAbsoluteFile)
     logger.debug(s"will use ${history.getFile} as history file")
@@ -124,11 +125,22 @@ object PigREPL extends PigParser with LazyLogging {
         finished = handler(EmptyLine)
       }
       else if (line.size > 0) {
+        println("add to lineBuffer: " + line)
         lineBuffer += line
+        if (line.startsWith("<%") || line.startsWith("<!")) {
+          insideEmbeddedCode = true
+          prompt = "    | "
+        }
+        else if (insideEmbeddedCode && (line.endsWith("%>") || line.endsWith("!>"))) {
+          prompt = "pigsh> "
+          finished = handler(Line(lineBuffer, planBuffer))
+          lineBuffer = ""
+        }
+
         // if the line doesn't end with a semicolon or the current
         // buffer contains a unbalanced number of brackets
         // then we change the prompt and do not execute the command.
-        if (!isCommand(line) && (! line.trim.endsWith(";") || unbalancedBrackets(lineBuffer))) {
+        else if (!isCommand(line) && (! line.trim.endsWith(";") || unbalancedBrackets(lineBuffer))) {
           prompt = "    | "
         }
         else {
@@ -296,8 +308,8 @@ object PigREPL extends PigParser with LazyLogging {
         processFsCmd(s)
       }
       case Line(s, buf) => try {
-        buf ++= parseScript(s);
-        false 
+        buf ++= parseScript(s)
+        false
       } catch {
         case iae: IllegalArgumentException => println(iae.getMessage); false
       }
