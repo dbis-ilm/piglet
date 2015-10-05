@@ -584,7 +584,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
           val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
           val op3 = Dump(Pipe("b"))
-          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F5))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F6))
 
           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
           plan.operators should contain only(op1, op2, op3)
@@ -869,6 +869,98 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     }
   }
 
+  it should "apply rewriting rule J2" in {
+    val patterns = Table(
+      ("Patterns", "ForEach", "Filter"),
+      (List(
+        TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
+        TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))),
+        Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("obj1")))),
+          Filter(Pipe("pipeEgkYzrkOZO"), Pipe("stmts_2"),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("obj2")))),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField("pipevHyYGvOfsZ")))),
+                Some(Field("cnt0", Types.ByteArrayType))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField("pipeEgkYzrkOZO")))),
+                Some(Field("cnt1", Types.ByteArrayType)))))))),
+        Filter(Pipe("b"), Pipe("pipePClecYbNXF"),
+          And(
+            Gt(RefExpr(NamedField("cnt0")), RefExpr(Value(0))),
+            Gt(RefExpr(NamedField("cnt1")), RefExpr(Value(0))))
+        )),
+
+      (List(
+          TriplePattern(Value("subj1"), NamedField("p"), PositionalField(3)),
+          TriplePattern(Value("subj2"), NamedField("p"), PositionalField(3))),
+        Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
+            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subj1")))),
+          Filter(Pipe("pipeEgkYzrkOZO"), Pipe("stmts_2"),
+            Eq(RefExpr(NamedField("subject")), RefExpr(Value("subj2")))),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField("pipevHyYGvOfsZ")))),
+                Some(Field("cnt0", Types.ByteArrayType))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField("pipeEgkYzrkOZO")))),
+                Some(Field("cnt1", Types.ByteArrayType)))))))),
+        Filter(Pipe("b"), Pipe("pipePClecYbNXF"),
+          And(
+            Gt(RefExpr(NamedField("cnt0")), RefExpr(Value(0))),
+            Gt(RefExpr(NamedField("cnt1")), RefExpr(Value(0))))
+        )),
+
+      (List(
+        TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")),
+        TriplePattern(PositionalField(0), Value("pred2"), NamedField("o"))),
+        Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
+            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("pred1")))),
+          Filter(Pipe("pipeEgkYzrkOZO"), Pipe("stmts_2"),
+            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("pred2")))),
+          Generate(
+            List(
+              GeneratorExpr(RefExpr(NamedField("*"))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField("pipevHyYGvOfsZ")))),
+                Some(Field("cnt0", Types.ByteArrayType))),
+              GeneratorExpr(Func("COUNT",
+                List(RefExpr(NamedField("pipeEgkYzrkOZO")))),
+                Some(Field("cnt1", Types.ByteArrayType)))))))),
+        Filter(Pipe("b"), Pipe("pipePClecYbNXF"),
+          And(
+            Gt(RefExpr(NamedField("cnt0")), RefExpr(Value(0))),
+            Gt(RefExpr(NamedField("cnt1")), RefExpr(Value(0))))
+        )))
+
+    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+
+    forAll (possibleGroupers) { (g: String) =>
+      forAll(patterns) { (p: List[TriplePattern], fo: Foreach, fi: Filter) =>
+        // We generate multiple pipe names for each `p`, therefore we need to reset the random generators state not
+        // at the beginning of this function, but before processing each combination of pattern and grouping column.
+        Random.setSeed(123456789)
+        PipeNameGenerator.clearGenerated
+        val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+        val op2 = BGPFilter(Pipe("b"), Pipe("a"), p)
+        val op3 = Dump(Pipe("b"))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.J2))
+
+        plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only fo
+        plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+        plan.findOperatorForAlias("b").value shouldBe fi
+        plan.operators should contain only(op1, fo, fi, op3)
+      }
+    }
+  }
   it should "replace GENERATE * by a list of fields" in {
     val plan = new DataflowPlan(parseScript(
       s"""A = LOAD 'file' AS (x, y, z);

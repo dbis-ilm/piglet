@@ -526,7 +526,6 @@ object Rules {
       val intermediateResultName = generate
       val constraint = RDF.patternToConstraint(pattern).get
 
-
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
           Filter(Pipe(intermediateResultName), Pipe("stmts"), constraint),
@@ -745,7 +744,7 @@ object Rules {
     group_filter
   }
 
-  /** Applies rewriting rule F8 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+  /** Applies rewriting rule J1 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
     * @return Some BGPFilter objects if the input filters BGP is a star join.
@@ -795,6 +794,76 @@ object Rules {
 
       return Some(filters)
 
+    case _ => None
+  }
+
+  /** Applies rewriting rule J2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    */
+  def J2(term: Any): Option[Foreach] = term match {
+    case op @ BGPFilter(_, _, patterns) =>
+      if (groupedSchemaEarlyAbort(op.inputSchema)) {
+        return None
+      }
+
+      if (patterns.length < 2) {
+        return None
+      }
+
+      if (!RDF.isStarJoin(patterns)) {
+        return None
+      }
+
+      val out = op.outputs.head
+      val in = op.inputs.head
+
+      // We'll reuse in later on, so we need to remove `op` from its consumers
+      in.removeConsumer(op)
+
+      val internalPipeName = generate
+
+      val filters: List[Filter] = patterns map RDF.patternToConstraint flatMap { c =>
+        Some(Filter(Pipe(generate), Pipe("stmts"), c.get))
+      } toList
+
+      val filterPipeNames = filters map (_.outputs.head.name)
+
+      // This generates the GENERATE *, COUNT(t1) AS cnt1, ..., COUNT(tN) as cntN; operator
+      val countAsOps: List[GeneratorExpr] = filterPipeNames.zipWithIndex.map{case (name, i) =>
+        GeneratorExpr(Func("COUNT",
+          List(RefExpr(NamedField(name)))),
+          Some(Field(s"cnt$i", Types.ByteArrayType)))
+      } toList
+
+      val generatorOps: List[PigOperator] = filters :+ Generate(
+            GeneratorExpr(RefExpr(NamedField("*"))) :: countAsOps)
+
+      val foreach =
+        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(generatorOps))
+
+      val countGtZeroConstraint: Predicate = filterPipeNames.zipWithIndex.map {case (_, i) =>
+          Gt(RefExpr(NamedField(s"cnt$i")), RefExpr(Value(0)))
+      } reduceLeft And
+
+      val filter = Filter(out, Pipe(internalPipeName, foreach), countGtZeroConstraint)
+
+      foreach.outputs foreach (_.addConsumer(filter))
+
+      filter.outputs foreach { output =>
+        output.consumer foreach { consumer =>
+          consumer.inputs foreach { input =>
+            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
+            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
+            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
+            // that.
+            if (input.producer == op) {
+              input.producer = filter
+            }
+          }
+        }
+      }
+
+      Some(foreach)
     case _ => None
   }
 
@@ -878,6 +947,7 @@ object Rules {
     addTypedStrategy(F7)
     addTypedStrategy(F8)
     addStrategy(strategyf(t => J1(t)))
+    addStrategy(strategyf(t => J2(t)))
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk _)
   }
 }
