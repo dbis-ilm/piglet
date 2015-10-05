@@ -458,21 +458,7 @@ object Rules {
 
       foreach.outputs foreach (_.addConsumer(filter))
 
-      filter.outputs foreach { output =>
-        output.consumer foreach { consumer =>
-          consumer.inputs foreach { input =>
-            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
-            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
-            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
-            // that.
-            if (input.producer == op) {
-              input.producer = filter
-            }
-          }
-        }
-      }
-
-      in.removeConsumer(op)
+      Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
       Some(foreach)
     case _ => None
@@ -541,21 +527,7 @@ object Rules {
 
       foreach.outputs foreach (_.addConsumer(filter))
 
-      filter.outputs foreach { output =>
-        output.consumer foreach { consumer =>
-          consumer.inputs foreach { input =>
-            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
-            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
-            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
-            // that.
-            if (input.producer == op) {
-              input.producer = filter
-            }
-          }
-        }
-      }
-
-      in.removeConsumer(op)
+      Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
       Some(foreach)
     case _ => None
@@ -640,19 +612,7 @@ object Rules {
 
     val other_filter = BGPFilter(out, Pipe(internalPipeName, group_filter.get), List(other_filter_pattern.get))
 
-    other_filter.outputs foreach { output =>
-      output.consumer foreach { consumer =>
-        consumer.inputs foreach { input =>
-          // If `op` (the old term) is the producer of any of the input pipes of `other_filter` (the new terms)
-          // successors, replace it with `other_filter` in that attribute. Replacing `op` with `other_filter` in
-          // the pipes on `other_filter` itself is not necessary because the setters of `inputs` and `outputs` do
-          // that.
-          if (input.producer == op) {
-            input.producer = other_filter
-          }
-        }
-      }
-    }
+    Rewriter.fixReplacementwithMultipleOperators(op, group_filter.get, other_filter)
 
     group_filter foreach {
       _.outputs.head.consumer = List(other_filter)
@@ -717,21 +677,7 @@ object Rules {
         PositionalField(2)))))
     }
 
-    other_filter foreach {
-      _.outputs foreach { output =>
-        output.consumer foreach { consumer =>
-          consumer.inputs foreach { input =>
-            // If `op` (the old term) is the producer of any of the input pipes of `other_filter` (the new terms)
-            // successors, replace it with `other_filter` in that attribute. Replacing `op` with `other_filter` in
-            // the pipes on `other_filter` itself is not necessary because the setters of `inputs` and `outputs` do
-            // that.
-            if (input.producer == op) {
-              input.producer = other_filter.get
-            }
-          }
-        }
-      }
-    }
+    Rewriter.fixReplacementwithMultipleOperators(op, group_filter.get, other_filter.get)
 
     group_filter foreach {
       _.outputs.head.consumer = List(other_filter.get)
@@ -849,19 +795,7 @@ object Rules {
 
       foreach.outputs foreach (_.addConsumer(filter))
 
-      filter.outputs foreach { output =>
-        output.consumer foreach { consumer =>
-          consumer.inputs foreach { input =>
-            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
-            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
-            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
-            // that.
-            if (input.producer == op) {
-              input.producer = filter
-            }
-          }
-        }
-      }
+      Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
       Some(foreach)
     case _ => None
