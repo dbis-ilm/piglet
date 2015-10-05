@@ -33,6 +33,7 @@ import org.kiama.rewriting.Strategy
 /** This object contains all the rewriting rules that are currently implemented
   *
   */
+//noinspection ScalaDocMissingParameterDescription
 object Rules {
   /** Put Filters before multipleInputOp if we can figure out which input of multipleInputOp contains the fields used in the Filters predicate
     */
@@ -75,8 +76,9 @@ object Rules {
 
   /** Removes a [[dbis.pig.op.Filter]] object that's a successor of a Filter with the same Predicate
     */
+  //noinspection MutatorLikeMethodIsParameterless
   def removeDuplicateFilters = rulefs[Filter] {
-    case op@Filter(_, _, pred, _) => {
+    case op@Filter(_, _, pred, _) =>
       topdown(
         attempt(
           op.outputs.flatMap(_.consumer).
@@ -85,7 +87,6 @@ object Rules {
             foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, buildRemovalStrategy(pigOp)
           )
           }))
-    }
   }
 
   def splitIntoToFilters(node: Any): Option[List[Filter]] = node match {
@@ -166,7 +167,7 @@ object Rules {
 
   /** Applies rewriting rule R1 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
     */
   //noinspection ScalaDocMissingParameterDescription
@@ -219,7 +220,7 @@ object Rules {
 
   /** Applies rewriting rule L2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Load operator, if `term` was an RDFLoad operator loading a resource from hdfs
     */
   //noinspection ScalaDocMissingParameterDescription
@@ -252,7 +253,7 @@ object Rules {
 
   /** Applies rewriting rule F2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Filter operator, if `term` was an BGPFilter operator with only one bound variable
     */
   def F2(op: BGPFilter): Option[Filter] = {
@@ -289,12 +290,12 @@ object Rules {
       in.removeConsumer(op)
     }
 
-    return filter
+    filter
   }
 
   /** Applies rewriting rule F3 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Filter operator, if `term` was an BGPFilter operator with multiple bound variables
     */
   def F3(op: BGPFilter): Option[Filter] = {
@@ -397,7 +398,7 @@ object Rules {
       in.removeConsumer(op)
     }
 
-    return filter
+    filter
   }
 
   /** Applies rewriting rule F5 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -439,8 +440,8 @@ object Rules {
         return None
       }
 
-      val internalPipeName = generate
-      val intermediateResultName = generate
+      val internalPipeName = generate()
+      val intermediateResultName = generate()
       val eq = RDF.patternToConstraint(pattern).get
 
       val foreach =
@@ -508,8 +509,8 @@ object Rules {
         return None
       }
 
-      val internalPipeName = generate
-      val intermediateResultName = generate
+      val internalPipeName = generate()
+      val intermediateResultName = generate()
       val constraint = RDF.patternToConstraint(pattern).get
 
       val foreach =
@@ -535,7 +536,7 @@ object Rules {
 
   /** Applies rewriting rule F7 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with two bound variables of which
     *         one is the grouping column
     */
@@ -571,7 +572,7 @@ object Rules {
       return None
     }
 
-    val internalPipeName = generate
+    val internalPipeName = generate()
     var group_filter: Option[BGPFilter] = None
     var other_filter_pattern: Option[TriplePattern] = None
 
@@ -627,7 +628,7 @@ object Rules {
 
   /** Applies rewriting rule F8 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with only bound variables.
     */
   def F8(op: BGPFilter): Option[BGPFilter] = {
@@ -655,7 +656,7 @@ object Rules {
       return None
     }
 
-    val internalPipeName = generate
+    val internalPipeName = generate()
     var group_filter: Option[BGPFilter] = None
     var other_filter: Option[BGPFilter] = None
 
@@ -730,7 +731,7 @@ object Rules {
       in.removeConsumer(op)
 
       val fieldname = RDF.starJoinColumn(patterns).get._2
-      val filters = patterns map { p => BGPFilter(Pipe(generate), in, List(p)) }
+      val filters = patterns map { p => BGPFilter(Pipe(generate()), in, List(p)) }
       val join = Join(out,
         filters map { f => Pipe(f.outPipeName, f) },
         // Use map here to make sure the amount of field expressions is the same as the amount of filters
@@ -738,7 +739,7 @@ object Rules {
 
       filters foreach { f => f.outputs.head.consumer = List(join) }
 
-      return Some(filters)
+      Some(filters)
 
     case _ => None
   }
@@ -766,20 +767,20 @@ object Rules {
       // We'll reuse in later on, so we need to remove `op` from its consumers
       in.removeConsumer(op)
 
-      val internalPipeName = generate
+      val internalPipeName = generate()
 
       val filters: List[Filter] = patterns map RDF.patternToConstraint flatMap { c =>
-        Some(Filter(Pipe(generate), Pipe("stmts"), c.get))
-      } toList
+        Some(Filter(Pipe(generate()), Pipe("stmts"), c.get))
+      }
 
       val filterPipeNames = filters map (_.outputs.head.name)
 
       // This generates the GENERATE *, COUNT(t1) AS cnt1, ..., COUNT(tN) as cntN; operator
-      val countAsOps: List[GeneratorExpr] = filterPipeNames.zipWithIndex.map{case (name, i) =>
+      val countAsOps: List[GeneratorExpr] = filterPipeNames.zipWithIndex.map { case (name, i) =>
         GeneratorExpr(Func("COUNT",
           List(RefExpr(NamedField(name)))),
           Some(Field(s"cnt$i", Types.ByteArrayType)))
-      } toList
+      }
 
       val generatorOps: List[PigOperator] = filters :+ Generate(
             GeneratorExpr(RefExpr(NamedField("*"))) :: countAsOps)
@@ -834,35 +835,33 @@ object Rules {
   def foreachGenerateWithAsterisk(term: Any): Option[PigOperator] = {
     term match {
       case op@Foreach(_, _, gen, _) => gen match {
-        case GeneratorList(exprs) => {
+        case GeneratorList(exprs) =>
           val (genExprs, foundStar) = constructGeneratorList(exprs, op)
           if (foundStar) {
             val newGen = GeneratorList(genExprs.toList)
             val newOp = Foreach(op.outputs.head, op.inputs.head, newGen, op.windowMode)
             newOp.constructSchema
-            return Some(newOp)
+            Some(newOp)
           }
           else
-            return None
-        }
+            None
         case _ => None
       }
-      case op@Generate(exprs) => {
+      case op@Generate(exprs) =>
         val (genExprs, foundStar) = constructGeneratorList(exprs, op)
         if (foundStar) {
           val newOp = Generate(genExprs.toList)
           newOp.copyPipes(op)
           newOp.constructSchema
-          return Some(newOp)
+          Some(newOp)
         }
         else
-          return None
-      }
+          None
       case _ => None
     }
   }
 
-  def registerAllRules = {
+  def registerAllRules() = {
     addStrategy(removeDuplicateFilters)
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
@@ -882,6 +881,6 @@ object Rules {
     addTypedStrategy(F8)
     addStrategy(strategyf(t => J1(t)))
     addStrategy(strategyf(t => J2(t)))
-    addOperatorReplacementStrategy(foreachGenerateWithAsterisk _)
+    addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }
 }
