@@ -306,7 +306,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
       val uri = new URI(f)
       
       u match {
-        case Some(p) => new Load(Pipe(b), uri, s, Some(p._1), if (p._2.isEmpty) null else p._2)
+        case Some(p) => new Load(Pipe(b), uri, s, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
         case None => new Load(Pipe(b), uri, s)
       }
   }
