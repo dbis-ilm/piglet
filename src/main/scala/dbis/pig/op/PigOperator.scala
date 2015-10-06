@@ -40,7 +40,7 @@ trait PigOperator extends Rewritable {
   /**
    * The (optional) schema describing the output produced by the operator.
    */
-  val schema: Option[Schema] = constructSchema
+  var schema: Option[Schema] = None
 
   /**
    * Getter method for the output pipes.
@@ -125,15 +125,14 @@ trait PigOperator extends Rewritable {
    */
   def constructSchema: Option[Schema] = {
     if (inputs.nonEmpty) {
-      val schema = inputs.head.producer.schema
+      schema = inputs.head.producer.schema
       // the bag should be named with the output pipe
       schema match {
         case Some(s) => s.setBagName(outPipeName)
         case None =>
       }
-      return schema
     }
-    None
+    schema
   }
 
   /**
