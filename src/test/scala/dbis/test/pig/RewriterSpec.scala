@@ -800,11 +800,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule J1" in {
-    Random.setSeed(123456789)
-    PipeNameGenerator.clearGenerated
-
     val patterns = Table(
-      ("patterns", "filters", "join"),
+      ("patterns", "filters", "join", "foreach", "expected schema"),
       (List(
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))),
@@ -813,43 +810,80 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
             Value("obj1")))),
           BGPFilter(Pipe("pipevHyYGvOfsZ"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1),
             Value("obj2"))))),
-        Join(Pipe("b"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")), List(List(NamedField("s")),
-          List(NamedField("s"))))),
+        Join(Pipe("pipeEgkYzrkOZO"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")), List(List(NamedField("s")),
+          List(NamedField("s")))),
+        Foreach(Pipe("b"), Pipe("pipeEgkYzrkOZO"), GeneratorList(List(
+          GeneratorExpr(
+            RefExpr(
+              NamedField("subject", List("pipePClecYbNXF"))
+            ),
+            Some(Field("s", Types.CharArrayType))
+          )
+        ))),
+        Some(Schema(BagType(TupleType(Array(Field("s", Types.CharArrayType))), "b")))
+        ),
       (List(
         TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
         TriplePattern(PositionalField(0), NamedField("p"), Value("obj2"))),
         List(
-          BGPFilter(Pipe("pipeEgkYzrkOZO"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"),
+          BGPFilter(Pipe("pipePClecYbNXF"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"),
             Value("obj1")))),
-          BGPFilter(Pipe("pipejvdcHuREqz"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"),
+          BGPFilter(Pipe("pipevHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"),
             Value("obj2"))))),
-        Join(Pipe("b"), List(Pipe("pipeEgkYzrkOZO"), Pipe("pipejvdcHuREqz")), List(List(NamedField("p")), List
+        Join(Pipe("pipeEgkYzrkOZO"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")), List(List(NamedField("p")), List
           (NamedField
-          ("p"))))),
+          ("p")))),
+        Foreach(Pipe("b"), Pipe("pipeEgkYzrkOZO"), GeneratorList(List(
+          GeneratorExpr(
+            RefExpr(
+              NamedField("predicate", List("pipePClecYbNXF"))
+            ),
+            Some(Field("p", Types.CharArrayType))
+          )
+        ))),
+        Some(Schema(BagType(TupleType(Array(Field("p", Types.CharArrayType))), "b")))
+        ),
       (List(
         TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")),
         TriplePattern(PositionalField(0), Value("pred2"), NamedField("o"))),
         List(
-          BGPFilter(Pipe("pipeUxwEkfQHGx"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred1"), NamedField
+          BGPFilter(Pipe("pipePClecYbNXF"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred1"), NamedField
             ("o")))),
-          BGPFilter(Pipe("pipeYAXKzBIYXu"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred2"), NamedField
+          BGPFilter(Pipe("pipevHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred2"), NamedField
             ("o"))))),
-        Join(Pipe("b"), List(Pipe("pipeUxwEkfQHGx"), Pipe("pipeYAXKzBIYXu")), List(List(NamedField("o")), List
-          (NamedField("o")))))
+        Join(Pipe("pipeEgkYzrkOZO"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")), List(List(NamedField("o")), List
+          (NamedField("o")))),
+        Foreach(Pipe("b"), Pipe("pipeEgkYzrkOZO"), GeneratorList(List(
+          GeneratorExpr(
+            RefExpr(
+              NamedField("object", List("pipePClecYbNXF"))
+            ),
+            Some(Field("o", Types.CharArrayType))
+          )
+        ))),
+        Some(Schema(BagType(TupleType(Array(Field("o", Types.CharArrayType))), "b")))
+        )
     )
 
-    forAll(patterns) { (p: List[TriplePattern], fs: List[BGPFilter], j: Join) =>
+    forAll(patterns) { (p: List[TriplePattern], fs: List[BGPFilter], j: Join, fo: Foreach, sc: Option[Schema]) =>
+      Random.setSeed(123456789)
+      PipeNameGenerator.clearGenerated
+
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), p)
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), strategyf(t => Rules.J1(t)))
-      plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
-      plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only j
+      val plan = new DataflowPlan(List(op1, op2, op3))
+      val rewrittenPlan = processPlan(plan, strategyf(t => Rules.J1(t)))
+      rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
+      rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
+      rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
+      sc shouldBe rewrittenPlan.findOperatorForAlias("b")
+        .headOption.value.schema
     }
 
 
     // Don't apply J1 if there's only one pattern
-    forAll(patterns) { (p: List[TriplePattern], fs: List[BGPFilter], j: Join) =>
+    forAll(patterns) { (p: List[TriplePattern], fs: List[BGPFilter], j: Join, fo: Foreach, sc: Option[Schema]) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p.head))
       val op3 = Dump(Pipe("b"))
@@ -859,7 +893,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     }
 
     // Don't apply J1 if there's no pattern
-    forAll(patterns) { (p: List[TriplePattern], fs: List[BGPFilter], j: Join) =>
+    forAll(patterns) { (p: List[TriplePattern], fs: List[BGPFilter], j: Join, fo: Foreach, sc: Option[Schema]) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))

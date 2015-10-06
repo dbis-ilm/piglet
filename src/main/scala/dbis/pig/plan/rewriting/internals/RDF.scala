@@ -220,4 +220,17 @@ object RDF {
       case _ => Some(constraints reduceLeft And)
     }
   }
+
+  def namedFieldColumnPairFromPattern(p: TriplePattern): Seq[(NamedField, Column.Column)] = {
+    def makeTuple(r: Ref, c: Column): Option[(NamedField, Column.Column)] = {
+      if (r.isInstanceOf[NamedField]) {
+        return Some((r.asInstanceOf[NamedField], c))
+      }
+      None
+    }
+
+    List(makeTuple(p.subj, Column.Subject),
+      makeTuple(p.pred, Column.Predicate),
+      makeTuple(p.obj, Column.Object)).flatten
+  }
 }

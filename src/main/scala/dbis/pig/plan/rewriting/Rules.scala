@@ -20,6 +20,7 @@ import dbis.pig.plan.PipeNameGenerator
 import dbis.pig.plan.rewriting.internals.{RDF, Column, FilterUtils}
 
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Map
 import dbis.pig.op._
 import Column.Column
 import FilterUtils._
@@ -731,13 +732,60 @@ object Rules {
       in.removeConsumer(op)
 
       val fieldname = RDF.starJoinColumn(patterns).get._2
-      val filters = patterns map { p => BGPFilter(Pipe(generate()), in, List(p)) }
-      val join = Join(out,
+
+
+      // This maps NamedField to a list of pipe names columns. Each column of that specific Pipe (produces by one of
+      // the filters) contains the value of the NamedField in the join.
+      // Its keys are also all the NamedFields that appear in `patterns`.
+      val namedFieldToPipeName: Map[NamedField, List[(String, Column.Column)]] = Map.empty
+
+      val filters = patterns map { p =>
+        val pipename = generate()
+
+        val namedFieldsOfP = RDF.namedFieldColumnPairFromPattern(p)
+        namedFieldsOfP foreach { case (nf, c) =>
+            namedFieldToPipeName(nf) = namedFieldToPipeName.getOrElse(nf, List.empty) :+ (pipename, c)
+        }
+
+        BGPFilter(Pipe(pipename), in, List(p))
+      }
+
+      val joinOutPipeName = generate()
+
+      val join = Join(Pipe(joinOutPipeName),
         filters map { f => Pipe(f.outPipeName, f) },
         // Use map here to make sure the amount of field expressions is the same as the amount of filters
         filters map { _ => List(fieldname) })
 
-      filters foreach { f => f.outputs.head.consumer = List(join) }
+      filters foreach { f =>
+        f.outputs.head.consumer = List(join)
+        f.constructSchema
+      }
+
+      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map
+      { case (nf, (firstSourceName, firstSourceColumn)
+        :: _) =>
+        GeneratorExpr(
+          RefExpr(
+            NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
+          Some(Field(nf.name, Types.CharArrayType)))
+      } toList
+
+      val foreach = Foreach(out, Pipe(joinOutPipeName, join),
+        GeneratorList(
+          generators
+        )
+      )
+      foreach.constructSchema
+
+      // Make the Foreach a successor of the Join
+      join.outputs.foreach { o => o.consumer = List(foreach) }
+
+      // Replace the Foreach as the producer of ops inputs outputs
+      out.consumer.foreach { op => op.inputs.foreach { i =>
+        if (i.producer == op) {
+          i.producer = join
+        }}}
 
       Some(filters)
 
