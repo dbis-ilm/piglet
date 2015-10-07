@@ -740,4 +740,18 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     nf2.name shouldBe "foo"
     nf2.lineage shouldBe List("B")
   }
+
+  it should "parse a DEFINE macro statement" in {
+    val ops = parseScript(
+    """DEFINE my_macro(in_alias, p) RETURNS out_alias {
+      |$out_alias = FOREACH $in GENERATE $0 + $p;
+      |};
+    """.stripMargin
+    )
+  }
+
+  it should "parse a statement invoking a macro" in {
+    assert(parseScript("a = my_macro(in, 42);") == List(MacroOp(Pipe("a"), "my_macro", Some(List(NamedField("in"), Value("42"))))))
+
+  }
 }

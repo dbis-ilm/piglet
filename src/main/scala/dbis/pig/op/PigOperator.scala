@@ -89,14 +89,22 @@ trait PigOperator extends Rewritable {
     _inputs.foreach(p => if (!p.consumer.contains(this)) p.consumer = p.consumer :+ this)
   }
 
-  def outPipeName: String = if (outputs.nonEmpty) outputs.head.name else ""
+  def outPipeName: String = if (outputs.nonEmpty) validPipeName(outputs.head.name) else ""
 
-  def outPipeNames: List[String] = outputs.map(p => p.name)
+  def outPipeNames: List[String] = outputs.map(p => validPipeName(p.name))
 
-  def inPipeName: String = if (inputs.nonEmpty) inputs.head.name else ""
+  def inPipeName: String = if (inputs.nonEmpty) validPipeName(inputs.head.name) else ""
 
-  def inPipeNames: List[String] = inputs.map(p => p.name)
+  def inPipeNames: List[String] = inputs.map(p => validPipeName(p.name))
 
+  /**
+   * Checks whether the pipe name is a valid identifier. It returns the input name if valid,
+   * otherwise an exception is raised.
+   *
+   * @param s the name of a pipe
+   * @return the same value as the input
+   */
+  def validPipeName(s: String): String = if (! s.matches("""[a-zA-Z_]\w*""")) throw InvalidPipeNameException(s) else s
 
   def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 

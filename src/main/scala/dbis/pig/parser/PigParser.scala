@@ -69,7 +69,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def num: Parser[Int] = wholeNumber ^^ (_.toInt)
 
-  def bag: Parser[String] = ident
+  def bag: Parser[String] = """\$?[a-zA-Z_]\w*""".r
   def fileName: Parser[String] = pigStringLiteral ^^ { str => unquote(str) }
 
   def className: Parser[String] = repsep(ident, ".") ^^ { identList => identList.mkString(".")}
@@ -82,17 +82,17 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * A NamedField is either just the field name or the field name with lineage information prepended.
    */
   def namedField: Parser[Ref] = not(boolean) ~>  (namedFieldWithLineage | namedFieldWithoutLineage)
-  def namedFieldWithoutLineage: Parser[NamedField] =  ident ^^ { case i => NamedField(i) }
-  def namedFieldWithLineage: Parser[NamedField] = rep1sep(ident, Field.lineageSeparator) ^^
+  def namedFieldWithoutLineage: Parser[NamedField] =  bag ^^ { case i => NamedField(i) }
+  def namedFieldWithLineage: Parser[NamedField] = rep1sep(bag, Field.lineageSeparator) ^^
     { case l  => NamedField.fromStringList(l) }
 
   def literalField: Parser[Ref] = (floatingPointNumber ^^ { n => Value(n) } | stringLiteral ^^ { s => Value(s) } | boolean ^^ { b => Value(b) })
-  def fieldSpec: Parser[Ref] = (posField | namedField | literalField)
+  def fieldSpec: Parser[Ref] = (namedField | posField | literalField)
   /*
    * A reference can be also a dereference operator for tuples, bags or maps.
    */
-  def derefBagOrTuple: Parser[Ref] = (posField | namedField) ~ "." ~ (posField | namedField) ^^ { case r1 ~ _ ~ r2 => DerefTuple(r1, r2) }
-  def derefMap: Parser[Ref] = (posField | namedField) ~ "#" ~ stringLiteral ^^ { case m ~ _ ~ k => DerefMap(m, k) }
+  def derefBagOrTuple: Parser[Ref] = (namedField | posField) ~ "." ~ (posField | namedField) ^^ { case r1 ~ _ ~ r2 => DerefTuple(r1, r2) }
+  def derefMap: Parser[Ref] = (namedField | posField) ~ "#" ~ stringLiteral ^^ { case m ~ _ ~ k => DerefMap(m, k) }
 
   def ref: Parser[Ref] = (derefMap |  derefBagOrTuple | fieldSpec) // ( fieldSpec | derefBagOrTuple | derefMap)
 
@@ -245,6 +245,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val falseKeyword = "false".ignoreCase
   lazy val fsKeyword = "fs".ignoreCase
   lazy val setKeyword = "set".ignoreCase
+  lazy val returnsKeyword = "returns".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -413,20 +414,6 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def limitStmt: Parser[PigOperator] = bag ~ "=" ~ limitKeyword ~ bag ~ num ^^ { case out ~ _ ~ _ ~ in ~ num => new Limit(Pipe(out), Pipe(in), num) }
 
   /*
-   * <A> = WINDOW <B> ROWS  <Num> SLIDE ROWS <Num>
-   * <A> = WINDOW <B> ROWS  <Num> SLIDE RANGE <Num> <Unit>
-   * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE ROWS <Num>
-   * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE RANGE <Num> <Unit>
-   */
-  def timeUnit: Parser[String] = ("seconds".ignoreCase | "minutes".ignoreCase) ^^ { _.toUpperCase }
-  def rangeParam: Parser[Tuple2[Int,String]] = rangeKeyword ~ num ~ timeUnit ^^ {case _ ~ n ~ u => (n,u)}
-  def rowsParam: Parser[Tuple2[Int,String]] = rowsKeyword ~ num ^^ {case _ ~ n => (n, "")}
-  def windowParam: Parser[Tuple2[Int,String]] = (rangeParam | rowsParam)
-  def windowStmt: Parser[PigOperator] = bag ~ "=" ~ windowKeyword ~ bag ~ windowParam ~ slideKeyword ~ windowParam ^^ {
-    case out ~ _ ~ _ ~ in ~ on ~ _ ~ slide => Window(Pipe(out), Pipe(in), on, slide)
-  }
-
-  /*
    * <A> = JOIN <B> BY <Ref>, <C> BY <Ref>, ...
    * <A> = JOIN <B> BY ( <ListOfRefs> ), <C> BY ( <ListOfRefs>), ...
    */
@@ -464,15 +451,32 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   }
 
   /*
+   * DEFINE <Macro> ( [ParamList] ) RETURNS <Alias> { <Block> }
+   */
+  def paramNameList: Parser[List[String]] = "(" ~ repsep(ident, ",") ~ ")" ^^ { case _ ~ plist ~ _ => plist}
+
+  def defineMacroStmt: Parser[PigOperator] = defineKeyword ~ ident ~ (paramNameList?) ~ returnsKeyword ~ bag ~ "{" ~ rep(stmt) ~ "}" ~ ";" ^^{
+    case _ ~ macroName ~ params ~ _ ~ out ~ _ ~ stmtList ~ _  ~ _ => DefineMacroCmd(Pipe(out), macroName, params, stmtList)
+  }
+
+  def paramList: Parser[List[Ref]] = "(" ~ repsep(ref, ",") ~ ")" ^^ { case _ ~ rlist ~ _ => rlist}
+
+  /*
+   * <A> = <MacroName> ( [<ParamList>] )
+   */
+  def macroRefStmt: Parser[PigOperator] = bag ~ "=" ~ ident ~ (paramList?) ^^ {
+    case out ~ _ ~ macroName ~ params => MacroOp(Pipe(out), macroName, params)
+  }
+
+  /*
    * SET <Param> <Value>
    */
-  def setStmt: Parser[PigOperator] = setKeyword ~ ident ~ literalField ^^ { case _ ~ k ~ v => SetCmd(k, v.asInstanceOf[dbis.pig.op.Value]) }
+  def setStmt: Parser[PigOperator] = setKeyword ~ ident ~ literalField ^^ {
+    case _ ~ k ~ v => SetCmd(k, v.asInstanceOf[dbis.pig.op.Value]) }
 
   /*
    * <A> = STREAM <B> TROUGH <Operator> [(ParamList)] [AS (<Schema>) ]
    */
-  def paramList: Parser[List[Ref]] = "(" ~ repsep(ref, ",") ~ ")" ^^ { case _ ~ rlist ~ _ => rlist}
-
   def streamStmt: Parser[PigOperator] = bag ~ "=" ~ streamKeyword ~ bag ~ throughKeyword ~ className ~ (paramList?) ~ (loadSchemaClause?) ^^{
     case out ~ _ ~_ ~ in ~ _ ~ opname ~ params ~ schema => new StreamOp(Pipe(out), Pipe(in), opname, params, schema)
   }
@@ -564,16 +568,21 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   def undelimStmt: Parser[PigOperator] = embedStmt
 
   def stmt: Parser[PigOperator] = delimStmt | undelimStmt
+
+  /*
+   * defineMacroStmt contains other statements but not other macro definitions
+   */
+  def plainStmt: Parser[PigOperator] = stmt | defineMacroStmt
   /*
    * A plain Pig script is a list of statements.
    */
-  def plainPigScript: Parser[List[PigOperator]] = rep(stmt)
+  def plainPigScript: Parser[List[PigOperator]] = rep(plainStmt)
 
   /* ---------------------------------------------------------------------------------------------------------------- */
   /*
@@ -609,6 +618,20 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * Pig extensions for processing streaming data.
    */
+
+  /*
+   * <A> = WINDOW <B> ROWS  <Num> SLIDE ROWS <Num>
+   * <A> = WINDOW <B> ROWS  <Num> SLIDE RANGE <Num> <Unit>
+   * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE ROWS <Num>
+   * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE RANGE <Num> <Unit>
+   */
+  def timeUnit: Parser[String] = ("seconds".ignoreCase | "minutes".ignoreCase) ^^ { _.toUpperCase }
+  def rangeParam: Parser[Tuple2[Int,String]] = rangeKeyword ~ num ~ timeUnit ^^ {case _ ~ n ~ u => (n,u)}
+  def rowsParam: Parser[Tuple2[Int,String]] = rowsKeyword ~ num ^^ {case _ ~ n => (n, "")}
+  def windowParam: Parser[Tuple2[Int,String]] = (rangeParam | rowsParam)
+  def windowStmt: Parser[PigOperator] = bag ~ "=" ~ windowKeyword ~ bag ~ windowParam ~ slideKeyword ~ windowParam ^^ {
+    case out ~ _ ~ _ ~ in ~ on ~ _ ~ slide => Window(Pipe(out), Pipe(in), on, slide)
+  }
 
   /*
    * Socket Definitions

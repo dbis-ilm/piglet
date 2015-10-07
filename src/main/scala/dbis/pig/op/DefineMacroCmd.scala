@@ -14,35 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package dbis.pig.op
 
-import dbis.pig.schema.Schema
+import dbis.pig.plan.DataflowPlan
 
-/**
- *
- * @param out the output pipe (relation).
- * @param in the input pipe
- * @param opName
- * @param params
- * @param loadSchema
- */
-case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref]] = None,
-                    var loadSchema: Option[Schema] = None) extends PigOperator {
+
+case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[String]], stmts: List[PigOperator]) extends PigOperator {
   _outputs = List(out)
-  _inputs = List(in)
-  schema = loadSchema
+  _inputs = List()
 
-  override def lineageString: String = s"""STREAM%${opName}%""" + super.lineageString
+  var subPlan: Option[DataflowPlan] = None
 
-  override def checkSchemaConformance: Boolean = {
-    // TODO
-    true
-  }
-
-  override def constructSchema: Option[Schema] = {
-    // TODO
-    schema
-  }
+  override def preparePlan: Unit = {}
 }
-

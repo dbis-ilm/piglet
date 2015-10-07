@@ -22,18 +22,14 @@ import dbis.pig.schema.Schema
 /**
  *
  * @param out the output pipe (relation).
- * @param in the input pipe
- * @param opName
+ * @param macroName
  * @param params
- * @param loadSchema
  */
-case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref]] = None,
-                    var loadSchema: Option[Schema] = None) extends PigOperator {
+case class MacroOp(out: Pipe, macroName: String, params: Option[List[Ref]] = None) extends PigOperator {
   _outputs = List(out)
-  _inputs = List(in)
-  schema = loadSchema
+  _inputs = List()
 
-  override def lineageString: String = s"""STREAM%${opName}%""" + super.lineageString
+  override def lineageString: String = s"""MACRO%${macroName}%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
     // TODO
@@ -42,7 +38,7 @@ case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref
 
   override def constructSchema: Option[Schema] = {
     // TODO
-    schema
+    super.constructSchema
   }
 }
 

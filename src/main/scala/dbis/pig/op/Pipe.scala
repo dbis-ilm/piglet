@@ -16,6 +16,13 @@
  */
 package dbis.pig.op
 
+/**
+ * An exception indicating that the name of the pipe isn't a valid identifier (e.g. contains still a leading '$').
+ *
+ * @param msg a message describing the exception.
+ */
+case class InvalidPipeNameException(private val msg: String) extends Exception("invalid pipe name: " + msg)
+
 
 /**
  * A pipe connects some Pig operator and associates a name to this channel.
