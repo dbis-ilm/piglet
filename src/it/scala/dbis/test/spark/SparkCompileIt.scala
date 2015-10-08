@@ -45,9 +45,9 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false),
     ("embedded.pig", "embedded.out", "truth/embedded.data", true)
-    //("rscript.pig", "cluster.out", "truth/cluster.data", true),
-    //("json.pig", "json.out", "json.data", true),
-    // ("jdbc.pig", "jdbc-data.out", "truth/jdbc-data.data", true)
+    //("rscript.pig", "cluster.out", "truth/cluster.data", true), // requires an installation of R
+    //("json.pig", "json.out", "json.data", true), // not working yet
+    // ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true) // requires a H2 database and the corresponding JDBC driver
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
   )
 
@@ -72,9 +72,12 @@ class SparkCompileIt extends FlatSpec with Matchers {
 
       val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
       val resourcePath = getClass.getResource("").getPath + "../../../"
-      
+
       // 2. compile and execute Pig script
-      PigCompiler.main(Array("--backend", "spark", "--params", s"inbase=$resourcePath,outfile=${resultPath.path}", "--master", "local[2]", "--outdir", ".", resourcePath + script))
+      PigCompiler.main(Array("--backend", "spark",
+        "--params", s"inbase=$resourcePath,outfile=${resultPath.path}",
+        "--master", "local[2]",
+        "--outdir", ".", resourcePath + script))
       println("execute: " + script)
 
       // 3. load the output file and the truth file
