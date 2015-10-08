@@ -174,6 +174,38 @@ object RDF {
     }
   }
 
+  /** Builds a map of [[dbis.pig.op.NamedField]] objects to the columns they appear in in `patterns`.
+    *
+    */
+  private def buildPathJoinMap(patterns: Seq[TriplePattern]): Map[NamedField, Set[Column.Value]] = {
+    val pathJoinMap = Map[NamedField, Set[Column.Value]]().withDefaultValue(Set.empty)
+    patterns foreach { pattern =>
+      if (pattern.subj.isInstanceOf[NamedField]) {
+        val key = pattern.subj.asInstanceOf[NamedField]
+        pathJoinMap(key) = pathJoinMap(key) + Column.Subject
+      }
+
+      if (pattern.pred.isInstanceOf[NamedField]) {
+        val key = pattern.pred.asInstanceOf[NamedField]
+        pathJoinMap(key) = pathJoinMap(key) + Column.Predicate
+      }
+
+      if (pattern.obj.isInstanceOf[NamedField]) {
+        val key = pattern.obj.asInstanceOf[NamedField]
+        pathJoinMap(key) = pathJoinMap(key) + Column.Object
+      }
+    }
+    pathJoinMap
+  }
+
+  /** True if `patterns` form a path join.
+    *
+    */
+  def isPathJoin(patterns: Seq[TriplePattern]): Boolean =
+    (patterns.length > 1) && buildPathJoinMap(patterns).foldLeft(false) { case (old, (_, set)) =>
+      old || set.size == patterns.length
+    }
+
   /** Converts multiple TriplePatterns to a String representation as a BGP.
     *
     * @param patterns
