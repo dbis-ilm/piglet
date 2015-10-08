@@ -1,0 +1,11 @@
+src
+zeppelin
+bin
+lib_unmanaged
+*.class
+*.scala
+*/sparklib-assembly-1.0.jar
+*/flinklib-assembly-1.0.jar
+*/mapreduce-assembly-1.0.jar
+*/common-assembly-1.0.jar
+*/piglet_2.11-1.0.jar

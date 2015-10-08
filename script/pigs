@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 echo '
  ____  _         _          ____                   _
@@ -48,7 +48,9 @@ function isLocalMode {
 isLocalMode $*
 
 # TODO: we should find our jar file the same way we do for spark
-PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
+if [ -z "$PIG_LIB" ]; then
+    PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
+fi
 
 CP=$PIG_LIB:$CLASSPATH
 
@@ -76,7 +78,7 @@ fi
 
 echo "Including backends in $BACKEND_DIR"
 
-CP=$BACKEND_DIR:$CP
+CP=./script/../common/target/scala-2.11/common_2.11-1.0.jar:$BACKEND_DIR:$CP
 
 if [ -z "$SPARK_JAR" ]; then
     echo "Please set SPARK_JAR to your spark-assembly-hadoop jar file"
@@ -84,5 +86,5 @@ if [ -z "$SPARK_JAR" ]; then
 else
     CP=$SPARK_JAR:$CP
 fi
-
-java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.PigCompiler $*
+echo $CP
+java -Dscala.usejavacp=true -cp $CP dbis.pig.PigCompiler $*
