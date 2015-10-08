@@ -126,12 +126,12 @@ object RDF {
       }
 
       if (pattern.pred.isInstanceOf[NamedField]) {
-        val key = (Column.Subject, pattern.pred.asInstanceOf[NamedField])
+        val key = (Column.Predicate, pattern.pred.asInstanceOf[NamedField])
         variableInPosition(key) = variableInPosition(key) + 1
       }
 
       if (pattern.obj.isInstanceOf[NamedField]) {
-        val key = (Column.Subject, pattern.obj.asInstanceOf[NamedField])
+        val key = (Column.Object, pattern.obj.asInstanceOf[NamedField])
         variableInPosition(key) = variableInPosition(key) + 1
       }
     }
