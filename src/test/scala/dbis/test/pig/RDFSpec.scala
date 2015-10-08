@@ -193,65 +193,84 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
     )
   }
 
-  "isPathJoin" should "return true for path joins" in {
-    val patterns = Table(
-      ("pattern"),
-      List(
-        TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
-        TriplePattern(PositionalField(0), NamedField("s"), Value("obj2"))),
-      List(
-        TriplePattern(PositionalField(0), PositionalField(1),NamedField("s")),
-        TriplePattern(PositionalField(0), NamedField("s"), Value("obj2"))),
-      List(
-        TriplePattern(PositionalField(0), PositionalField(1),NamedField("s")),
-        TriplePattern(NamedField("s"), PositionalField(1), Value("obj2")))
-    )
+  private val pathJoins = Table(
+    ("pattern"),
+    List(
+      TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
+      TriplePattern(PositionalField(0), NamedField("s"), Value("obj2"))),
+    List(
+      TriplePattern(PositionalField(0), PositionalField(1),NamedField("s")),
+      TriplePattern(PositionalField(0), NamedField("s"), Value("obj2"))),
+    List(
+      TriplePattern(PositionalField(0), PositionalField(1),NamedField("s")),
+      TriplePattern(NamedField("s"), PositionalField(1), Value("obj2")))
+  )
 
-    forAll(patterns) { p =>
+  private val starJoins = Table(
+    ("patterns"),
+    List(
+      TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
+      TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))),
+    List(
+      TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
+      TriplePattern(PositionalField(0), NamedField("p"), Value("obj2"))),
+    List(
+      TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")),
+      TriplePattern(PositionalField(0), Value("pred2"), NamedField("o")))
+  )
+
+  private val noJoins = Table(
+    ("patterns"),
+    // Only 1 pattern, can't be a join
+    List(
+      TriplePattern(NamedField("s"), PositionalField(1), Value("obj1"))),
+    // 2 patterns where each one contains a different variable
+    List(
+      TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
+      TriplePattern(PositionalField(0), NamedField("r"), Value("obj2"))),
+    // 2 patterns where each one contains a different variable in a different position
+    List(
+      TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
+      TriplePattern(PositionalField(0), PositionalField(1), NamedField("r"))),
+    // No variables at all
+    List(
+      TriplePattern(PositionalField(0), Value("pred1"), Value("obj1")))
+  )
+
+
+  "isPathJoin" should "return true for path joins" in {
+    forAll(pathJoins) { p =>
       RDF.isPathJoin(p) shouldBe true
     }
   }
 
   it should "return false for star joins" in {
-    val patterns = Table(
-      ("patterns"),
-      List(
-        TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
-        TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))),
-      List(
-        TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
-        TriplePattern(PositionalField(0), NamedField("p"), Value("obj2"))),
-      List(
-        TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")),
-        TriplePattern(PositionalField(0), Value("pred2"), NamedField("o")))
-    )
-
-    forAll(patterns) { p =>
+    forAll(starJoins) { p =>
       RDF.isPathJoin(p) shouldBe false
     }
   }
 
   it should "return false for patterns that are no joins at all" in {
-    val patterns = Table(
-      ("patterns"),
-      // Only 1 pattern, can't be a join
-      List(
-        TriplePattern(NamedField("s"), PositionalField(1), Value("obj1"))),
-      // 2 patterns where each one contains a different variable
-      List(
-        TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
-        TriplePattern(PositionalField(0), NamedField("r"), Value("obj2"))),
-      // 2 patterns where each one contains a different variable in a different position
-      List(
-        TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
-        TriplePattern(PositionalField(0), PositionalField(1), NamedField("r"))),
-      // No variables at all
-      List(
-        TriplePattern(PositionalField(0), Value("pred1"), Value("obj1")))
-    )
-
-    forAll(patterns) { p =>
+    forAll(noJoins) { p =>
       RDF.isPathJoin(p) shouldBe false
+    }
+  }
+
+  "isStarJoin" should "return true for star joins" in {
+    forAll(starJoins) { p =>
+      RDF.isStarJoin(p) shouldBe true
+    }
+  }
+
+  it should "return false for path joins" in {
+    forAll(pathJoins) { p =>
+      RDF.isStarJoin(p) shouldBe false
+    }
+  }
+
+  it should "return false for patterns that are no joins at all" in {
+    forAll(noJoins) { p =>
+      RDF.isStarJoin(p) shouldBe false
     }
   }
 }

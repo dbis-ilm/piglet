@@ -168,11 +168,11 @@ object RDF {
     * ``patterns`` form a star join if the same [[dbis.pig.op.NamedField]] is used in the same position in each
     * pattern.
     */
-  def isStarJoin(patterns: Seq[TriplePattern]): Boolean = {
-    buildStarJoinMap(patterns).foldLeft(false) { case (old, ((_, _), count)) =>
+  def isStarJoin(patterns: Seq[TriplePattern]): Boolean =
+    (patterns.length > 1) && buildStarJoinMap(patterns).foldLeft(false) { case (old, (
+      (_, _), count)) =>
       old || count == patterns.length
     }
-  }
 
   /** Builds a map of [[dbis.pig.op.NamedField]] objects to the columns they appear in in `patterns`.
     *
