@@ -49,6 +49,8 @@ class Pipe (var name: String, var producer: PigOperator = null, var consumer: Li
   def removeConsumer(op:PigOperator): Unit = this.consumer = this.consumer.filterNot(_ == op)
 
   def addConsumer(op: PigOperator): Unit = this.consumer = this.consumer.filterNot(_ == op) :+ op
+
+  def fixName: Unit = if (name.startsWith("$")) name = name.replace("$", "_")
 }
 
 object Pipe {

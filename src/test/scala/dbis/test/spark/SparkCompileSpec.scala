@@ -25,6 +25,7 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
 import dbis.pig.backends.BackendManager
+import dbis.pig.plan.rewriting.Rewriter._
 
 import java.net.URI
 
@@ -599,7 +600,7 @@ class SparkCompileSpec extends FlatSpec {
   }
 
   it should "not contain code for EMPTY operators" in {
-    val op = Empty(Pipe(""))
+    val op = Empty(Pipe("_"))
     val codeGenerator = new BatchGenCode(templateFile)
 
     assert(codeGenerator.emitNode(op) == "")
@@ -623,5 +624,23 @@ class SparkCompileSpec extends FlatSpec {
         | s
         |}
       """.stripMargin))
+  }
+
+  it should "contain code for macros" in {
+    val ops = parseScript(
+    """
+      |DEFINE my_macro(in_alias, p) RETURNS out_alias {
+      |$out_alias = FOREACH $in_alias GENERATE $0 + $p;
+      |};
+      |
+      |in = LOAD 'file';
+      |out = my_macro(in, 42);
+    """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new BatchGenCode(templateFile)
+    val generatedCode = codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get)
+    println("generated code: " + generatedCode)
   }
 }

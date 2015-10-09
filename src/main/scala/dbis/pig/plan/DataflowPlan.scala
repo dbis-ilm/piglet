@@ -57,10 +57,12 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
 
     // This maps a String (the relation name, a string) to the pipe that writes it and the list of
     // operators that read it.
-    val pipes: Map[String, Pipe] = Map[String, Pipe]()
+    val pipes = Map[String, Pipe]()
+    // This maps macro names to their definitions
 
+    val macros = Map[String, DefineMacroCmd]()
     /*
-     * 0. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
+     * 1. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
      *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
      */
     ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
@@ -74,10 +76,37 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
       castedOp.ruleCode.foreach { c: String => extraRuleCode = extraRuleCode :+ c}
     })
 
-    val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd]).filterNot(_.isInstanceOf[EmbedCmd])
-    val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])
     /*
-     * 1. We create a Map from names to the pipes that *write* them.
+     * 2. We collect all macro definitions
+     */
+    ops.filter(_.isInstanceOf[DefineMacroCmd]).foreach(op => {
+      val macroOp = op.asInstanceOf[DefineMacroCmd]
+      macroOp.preparePlan
+      macros += (macroOp.macroName -> macroOp)
+    })
+
+    /*
+     * 3. We assign to each MacroOp the corresponding definition. Note, that the actual replacement
+     * is done later in the rewriting phase
+     */
+    ops.filter(_.isInstanceOf[MacroOp]).foreach(op => {
+      val macroOp = op.asInstanceOf[MacroOp]
+      macroOp.macroDefinition = macros.get(macroOp.macroName)
+    })
+
+    /*
+     * 4. ... and finally, filter out all commands not representing a dataflow operator
+     */
+    val allOps = ops.filterNot(o =>
+      o.isInstanceOf[RegisterCmd] ||
+      o.isInstanceOf[DefineCmd] ||
+      o.isInstanceOf[EmbedCmd] ||
+      o.isInstanceOf[DefineMacroCmd]
+    )
+    val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])
+
+    /*
+     * 5. We create a Map from names to the pipes that *write* them.
      */
     planOps.foreach(op => {
       // we can have multiple outputs (e.g. in SplitInto)
@@ -94,7 +123,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     })
 
     /*
-     * 2. We add operators that *read* from a pipe to this pipe
+     * 6. We add operators that *read* from a pipe to this pipe
      */
     // TODO: replace by PigOperator.addConsumer
     var varCnt = 1
@@ -105,7 +134,10 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
             val outerPipe = resolvePipeFromContext(p.name)
             outerPipe match {
               case Some(oPipe) => {
-                val cbOp = ConstructBag(Pipe(s"${p.name}_${varCnt}"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
+                val cbOp = if (oPipe.name != p.name)
+                    ConstructBag(Pipe(s"${p.name}_${varCnt}"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
+                else
+                    ConstructBag(Pipe(p.name), NamedField(p.name))
                 newOps += ((cbOp, op))
                 varCnt += 1
               }
@@ -124,7 +156,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     })
 
     /*
-     * 3. If new operators were constructed we have to insert them now.
+     * 7. If new operators were constructed we have to insert them now.
      */
     val resolvedPlanOps = insertOperators(planOps, newOps.toList, pipes)
 
@@ -205,9 +237,10 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     else {
       var res: Option[Pipe] = None
       for (pipe <- ctx.get) {
+        println("resolvePipeFromContext: " + pipe)
         pipe.inputSchema match {
           case Some(schema) => if (schema.indexOfField(pName) != -1) res = Some(pipe)
-          case None => None
+          case None => res = Some(pipe) // None
         }
       }
       res

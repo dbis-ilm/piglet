@@ -16,7 +16,10 @@
  */
 package dbis.pig.op
 
-import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.{InvalidPlanException, DataflowPlan}
+import dbis.pig.schema.{Types, PigType}
+
+import scala.collection.mutable.ListBuffer
 
 
 case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[String]], stmts: List[PigOperator]) extends PigOperator {
@@ -25,5 +28,46 @@ case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[Stri
 
   var subPlan: Option[DataflowPlan] = None
 
-  override def preparePlan: Unit = {}
+  override def preparePlan: Unit = {
+    /*
+     * First, we try to identify pipes from the input parameter list.
+     */
+    val inputs = params match {
+      case Some(p) => {
+        /*
+         * We collect potential input pipes.
+         */
+        val pipes = collectPipes(stmts)
+
+        /*
+         * Next, we check which parameter refers to a pipe.
+         */
+        val pp = p.map(s => "$" + s)
+        val macroInPipes = pipes.filter(pi => pp.contains(pi.name))
+        println("------> macroInPipes = " + macroInPipes.map(_.name).mkString(","))
+        macroInPipes
+      }
+      case None => List()
+    }
+    /*
+     * We construct a subplan for the operator list
+     * and add our input pipe(s) to the context of the plan.
+     */
+    subPlan = Some(new DataflowPlan(stmts, Some(inputs)))
+
+    // fix pipe names
+    subPlan.get.operators.foreach(_.fixPipeNames)
+  }
+
+  /**
+   * Collect all input pipes of the operators in the given list.
+   *
+   * @param ops a list of Pig operators
+   * @return the list of all input pipes
+   */
+  def collectPipes(ops: List[PigOperator]): List[Pipe] = {
+    val pipes = ListBuffer[Pipe]()
+    ops.foreach{op => op.inputs.foreach(p => pipes += p)}
+    pipes.toList
+  }
 }

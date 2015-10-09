@@ -29,6 +29,8 @@ case class MacroOp(out: Pipe, macroName: String, params: Option[List[Ref]] = Non
   _outputs = List(out)
   _inputs = List()
 
+  var macroDefinition: Option[DefineMacroCmd] = None
+
   override def lineageString: String = s"""MACRO%${macroName}%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {

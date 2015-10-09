@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.plan.PipeNameGenerator
+import dbis.pig.plan.{InvalidPlanException, PipeNameGenerator}
 import dbis.pig.plan.rewriting.internals.{RDF, Column, FilterUtils}
 
 import scala.collection.mutable.ListBuffer
@@ -862,6 +862,19 @@ object Rules {
     }
   }
 
+  def replaceMacroOp(t: Any): Option[PigOperator] = t match {
+    case op@MacroOp(out, name, params) => {
+      if (op.macroDefinition.isEmpty)
+        throw new InvalidPlanException(s"macro ${op.macroName} undefined")
+
+      val macroDef = op.macroDefinition.get
+      val newParent = macroDef.subPlan.get.operators.head
+      val newChild = macroDef.subPlan.get.operators.last
+      None // Some(fixReplacementWithMultipleOperators(op, newParent, newChild))
+    }
+    case _ => None
+  }
+
   def registerAllRules = {
     addStrategy(removeDuplicateFilters)
     merge[Filter, Filter](mergeFilters)
@@ -882,5 +895,6 @@ object Rules {
     addTypedStrategy(F8)
     addStrategy(strategyf(t => J1(t)))
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk _)
+    // addStrategy(strategyf(t => replaceMacroOp(t)))
   }
 }

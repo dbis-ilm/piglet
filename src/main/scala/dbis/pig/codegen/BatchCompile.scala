@@ -35,10 +35,12 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     * @param requiresTypeCast
     * @return
     */
-  override def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = ref match {
+  override def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
+                       requiresTypeCast: Boolean = true,
+                       aggregate: Boolean = false): String = ref match {
       case DerefTuple(r1, r2) => 
         if (aggregate) s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]].map(e => e${emitRef(tupleSchema(schema, r1), r2, "", false)})"
-        else s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
+        else s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false, aggregate)}"
       case _ => super.emitRef(schema, ref, tuplePrefix, requiresTypeCast, aggregate)
   }
 

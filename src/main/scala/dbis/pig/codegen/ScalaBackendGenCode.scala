@@ -157,14 +157,18 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   /*------------------------------------------------------------------------------------------------- */
 
    /**
-   *
-   * @param schema
-   * @param ref
-   * @param tuplePrefix
-   * @param requiresTypeCast
-   * @return
-   */
-  def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = ref match {
+    * Generate Scala code for a reference to a named field, a positional field or a tuple/map derefence.
+    *
+    * @param schema the (optional) schema decribing the tuple structure
+    * @param ref
+    * @param tuplePrefix the variable name
+    * @param requiresTypeCast true if we should generate a typecase using asInstanceOf
+    * @param aggregate ??
+    * @return the generated code
+    */
+  def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
+              requiresTypeCast: Boolean = true,
+              aggregate: Boolean = false): String = ref match {
     case nf @ NamedField(f, _) => schema match {
       case Some(s) => {
         val idx = s.indexOfField(nf)
@@ -384,6 +388,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
      * "CompactBuffer(...)" in the output.
      *
      * @param schema a schema describing the tuple structure
+     * @param stringDelim delimiter character
      * @return the string representation
      */
     def genStringRepOfTuple(schema: Option[Schema], stringDelim: String = "','"): String = schema match {
@@ -486,7 +491,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    *
    * @param in name of the input bag
    * @param file the URI of the target file
-   * @param func a storage function
+   * @param storeFunc a storage function
    * @return the Scala code implementing the STORE operator
    */
   def emitStore(in: String, file: URI, storeFunc: Option[String]): String = {
@@ -513,6 +518,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return a string representing the code
    */
   def emitNode(node: PigOperator): String = {
+    node.checkPipeNames
     node match {
         /*
          * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
@@ -526,8 +532,11 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->node.inPipeName,"others"->node.inPipeNames.tail))
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
       case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inPipeName,"params"->emitParamList(node.schema, params)))
+      // case MacroOp(out, name, params) => callST("call_macro", Map("out"->node.outPipeName,"macro_name"->name,"params"->emitMacroParamList(node.schema, params)))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
+      case ConstructBag(in, ref) => "" // used only inside macros
+      case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again
       case Empty(_) => ""
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }

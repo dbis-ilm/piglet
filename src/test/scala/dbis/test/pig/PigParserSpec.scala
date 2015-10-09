@@ -744,10 +744,15 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   it should "parse a DEFINE macro statement" in {
     val ops = parseScript(
     """DEFINE my_macro(in_alias, p) RETURNS out_alias {
-      |$out_alias = FOREACH $in GENERATE $0 + $p;
+      |$out_alias = FILTER $in_alias BY $0 == $p;
       |};
     """.stripMargin
     )
+    assert(ops == List(DefineMacroCmd(Pipe("out_alias"), "my_macro", Some(List("in_alias", "p")),
+                        List(Filter(Pipe("$out_alias"), Pipe("$in_alias"),
+                          Eq(RefExpr(PositionalField(0)), RefExpr(NamedField("$p")))
+                        ))
+    )))
   }
 
   it should "parse a statement invoking a macro" in {
