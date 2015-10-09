@@ -668,12 +668,7 @@ class SparkCompileSpec extends FlatSpec {
       """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    println("-1--------------------------------------------")
-    println("input plan = { " + plan.operators.mkString("\n") + "\n}")
-    println("-2--------------------------------------------")
     val rewrittenPlan = processPlan(plan)
-    println("-3--------------------------------------------")
-    println("rewritten plan = { " + rewrittenPlan.operators.mkString("\n") + "\n}")
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
@@ -696,25 +691,26 @@ class SparkCompileSpec extends FlatSpec {
         |$out_alias = FOREACH $in_alias GENERATE $0 + $p;
         |};
         |
-        |in = LOAD 'file';
+        |in = LOAD 'file' AS (c1: int, c2: int);
         |out = my_macro(in, 42);
         |out2 = my_macro(out, 43);
-        |DUMP out;
+        |DUMP out2;
       """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    println("-1--------------------------------------------")
-    println("input plan = { " + plan.operators.mkString("\n") + "\n}")
-    println("-2--------------------------------------------")
     val rewrittenPlan = processPlan(plan)
-    println("-3--------------------------------------------")
-    println("rewritten plan = { " + rewrittenPlan.operators.mkString("\n") + "\n}")
     val codeGenerator = new BatchGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
-    val expectedCode = cleanString(
+    val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val expectedCode1 = cleanString(
       """
-        |val out = in.map(t => List(t(0) + 42))
+        |val out = in.map(t => List(t(0).asInstanceOf[Int] + 42))
         |""".stripMargin)
-   //  assert(generatedCode == expectedCode)
+    assert(generatedCode1 == expectedCode1)
+    val generatedCode2 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out2").get))
+    val expectedCode2 = cleanString(
+      """
+        |val out2 = out.map(t => List(t(0).asInstanceOf[Int] + 43))
+        |""".stripMargin)
+    assert(generatedCode2 == expectedCode2)
   }
 }

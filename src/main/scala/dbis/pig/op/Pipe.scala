@@ -31,7 +31,7 @@ case class InvalidPipeNameException(private val msg: String) extends Exception("
  * @param producer the operator producing the data
  * @param consumer the list of operators reading this data
  */
-class Pipe (var name: String, var producer: PigOperator = null, var consumer: List[PigOperator] = List()) {
+class Pipe (var name: String, var producer: PigOperator = null, var consumer: List[PigOperator] = List()) extends Serializable {
   override def toString = s"Pipe($name)"
 
   def canEqual(a: Any) = a.isInstanceOf[Pipe]

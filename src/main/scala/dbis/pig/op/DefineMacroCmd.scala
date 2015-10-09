@@ -16,6 +16,8 @@
  */
 package dbis.pig.op
 
+import java.io.{ObjectInputStream, ByteArrayInputStream, ObjectOutputStream, ByteArrayOutputStream}
+
 import dbis.pig.plan.{InvalidPlanException, DataflowPlan}
 import dbis.pig.schema.{Types, PigType}
 
@@ -28,6 +30,15 @@ case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[Stri
 
   var subPlan: Option[DataflowPlan] = None
   var inPipes = List[Pipe]()
+
+  def deepClone(): DefineMacroCmd = {
+      val baos = new ByteArrayOutputStream()
+      val oos = new ObjectOutputStream(baos)
+      oos.writeObject(this)
+      val bais = new ByteArrayInputStream(baos.toByteArray())
+      val ois = new ObjectInputStream(bais)
+      ois.readObject().asInstanceOf[DefineMacroCmd]
+  }
 
   override def preparePlan: Unit = {
     /*
@@ -45,7 +56,6 @@ case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[Stri
          */
         val pp = p.map(s => "$" + s)
         inPipes = pipes.filter(pi => pp.contains(pi.name))
-        println("------> macroInPipes = " + inPipes.map(_.name).mkString(","))
         inPipes
       }
       case None => List()

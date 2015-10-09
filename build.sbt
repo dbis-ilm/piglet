@@ -17,6 +17,9 @@ mainClass in assembly := Some("dbis.pig.PigCompiler")
 
 test in assembly := {}
 
+// needed for serialization/deserialization
+fork in (Test) := true
+
 testOptions in IntegrationTest += Tests.Argument("-oDF")
 
 // scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")

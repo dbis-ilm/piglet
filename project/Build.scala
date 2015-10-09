@@ -72,7 +72,7 @@ object Dependencies {
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
   val jline = "jline" % "jline" % "2.12.1"
-  val graphCore = "com.assembla.scala-incubator" %% "graph-core" % "1.9.2"
+//  val graphCore = "com.assembla.scala-incubator" %% "graph-core" % "1.9.2"
   val sparkCore = "org.apache.spark" %% "spark-core" % "1.4.1"
   val sparkSql = "org.apache.spark" %% "spark-sql" % "1.4.1"
   val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10-SNAPSHOT"

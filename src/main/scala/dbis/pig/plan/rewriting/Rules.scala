@@ -911,7 +911,6 @@ object Rules {
 
   def replaceMacroOp(t: Any): Option[PigOperator] = t match {
     case op@MacroOp(out, name, params) => {
-      println("replace macro: " + name)
       if (op.macroDefinition.isEmpty)
         throw new InvalidPlanException(s"macro ${op.macroName} undefined")
 
@@ -923,6 +922,9 @@ object Rules {
        */
       subPlan.resolveParameters(op.paramMapping)
 
+      /*
+       * and replace the macro call by its definition
+       */
       val newParent = subPlan.operators.head
       val newChild = subPlan.operators.last
       val newOp = Rewriter.fixReplacementwithMultipleOperators(op, newParent, newChild)

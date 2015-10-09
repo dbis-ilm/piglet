@@ -36,7 +36,7 @@ import dbis.pig.schema.TypeCode._
 /**
  * The base class for all Pig types.
  */
-abstract class PigType {
+abstract class PigType extends Serializable {
   var name: String = ""
 
   def this(s: String) = { this(); name = s }

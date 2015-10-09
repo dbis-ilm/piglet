@@ -29,7 +29,7 @@ import scala.collection.mutable.{ListBuffer, Map}
  */
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
-class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) {
+class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable {
   /**
    * A list of JAR files specified by the REGISTER statement
    */

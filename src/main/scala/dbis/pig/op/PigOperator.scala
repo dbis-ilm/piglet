@@ -29,7 +29,7 @@ import scala.collection.mutable.Map
  * pipes representing the input and output connections to other operators in the
  * dataflow.
  */
-trait PigOperator extends Rewritable {
+trait PigOperator extends Rewritable with Serializable {
   protected var _outputs: List[Pipe] = _
   protected var _inputs: List[Pipe] = _
 

@@ -40,8 +40,10 @@ case class MacroOp(out: Pipe, macroName: String, params: Option[List[Ref]] = Non
   def macroDefinition(): Option[DefineMacroCmd] = macroDef
 
   def setMacroDefinition(cmd: DefineMacroCmd): Unit = {
-    // TODO: make a deep copy of cmd
-    macroDef = Some(cmd)
+    /*
+     * Make a deep copy of cmd
+     */
+    macroDef = Some(cmd.deepClone())
 
     /*
      * Build the mapping table for parameter values.
@@ -65,10 +67,16 @@ case class MacroOp(out: Pipe, macroName: String, params: Option[List[Ref]] = Non
       case None => {}
     }
     /*
-     * Create unique pipe names.
+     * TODO: Create unique pipe names.
      */
   }
 
+  /**
+   * Constructs a table containing mappings from macro parameter names
+   * to the current values of the macro call.
+   *
+   * @param cmd the macro DEFINE statement
+   */
   def buildParameterMapping(cmd: DefineMacroCmd): Unit = {
       if (cmd.params.isEmpty && params.isDefined || cmd.params.isDefined && params.isEmpty)
         throw new InvalidPlanException(s"macro ${macroName}: parameter list doesn't match with definition")

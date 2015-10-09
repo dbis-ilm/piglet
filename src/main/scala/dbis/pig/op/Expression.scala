@@ -23,7 +23,7 @@ import scala.collection.mutable.Map
 /**
  * A trait for all types of expressions.
  */
-trait Expr {
+trait Expr extends Serializable {
   /**
    * Traverses the expression tree and applies the traverser function to each node.
    * The final boolean result is constructed by ANDing the result of the traverser
