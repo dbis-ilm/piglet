@@ -63,7 +63,7 @@ class ExprSpec extends FlatSpec with Matchers {
     ))))
 
     val e1 = Add(RefExpr(NamedField("f1")), RefExpr(NamedField("f2")))
-    e1.resultType(Some(schema)) should be (("", Types.DoubleType))
+    e1.resultType(Some(schema)) should be (Types.DoubleType)
   }
 
   it should "return the correct result type for casts" in {
@@ -73,10 +73,10 @@ class ExprSpec extends FlatSpec with Matchers {
     ))))
 
     val e1 = CastExpr(Types.IntType, RefExpr(PositionalField(0)))
-    e1.resultType(Some(schema)) should be (("", Types.IntType))
+    e1.resultType(Some(schema)) should be (Types.IntType)
 
     val tupleType = TupleType(Array(Field("", Types.IntType), Field("", Types.DoubleType)))
     val e2 = CastExpr(tupleType, RefExpr(NamedField("f3")))
-    e2.resultType(Some(schema)) should be (("f3", tupleType))
+    e2.resultType(Some(schema)) should be (tupleType)
   }
 }

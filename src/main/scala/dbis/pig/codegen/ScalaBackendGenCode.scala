@@ -279,7 +279,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
     case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast, aggregate)}"
     case Func(f, params) => {
-      val pTypes = params.map(p => {p.resultType(schema)._2})
+      val pTypes = params.map(p => p.resultType(schema))
       UDFTable.findUDF(f, pTypes) match {
         case Some(udf) => { 
           if (udf.isAggregate) {

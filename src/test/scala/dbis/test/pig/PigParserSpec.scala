@@ -135,25 +135,25 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   it should "parse a simple filter with a less than expression on fields and literals" in {
     assert(parseScript("a = filter b by $1 < 42;") ==
-      List(Filter(Pipe("a"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))))
+      List(Filter(Pipe("a"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value(42))))))
   }
 
   it should "parse a filter with a complex arithmetic expression" in {
     assert(parseScript("a = FILTER b BY x > (42 + y) * 3;") ==
       List(Filter(Pipe("a"), Pipe("b"), Gt(RefExpr(NamedField("x")),
-        Mult(PExpr(Add(RefExpr(Value("42")), RefExpr(NamedField("y")))), RefExpr(Value("3")))))))
+        Mult(PExpr(Add(RefExpr(Value(42)), RefExpr(NamedField("y")))), RefExpr(Value(3)))))))
   }
 
   it should "parse a filter with a logical expression" in {
     assert(parseScript("a = FILTER b BY x > 0 AND y < 1;") ==
-      List(Filter(Pipe("a"), Pipe("b"), And(Gt(RefExpr(NamedField("x")), RefExpr(Value("0"))),
-                                Lt(RefExpr(NamedField("y")), RefExpr(Value("1")))))))
+      List(Filter(Pipe("a"), Pipe("b"), And(Gt(RefExpr(NamedField("x")), RefExpr(Value(0))),
+                                Lt(RefExpr(NamedField("y")), RefExpr(Value(1)))))))
   }
 
   it should "parse a filter with a complex logical expression" in {
     assert(parseScript("a = FILTER b BY x > 0 AND (y < 0 OR (NOT a == b));") ==
-      List(Filter(Pipe("a"), Pipe("b"), And(Gt(RefExpr(NamedField("x")), RefExpr(Value("0"))),
-      PPredicate(Or(Lt(RefExpr(NamedField("y")), RefExpr(Value("0"))),
+      List(Filter(Pipe("a"), Pipe("b"), And(Gt(RefExpr(NamedField("x")), RefExpr(Value(0))),
+      PPredicate(Or(Lt(RefExpr(NamedField("y")), RefExpr(Value(0))),
         PPredicate(Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))))))))))
   }
 
@@ -168,7 +168,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = FILTER b BY aFunc(x, y) > 0;") ==
       List(Filter(Pipe("a"), Pipe("b"), Gt(
         Func("aFunc", List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),
-        RefExpr(Value("0"))))))
+        RefExpr(Value(0))))))
   }
 
   it should "parse a filter with a boolean function expression" in {
@@ -218,7 +218,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = foreach b generate $0 + $1 as f1, $1 * 42 as f2;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
         GeneratorExpr(Add(RefExpr(PositionalField(0)), RefExpr(PositionalField(1))), Some(Field("f1"))),
-        GeneratorExpr(Mult(RefExpr(PositionalField(1)), RefExpr(Value("42"))), Some(Field("f2")))
+        GeneratorExpr(Mult(RefExpr(PositionalField(1)), RefExpr(Value(42))), Some(Field("f2")))
       )))))
   }
 
@@ -425,11 +425,11 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   it should "parse a define (function alias) statement with constructor parameters" in {
     assert(parseScript("""define myFunc class.func(42, "Hallo");""") ==
-      List(DefineCmd("myFunc", "class.func", List(Value("42"), Value("\"Hallo\"")))))
+      List(DefineCmd("myFunc", "class.func", List(Value(42), Value("\"Hallo\"")))))
   }
 
   it should "parse a SET statement" in {
-    assert(parseScript("set parallelism 5;") == List(SetCmd("parallelism", Value("5"))))
+    assert(parseScript("set parallelism 5;") == List(SetCmd("parallelism", Value(5))))
     assert(parseScript("""set baseDirectory "/home/user";""") == List(SetCmd("baseDirectory", Value("\"/home/user\""))))
   }
 
@@ -438,7 +438,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a stream statement with parameters" in {
-    assert(parseScript("a = stream b through myOp(1.0, 42);") == List(StreamOp(Pipe("a"), Pipe("b"), "myOp", Some(List(Value("1.0"), Value("42"))))))
+    assert(parseScript("a = stream b through myOp(1.0, 42);") == List(StreamOp(Pipe("a"), Pipe("b"), "myOp", Some(List(Value(1.0), Value(42))))))
   }
 
   it should "parse a stream statement with schema" in {
@@ -448,12 +448,12 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a sample statement with a given size" in {
-    assert(parseScript("a = sample b 0.10;") == List(Sample(Pipe("a"), Pipe("b"), RefExpr(Value("0.10")))))
+    assert(parseScript("a = sample b 0.10;") == List(Sample(Pipe("a"), Pipe("b"), RefExpr(Value(0.10)))))
   }
 
   it should "parse a sample statement with an expression" in {
     assert(parseScript("a = sample b 100/num_rows;") ==
-      List(Sample(Pipe("a"), Pipe("b"), Div(RefExpr(Value("100")), RefExpr(NamedField("num_rows"))))))
+      List(Sample(Pipe("a"), Pipe("b"), Div(RefExpr(Value(100)), RefExpr(NamedField("num_rows"))))))
   }
 
   it should "parse a simple order by statement" in {
@@ -522,9 +522,9 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   it should "parse a SPLIT INTO statement" in {
     assert(parseScript("SPLIT a INTO b IF $0 > 12, c IF $0 < 12, d IF $0 == 0;") ==
       List(SplitInto(Pipe("a"), List(
-        SplitBranch(Pipe("b"), Gt(RefExpr(PositionalField(0)), RefExpr(Value("12")))),
-        SplitBranch(Pipe("c"), Lt(RefExpr(PositionalField(0)), RefExpr(Value("12")))),
-        SplitBranch(Pipe("d"), Eq(RefExpr(PositionalField(0)), RefExpr(Value("0"))))
+        SplitBranch(Pipe("b"), Gt(RefExpr(PositionalField(0)), RefExpr(Value(12)))),
+        SplitBranch(Pipe("c"), Lt(RefExpr(PositionalField(0)), RefExpr(Value(12)))),
+        SplitBranch(Pipe("d"), Eq(RefExpr(PositionalField(0)), RefExpr(Value(0))))
     ))))
   }
 
@@ -595,7 +595,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_next_match;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
         "skip_till_next_match",
         (0, "SECONDS"))))
   }
@@ -604,7 +604,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_any_match;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
         "skip_till_any_match",
         (0, "SECONDS"))))
   }
@@ -613,7 +613,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
@@ -622,7 +622,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = Matcher b PATTERN A EVENTS (A = x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SimplePattern("A"),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
@@ -630,7 +630,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = Matcher b PATTERN seq (A, B, C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
@@ -638,7 +638,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
@@ -647,8 +647,8 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0, C = x == 1) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
-          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))),
+          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value(1)))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
@@ -657,9 +657,9 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"),
           SeqPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
-          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
-          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))),
+          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value(1)))),
+          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value(10)))))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
@@ -669,9 +669,9 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       == List(Matcher(Pipe("a"), Pipe("b"),
         ConjPattern(List(SimplePattern("A"),
           DisjPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
-        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value("0")))),
-          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value("1")))),
-          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value("10")))))))),
+        CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))),
+          SimpleEvent(SimplePattern("C"), Eq(RefExpr(NamedField("x")), RefExpr(Value(1)))),
+          SimpleEvent(SimplePattern("D"), Eq(RefExpr(NamedField("y")), PExpr(Div(RefExpr(NamedField("x")), RefExpr(Value(10)))))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
@@ -756,7 +756,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a statement invoking a macro" in {
-    assert(parseScript("a = my_macro(in, 42);") == List(MacroOp(Pipe("a"), "my_macro", Some(List(NamedField("in"), Value("42"))))))
+    assert(parseScript("a = my_macro(in, 42);") == List(MacroOp(Pipe("a"), "my_macro", Some(List(NamedField("in"), Value(42))))))
 
   }
 }

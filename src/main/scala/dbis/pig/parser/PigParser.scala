@@ -86,7 +86,11 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def namedFieldWithLineage: Parser[NamedField] = rep1sep(bag, Field.lineageSeparator) ^^
     { case l  => NamedField.fromStringList(l) }
 
-  def literalField: Parser[Ref] = (floatingPointNumber ^^ { n => Value(n) } | stringLiteral ^^ { s => Value(s) } | boolean ^^ { b => Value(b) })
+  def literalField: Parser[Ref] = (
+    decimalNumber ^^ { i => if (i.contains('.')) Value(i.toDouble) else Value(i.toInt) } |
+    // floatingPointNumber ^^ { n => Value(n.toDouble) } |
+    stringLiteral ^^ { s => Value(s) } |
+    boolean ^^ { b => Value(b) })
   def fieldSpec: Parser[Ref] = (namedField | posField | literalField)
   /*
    * A reference can be also a dereference operator for tuples, bags or maps.

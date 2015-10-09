@@ -52,7 +52,7 @@ trait Expr extends Serializable {
    * @param schema The input schema for the operator providing the context of this expression (if defined).
    * @return
    */
-  def resultType(schema: Option[Schema]): (String, PigType)
+  def resultType(schema: Option[Schema]): PigType
 
   /**
    * Try to replace all references in expressions with a leading $ via the mapping table.
@@ -138,7 +138,7 @@ object Expr {
    */
   def containsFlattenOnBag(schema: Schema, ex: Expr): Boolean = {
     ex match {
-      case FlattenExpr(e) => e.resultType(Some(schema))._2.isInstanceOf[BagType]
+      case FlattenExpr(e) => e.resultType(Some(schema)).isInstanceOf[BagType]
       case _ => false
     }
   }

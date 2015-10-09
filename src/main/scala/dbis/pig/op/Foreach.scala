@@ -141,14 +141,14 @@ case class Foreach(out: Pipe,
             // if the type was only bytearray, we should check the expression if we have a more
             // specific type
             val res = e.expr.resultType(inputSchema)
-            Field(f.name, res._2)
+            Field(f.name, res)
           }
           else
             f
         }
         // otherwise we take the field name from the expression and
         // the input schema
-        case None => val res = e.expr.resultType(inputSchema); Field(res._1, res._2)
+        case None => val res = e.expr.resultType(inputSchema); Field("", res)
       }
     }).toArray
 
@@ -348,14 +348,14 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
             // if the type was only bytearray, we should check the expression if we have a more
             // specific type
             val res = e.expr.resultType(inputSchema)
-            Field(f.name, res._2)
+            Field(f.name, res)
           }
           else
             f
         }
         // otherwise we take the field name from the expression and
         // the input schema
-        case None => val res = e.expr.resultType(inputSchema); Field(res._1, res._2)
+        case None => val res = e.expr.resultType(inputSchema); Field("", res)
       }
     }).toArray
 }
