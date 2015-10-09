@@ -27,6 +27,7 @@ case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[Stri
   _inputs = List()
 
   var subPlan: Option[DataflowPlan] = None
+  var inPipes = List[Pipe]()
 
   override def preparePlan: Unit = {
     /*
@@ -43,9 +44,9 @@ case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[Stri
          * Next, we check which parameter refers to a pipe.
          */
         val pp = p.map(s => "$" + s)
-        val macroInPipes = pipes.filter(pi => pp.contains(pi.name))
-        println("------> macroInPipes = " + macroInPipes.map(_.name).mkString(","))
-        macroInPipes
+        inPipes = pipes.filter(pi => pp.contains(pi.name))
+        println("------> macroInPipes = " + inPipes.map(_.name).mkString(","))
+        inPipes
       }
       case None => List()
     }
@@ -54,9 +55,6 @@ case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[Stri
      * and add our input pipe(s) to the context of the plan.
      */
     subPlan = Some(new DataflowPlan(stmts, Some(inputs)))
-
-    // fix pipe names
-    subPlan.get.operators.foreach(_.fixPipeNames)
   }
 
   /**
@@ -69,5 +67,20 @@ case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[Stri
     val pipes = ListBuffer[Pipe]()
     ops.foreach{op => op.inputs.foreach(p => pipes += p)}
     pipes.toList
+  }
+
+  /**
+   * Construct a list of positions in the macro parameter list corresponding
+   * to pipe parameters.
+   *
+   * @return
+   */
+  def pipeParamPositions(): List[Int] = {
+    val l = ListBuffer[Int]()
+    inPipes.foreach(i => {
+      val pos = params.get.indexOf(i.name.substring(1))
+      if (pos >= 0) l += pos
+    })
+    l.toList
   }
 }

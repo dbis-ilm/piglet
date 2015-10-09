@@ -20,7 +20,7 @@ import dbis.pig.schema.Field
 
 sealed abstract class Ref
 
-case class NamedField(name: String, lineage: List[String] = List.empty) extends Ref
+case class NamedField(var name: String, lineage: List[String] = List.empty) extends Ref
 
 object NamedField {
   def fromString(s: String): NamedField = {
@@ -40,7 +40,7 @@ object NamedField {
 
 case class PositionalField(pos: Int) extends Ref
 
-case class Value(v: Any) extends Ref
+case class Value(var v: Any) extends Ref
 
 case class DerefTuple(tref: Ref, component: Ref) extends Ref
 

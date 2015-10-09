@@ -17,7 +17,11 @@
 
 package dbis.pig.op
 
+import dbis.pig.plan.InvalidPlanException
 import dbis.pig.schema.Schema
+
+import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Map
 
 /**
  *
@@ -29,7 +33,58 @@ case class MacroOp(out: Pipe, macroName: String, params: Option[List[Ref]] = Non
   _outputs = List(out)
   _inputs = List()
 
-  var macroDefinition: Option[DefineMacroCmd] = None
+  val paramMapping = Map[String, Ref]()
+
+  private var macroDef: Option[DefineMacroCmd] = None
+
+  def macroDefinition(): Option[DefineMacroCmd] = macroDef
+
+  def setMacroDefinition(cmd: DefineMacroCmd): Unit = {
+    // TODO: make a deep copy of cmd
+    macroDef = Some(cmd)
+
+    /*
+     * Build the mapping table for parameter values.
+     */
+    buildParameterMapping(cmd)
+    /*
+     * Adjust the input pipes: which of the params is a pipe?
+     */
+    params match {
+      case Some(p) => {
+        val pipeParams = cmd.pipeParamPositions()
+        val inPipes = ListBuffer[Pipe]()
+        pipeParams.foreach(i => {
+          val ref = p(i)
+          if (ref.isInstanceOf[NamedField]) {
+            inPipes += Pipe(ref.asInstanceOf[NamedField].name)
+          }
+        })
+        _inputs = inPipes.toList
+      }
+      case None => {}
+    }
+    /*
+     * Create unique pipe names.
+     */
+  }
+
+  def buildParameterMapping(cmd: DefineMacroCmd): Unit = {
+      if (cmd.params.isEmpty && params.isDefined || cmd.params.isDefined && params.isEmpty)
+        throw new InvalidPlanException(s"macro ${macroName}: parameter list doesn't match with definition")
+    if (cmd.params.isDefined) {
+      val defs = cmd.params.get
+      val p = params.get
+      if (defs.size != p.size)
+        throw new InvalidPlanException(s"macro ${macroName}: number of parameters doesn't match with definition")
+
+      for (i <- 0 to defs.size-1) {
+        paramMapping += ("$" + defs(i) -> p(i))
+      }
+    }
+
+    paramMapping += ("$" + cmd.out.name -> NamedField(outPipeName))
+  }
 
   override def lineageString: String = s"""MACRO%${macroName}%""" + super.lineageString
 

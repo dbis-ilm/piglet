@@ -18,6 +18,8 @@ package dbis.pig.op
 
 import dbis.pig.schema._
 
+import scala.collection.mutable.Map
+
 /**
  * A trait for all types of expressions.
  */
@@ -51,6 +53,13 @@ trait Expr {
    * @return
    */
   def resultType(schema: Option[Schema]): (String, PigType)
+
+  /**
+   * Try to replace all references in expressions with a leading $ via the mapping table.
+   *
+   * @param mapping a map from identifiers to values
+   */
+  def resolveReferences(mapping: Map[String, Ref]): Unit
 }
 
 abstract class BinaryExpr(val left: Expr, val right: Expr) extends Expr {
@@ -61,6 +70,10 @@ abstract class BinaryExpr(val left: Expr, val right: Expr) extends Expr {
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) || left.traverseOr(schema, traverser) || right.traverseOr(schema, traverser)
 
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = {
+    left.resolveReferences(mapping)
+    right.resolveReferences(mapping)
+  }
 }
 
 object BinaryExpr {

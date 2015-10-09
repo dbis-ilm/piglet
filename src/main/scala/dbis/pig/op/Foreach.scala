@@ -97,6 +97,13 @@ case class Foreach(out: Pipe,
     }
   }
 
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = generator match {
+    case GeneratorList(exprs) => exprs.foreach(_.expr.resolveReferences(mapping))
+    case GeneratorPlan(plan) => {
+      // TODO
+    }
+  }
+
   override def checkConnectivity: Boolean = {
     generator match {
       case GeneratorList(expr) => true

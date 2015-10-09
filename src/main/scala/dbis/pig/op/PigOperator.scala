@@ -22,6 +22,7 @@ import dbis.pig.plan.InvalidPlanException
 import dbis.pig.schema._
 import org.kiama.rewriting.Rewritable
 import scala.collection.immutable.Seq
+import scala.collection.mutable.Map
 
 /**
  * PigOperator is the base trait for all Pig operators. An operator contains
@@ -107,14 +108,44 @@ trait PigOperator extends Rewritable {
     inputs.foreach(p => validPipeName(p.name))
   }
 
-  def fixPipeNames: Unit = {
-    outputs.foreach(_.fixName)
-    inputs.foreach(_.fixName)
-  }
-
   def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 
   def preparePlan: Unit = {}
+
+  /**
+   * Try to replace all pipes/references with a leading $ via the mapping table.
+   *
+   * @param mapping a map from identifiers to values
+   */
+  def resolveParameters(mapping: Map[String, Ref]): Unit = {
+    def rename(p: Pipe): Unit = {
+      if (p.name.startsWith("$") && mapping.contains(p.name)) {
+        val s2 = mapping(p.name) match {
+          case NamedField(n, _) => n
+          case _ => p.name
+        }
+        p.name = s2
+      }
+    }
+
+    /*
+     * We resolve only the pipe names here.
+     */
+    outputs.foreach(p => rename(p))
+    inputs.foreach(p => rename(p))
+
+    /*
+     * This method has to be overriden by the subclasses.
+     */
+    resolveReferences(mapping)
+  }
+
+  /**
+   * Try to replace all references in expressions with a leading $ via the mapping table.
+   *
+   * @param mapping a map from identifiers to values
+   */
+  def resolveReferences(mapping: Map[String, Ref]): Unit = {}
 
   def checkConnectivity: Boolean = true
 

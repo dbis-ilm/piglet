@@ -20,9 +20,11 @@ package dbis.pig.op
 import dbis.pig.schema._
 import dbis.pig.udf.{UDFTable, UDF}
 
+import scala.collection.mutable.Map
+
 trait ArithmeticExpr extends Expr
 
-case class RefExpr(r: Ref) extends ArithmeticExpr {
+case class RefExpr(var r: Ref) extends ArithmeticExpr {
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
 
@@ -43,6 +45,34 @@ case class RefExpr(r: Ref) extends ArithmeticExpr {
       case _ => ("", Types.ByteArrayType)
     }
     case None => ("", Types.ByteArrayType)
+  }
+
+  def resolveReferences(mapping: Map[String, Ref]): Unit = r match {
+    case nf@NamedField(n, _) => {
+      val newVal = replaceReference(n, mapping)
+      if (newVal != n) {
+        /*
+         * If we have replaced the name of a NamedField it means that we
+         * don't have a field reference anymore, but a value. So, let's
+          * replace it.
+         */
+        r = Value(newVal)
+      }
+    }
+    case v@Value(n) => if (n.isInstanceOf[String]) v.v = replaceReference(n.asInstanceOf[String], mapping)
+    case _ => {}
+  }
+
+  def replaceReference(s: String, mapping: Map[String, Ref]): String = {
+    if (s.startsWith("$") && mapping.contains(s)) {
+      val s2 = mapping(s) match {
+        case NamedField(n, _) => n
+        case Value(v) => v.toString
+        case _ => s
+      }
+      s2
+    }
+    else s
   }
 }
 
@@ -65,6 +95,8 @@ case class FlattenExpr(a: ArithmeticExpr) extends ArithmeticExpr {
       a.resultType(schema)
     }
   }
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
 }
 
 case class PExpr(a: ArithmeticExpr) extends ArithmeticExpr {
@@ -77,6 +109,8 @@ case class PExpr(a: ArithmeticExpr) extends ArithmeticExpr {
   }
 
   override def resultType(schema: Option[Schema]): (String, PigType) = a.resultType(schema)
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
 }
 
 case class CastExpr(t: PigType, a: ArithmeticExpr) extends ArithmeticExpr {
@@ -89,6 +123,8 @@ case class CastExpr(t: PigType, a: ArithmeticExpr) extends ArithmeticExpr {
   }
 
   override def resultType(schema: Option[Schema]): (String, PigType) = (a.resultType(schema)._1, t)
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
 }
 
 case class MSign(a: ArithmeticExpr) extends ArithmeticExpr {
@@ -99,6 +135,8 @@ case class MSign(a: ArithmeticExpr) extends ArithmeticExpr {
     traverser(schema, this) || a.traverseOr(schema, traverser)
   }
   override def resultType(schema: Option[Schema]): (String, PigType) = a.resultType(schema)
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
 }
 
 case class Add(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
@@ -137,6 +175,8 @@ case class Func(f: String, params: List[ArithmeticExpr]) extends ArithmeticExpr 
       case None => ("", Types.ByteArrayType)
     }
   }
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = params.foreach(_.resolveReferences(mapping))
 }
 
 trait ConstructExpr extends ArithmeticExpr {
@@ -151,6 +191,8 @@ trait ConstructExpr extends ArithmeticExpr {
     traverser(schema, this) ||
       exprs.map(_.traverseOr(schema, traverser)).exists(b => b)
   }
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = exprs.foreach(_.resolveReferences(mapping))
 
   def exprListToTuple(schema: Option[Schema]): Array[Field] =
     exprs.map(e => e.resultType(schema)._2).zipWithIndex.map(f => Field(s"f${f._2}", f._1)).toArray

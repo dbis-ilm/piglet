@@ -21,7 +21,7 @@ import dbis.test.TestTools._
 import dbis.pig.PigCompiler._
 import dbis.pig.codegen.BatchGenCode
 import dbis.pig.op._
-import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.{PrettyPrinter, DataflowPlan}
 import dbis.pig.schema._
 import org.scalatest.FlatSpec
 import dbis.pig.backends.BackendManager
@@ -635,12 +635,86 @@ class SparkCompileSpec extends FlatSpec {
       |
       |in = LOAD 'file';
       |out = my_macro(in, 42);
+      |DUMP out;
     """.stripMargin
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
     val codeGenerator = new BatchGenCode(templateFile)
-    val generatedCode = codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get)
-    println("generated code: " + generatedCode)
+    val generatedCode = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val expectedCode = cleanString(
+      """
+        |val out = in.map(t => List(t(0) + 42))
+        |""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for multiple macros" in {
+    val ops = parseScript(
+      """
+        |DEFINE my_macro(in_alias, p) RETURNS out_alias {
+        |$out_alias = FOREACH $in_alias GENERATE $0 + $p, $1;
+        |};
+        |
+        |DEFINE my_macro2(in_alias, p) RETURNS out_alias {
+        |$out_alias = FOREACH $in_alias GENERATE $0, $1 - $p;
+        |};
+        |
+        |in = LOAD 'file' AS (c1: int, c2: int);
+        |out = my_macro(in, 42);
+        |out2 = my_macro2(out, 5);
+        |DUMP out;
+        |DUMP out2;
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    println("-1--------------------------------------------")
+    println("input plan = { " + plan.operators.mkString("\n") + "\n}")
+    println("-2--------------------------------------------")
+    val rewrittenPlan = processPlan(plan)
+    println("-3--------------------------------------------")
+    println("rewritten plan = { " + rewrittenPlan.operators.mkString("\n") + "\n}")
+    val codeGenerator = new BatchGenCode(templateFile)
+    val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val expectedCode1 = cleanString(
+      """
+        |val out = in.map(t => List(t(0).asInstanceOf[Int] + 42,t(1)))
+        |""".stripMargin)
+    assert(generatedCode1 == expectedCode1)
+    val generatedCode2 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out2").get))
+    val expectedCode2 = cleanString(
+      """
+        |val out2 = out.map(t => List(t(0),t(1).asInstanceOf[Int] - 5))
+        |""".stripMargin)
+    assert(generatedCode2 == expectedCode2)
+  }
+
+  it should "contain code for invoking a macro multiple times" in {
+    val ops = parseScript(
+      """
+        |DEFINE my_macro(in_alias, p) RETURNS out_alias {
+        |$out_alias = FOREACH $in_alias GENERATE $0 + $p;
+        |};
+        |
+        |in = LOAD 'file';
+        |out = my_macro(in, 42);
+        |out2 = my_macro(out, 43);
+        |DUMP out;
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    println("-1--------------------------------------------")
+    println("input plan = { " + plan.operators.mkString("\n") + "\n}")
+    println("-2--------------------------------------------")
+    val rewrittenPlan = processPlan(plan)
+    println("-3--------------------------------------------")
+    println("rewritten plan = { " + rewrittenPlan.operators.mkString("\n") + "\n}")
+    val codeGenerator = new BatchGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val expectedCode = cleanString(
+      """
+        |val out = in.map(t => List(t(0) + 42))
+        |""".stripMargin)
+   //  assert(generatedCode == expectedCode)
   }
 }

@@ -911,18 +911,29 @@ object Rules {
 
   def replaceMacroOp(t: Any): Option[PigOperator] = t match {
     case op@MacroOp(out, name, params) => {
+      println("replace macro: " + name)
       if (op.macroDefinition.isEmpty)
         throw new InvalidPlanException(s"macro ${op.macroName} undefined")
 
       val macroDef = op.macroDefinition.get
-      val newParent = macroDef.subPlan.get.operators.head
-      val newChild = macroDef.subPlan.get.operators.last
-      None // Some(fixReplacementWithMultipleOperators(op, newParent, newChild))
+      val subPlan = macroDef.subPlan.get
+
+      /*
+       * adjust the parameter names
+       */
+      subPlan.resolveParameters(op.paramMapping)
+
+      val newParent = subPlan.operators.head
+      val newChild = subPlan.operators.last
+      val newOp = Rewriter.fixReplacementwithMultipleOperators(op, newParent, newChild)
+      val schema = newOp.constructSchema
+      Some(newOp)
     }
-    case _ => None
+    case _ =>  None
   }
 
   def registerAllRules() = {
+    addStrategy(strategyf(t => replaceMacroOp(t)))
     addStrategy(removeDuplicateFilters)
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
@@ -945,6 +956,5 @@ object Rules {
     addStrategy(strategyf(t => J1(t)))
     addStrategy(strategyf(t => J2(t)))
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
-    // addStrategy(strategyf(t => replaceMacroOp(t)))
   }
 }

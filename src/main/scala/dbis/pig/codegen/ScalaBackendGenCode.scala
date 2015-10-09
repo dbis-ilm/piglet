@@ -195,6 +195,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     } // TODO: should be position of field
     case PositionalField(pos) =>
       if (requiresTypeCast && schema.isDefined) {
+        if (pos >= schema.get.fields.length)
+          throw new SchemaException("invalid field reference: $" + pos)
         val field = schema.get.field(pos)
         val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
         s"$tuplePrefix($pos).asInstanceOf[${typeCast}]"

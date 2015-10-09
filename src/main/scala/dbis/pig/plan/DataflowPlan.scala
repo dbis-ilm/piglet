@@ -91,7 +91,8 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
      */
     ops.filter(_.isInstanceOf[MacroOp]).foreach(op => {
       val macroOp = op.asInstanceOf[MacroOp]
-      macroOp.macroDefinition = macros.get(macroOp.macroName)
+      if (macros.contains(macroOp.macroName))
+        macroOp.setMacroDefinition(macros(macroOp.macroName))
     })
 
     /*
@@ -131,15 +132,18 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     planOps.foreach(op => {
         for (p <- op.inputs) {
           if (! pipes.contains(p.name)) {
+            /*
+             * If we cannot find the pipe we look in the context: perhaps we can get it from the outer
+             * scope of a nested statement
+             */
             val outerPipe = resolvePipeFromContext(p.name)
             outerPipe match {
               case Some(oPipe) => {
-                val cbOp = if (oPipe.name != p.name)
-                    ConstructBag(Pipe(s"${p.name}_${varCnt}"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
-                else
-                    ConstructBag(Pipe(p.name), NamedField(p.name))
-                newOps += ((cbOp, op))
-                varCnt += 1
+                if (oPipe.name != p.name) {
+                  val cbOp = ConstructBag(Pipe(s"${p.name}_${varCnt}"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
+                  newOps += ((cbOp, op))
+                  varCnt += 1
+                }
               }
               case None => throw new InvalidPlanException("invalid pipe: " + p.name)
             }
@@ -166,8 +170,11 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
      */
     try {
       resolvedPlanOps.foreach(op => {
-        val newPipes = op.inputs.map(p => pipes(p.name))
-        op.inputs = newPipes
+        // we ignore $name here because this appears only inside a macro
+        if (op.inputs.filter(p => p.name.startsWith("$")).isEmpty) {
+          val newPipes = op.inputs.map(p => pipes(p.name))
+          op.inputs = newPipes
+        }
         op.preparePlan
         op.constructSchema
       })
@@ -237,7 +244,6 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     else {
       var res: Option[Pipe] = None
       for (pipe <- ctx.get) {
-        println("resolvePipeFromContext: " + pipe)
         pipe.inputSchema match {
           case Some(schema) => if (schema.indexOfField(pName) != -1) res = Some(pipe)
           case None => res = Some(pipe) // None
@@ -414,8 +420,10 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     
     op2.inputs = op2.inputs.filter { op => op.producer != op1 }
     op1.outputs = op1.outputs.filter { op => op != op2 }
-    
-    
+
     this
   }
+
+  def resolveParameters(mapping: Map[String, Ref]): Unit = operators.foreach(p => p.resolveParameters(mapping))
+
 }
