@@ -925,6 +925,8 @@ object Rules {
     addOperatorReplacementStrategy(buildTypedCaseWrapper(F2))
     addOperatorReplacementStrategy(buildTypedCaseWrapper(F3))
     addOperatorReplacementStrategy(buildTypedCaseWrapper(F4))
+    addOperatorReplacementStrategy(F5)
+    addOperatorReplacementStrategy(F6)
     addTypedStrategy(F7)
     addTypedStrategy(F8)
     addStrategy(strategyf(t => J1(t)))
