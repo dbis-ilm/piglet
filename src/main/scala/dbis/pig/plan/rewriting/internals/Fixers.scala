@@ -144,4 +144,45 @@ trait Fixers {
 
     toBePulled
   }
+
+  /** Changes inputs and outputs such that `newParent` is the new consumer of `old`s inputs outputs and newChild the
+    * producer of `old`s outputs inputs.
+    *
+    * `newChild` does not have do be a direct successor of `newParent`.
+    *
+    * @param old
+    * @param newParent
+    * @param newChild
+    * @tparam T
+    * @tparam T2
+    * @tparam T3
+    * @return
+    */
+  def fixReplacementwithMultipleOperators[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator]
+  (old: T, newParent: T2, newChild: T3): T2 = {
+    newParent.inputs = old.inputs
+    newChild.outputs = old.outputs
+
+    // Remove `old` as a consumer of its inputs
+    old.inputs.foreach { in =>
+     in.removeConsumer(old)
+    }
+
+    // Replace `old` as a producer of its outputs inputs with `newChild`
+    newChild.outputs foreach { output =>
+      output.consumer foreach { consumer =>
+        consumer.inputs foreach { input =>
+          // If `op` (the old term) is the producer of any of the input pipes of `newChild` (the new terms)
+          // successors, replace it with `newChild` in that attribute. Replacing `op` with `other_filter` in
+          // the pipes on `newChild` itself is not necessary because the setters of `inputs` and `outputs` do
+          // that.
+          if (input.producer == old) {
+            input.producer = newChild
+          }
+        }
+      }
+    }
+
+    newParent
+  }
 }
