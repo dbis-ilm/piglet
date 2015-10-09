@@ -198,6 +198,12 @@ object RDF {
     pathJoinMap
   }
 
+  /** Returns the [[dbis.pig.op.NamedField]] that's used in the path join in ``patterns``.
+    */
+  def pathJoinNamedField(patterns: Seq[TriplePattern]): Option[(NamedField)] = {
+    buildPathJoinMap(patterns).find(_._2.size == patterns.length).map(_._1)
+  }
+
   /** True if `patterns` form a path join.
     *
     */
