@@ -50,7 +50,6 @@ case class GroupingExpression(val keyList: List[Ref]) {
       typeForRef(keyList.head)
     }
     else {
-      println("keyList = " + keyList.mkString(","))
       val resList = keyList.map(r => {
         r match {
           case NamedField(n, _) => (n, typeForRef(r))

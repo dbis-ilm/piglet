@@ -44,11 +44,19 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("union.pig", "united.out", "truth/united.data", true),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false),
-    ("embedded.pig", "embedded.out", "truth/embedded.data", true),
+    ("embedded.pig", "embedded.out", "truth/embedded.data", true)
+    /* Works, but requires fork := true which breaks other tests
     ("macro1.pig", "macro1.out", "truth/macro1.data", true)
-    //("rscript.pig", "cluster.out", "truth/cluster.data", true), // requires an installation of R
-    //("json.pig", "json.out", "json.data", true), // not working yet
-    // ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true) // requires a H2 database and the corresponding JDBC driver
+    */
+    /* Works, but requires a R installation
+    ("rscript.pig", "cluster.out", "truth/cluster.data", true)
+    */
+    /* Not working yet
+    ("json.pig", "json.out", "json.data", true), // not working yet
+    */
+    /* Works, but requires a H2 database and the corresponding JDBC driver
+    ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true) 
+    */
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
   )
 
