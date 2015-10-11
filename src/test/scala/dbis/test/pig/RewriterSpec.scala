@@ -20,7 +20,7 @@ import java.net.URI
 
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
-import dbis.pig.parser.PigParser
+import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.{PipeNameGenerator, DataflowPlan}
 import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
 import dbis.pig.plan.rewriting.Rewriter._
@@ -1302,7 +1302,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
         |a = LOAD 'file.csv';
         |b = FOREACH a GENERATE myFunc($0);
         |dump b;
-      """.stripMargin)
+      """.stripMargin, LanguageFeature.PlainPig)
     val plan = new DataflowPlan(ops)
     plan.extraRuleCode should have length 1
     val newPlan = processPlan(plan)
