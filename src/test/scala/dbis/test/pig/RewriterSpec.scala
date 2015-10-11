@@ -312,12 +312,12 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   it should "apply rewriting rule F2" in {
     val patterns = Table(
       ("Pattern"),
-      (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
-        Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))))),
-      (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
-      Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))),
-      (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
-      Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+      (TriplePattern(Value("subjectv"), PositionalField(1), PositionalField(2)),
+        Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subjectv"))))),
+      (TriplePattern(PositionalField(0), Value("predicatev"), PositionalField(2)),
+      Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicatev"))))),
+      (TriplePattern(PositionalField(0), PositionalField(1), Value("objectv")),
+      Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("object")), RefExpr(Value("objectv"))))))
     forAll (patterns) { (p: (TriplePattern, Filter)) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
