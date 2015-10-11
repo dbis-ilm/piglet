@@ -810,8 +810,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
             Value("obj1")))),
           BGPFilter(Pipe("pipevHyYGvOfsZ"), Pipe("a"), List(TriplePattern(NamedField("s"), PositionalField(1),
             Value("obj2"))))),
-        Join(Pipe("pipeEgkYzrkOZO"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")), List(List(NamedField("s")),
-          List(NamedField("s")))),
+        Join(Pipe("pipeEgkYzrkOZO"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")),
+          List(List(NamedField("subject")), List(NamedField("subject")))),
         Foreach(Pipe("b"), Pipe("pipeEgkYzrkOZO"), GeneratorList(List(
           GeneratorExpr(
             RefExpr(
@@ -830,9 +830,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
             Value("obj1")))),
           BGPFilter(Pipe("pipevHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), NamedField("p"),
             Value("obj2"))))),
-        Join(Pipe("pipeEgkYzrkOZO"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")), List(List(NamedField("p")), List
-          (NamedField
-          ("p")))),
+        Join(Pipe("pipeEgkYzrkOZO"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")),
+          List(List(NamedField("predicate")), List (NamedField("predicate")))),
         Foreach(Pipe("b"), Pipe("pipeEgkYzrkOZO"), GeneratorList(List(
           GeneratorExpr(
             RefExpr(
@@ -851,8 +850,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
             ("o")))),
           BGPFilter(Pipe("pipevHyYGvOfsZ"), Pipe("a"), List(TriplePattern(PositionalField(0), Value("pred2"), NamedField
             ("o"))))),
-        Join(Pipe("pipeEgkYzrkOZO"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")), List(List(NamedField("o")), List
-          (NamedField("o")))),
+        Join(Pipe("pipeEgkYzrkOZO"), List(Pipe("pipePClecYbNXF"), Pipe("pipevHyYGvOfsZ")),
+          List(List(NamedField("object")), List (NamedField("object")))),
         Foreach(Pipe("b"), Pipe("pipeEgkYzrkOZO"), GeneratorList(List(
           GeneratorExpr(
             RefExpr(

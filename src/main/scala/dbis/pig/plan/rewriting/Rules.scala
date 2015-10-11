@@ -731,9 +731,6 @@ object Rules {
       // We'll reuse in later on, so we need to remove `op` from its consumers
       in.removeConsumer(op)
 
-      val fieldname = RDF.starJoinColumn(patterns).get._2
-
-
       // This maps NamedField to a list of pipe names columns. Each column of that specific Pipe (produces by one of
       // the filters) contains the value of the NamedField in the join.
       // Its keys are also all the NamedFields that appear in `patterns`.
@@ -752,10 +749,14 @@ object Rules {
 
       val joinOutPipeName = generate()
 
+      // The NamedField that we're joining on and its position in the patterns
+      val starJoinFieldName = RDF.starJoinColumn(patterns).get._2
+      val starJoinColumnName = Column.columnToNamedField(namedFieldToPipeName(starJoinFieldName).head._2)
+
       val join = Join(Pipe(joinOutPipeName),
         filters map { f => Pipe(f.outPipeName, f) },
         // Use map here to make sure the amount of field expressions is the same as the amount of filters
-        filters map { _ => List(fieldname) })
+        filters map { _ => List(starJoinColumnName) })
 
       filters foreach { f =>
         f.outputs.head.consumer = List(join)
