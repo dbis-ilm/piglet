@@ -347,27 +347,27 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
     val patterns = Table(
       ("Pattern"),
       // s p o bound
-      (TriplePattern(Value("subject"), Value("predicate"), Value("object")),
+      (TriplePattern(Value("subjectv"), Value("predicatev"), Value("objectv")),
         Filter(Pipe("b"), Pipe("a"), And(
-          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subjectv"))),
           And(
-            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
-            Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))),
+            Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicatev"))),
+            Eq(RefExpr(NamedField("object")), RefExpr(Value("objectv"))))))),
       // s p bound
-      (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
+      (TriplePattern(Value("subjectv"), Value("predicatev"), PositionalField(2)),
         Filter(Pipe("b"), Pipe("a"), And(
-          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate")))))),
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subjectv"))),
+          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicatev")))))),
       // s o bound
-      (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
+      (TriplePattern(Value("subjectv"), PositionalField(1), Value("objectv")),
         Filter(Pipe("b"), Pipe("a"), And(
-          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-          Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))),
+          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subjectv"))),
+          Eq(RefExpr(NamedField("object")), RefExpr(Value("objectv")))))),
       // p o bound
-      (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
+      (TriplePattern(PositionalField(0), Value("predicatev"), Value("objectv")),
         Filter(Pipe("b"), Pipe("a"), And(
-          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
-          Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))))))
+          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicatev"))),
+          Eq(RefExpr(NamedField("object")), RefExpr(Value("objectv")))))))
 
     forAll (patterns) { (p: (TriplePattern, Filter)) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)

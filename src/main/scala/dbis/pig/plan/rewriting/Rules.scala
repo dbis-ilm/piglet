@@ -323,16 +323,16 @@ object Rules {
             Eq(RefExpr(NamedField("object")), RefExpr(o))))))
       case TriplePattern(s@Value(_), p@Value(_), _) => Some(
         Filter(out, in, And(
-          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))))
+          Eq(RefExpr(NamedField("subject")), RefExpr(s)),
+          Eq(RefExpr(NamedField("predicate")), RefExpr(p)))))
       case TriplePattern(s@Value(_), _, o@Value(_)) => Some(
         Filter(out, in, And(
-          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-          Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+          Eq(RefExpr(NamedField("subject")), RefExpr(s)),
+          Eq(RefExpr(NamedField("object")), RefExpr(o)))))
       case TriplePattern(_, p@Value(_), o@Value(_)) => Some(
         Filter(out, in, And(
-          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
-          Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+          Eq(RefExpr(NamedField("predicate")), RefExpr(p)),
+          Eq(RefExpr(NamedField("object")), RefExpr(o)))))
       case _ => None
     }
   }
