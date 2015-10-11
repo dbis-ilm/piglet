@@ -45,7 +45,8 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false),
     ("embedded.pig", "embedded.out", "truth/embedded.data", true),
-    ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false)
+    ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false),
+    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false)
     //("rscript.pig", "cluster.out", "truth/cluster.data", true), // requires an installation of R
     //("json.pig", "json.out", "json.data", true), // not working yet
     // ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true) // requires a H2 database and the corresponding JDBC driver
