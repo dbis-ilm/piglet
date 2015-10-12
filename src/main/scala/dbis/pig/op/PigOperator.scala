@@ -22,13 +22,14 @@ import dbis.pig.plan.InvalidPlanException
 import dbis.pig.schema._
 import org.kiama.rewriting.Rewritable
 import scala.collection.immutable.Seq
+import scala.collection.mutable.Map
 
 /**
  * PigOperator is the base trait for all Pig operators. An operator contains
  * pipes representing the input and output connections to other operators in the
  * dataflow.
  */
-trait PigOperator extends Rewritable {
+trait PigOperator extends Rewritable with Serializable {
   protected var _outputs: List[Pipe] = _
   protected var _inputs: List[Pipe] = _
 
@@ -97,10 +98,54 @@ trait PigOperator extends Rewritable {
 
   def inPipeNames: List[String] = inputs.map(p => p.name)
 
+  /**
+   * Checks whether the pipe names are valid identifiers. If not an exception is raised.
+   */
+  def checkPipeNames: Unit = {
+    def validPipeName(s: String) = if (!s.matches("""[a-zA-Z_]\w*""")) throw InvalidPipeNameException(s)
+
+    outputs.foreach(p => validPipeName(p.name))
+    inputs.foreach(p => validPipeName(p.name))
+  }
 
   def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 
   def preparePlan: Unit = {}
+
+  /**
+   * Try to replace all pipes/references with a leading $ via the mapping table.
+   *
+   * @param mapping a map from identifiers to values
+   */
+  def resolveParameters(mapping: Map[String, Ref]): Unit = {
+    def rename(p: Pipe): Unit = {
+      if (p.name.startsWith("$") && mapping.contains(p.name)) {
+        val s2 = mapping(p.name) match {
+          case NamedField(n, _) => n
+          case _ => p.name
+        }
+        p.name = s2
+      }
+    }
+
+    /*
+     * We resolve only the pipe names here.
+     */
+    outputs.foreach(p => rename(p))
+    inputs.foreach(p => rename(p))
+
+    /*
+     * This method has to be overriden by the subclasses.
+     */
+    resolveReferences(mapping)
+  }
+
+  /**
+   * Try to replace all references in expressions with a leading $ via the mapping table.
+   *
+   * @param mapping a map from identifiers to values
+   */
+  def resolveReferences(mapping: Map[String, Ref]): Unit = {}
 
   def checkConnectivity: Boolean = true
 

@@ -33,7 +33,7 @@ case class GroupingExpression(val keyList: List[Ref]) {
    * @return the expression type
    */
   def resultType(schema: Option[Schema]): PigType = {
-    def typeForRef(r: Ref): (String, PigType) = {
+    def typeForRef(r: Ref): PigType = {
        /*
         * We create a temporary expression, because the result type construction is already
         * implemented there.
@@ -47,11 +47,15 @@ case class GroupingExpression(val keyList: List[Ref]) {
       Types.CharArrayType
     }
     else if (keyList.size == 1) {
-      val res = typeForRef(keyList.head)
-      res._2
+      typeForRef(keyList.head)
     }
     else {
-      val resList = keyList.map(r => typeForRef(r)).map(pair => Field(pair._1, pair._2))
+      val resList = keyList.map(r => {
+        r match {
+          case NamedField(n, _) => (n, typeForRef(r))
+          case _ => ("", typeForRef(r))
+        }
+      }).map{ case (n, t) => Field(n, t)}
       TupleType(resList.toArray)
     }
   }

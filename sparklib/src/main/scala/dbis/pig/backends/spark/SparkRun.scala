@@ -34,7 +34,7 @@ class SparkRun extends PigletBackend with BackendConf {
   private val appconf = ConfigFactory.load() 
   
   override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]) {
-    println(backendArgs.mkString("#"))
+
     val ba = backendArgs.flatMap{case (k,v) => Seq(k,v)}.toArray
     
     var args = List("--master", master, "--class", className) ++ ba ++ Seq(jarFile.toAbsolutePath().toString())

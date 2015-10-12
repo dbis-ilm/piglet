@@ -18,10 +18,12 @@ package dbis.pig.op
 
 import dbis.pig.schema._
 
+import scala.collection.mutable.Map
+
 /**
  * A trait for all types of expressions.
  */
-trait Expr {
+trait Expr extends Serializable {
   /**
    * Traverses the expression tree and applies the traverser function to each node.
    * The final boolean result is constructed by ANDing the result of the traverser
@@ -50,7 +52,14 @@ trait Expr {
    * @param schema The input schema for the operator providing the context of this expression (if defined).
    * @return
    */
-  def resultType(schema: Option[Schema]): (String, PigType)
+  def resultType(schema: Option[Schema]): PigType
+
+  /**
+   * Try to replace all references in expressions with a leading $ via the mapping table.
+   *
+   * @param mapping a map from identifiers to values
+   */
+  def resolveReferences(mapping: Map[String, Ref]): Unit
 }
 
 abstract class BinaryExpr(val left: Expr, val right: Expr) extends Expr {
@@ -61,6 +70,10 @@ abstract class BinaryExpr(val left: Expr, val right: Expr) extends Expr {
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) || left.traverseOr(schema, traverser) || right.traverseOr(schema, traverser)
 
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = {
+    left.resolveReferences(mapping)
+    right.resolveReferences(mapping)
+  }
 }
 
 object BinaryExpr {
@@ -125,7 +138,7 @@ object Expr {
    */
   def containsFlattenOnBag(schema: Schema, ex: Expr): Boolean = {
     ex match {
-      case FlattenExpr(e) => e.resultType(Some(schema))._2.isInstanceOf[BagType]
+      case FlattenExpr(e) => e.resultType(Some(schema)).isInstanceOf[BagType]
       case _ => false
     }
   }

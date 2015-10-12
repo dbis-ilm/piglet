@@ -763,7 +763,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * @param aggr the function to be checked
    */
   private def getAggrFun(aggr: Func, schema: Option[Schema]): UDF = {
-    val pTypes = aggr.params.map(p => { p.resultType(schema)._2 })
+    val pTypes = aggr.params.map(p => p.resultType(schema))
     UDFTable.findUDF(aggr.f, pTypes) match {
       case Some(udf) => {
         if (udf.isAggregate) udf else null

@@ -24,7 +24,6 @@ object PigBuild extends Build {
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
     dependsOn(mapreduce % "test;it").
-    // dependsOn(zeppelin).
     aggregate(common, sparklib, flinklib, mapreduce) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
@@ -42,7 +41,6 @@ object PigBuild extends Build {
     settings(commonSettings: _*).
     dependsOn(common)
         
-
   lazy val zeppelin = (project in file("zeppelin")).
     settings(commonSettings: _*).
     dependsOn(common).
@@ -74,12 +72,12 @@ object PigBuild extends Build {
  */
 object Dependencies {
   // Libraries
+  val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.7"
   val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.7"
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.0"
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
   val jline = "jline" % "jline" % "2.12.1"
-  val graphCore = "com.assembla.scala-incubator" %% "graph-core" % "1.9.2"
   val sparkCore = "org.apache.spark" %% "spark-core" % "1.5.0"
   val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.0"
   val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10-SNAPSHOT"
@@ -100,6 +98,7 @@ object Dependencies {
   
   // Projects
   val rootDeps = Seq(
+    scalaLib,
     jline,
     scalaTest % "test;it" withSources(),
     scalaParserCombinators withSources(),

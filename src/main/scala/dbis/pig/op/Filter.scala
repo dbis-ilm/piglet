@@ -17,6 +17,8 @@
 
 package dbis.pig.op
 
+import scala.collection.mutable.Map
+
 /**
  * Filter represents the FILTER operator of Pig.
  *
@@ -37,6 +39,8 @@ case class Filter(out: Pipe, in: Pipe, pred: Predicate, var windowMode: Boolean 
   override def lineageString: String = {
     s"""FILTER%${pred}%""" + super.lineageString
   }
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = pred.resolveReferences(mapping)
 
   override def checkSchemaConformance: Boolean = {
     schema match {

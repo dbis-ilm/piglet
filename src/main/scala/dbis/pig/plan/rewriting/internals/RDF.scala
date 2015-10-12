@@ -126,12 +126,12 @@ object RDF {
       }
 
       if (pattern.pred.isInstanceOf[NamedField]) {
-        val key = (Column.Subject, pattern.pred.asInstanceOf[NamedField])
+        val key = (Column.Predicate, pattern.pred.asInstanceOf[NamedField])
         variableInPosition(key) = variableInPosition(key) + 1
       }
 
       if (pattern.obj.isInstanceOf[NamedField]) {
-        val key = (Column.Subject, pattern.obj.asInstanceOf[NamedField])
+        val key = (Column.Object, pattern.obj.asInstanceOf[NamedField])
         variableInPosition(key) = variableInPosition(key) + 1
       }
     }
@@ -163,16 +163,54 @@ object RDF {
     column
   }
 
-    /** Returns true if ``patterns`` form a star join
-      *
-      * ``patterns`` form a star join if the same [[dbis.pig.op.NamedField]] is used in the same position in each
-      * pattern.
-      */
-  def isStarJoin(patterns: Seq[TriplePattern]): Boolean = {
-    buildStarJoinMap(patterns).foldLeft(false) { case (old, ((_, _), count)) =>
+  /** Returns true if ``patterns`` form a star join
+    *
+    * ``patterns`` form a star join if the same [[dbis.pig.op.NamedField]] is used in the same position in each
+    * pattern.
+    */
+  def isStarJoin(patterns: Seq[TriplePattern]): Boolean =
+    (patterns.length > 1) && buildStarJoinMap(patterns).foldLeft(false) { case (old, (
+      (_, _), count)) =>
       old || count == patterns.length
     }
+
+  /** Builds a map of [[dbis.pig.op.NamedField]] objects to the columns they appear in in `patterns`.
+    *
+    */
+  private def buildPathJoinMap(patterns: Seq[TriplePattern]): Map[NamedField, Set[Column.Value]] = {
+    val pathJoinMap = Map[NamedField, Set[Column.Value]]().withDefaultValue(Set.empty)
+    patterns foreach { pattern =>
+      if (pattern.subj.isInstanceOf[NamedField]) {
+        val key = pattern.subj.asInstanceOf[NamedField]
+        pathJoinMap(key) = pathJoinMap(key) + Column.Subject
+      }
+
+      if (pattern.pred.isInstanceOf[NamedField]) {
+        val key = pattern.pred.asInstanceOf[NamedField]
+        pathJoinMap(key) = pathJoinMap(key) + Column.Predicate
+      }
+
+      if (pattern.obj.isInstanceOf[NamedField]) {
+        val key = pattern.obj.asInstanceOf[NamedField]
+        pathJoinMap(key) = pathJoinMap(key) + Column.Object
+      }
+    }
+    pathJoinMap
   }
+
+  /** Returns the [[dbis.pig.op.NamedField]] that's used in the path join in ``patterns``.
+    */
+  def pathJoinNamedField(patterns: Seq[TriplePattern]): Option[(NamedField)] = {
+    buildPathJoinMap(patterns).find(_._2.size == patterns.length).map(_._1)
+  }
+
+  /** True if `patterns` form a path join.
+    *
+    */
+  def isPathJoin(patterns: Seq[TriplePattern]): Boolean =
+    (patterns.length > 1) && buildPathJoinMap(patterns).foldLeft(false) { case (old, (_, set)) =>
+      old || set.size == patterns.length
+    }
 
   /** Converts multiple TriplePatterns to a String representation as a BGP.
     *
@@ -206,4 +244,31 @@ object RDF {
     return Eq(RefExpr(filter_by), RefExpr(filter_value))
   }
 
+  /** Builds a [[dbis.pig.op.Predicate]] that checks for all the bound columns in `p`.
+   *
+   * @param p
+   * @return None, if no columns are bound.
+   */
+  def patternToConstraint(p: TriplePattern): Option[Predicate] = {
+    val bound_columns = getAllBoundColumns(p)
+    val constraints = bound_columns map {c => columnToConstraint(c, p)}
+    constraints.length match {
+      case 0 => None
+      case 1 => Some(constraints.head)
+      case _ => Some(constraints reduceLeft And)
+    }
+  }
+
+  def namedFieldColumnPairFromPattern(p: TriplePattern): Seq[(NamedField, Column.Column)] = {
+    def makeTuple(r: Ref, c: Column): Option[(NamedField, Column.Column)] = {
+      if (r.isInstanceOf[NamedField]) {
+        return Some((r.asInstanceOf[NamedField], c))
+      }
+      None
+    }
+
+    List(makeTuple(p.subj, Column.Subject),
+      makeTuple(p.pred, Column.Predicate),
+      makeTuple(p.obj, Column.Object)).flatten
+  }
 }

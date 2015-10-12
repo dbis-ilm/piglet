@@ -568,13 +568,13 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     val opC = plan.findOperatorForAlias("C")
     val opD = plan.findOperatorForAlias("D")
     opB.get.configParams should contain key ("parallelismHint")
-    opB.get.configParams("parallelismHint") should be (Value("5"))
+    opB.get.configParams("parallelismHint") should be (Value(5))
     opC.get.configParams should contain key ("parallelismHint")
-    opC.get.configParams("parallelismHint") should be (Value("5"))
+    opC.get.configParams("parallelismHint") should be (Value(5))
     opC.get.configParams should not contain key ("some")
     opD.get.configParams should contain key ("parallelismHint")
     opD.get.configParams should contain key ("some")
-    opD.get.configParams("parallelismHint") should be (Value("3"))
+    opD.get.configParams("parallelismHint") should be (Value(3))
     opD.get.configParams("some") should be (Value("\"thing\""))
   }
 

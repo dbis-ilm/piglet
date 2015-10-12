@@ -194,12 +194,12 @@ object PigCompiler extends PigParser with LazyLogging {
         // the file was created --> execute it
         case Some(jarFile) =>  
           if (!compileOnly) {
-          // 4. and finally deploy/submit  
-          val runner = backendConf.runnerClass 
-          logger.debug(s"using runner class ${runner.getClass.toString()}")
-          
-          logger.info(s"""starting job at "$jarFile" using backend "$backend" """)
-          runner.execute(master, scriptName, jarFile, backendArgs)
+            // 4. and finally deploy/submit
+            val runner = backendConf.runnerClass
+            logger.debug(s"using runner class ${runner.getClass.toString()}")
+
+            logger.info( s"""starting job at "$jarFile" using backend "$backend" """)
+            runner.execute(master, scriptName, jarFile, backendArgs)
         } else
           logger.info("successfully compiled program - exiting.")
           

@@ -44,7 +44,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     var posCounter=0
     exprs = exprs.map( e => e.expr match {
         case Func(f, params) => {
-          val pTypes = params.map(p => {p.resultType(node.inputSchema)._2})
+          val pTypes = params.map(p => p.resultType(node.inputSchema))
           UDFTable.findUDF(f, pTypes) match {
             case Some(udf) if (udf.isAggregate) => {
               if(node.inputSchema == None) throw new SchemaException(s"unknown input schema for node $node")
@@ -91,7 +91,9 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     * @param requiresTypeCast
     * @return
     */
-  override def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t", requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = ref match {
+  override def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
+                       requiresTypeCast: Boolean = true,
+                       aggregate: Boolean = false): String = ref match {
       case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]](0)${emitRef(tupleSchema(schema, r1), r2, "", false)}"
       case _ => super.emitRef(schema, ref, tuplePrefix, requiresTypeCast, aggregate)
   }

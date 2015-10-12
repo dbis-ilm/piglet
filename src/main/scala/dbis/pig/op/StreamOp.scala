@@ -21,9 +21,8 @@ import dbis.pig.schema.Schema
 
 /**
  *
- * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
- *                           can be changed later.
- * @param initialInPipeName
+ * @param out the output pipe (relation).
+ * @param in the input pipe
  * @param opName
  * @param params
  * @param loadSchema

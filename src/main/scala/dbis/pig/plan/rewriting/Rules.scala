@@ -16,10 +16,11 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.plan.PipeNameGenerator
+import dbis.pig.plan.{InvalidPlanException, PipeNameGenerator}
 import dbis.pig.plan.rewriting.internals.{RDF, Column, FilterUtils}
 
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Map
 import dbis.pig.op._
 import Column.Column
 import FilterUtils._
@@ -33,6 +34,7 @@ import org.kiama.rewriting.Strategy
 /** This object contains all the rewriting rules that are currently implemented
   *
   */
+//noinspection ScalaDocMissingParameterDescription
 object Rules {
   /** Put Filters before multipleInputOp if we can figure out which input of multipleInputOp contains the fields used in the Filters predicate
     */
@@ -75,8 +77,9 @@ object Rules {
 
   /** Removes a [[dbis.pig.op.Filter]] object that's a successor of a Filter with the same Predicate
     */
+  //noinspection MutatorLikeMethodIsParameterless
   def removeDuplicateFilters = rulefs[Filter] {
-    case op@Filter(_, _, pred, _) => {
+    case op@Filter(_, _, pred, _) =>
       topdown(
         attempt(
           op.outputs.flatMap(_.consumer).
@@ -85,7 +88,6 @@ object Rules {
             foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, buildRemovalStrategy(pigOp)
           )
           }))
-    }
   }
 
   def splitIntoToFilters(node: Any): Option[List[Filter]] = node match {
@@ -154,19 +156,27 @@ object Rules {
   //noinspection ScalaDocMissingParameterDescription
   def mergeWithEmpty(parent: PigOperator, child: Empty): Option[PigOperator] = Some(child)
 
+  /** Finds the next BGPFilter object reachable from ``op``.
+    */
+  private def nextBGPFilter(op: PigOperator): Option[BGPFilter] = op match {
+    case bf@BGPFilter(_, _, _) => Some(bf)
+    // We need to make sure that each intermediate operator has only one successor - if it has multiple, we can't
+    // pull up the BGPFilter because its patterns don't apply to all successors of the RDFLoad
+    case _: OrderBy | _: Distinct | _: Limit | _: RDFLoad
+      if op.outputs.flatMap(_.consumer).length == 1 => op.outputs.flatMap(_.consumer).map(nextBGPFilter).head
+    case _ => None
+  }
+
   /** Applies rewriting rule R1 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Load operator, if `term` was an RDFLoad operator loading a remote resource
     */
   //noinspection ScalaDocMissingParameterDescription
   def R1(op: RDFLoad): Option[Load] = {
     // Only apply this rule if `op` is not followed by a BGPFilter operator. If it is, R2 applies.
-    if (op.outputs.flatMap(_.consumer).exists(_.isInstanceOf[BGPFilter])) {
-      return None
-    }
-
-    if (op.BGPFilterIsReachable) {
+    val next_bgpfilter = nextBGPFilter(op)
+    if (next_bgpfilter.isDefined && next_bgpfilter.get.schema == op.schema) {
       return None
     }
 
@@ -185,20 +195,10 @@ object Rules {
   def R2 = rulefs[RDFLoad] {
     case op =>
 
-      /** Finds the next BGPFilter object reachable from ``op``.
-        */
-      def nextBGPFilter(op: PigOperator): Option[BGPFilter] = op match {
-        case bf@BGPFilter(_, _, _) => Some(bf)
-        // We need to make sure that each intermediate operator has only one successor - if it has multiple, we can't
-        // pull up the BGPFilter because its patterns don't apply to all successors of the RDFLoad
-        case _: OrderBy | _: Distinct | _: Limit | _: RDFLoad
-          if op.outputs.flatMap(_.consumer).length == 1 => op.outputs.flatMap(_.consumer).map(nextBGPFilter).head
-        case _ => None
-      }
 
       val bf = nextBGPFilter(op)
 
-      if (bf.isDefined) {
+      if (bf.isDefined && bf.get.schema == op.schema) {
         // This is the function we'll use for replacing RDFLoad with Load
         def replacer = buildOperatorReplacementStrategy { sop: Any =>
           if (sop == op) {
@@ -222,7 +222,7 @@ object Rules {
 
   /** Applies rewriting rule L2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Load operator, if `term` was an RDFLoad operator loading a resource from hdfs
     */
   //noinspection ScalaDocMissingParameterDescription
@@ -255,7 +255,7 @@ object Rules {
 
   /** Applies rewriting rule F2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Filter operator, if `term` was an BGPFilter operator with only one bound variable
     */
   def F2(op: BGPFilter): Option[Filter] = {
@@ -292,12 +292,12 @@ object Rules {
       in.removeConsumer(op)
     }
 
-    return filter
+    filter
   }
 
   /** Applies rewriting rule F3 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some Filter operator, if `term` was an BGPFilter operator with multiple bound variables
     */
   def F3(op: BGPFilter): Option[Filter] = {
@@ -324,16 +324,16 @@ object Rules {
             Eq(RefExpr(NamedField("object")), RefExpr(o))))))
       case TriplePattern(s@Value(_), p@Value(_), _) => Some(
         Filter(out, in, And(
-          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))))
+          Eq(RefExpr(NamedField("subject")), RefExpr(s)),
+          Eq(RefExpr(NamedField("predicate")), RefExpr(p)))))
       case TriplePattern(s@Value(_), _, o@Value(_)) => Some(
         Filter(out, in, And(
-          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-          Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+          Eq(RefExpr(NamedField("subject")), RefExpr(s)),
+          Eq(RefExpr(NamedField("object")), RefExpr(o)))))
       case TriplePattern(_, p@Value(_), o@Value(_)) => Some(
         Filter(out, in, And(
-          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
-          Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+          Eq(RefExpr(NamedField("predicate")), RefExpr(p)),
+          Eq(RefExpr(NamedField("object")), RefExpr(o)))))
       case _ => None
     }
   }
@@ -400,7 +400,7 @@ object Rules {
       in.removeConsumer(op)
     }
 
-    return filter
+    filter
   }
 
   /** Applies rewriting rule F5 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -442,9 +442,9 @@ object Rules {
         return None
       }
 
-      val internalPipeName = generate
-      val intermediateResultName = generate
-      val eq = RDF.columnToConstraint(bound_column.get, pattern)
+      val internalPipeName = generate()
+      val intermediateResultName = generate()
+      val eq = RDF.patternToConstraint(pattern).get
 
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
@@ -461,21 +461,7 @@ object Rules {
 
       foreach.outputs foreach (_.addConsumer(filter))
 
-      filter.outputs foreach { output =>
-        output.consumer foreach { consumer =>
-          consumer.inputs foreach { input =>
-            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
-            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
-            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
-            // that.
-            if (input.producer == op) {
-              input.producer = filter
-            }
-          }
-        }
-      }
-
-      in.removeConsumer(op)
+      Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
       Some(foreach)
     case _ => None
@@ -525,15 +511,13 @@ object Rules {
         return None
       }
 
-      val internalPipeName = generate
-      val intermediateResultName = generate
-
-      val eq_1 = RDF.columnToConstraint(bound_columns.head, pattern)
-      val eq_2 = RDF.columnToConstraint(bound_columns.last, pattern)
+      val internalPipeName = generate()
+      val intermediateResultName = generate()
+      val constraint = RDF.patternToConstraint(pattern).get
 
       val foreach =
         Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
-          Filter(Pipe(intermediateResultName), Pipe("stmts"), And(eq_1, eq_2)),
+          Filter(Pipe(intermediateResultName), Pipe("stmts"), constraint),
           Generate(
             List(
               GeneratorExpr(RefExpr(NamedField("*"))),
@@ -546,21 +530,7 @@ object Rules {
 
       foreach.outputs foreach (_.addConsumer(filter))
 
-      filter.outputs foreach { output =>
-        output.consumer foreach { consumer =>
-          consumer.inputs foreach { input =>
-            // If `op` (the old term) is the producer of any of the input pipes of `filter` (the new terms)
-            // successors, replace it with `filter` in that attribute. Replacing `op` with `other_filter` in
-            // the pipes on `filter` itself is not necessary because the setters of `inputs` and `outputs` do
-            // that.
-            if (input.producer == op) {
-              input.producer = filter
-            }
-          }
-        }
-      }
-
-      in.removeConsumer(op)
+      Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
       Some(foreach)
     case _ => None
@@ -568,7 +538,7 @@ object Rules {
 
   /** Applies rewriting rule F7 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with two bound variables of which
     *         one is the grouping column
     */
@@ -604,7 +574,7 @@ object Rules {
       return None
     }
 
-    val internalPipeName = generate
+    val internalPipeName = generate()
     var group_filter: Option[BGPFilter] = None
     var other_filter_pattern: Option[TriplePattern] = None
 
@@ -645,19 +615,7 @@ object Rules {
 
     val other_filter = BGPFilter(out, Pipe(internalPipeName, group_filter.get), List(other_filter_pattern.get))
 
-    other_filter.outputs foreach { output =>
-      output.consumer foreach { consumer =>
-        consumer.inputs foreach { input =>
-          // If `op` (the old term) is the producer of any of the input pipes of `other_filter` (the new terms)
-          // successors, replace it with `other_filter` in that attribute. Replacing `op` with `other_filter` in
-          // the pipes on `other_filter` itself is not necessary because the setters of `inputs` and `outputs` do
-          // that.
-          if (input.producer == op) {
-            input.producer = other_filter
-          }
-        }
-      }
-    }
+    Rewriter.fixReplacementwithMultipleOperators(op, group_filter.get, other_filter)
 
     group_filter foreach {
       _.outputs.head.consumer = List(other_filter)
@@ -672,7 +630,7 @@ object Rules {
 
   /** Applies rewriting rule F8 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some BGPFilter operator if `term` was a BGPFilter with a single Pattern with only bound variables.
     */
   def F8(op: BGPFilter): Option[BGPFilter] = {
@@ -700,7 +658,7 @@ object Rules {
       return None
     }
 
-    val internalPipeName = generate
+    val internalPipeName = generate()
     var group_filter: Option[BGPFilter] = None
     var other_filter: Option[BGPFilter] = None
 
@@ -722,21 +680,7 @@ object Rules {
         PositionalField(2)))))
     }
 
-    other_filter foreach {
-      _.outputs foreach { output =>
-        output.consumer foreach { consumer =>
-          consumer.inputs foreach { input =>
-            // If `op` (the old term) is the producer of any of the input pipes of `other_filter` (the new terms)
-            // successors, replace it with `other_filter` in that attribute. Replacing `op` with `other_filter` in
-            // the pipes on `other_filter` itself is not necessary because the setters of `inputs` and `outputs` do
-            // that.
-            if (input.producer == op) {
-              input.producer = other_filter.get
-            }
-          }
-        }
-      }
-    }
+    Rewriter.fixReplacementwithMultipleOperators(op, group_filter.get, other_filter.get)
 
     group_filter foreach {
       _.outputs.head.consumer = List(other_filter.get)
@@ -749,7 +693,7 @@ object Rules {
     group_filter
   }
 
-  /** Applies rewriting rule F8 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+  /** Applies rewriting rule J1 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param term
     * @return Some BGPFilter objects if the input filters BGP is a star join.
@@ -788,17 +732,221 @@ object Rules {
       // We'll reuse in later on, so we need to remove `op` from its consumers
       in.removeConsumer(op)
 
-      val fieldname = RDF.starJoinColumn(patterns).get._2
-      val filters = patterns map { p => BGPFilter(Pipe(generate), in, List(p)) }
-      val join = Join(out,
+      // This maps NamedField to a list of pipe names columns. Each column of that specific Pipe (produces by one of
+      // the filters) contains the value of the NamedField in the join.
+      // Its keys are also all the NamedFields that appear in `patterns`.
+      val namedFieldToPipeName: Map[NamedField, List[(String, Column.Column)]] = Map.empty
+
+      val filters = patterns map { p =>
+        val pipename = generate()
+
+        val namedFieldsOfP = RDF.namedFieldColumnPairFromPattern(p)
+        namedFieldsOfP foreach { case (nf, c) =>
+            namedFieldToPipeName(nf) = namedFieldToPipeName.getOrElse(nf, List.empty) :+ (pipename, c)
+        }
+
+        BGPFilter(Pipe(pipename), in, List(p))
+      }
+
+      val joinOutPipeName = generate()
+
+      // The NamedField that we're joining on and its position in the patterns
+      val starJoinFieldName = RDF.starJoinColumn(patterns).get._2
+      val starJoinColumnName = Column.columnToNamedField(namedFieldToPipeName(starJoinFieldName).head._2)
+
+      val join = Join(Pipe(joinOutPipeName),
         filters map { f => Pipe(f.outPipeName, f) },
         // Use map here to make sure the amount of field expressions is the same as the amount of filters
-        filters map { _ => List(fieldname) })
+        filters map { _ => List(starJoinColumnName) })
 
-      filters foreach { f => f.outputs.head.consumer = List(join) }
+      filters foreach { f =>
+        f.outputs.head.consumer = List(join)
+        f.constructSchema
+      }
 
-      return Some(filters)
+      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+        GeneratorExpr(
+          RefExpr(
+            NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
+          Some(Field(nf.name, Types.CharArrayType)))
+      } toList
 
+      val foreach = Foreach(out, Pipe(joinOutPipeName, join),
+        GeneratorList(
+          generators
+        )
+      )
+      foreach.constructSchema
+
+      // Make the Foreach a successor of the Join
+      join.outputs.foreach { o => o.consumer = List(foreach) }
+
+      // Replace the Foreach as the producer of ops inputs outputs
+      out.consumer.foreach { op => op.inputs.foreach { i =>
+        if (i.producer == op) {
+          i.producer = join
+        }}}
+
+      Some(filters)
+
+    case _ => None
+  }
+
+  /** Applies rewriting rule J2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    */
+  def J2(term: Any): Option[Foreach] = term match {
+    case op @ BGPFilter(_, _, patterns) =>
+      if (groupedSchemaEarlyAbort(op.inputSchema)) {
+        return None
+      }
+
+      if (patterns.length < 2) {
+        return None
+      }
+
+      if (!RDF.isStarJoin(patterns)) {
+        return None
+      }
+
+      val out = op.outputs.head
+      val in = op.inputs.head
+
+      // We'll reuse in later on, so we need to remove `op` from its consumers
+      in.removeConsumer(op)
+
+      val internalPipeName = generate()
+
+      val filters: List[Filter] = patterns map RDF.patternToConstraint flatMap { c =>
+        Some(Filter(Pipe(generate()), Pipe("stmts"), c.get))
+      }
+
+      val filterPipeNames = filters map (_.outputs.head.name)
+
+      // This generates the GENERATE *, COUNT(t1) AS cnt1, ..., COUNT(tN) as cntN; operator
+      val countAsOps: List[GeneratorExpr] = filterPipeNames.zipWithIndex.map { case (name, i) =>
+        GeneratorExpr(Func("COUNT",
+          List(RefExpr(NamedField(name)))),
+          Some(Field(s"cnt$i", Types.ByteArrayType)))
+      }
+
+      val generatorOps: List[PigOperator] = filters :+ Generate(
+            GeneratorExpr(RefExpr(NamedField("*"))) :: countAsOps)
+
+      val foreach =
+        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(generatorOps))
+
+      val countGtZeroConstraint: Predicate = filterPipeNames.zipWithIndex.map {case (_, i) =>
+          Gt(RefExpr(NamedField(s"cnt$i")), RefExpr(Value(0)))
+      } reduceLeft And
+
+      val filter = Filter(out, Pipe(internalPipeName, foreach), countGtZeroConstraint)
+
+      foreach.outputs foreach (_.addConsumer(filter))
+
+      Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
+
+      Some(foreach)
+    case _ => None
+  }
+
+  /** Applies rewriting rule J3 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    * @param term
+    * @return Some BGPFilter objects if the input filters BGP is a star join.
+    */
+  // We need to return Option[List[Any]] here because we can return either a list of BGPFilters or of Joins
+  def J3(term: Any): Option[List[PigOperator]] = term match {
+    case op@BGPFilter(_, _, patterns) =>
+      val out = op.outputs.head
+      val in = op.inputs.head
+      if (op.inputSchema != RDFLoad.plainSchema) {
+        return None
+      }
+
+      if (patterns.length < 2) {
+        return None
+      }
+
+      if (!RDF.isPathJoin(patterns)) {
+        return None
+      }
+
+      // We'll reuse in later on, so we need to remove `op` from its consumers
+      in.removeConsumer(op)
+
+      val pathJoinField = RDF.pathJoinNamedField(patterns).get
+
+      // This maps NamedField to a list of pipe names and columns. Each column of that specific Pipe (produces by one of
+      // the filters) contains the value of the NamedField in the join.
+      // Its keys are also all the NamedFields that appear in `patterns`.
+      val namedFieldToPipeName: Map[NamedField, List[(String, Column.Column)]] = Map.empty
+
+      // First build new BGPFilter objects for all the patterns.
+
+      val newBGPFilters = patterns map { p =>
+        val pipename = generate()
+
+        // TODO this is duplicated from J1
+        val namedFieldsOfP = RDF.namedFieldColumnPairFromPattern(p)
+        namedFieldsOfP foreach { case (nf, c) =>
+          namedFieldToPipeName(nf) = namedFieldToPipeName.getOrElse(nf, List.empty) :+(pipename, c)
+        }
+
+        BGPFilter(Pipe(pipename), in, List(p))
+      }
+
+      // Now we need to join them again. Note: in the paper, multiple JOINs are used, but just do it in one here
+      // Since each filters schema is still (s,p,o), we can't join by namedfields, but only but s, p or o.
+      def findColumnForNamedField(nf: NamedField, p: TriplePattern): NamedField = p match {
+        case TriplePattern(n, _, _) if n == nf => Column.columnToNamedField(Column.Subject)
+        case TriplePattern(_, n, _) if n == nf => Column.columnToNamedField(Column.Predicate)
+        case TriplePattern(_, _, n) if n == nf => Column.columnToNamedField(Column.Object)
+      }
+
+      val joinFields = patterns map { p =>
+        List(findColumnForNamedField(pathJoinField, p))
+      }
+
+      val joinOutPipeName = generate()
+
+      val join = Join(Pipe(joinOutPipeName),
+        newBGPFilters map { f => Pipe(f.outPipeName, f)},
+        joinFields
+      )
+
+      // Set newBGPFilters' outputs to the join
+      newBGPFilters foreach { f =>
+        f.outputs.head.consumer = List(join)
+        f.constructSchema
+      }
+
+      // TODO this is duplicated from J1
+      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+        GeneratorExpr(
+          RefExpr(
+            NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
+          Some(Field(nf.name, Types.CharArrayType)))
+      } toList
+
+      val foreach = Foreach(out, Pipe(joinOutPipeName, join),
+        GeneratorList(
+          generators
+        )
+      )
+
+      // Make the Foreach a successor of the Join
+      join.outputs.foreach { o => o.consumer = List(foreach) }
+
+      foreach.constructSchema
+
+      // Replace the Foreach as the producer of ops inputs outputs
+      out.consumer.foreach { op => op.inputs.foreach { i =>
+        if (i.producer == op) {
+          i.producer = join
+        }}}
+
+      Some(newBGPFilters)
     case _ => None
   }
 
@@ -835,35 +983,59 @@ object Rules {
   def foreachGenerateWithAsterisk(term: Any): Option[PigOperator] = {
     term match {
       case op@Foreach(_, _, gen, _) => gen match {
-        case GeneratorList(exprs) => {
+        case GeneratorList(exprs) =>
           val (genExprs, foundStar) = constructGeneratorList(exprs, op)
           if (foundStar) {
             val newGen = GeneratorList(genExprs.toList)
             val newOp = Foreach(op.outputs.head, op.inputs.head, newGen, op.windowMode)
             newOp.constructSchema
-            return Some(newOp)
+            Some(newOp)
           }
           else
-            return None
-        }
+            None
         case _ => None
       }
-      case op@Generate(exprs) => {
+      case op@Generate(exprs) =>
         val (genExprs, foundStar) = constructGeneratorList(exprs, op)
         if (foundStar) {
           val newOp = Generate(genExprs.toList)
           newOp.copyPipes(op)
           newOp.constructSchema
-          return Some(newOp)
+          Some(newOp)
         }
         else
-          return None
-      }
+          None
       case _ => None
     }
   }
 
-  def registerAllRules = {
+  def replaceMacroOp(t: Any): Option[PigOperator] = t match {
+    case op@MacroOp(out, name, params) => {
+      if (op.macroDefinition.isEmpty)
+        throw new InvalidPlanException(s"macro ${op.macroName} undefined")
+
+      val macroDef = op.macroDefinition.get
+      val subPlan = macroDef.subPlan.get
+
+      /*
+       * adjust the parameter names
+       */
+      subPlan.resolveParameters(op.paramMapping)
+
+      /*
+       * and replace the macro call by its definition
+       */
+      val newParent = subPlan.operators.head
+      val newChild = subPlan.operators.last
+      val newOp = Rewriter.fixReplacementwithMultipleOperators(op, newParent, newChild)
+      val schema = newOp.constructSchema
+      Some(newOp)
+    }
+    case _ =>  None
+  }
+
+  def registerAllRules() = {
+    addStrategy(strategyf(t => replaceMacroOp(t)))
     addStrategy(removeDuplicateFilters)
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
@@ -879,9 +1051,13 @@ object Rules {
     addOperatorReplacementStrategy(buildTypedCaseWrapper(F2))
     addOperatorReplacementStrategy(buildTypedCaseWrapper(F3))
     addOperatorReplacementStrategy(buildTypedCaseWrapper(F4))
+    addOperatorReplacementStrategy(F5)
+    addOperatorReplacementStrategy(F6)
     addTypedStrategy(F7)
     addTypedStrategy(F8)
     addStrategy(strategyf(t => J1(t)))
-    addOperatorReplacementStrategy(foreachGenerateWithAsterisk _)
+    addStrategy(strategyf(t => J2(t)))
+    addStrategy(strategyf(t => J3(t)))
+    addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }
 }

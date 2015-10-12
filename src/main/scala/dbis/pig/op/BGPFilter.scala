@@ -38,14 +38,14 @@ case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends
   override def lineageString: String = s"""BGPFilter%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
-    if (schema.isEmpty) {
+    if (inputSchema.isEmpty) {
       return false
     }
 
-    if (schema == RDFLoad.plainSchema) {
+    if (inputSchema == RDFLoad.plainSchema) {
       return true
     }
-    if (RDFLoad.groupedSchemas.values.toList contains schema.get) {
+    if (RDFLoad.groupedSchemas.values.toList contains inputSchema.get) {
       return true
     }
 
