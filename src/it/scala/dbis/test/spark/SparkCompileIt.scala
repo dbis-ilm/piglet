@@ -22,6 +22,8 @@ import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import scala.io.Source
 import scalax.file.Path
+import org.apache.commons.exec._
+import org.apache.commons.exec.environment.EnvironmentUtils
 
 class SparkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
@@ -44,10 +46,10 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("union.pig", "united.out", "truth/united.data", true),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false),
-    ("embedded.pig", "embedded.out", "truth/embedded.data", true)
-    /* Works, but requires fork := true which breaks other tests
+    ("embedded.pig", "embedded.out", "truth/embedded.data", true),
+    /* Works, but requires fork := true which breaks other tests */
     ("macro1.pig", "macro1.out", "truth/macro1.data", true)
-    */
+
     /* Works, but requires a R installation
     ("rscript.pig", "cluster.out", "truth/cluster.data", true)
     */
@@ -73,6 +75,42 @@ class SparkCompileIt extends FlatSpec with Matchers {
 
   }
 
+  def runCompiler(script: String, resourceName: String, resultPath: Path): Boolean = {
+    println("execute: " + script)
+    /*
+    PigCompiler.main(Array("--backend", "spark",
+      "--params", s"inbase=$resourceName,outfile=${resultPath.path}",
+      "--master", "local[2]",
+      "--outdir", ".", resourceName + script))
+ */
+    val params = new java.util.HashMap[String, Object]()
+    params.put("backend", "spark")
+    params.put("master", "local[2]")
+    params.put("outdir", ".")
+    params.put("params", s"inbase=$resourceName,outfile=${resultPath.path}")
+    params.put("script", resourceName + script)
+    val cmdLine = new CommandLine("script/pigs")
+
+    cmdLine.addArgument("--backend")
+    cmdLine.addArgument("${backend}")
+    cmdLine.addArgument("--master")
+    cmdLine.addArgument("${master}")
+    cmdLine.addArgument("--outdir")
+    cmdLine.addArgument("${outdir}")
+    cmdLine.addArgument("--params")
+    cmdLine.addArgument("${params}")
+    cmdLine.addArgument("${script}")
+
+    cmdLine.setSubstitutionMap(params)
+
+    val executor = new DefaultExecutor()
+    executor.setExitValue(0)
+    val watchdog = new ExecuteWatchdog(120000)
+    executor.setWatchdog(watchdog)
+    println("EXECUTE: " + cmdLine)
+    executor.execute(cmdLine) == 0
+  }
+
   "The Pig compiler" should "compile and execute the script" in {
     forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean) =>
       // 1. make sure the output directory is empty
@@ -83,12 +121,15 @@ class SparkCompileIt extends FlatSpec with Matchers {
       val resourcePath = getClass.getResource("").getPath + "../../../"
 
       // 2. compile and execute Pig script
+      /*
       PigCompiler.main(Array("--backend", "spark",
         "--params", s"inbase=$resourcePath,outfile=${resultPath.path}",
         "--master", "local[2]",
         "--outdir", ".", resourcePath + script))
       println("execute: " + script)
-
+      */
+      runCompiler(script, resourcePath, resultPath) should be (true)
+      
       // 3. load the output file and the truth file
       val result = Source.fromFile(resultDir + "/part-00000").getLines()
       val truth = Source.fromFile(resourcePath + truthFile).getLines()
