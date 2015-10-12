@@ -458,8 +458,7 @@ object Rules {
       val filter = Filter(out, Pipe(internalPipeName, foreach),
         Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
 
-      foreach.outputs foreach (_.addConsumer(filter))
-
+      Rewriter.connect(foreach, filter)
       Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
       Some(foreach)
@@ -527,8 +526,7 @@ object Rules {
       val filter = Filter(out, Pipe(internalPipeName, foreach),
         Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
 
-      foreach.outputs foreach (_.addConsumer(filter))
-
+      Rewriter.connect(foreach, filter)
       Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
       Some(foreach)
@@ -617,8 +615,9 @@ object Rules {
     Rewriter.fixReplacementwithMultipleOperators(op, group_filter.get, other_filter)
 
     group_filter foreach {
-      _.outputs.head.consumer = List(other_filter)
+      Rewriter.connect(_, other_filter)
     }
+
 
     if (group_filter.isDefined) {
       in.removeConsumer(op)
@@ -682,7 +681,7 @@ object Rules {
     Rewriter.fixReplacementwithMultipleOperators(op, group_filter.get, other_filter.get)
 
     group_filter foreach {
-      _.outputs.head.consumer = List(other_filter.get)
+      Rewriter.connect(_, other_filter.get)
     }
 
     if (group_filter.isDefined) {
@@ -777,8 +776,7 @@ object Rules {
       )
       foreach.constructSchema
 
-      // Make the Foreach a successor of the Join
-      join.outputs.foreach { o => o.consumer = List(foreach) }
+      Rewriter.connect(join, foreach)
 
       // Replace the Foreach as the producer of ops inputs outputs
       out.consumer.foreach { op => op.inputs.foreach { i =>
@@ -841,8 +839,7 @@ object Rules {
 
       val filter = Filter(out, Pipe(internalPipeName, foreach), countGtZeroConstraint)
 
-      foreach.outputs foreach (_.addConsumer(filter))
-
+      Rewriter.connect(foreach, filter)
       Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
       Some(foreach)
@@ -934,9 +931,7 @@ object Rules {
         )
       )
 
-      // Make the Foreach a successor of the Join
-      join.outputs.foreach { o => o.consumer = List(foreach) }
-
+      Rewriter.connect(join, foreach)
       foreach.constructSchema
 
       // Replace the Foreach as the producer of ops inputs outputs

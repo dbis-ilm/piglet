@@ -22,6 +22,26 @@ import dbis.pig.op.{PigOperator, Pipe}
   *
   */
 trait Fixers {
+  /** Makes ``succ`` a successor of ``pred``.
+    *
+    */
+  @throws[IllegalArgumentException]("If pred does not have exactly one output pipe")
+  @throws[IllegalArgumentException]("If succ has more than one input pipe")
+  @throws[IllegalArgumentException]("If succ already has an input pipe with a producer that's not pred")
+  def connect(pred: PigOperator, succ: PigOperator): Unit = {
+    require(pred.outputs.length == 1, "The new predecessor does not have exactly one output pipe")
+    require(succ.inputs.length < 2, "The new successor has more than one input pipe")
+    require(succ.inputs.head.producer == null || succ.inputs.head.producer == pred,
+      "The new successors input pipe already has a producer that is not the same as pred")
+
+    // If there is an input pipe matching `pred`s output name, use it, otherwise build a new one
+    val inPipe = succ.inputs.find {_.name == pred.outputs.head.name}.orElse(Some(Pipe(pred.outputs.head.name, pred))).get
+    inPipe.consumer = List(succ)
+    succ.inputs = List(inPipe)
+
+    pred.outputs.head.consumer = pred.outputs.head.consumer :+ succ
+  }
+
   /** Fix the inputs and outputs attributes of PigOperators after an operation merged two of them into one.
     *
     * @param oldParent The old parent operator.
