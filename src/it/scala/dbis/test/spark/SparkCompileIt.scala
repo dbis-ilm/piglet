@@ -44,7 +44,6 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("union.pig", "united.out", "truth/united.data", true),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false),
-    ("embedded.pig", "embedded.out", "truth/embedded.data", true)
     /* Works, but requires fork := true which breaks other tests
     ("macro1.pig", "macro1.out", "truth/macro1.data", true)
     */
@@ -57,6 +56,11 @@ class SparkCompileIt extends FlatSpec with Matchers {
     /* Works, but requires a H2 database and the corresponding JDBC driver
     ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true) 
     */
+// TODO the embedded test case is commented out because the default languagefeature has temporarily been set to
+// sparqlpig which doesn't include embedding
+//    ("embedded.pig", "embedded.out", "truth/embedded.data", true),
+    ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false),
+    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false)
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
   )
 

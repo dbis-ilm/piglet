@@ -114,7 +114,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
   it should "conform to plain RDF data" in {
     val plan = new DataflowPlan(parseScript(
       s"""A = Load 'file' as (subject: chararray, predicate: chararray, object: chararray);
-         |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
+         |B = BGP_FILTER A by { ?a "firstName" "Wieland". ?a "lastName" "Hoffmann" };
          |DUMP B;
         """.stripMargin, LanguageFeature.SparqlPig))
     val bgpfilter = plan.findOperatorForAlias("B").value
@@ -123,15 +123,31 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
 
   it should "conform to grouped RDF data" in {
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    val patterns = Table(
+      "pattern",
+      List(
+        TriplePattern(PositionalField(0), PositionalField(1), PositionalField(2))),
+      List(
+        TriplePattern(PositionalField(0), PositionalField(1), PositionalField(2)),
+        TriplePattern(PositionalField(0), PositionalField(1), PositionalField(2))),
+      List(
+        TriplePattern(PositionalField(0), PositionalField(1), NamedField("foo")),
+        TriplePattern(PositionalField(0), NamedField("bar"), PositionalField(2))),
+      List(
+        TriplePattern(PositionalField(0), PositionalField(1), NamedField("foo")),
+        TriplePattern(PositionalField(0), PositionalField(1), NamedField("foo")))
+    )
     forAll (possibleGroupers) { (g: String) =>
-      val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
-      val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
-      val op3 = Dump(Pipe("b"))
-      val plan = new DataflowPlan(List(op1, op2, op3))
+      forAll(patterns) { p =>
+        val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
+        val op2 = BGPFilter(Pipe("b"), Pipe("a"), p)
+        val op3 = Dump(Pipe("b"))
+        val plan = new DataflowPlan(List(op1, op2, op3))
 
-      op2.inputs.map(_.producer) should have size 1
+        op2.inputs.map(_.producer) should have size 1
 
-      plan.findOperatorForAlias("b").value.checkSchemaConformance shouldBe true
+        plan.findOperatorForAlias("b").value.checkSchemaConformance shouldBe true
+      }
     }
   }
 
