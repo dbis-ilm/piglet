@@ -51,6 +51,7 @@ object PigREPL extends PigParser with LazyLogging {
   case class REPLConfig(master: String = "local",
                         outDir: String = ".",
                         backend: String = Conf.defaultBackend,
+                        interactive: Boolean = true,
                         backendArgs: Map[String,String] = Map())
 
   val consoleReader = new ConsoleReader()
@@ -178,9 +179,10 @@ object PigREPL extends PigParser with LazyLogging {
     var outDir: Path = null
     var backend: String = Conf.defaultBackend
     var backendArgs: Map[String, String] = null 
-
+    var interactive: Boolean = true
     val parser = new OptionParser[REPLConfig]("PigShell") {
       head("PigShell", "0.2")
+      opt[Unit]('i', "interactive") hidden() action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
