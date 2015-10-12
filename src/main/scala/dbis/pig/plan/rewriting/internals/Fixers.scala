@@ -57,12 +57,7 @@ trait Fixers {
     newParent.inputs = oldParent.inputs
     newParent.outputs = oldChild.outputs
 
-    // Each Operator that has oldChild in its inputs list as a producer needs to have it replaced with newParent
-    oldChild.outputs foreach { output =>
-      output.consumer foreach { op =>
-        op.inputs = op.inputs.filter(_.producer != oldChild) :+ Pipe(newParent.outPipeName, newParent, List(op))
-      }
-    }
+    replaceOpInSuccessorsInputs(oldChild, newParent)
 
     // Replacing oldParent with newParent in the outputs attribute of oldParents inputs producers is done by kiamas
     // Rewritable trait
@@ -188,21 +183,29 @@ trait Fixers {
      in.removeConsumer(old)
     }
 
-    // Replace `old` as a producer of its outputs inputs with `newChild`
-    newChild.outputs foreach { output =>
+    replaceOpInSuccessorsInputs(old, newChild)
+
+    newParent
+  }
+
+  /** Replaces ``oldOp`` in its outputs inputs as a producer with ``newOp``.
+    *
+    * @param oldOp
+    * @param newOp
+    */
+  def replaceOpInSuccessorsInputs(oldOp: PigOperator, newOp: PigOperator) = {
+    oldOp.outputs foreach { output =>
       output.consumer foreach { consumer =>
         consumer.inputs foreach { input =>
           // If `op` (the old term) is the producer of any of the input pipes of `newChild` (the new terms)
           // successors, replace it with `newChild` in that attribute. Replacing `op` with `other_filter` in
           // the pipes on `newChild` itself is not necessary because the setters of `inputs` and `outputs` do
           // that.
-          if (input.producer == old) {
-            input.producer = newChild
+          if (input.producer == oldOp) {
+            input.producer = newOp
           }
         }
       }
     }
-
-    newParent
   }
 }

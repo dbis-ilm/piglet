@@ -777,12 +777,7 @@ object Rules {
       foreach.constructSchema
 
       Rewriter.connect(join, foreach)
-
-      // Replace the Foreach as the producer of ops inputs outputs
-      out.consumer.foreach { op => op.inputs.foreach { i =>
-        if (i.producer == op) {
-          i.producer = foreach
-        }}}
+      Rewriter.replaceOpInSuccessorsInputs(op, foreach)
 
       Some(filters)
 
@@ -932,13 +927,9 @@ object Rules {
       )
 
       Rewriter.connect(join, foreach)
-      foreach.constructSchema
+      Rewriter.replaceOpInSuccessorsInputs(op, foreach)
 
-      // Replace the Foreach as the producer of ops inputs outputs
-      out.consumer.foreach { op => op.inputs.foreach { i =>
-        if (i.producer == op) {
-          i.producer = foreach
-        }}}
+      foreach.constructSchema
 
       Some(newBGPFilters)
     case _ => None
