@@ -323,16 +323,16 @@ object Rules {
             Eq(RefExpr(NamedField("object")), RefExpr(o))))))
       case TriplePattern(s@Value(_), p@Value(_), _) => Some(
         Filter(out, in, And(
-          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))))))
+          Eq(RefExpr(NamedField("subject")), RefExpr(s)),
+          Eq(RefExpr(NamedField("predicate")), RefExpr(p)))))
       case TriplePattern(s@Value(_), _, o@Value(_)) => Some(
         Filter(out, in, And(
-          Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
-          Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+          Eq(RefExpr(NamedField("subject")), RefExpr(s)),
+          Eq(RefExpr(NamedField("object")), RefExpr(o)))))
       case TriplePattern(_, p@Value(_), o@Value(_)) => Some(
         Filter(out, in, And(
-          Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
-          Eq(RefExpr(NamedField("object")), RefExpr(Value("object"))))))
+          Eq(RefExpr(NamedField("predicate")), RefExpr(p)),
+          Eq(RefExpr(NamedField("object")), RefExpr(o)))))
       case _ => None
     }
   }
@@ -731,9 +731,6 @@ object Rules {
       // We'll reuse in later on, so we need to remove `op` from its consumers
       in.removeConsumer(op)
 
-      val fieldname = RDF.starJoinColumn(patterns).get._2
-
-
       // This maps NamedField to a list of pipe names columns. Each column of that specific Pipe (produces by one of
       // the filters) contains the value of the NamedField in the join.
       // Its keys are also all the NamedFields that appear in `patterns`.
@@ -752,19 +749,21 @@ object Rules {
 
       val joinOutPipeName = generate()
 
+      // The NamedField that we're joining on and its position in the patterns
+      val starJoinFieldName = RDF.starJoinColumn(patterns).get._2
+      val starJoinColumnName = Column.columnToNamedField(namedFieldToPipeName(starJoinFieldName).head._2)
+
       val join = Join(Pipe(joinOutPipeName),
         filters map { f => Pipe(f.outPipeName, f) },
         // Use map here to make sure the amount of field expressions is the same as the amount of filters
-        filters map { _ => List(fieldname) })
+        filters map { _ => List(starJoinColumnName) })
 
       filters foreach { f =>
         f.outputs.head.consumer = List(join)
         f.constructSchema
       }
 
-      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map
-      { case (nf, (firstSourceName, firstSourceColumn)
-        :: _) =>
+      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
         GeneratorExpr(
           RefExpr(
             NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
@@ -847,6 +846,106 @@ object Rules {
       Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
       Some(foreach)
+    case _ => None
+  }
+
+  /** Applies rewriting rule J3 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    * @param term
+    * @return Some BGPFilter objects if the input filters BGP is a star join.
+    */
+  // We need to return Option[List[Any]] here because we can return either a list of BGPFilters or of Joins
+  def J3(term: Any): Option[List[PigOperator]] = term match {
+    case op@BGPFilter(_, _, patterns) =>
+      val out = op.outputs.head
+      val in = op.inputs.head
+      if (op.inputSchema != RDFLoad.plainSchema) {
+        return None
+      }
+
+      if (patterns.length < 2) {
+        return None
+      }
+
+      if (!RDF.isPathJoin(patterns)) {
+        return None
+      }
+
+      // We'll reuse in later on, so we need to remove `op` from its consumers
+      in.removeConsumer(op)
+
+      val pathJoinField = RDF.pathJoinNamedField(patterns).get
+
+      // This maps NamedField to a list of pipe names and columns. Each column of that specific Pipe (produces by one of
+      // the filters) contains the value of the NamedField in the join.
+      // Its keys are also all the NamedFields that appear in `patterns`.
+      val namedFieldToPipeName: Map[NamedField, List[(String, Column.Column)]] = Map.empty
+
+      // First build new BGPFilter objects for all the patterns.
+
+      val newBGPFilters = patterns map { p =>
+        val pipename = generate()
+
+        // TODO this is duplicated from J1
+        val namedFieldsOfP = RDF.namedFieldColumnPairFromPattern(p)
+        namedFieldsOfP foreach { case (nf, c) =>
+          namedFieldToPipeName(nf) = namedFieldToPipeName.getOrElse(nf, List.empty) :+(pipename, c)
+        }
+
+        BGPFilter(Pipe(pipename), in, List(p))
+      }
+
+      // Now we need to join them again. Note: in the paper, multiple JOINs are used, but just do it in one here
+      // Since each filters schema is still (s,p,o), we can't join by namedfields, but only but s, p or o.
+      def findColumnForNamedField(nf: NamedField, p: TriplePattern): NamedField = p match {
+        case TriplePattern(n, _, _) if n == nf => Column.columnToNamedField(Column.Subject)
+        case TriplePattern(_, n, _) if n == nf => Column.columnToNamedField(Column.Predicate)
+        case TriplePattern(_, _, n) if n == nf => Column.columnToNamedField(Column.Object)
+      }
+
+      val joinFields = patterns map { p =>
+        List(findColumnForNamedField(pathJoinField, p))
+      }
+
+      val joinOutPipeName = generate()
+
+      val join = Join(Pipe(joinOutPipeName),
+        newBGPFilters map { f => Pipe(f.outPipeName, f)},
+        joinFields
+      )
+
+      // Set newBGPFilters' outputs to the join
+      newBGPFilters foreach { f =>
+        f.outputs.head.consumer = List(join)
+        f.constructSchema
+      }
+
+      // TODO this is duplicated from J1
+      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+        GeneratorExpr(
+          RefExpr(
+            NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
+          Some(Field(nf.name, Types.CharArrayType)))
+      } toList
+
+      val foreach = Foreach(out, Pipe(joinOutPipeName, join),
+        GeneratorList(
+          generators
+        )
+      )
+
+      // Make the Foreach a successor of the Join
+      join.outputs.foreach { o => o.consumer = List(foreach) }
+
+      foreach.constructSchema
+
+      // Replace the Foreach as the producer of ops inputs outputs
+      out.consumer.foreach { op => op.inputs.foreach { i =>
+        if (i.producer == op) {
+          i.producer = join
+        }}}
+
+      Some(newBGPFilters)
     case _ => None
   }
 
@@ -957,6 +1056,7 @@ object Rules {
     addTypedStrategy(F8)
     addStrategy(strategyf(t => J1(t)))
     addStrategy(strategyf(t => J2(t)))
+    addStrategy(strategyf(t => J3(t)))
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }
 }
