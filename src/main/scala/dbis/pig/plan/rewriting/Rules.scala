@@ -781,7 +781,7 @@ object Rules {
       // Replace the Foreach as the producer of ops inputs outputs
       out.consumer.foreach { op => op.inputs.foreach { i =>
         if (i.producer == op) {
-          i.producer = join
+          i.producer = foreach
         }}}
 
       Some(filters)
@@ -937,7 +937,7 @@ object Rules {
       // Replace the Foreach as the producer of ops inputs outputs
       out.consumer.foreach { op => op.inputs.foreach { i =>
         if (i.producer == op) {
-          i.producer = join
+          i.producer = foreach
         }}}
 
       Some(newBGPFilters)
