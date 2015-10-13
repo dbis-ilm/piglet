@@ -6,7 +6,6 @@ FALSE=1
 local=$TRUE        # will be set by isLocalMode function
 backend=""         # will be set by getBackend function
 interactive=false
-#BACKEND_DIR=""     # directory to include in classpath to enable backends
 
 ##############################################################
 # printLogo - function to print the logo
@@ -192,13 +191,7 @@ fi
 
 CP=$BACKEND_DIR:$CP
 
-echo "cluster mode: $local"
-echo "backend: $backend"
-
 checkBackendJar
-
-echo "classpath: $CP"
-echo "interactive: $interactive"
 
 if $interactive; then
     java -Dscala.usejavacp=true -cp $CP dbis.pig.PigREPL $*
