@@ -1,12 +1,12 @@
-#!/bin/sh
+#!/bin/bash
 
 # some definitions
 TRUE=0
 FALSE=1
 local=$TRUE        # will be set by isLocalMode function
-backend=""         # will by set by getBackend function
+backend=""         # will be set by getBackend function
 interactive=false
-BACKEND_DIR=""     # directory to include in classpath to enable backends
+#BACKEND_DIR=""     # directory to include in classpath to enable backends
 
 ##############################################################
 # printLogo - function to print the logo
@@ -22,7 +22,7 @@ function printLogo {
 |_|   |_|\__, |  \__\___/  |____/| .__/ \__,_|_|  |_|\_\
          |___/                   |_|
 '
-    elif [ "$1" == "flink" ]; then
+    elif [ "$1" == "flink" ] || [ "$1" == "flinks" ]; then
 	echo '
  ____  _         _          _____ _ _       _
 |  _ \(_) __ _  | |_ ___   |  ___| (_)_ __ | | __
@@ -114,7 +114,7 @@ function checkBackendJar {
 	else
 	    CP=$SPARK_JAR:$CP
 	fi
-    elif [ "$backend" == "flink" ]; then
+    elif [ "$backend" == "flink" ] || [ "$backend" == "flinks" ]; then
 	if [ -z "$FLINK_JAR" ]; then
 	    echo "Please set FLINK_JAR to your flink-dist jar file (built with scala 2.11)"
 	    exit 1
