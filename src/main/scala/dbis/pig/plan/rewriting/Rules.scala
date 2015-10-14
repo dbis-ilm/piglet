@@ -846,7 +846,6 @@ object Rules {
     * @param term
     * @return Some BGPFilter objects if the input filters BGP is a star join.
     */
-  // We need to return Option[List[Any]] here because we can return either a list of BGPFilters or of Joins
   def J3(term: Any): Option[List[PigOperator]] = term match {
     case op@BGPFilter(_, _, patterns) =>
       val out = op.outputs.head
