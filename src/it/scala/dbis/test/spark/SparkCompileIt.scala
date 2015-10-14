@@ -54,10 +54,8 @@ class SparkCompileIt extends FlatSpec with Matchers {
     /* Not working yet
     ("json.pig", "json.out", "json.data", true), // not working yet
     */
-    /* Works, but requires a H2 database and the corresponding JDBC driver
-    ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true) 
-    */
-    ("embedded.pig", "embedded.out", "truth/embedded.data", true)
+    /* Works, but requires a H2 database and the corresponding JDBC driver */
+    ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true)
   // RDF integration tests don't work because the standard language feature is not sparqlpig
 //    ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false),
 //    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false)
@@ -91,7 +89,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     params.put("outdir", ".")
     params.put("params", s"inbase=$resourceName,outfile=${resultPath.path}")
     params.put("script", resourceName + script)
-    val cmdLine = new CommandLine("script/pigs")
+    val cmdLine = new CommandLine("script/piglet")
 
     cmdLine.addArgument("--backend")
     cmdLine.addArgument("${backend}")

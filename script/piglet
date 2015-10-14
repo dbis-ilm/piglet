@@ -8,6 +8,7 @@ backend=""         # will be set by getBackend function
 interactive=false
 #BACKEND_DIR=""     # directory to include in classpath to enable backends
 
+echo "args = $@"
 ##############################################################
 # printLogo - function to print the logo
 # @params: $1 = spark | flink |shell
