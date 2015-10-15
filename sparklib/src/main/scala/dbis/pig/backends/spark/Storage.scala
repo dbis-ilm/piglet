@@ -27,10 +27,21 @@ import java.io.FileOutputStream
 
 
 class PigStorage extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, delim: String = "\t"): RDD[List[String]] =
-    sc.textFile(path).map(line => line.split(delim, -1).toList)
+  def load(sc: SparkContext, path: String, delim: String = "\t"): RDD[List[String]] = {
+    val start = System.currentTimeMillis()
+    val data = sc.textFile(path).map(line => line.split(delim, -1).toList)
+    val end = System.currentTimeMillis()
+    
+    println(s"DURATION LOAD PIGSTORAGE : ${end - start}")
+    data
+  }
 
-  def write(path: String, rdd: RDD[String]) = rdd.saveAsTextFile(path)
+  def write(path: String, rdd: RDD[String]) = {
+    val start = System.currentTimeMillis()
+    rdd.saveAsTextFile(path)
+    val end = System.currentTimeMillis()
+    println(s"DURATION STORE PIGSTORAGE : ${end - start}")
+  }
 }
 
 object PigStorage {
@@ -62,9 +73,21 @@ object RDFFileStorage {
 
 class BinStorage extends java.io.Serializable {
   
-  def load(sc: SparkContext, path: String): RDD[List[Any]] = sc.objectFile[List[Any]](path)
+  def load(sc: SparkContext, path: String): RDD[List[Any]] = {
+    val start = System.currentTimeMillis()
+    val data = sc.objectFile[List[Any]](path)
+    val end = System.currentTimeMillis()
+    
+    println(s"DURATION LOAD BINSTORAGE: ${end - start}")
+    data
+  }
 
-  def write(path: String, rdd: RDD[_]) = rdd.saveAsObjectFile(path)
+  def write(path: String, rdd: RDD[_]) = {
+    val start = System.currentTimeMillis()
+    rdd.saveAsObjectFile(path)
+    val end = System.currentTimeMillis()
+    println(s"DURATION STORE BINSTORAGE: ${end - start}")
+  }
 }
 
 object BinStorage {

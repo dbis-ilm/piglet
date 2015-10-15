@@ -18,45 +18,35 @@ class PerfMonitor(appName: String, driver: String = "org.h2.Driver",
   
   private val lineLineageMapping = MutableMap.empty[Int, String]
   
-  private val submissionTimes = MutableMap.empty[Int, Long]
-  private val b = ListBuffer.empty[(String, Long, Long)]
+//  private val submissionTimes = MutableMap.empty[Int, Long]
+//  private val b = ListBuffer.empty[(String, Long, Long)]
   
   
-  override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
+  override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = this.synchronized {
     
-    // get the line number of the stages last operation
-    val line = getLineNumber(stageCompleted.stageInfo)
-
-    if(lineLineageMapping.contains(line)) {
-      val startTime = submissionTimes(stageCompleted.stageInfo.stageId)
-      val stageDuration = stageCompleted.stageInfo.completionTime.get - startTime
-      val progDuration = stageCompleted.stageInfo.completionTime.get - progStartTime
-      val lineage = lineLineageMapping(line)
-      
-//      b += ((opLineage, stageDuration, progDuration))
-
      DB localTx { implicit session =>
-      sql"""insert into exectimes(appname, stageid, stagename, lineage, stageduration, progduration) VALUES(
+      sql"""insert into exectimes(appname, stageid, stagename, lineage, stageduration, progduration, submissiontime, completiontime) VALUES(
               ${appName},
               ${stageCompleted.stageInfo.stageId},
               ${stageCompleted.stageInfo.name},
-              ${lineage},
-              ${stageDuration},
-              ${progDuration}
+              ${lineLineageMapping.getOrElse(stageCompleted.stageInfo.name.split(":")(1).toInt, null) },
+              ${stageCompleted.stageInfo.completionTime.get - stageCompleted.stageInfo.submissionTime.get},
+              ${stageCompleted.stageInfo.completionTime.get - progStartTime},
+              ${stageCompleted.stageInfo.submissionTime.get},
+              ${stageCompleted.stageInfo.completionTime.get}
             )"""
         .update
         .apply()
-    }
-    }
+      }
   }
 
   override def onStageSubmitted(stageSubmitted: SparkListenerStageSubmitted): Unit = {
-    val si = stageSubmitted.stageInfo
-    
-    // XXX: Does the current time match the submission time?
-    val time = if(si.submissionTime.isDefined) si.submissionTime.get else System.currentTimeMillis()
-    
-    submissionTimes += (si.stageId -> time)
+//    val si = stageSubmitted.stageInfo
+//    
+//    // XXX: Does the current time match the submission time?
+//    val time = if(si.submissionTime.isDefined) si.submissionTime.get else System.currentTimeMillis()
+//    
+//    submissionTimes += (si.stageId -> time)
   }
   
   def register(line: Int, lineage: String) {
@@ -84,6 +74,4 @@ class PerfMonitor(appName: String, driver: String = "org.h2.Driver",
 ////      ConnectionPool.closeAll()
 ////    }
   }
-  
-  private def getLineNumber(stageInfo: StageInfo) = stageInfo.name.split(":")(1).toInt
 }
