@@ -15,9 +15,6 @@ COPY /script/pigsh /piglet/
 RUN wget -q http://cloud01.prakinf.tu-ilmenau.de/spark-assembly-1.4.1-hadoop2.4.0.jar 
 RUN mv spark-assembly-1.4.1-hadoop2.4.0.jar /piglet/
 
-# FIXME: This is wrong, we need to add spark-assembly here, not the sparklib!
-# either the spark assembly has to be copied to the context dir (next to this docker file) before build
-# or we have to download it from somewhere else. This requires to install curl/wget in the image...
 ENV SPARK_JAR /piglet/spark-assembly-1.4.1-hadoop2.4.0.jar 
 ENV BACKEND_DIR /piglet/sparklib_2.11-1.0.jar
 
