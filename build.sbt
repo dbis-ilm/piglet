@@ -22,12 +22,12 @@ fork in Test := true
 
 fork in IntegrationTest := false
 
-testOptions in IntegrationTest += Tests.Argument("-oDF")
-
 // scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
 
-
 // run only those it tests, that are available for the selected backend
-testOptions in IntegrationTest := Seq(Tests.Filter(s => itTests.contains(s)))
+testOptions in IntegrationTest := Seq(
+	Tests.Filter(s => itTests.contains(s)),
+	Tests.Argument("-oDF")
+)
 
 EclipseKeys.skipParents in ThisBuild := false  // to enable piglet (parent not only children) eclispe import

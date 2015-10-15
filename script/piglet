@@ -7,6 +7,7 @@ local=$TRUE        # will be set by isLocalMode function
 backend=""         # will be set by getBackend function
 interactive=false
 
+echo "args = $@"
 ##############################################################
 # printLogo - function to print the logo
 # @params: $1 = spark | flink |shell

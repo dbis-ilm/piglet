@@ -94,13 +94,14 @@ class JdbcStorage extends java.io.Serializable {
     params += ("driver" -> driver)
     params += ("dbtable" -> table)
     val s1 = url.split("""\?""")
-    if (s1.length != 2) throw new IllegalArgumentException("invalid JDBC URL")
     params += ("url" -> s1(0))
-    val s2 = s1(1).split("&")
-    s2.foreach{s =>
-      val s3 = s.split("=")
-      if (s3.length != 2) throw new IllegalArgumentException("invalid JDBC parameter")
-      params += (s3(0) -> s3(1))
+    if (s1.length > 1) {
+      val s2 = s1(1).split("&")
+      s2.foreach { s =>
+        val s3 = s.split("=")
+        if (s3.length != 2) throw new IllegalArgumentException("invalid JDBC parameter")
+        params += (s3(0) -> s3(1))
+      }
     }
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     // TODO: convert a DataFrame to a RDD with generic components
