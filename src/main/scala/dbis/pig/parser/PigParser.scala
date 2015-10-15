@@ -250,6 +250,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val fsKeyword = "fs".ignoreCase
   lazy val setKeyword = "set".ignoreCase
   lazy val returnsKeyword = "returns".ignoreCase
+  lazy val accumulateKeyword = "accumulate".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -383,6 +384,13 @@ class PigParser extends JavaTokenParsers with LazyLogging {
     (plainForeachGenerator | nestedForeachGenerator) ^^ {
       case out ~ _ ~ _ ~ in ~ ex => new Foreach(Pipe(out), Pipe(in), ex)
     }
+
+  /*
+   * <A> = ACCUMULATE <B> GENERATE <Expr> [ AS <Schema> ]
+   */
+  def accumulateStmt: Parser[PigOperator] = bag ~ "=" ~ accumulateKeyword ~ bag ~ generateKeyword ~ generatorList ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ exList => new Accumulate(Pipe(out), Pipe(in), GeneratorList(exList))
+  }
 
   /*
    * <A> = FILTER <B> BY <Predicate>
@@ -570,7 +578,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
-  def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
+  def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt) ~ ";" ^^ {
     case op ~ _  => op }

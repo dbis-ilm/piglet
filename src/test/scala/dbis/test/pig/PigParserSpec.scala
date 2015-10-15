@@ -284,6 +284,14 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       ))))))
   }
 
+  it should "parse a simple accumulate statement" in {
+    assert(parseScript("a = ACCUMULATE b GENERATE COUNT($0), AVG($1), SUM($2);") ==
+      List(Accumulate(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(0))))),
+        GeneratorExpr(Func("AVG", List(RefExpr(PositionalField(1))))),
+        GeneratorExpr(Func("SUM", List(RefExpr(PositionalField(2)))))
+      )))))
+  }
 
   it should "parse a simple nested FOREACH statement" in {
     assert(parseScript(
