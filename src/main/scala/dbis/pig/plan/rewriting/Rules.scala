@@ -1141,16 +1141,16 @@ object Rules {
     addOperatorReplacementStrategy(buildTypedCaseWrapper(R1))
     addStrategy(R2)
     addOperatorReplacementStrategy(buildTypedCaseWrapper(L2))
-    Rewriter.rewrite(classOf[op.BGPFilter]) via F1
-    Rewriter.rewrite(classOf[op.BGPFilter]) via F2
-    Rewriter.rewrite(classOf[op.BGPFilter]) via F3
-    Rewriter.rewrite(classOf[op.BGPFilter]) via F4
-    Rewriter.rewrite(classOf[op.BGPFilter]) via F5
-    Rewriter.rewrite(classOf[op.BGPFilter]) via F6
-    Rewriter.rewrite(classOf[op.BGPFilter]) via F7
-    Rewriter.rewrite(classOf[op.BGPFilter]) via F8
-    Rewriter.rewrite(classOf[op.BGPFilter]) unless plainSchemaJoinEarlyAbort via (J1 _)
-    Rewriter.rewrite(classOf[op.BGPFilter]) unless groupedSchemaJoinEarlyAbort via (J2 _)
+    Rewriter.rewrite[op.BGPFilter] via F1
+    Rewriter.rewrite[op.BGPFilter] via F2
+    Rewriter.rewrite[op.BGPFilter] via F3
+    Rewriter.rewrite[op.BGPFilter] via F4
+    Rewriter.rewrite[op.BGPFilter] via F5
+    Rewriter.rewrite[op.BGPFilter] via F6
+    Rewriter.rewrite[op.BGPFilter] via F7
+    Rewriter.rewrite[op.BGPFilter] via F8
+    Rewriter.rewrite[op.BGPFilter] unless plainSchemaJoinEarlyAbort via (J1 _)
+    Rewriter.rewrite[op.BGPFilter] unless groupedSchemaJoinEarlyAbort via (J2 _)
 //    Rewriter.rewrite(classOf[op.BGPFilter]) unless plainSchemaJoinEarlyAbort via (J3 _)
 //    Rewriter.rewrite(classOf[op.BGPFilter]) when groupedSchemaEarlyAbort via (J4 _)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)

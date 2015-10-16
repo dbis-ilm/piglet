@@ -19,7 +19,7 @@ package dbis.pig.plan.rewriting.dsl
 import scala.reflect._
 
 trait RewriterDSL {
-  def rewrite[T : ClassTag](cls: Class[_]): RewriteWord[T] = {
-    new RewriteWord(cls)
+  def rewrite[T : ClassTag](implicit m: scala.reflect.Manifest[T]): RewriteWord[T] = {
+    new RewriteWord(m.runtimeClass)
   }
 }
