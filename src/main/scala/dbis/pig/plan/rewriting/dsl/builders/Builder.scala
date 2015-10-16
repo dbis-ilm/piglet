@@ -39,10 +39,7 @@ class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag](val func: (FROM => O
     *
     */
   def apply(): Unit = {
-    def f(t: Any): Option[TO] = {
-      if (classTag[FROM].runtimeClass.isInstance(t)) {
-        val term = t.asInstanceOf[FROM]
-
+    def f(term: FROM): Option[TO] = {
         if (check.isEmpty) {
           func(term)
         } else {
@@ -52,11 +49,10 @@ class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag](val func: (FROM => O
             None
           }
         }
-      } else {
-        None
-      }
     }
 
-    Rewriter.addStrategy(strategyf(t => f(t)))
+    val wrapped = Rewriter.buildTypedCaseWrapper(f)
+
+    Rewriter.addStrategy(strategyf(t => wrapped(t)))
   }
 }
