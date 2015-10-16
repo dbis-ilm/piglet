@@ -22,4 +22,8 @@ trait RewriterDSL {
   def rewrite[T : ClassTag](implicit m: scala.reflect.Manifest[T]): RewriteWord[T] = {
     new RewriteWord(m.runtimeClass)
   }
+
+  def rewrite[T : ClassTag](cls: Class[_]): RewriteWord[T] = {
+    new RewriteWord(cls)
+  }
 }

@@ -1142,7 +1142,7 @@ object Rules {
     addStrategy(R2)
     addOperatorReplacementStrategy(buildTypedCaseWrapper(L2))
     Rewriter.rewrite[op.BGPFilter] via F1
-    Rewriter.rewrite[op.BGPFilter] via F2
+    Rewriter rewrite (classOf[op.BGPFilter]) via F2
     Rewriter.rewrite[op.BGPFilter] via F3
     Rewriter.rewrite[op.BGPFilter] via F4
     Rewriter.rewrite[op.BGPFilter] via F5
