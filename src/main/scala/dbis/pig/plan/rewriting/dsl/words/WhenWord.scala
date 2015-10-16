@@ -14,8 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting.dsl
+package dbis.pig.plan.rewriting.dsl.words
 
-trait Word {
+import dbis.pig.op.PigOperator
+import dbis.pig.plan.rewriting.dsl.builders.Builder
 
+/** Adds ``check`` to ``b``.
+  *
+  * @param b
+  * @param check
+  * @tparam FROM
+  * @tparam TO
+  */
+class WhenWord[FROM <: PigOperator, TO](override val b: Builder[FROM, TO], val check: (FROM => Boolean))
+  extends Word(b) {
+  b.check = check
 }

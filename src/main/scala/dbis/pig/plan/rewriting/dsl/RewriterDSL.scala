@@ -16,14 +16,18 @@
  */
 package dbis.pig.plan.rewriting.dsl
 
+import dbis.pig.op.PigOperator
+import dbis.pig.plan.rewriting.dsl.builders.Builder
+import dbis.pig.plan.rewriting.dsl.words.RewriteWord
+
 import scala.reflect._
 
+/** The entry point to the rewriting DSL.
+  *
+  */
 trait RewriterDSL {
-  def rewrite[T : ClassTag](implicit m: scala.reflect.Manifest[T]): RewriteWord[T] = {
-    new RewriteWord(m.runtimeClass)
-  }
-
-  def rewrite[T : ClassTag](cls: Class[_]): RewriteWord[T] = {
-    new RewriteWord(cls)
+  def apply[FROM <: PigOperator : ClassTag, TO: ClassTag](f: (FROM => Option[TO])): RewriteWord[FROM, TO] = {
+    val b = new Builder(f)
+    new RewriteWord[FROM, TO](b)
   }
 }

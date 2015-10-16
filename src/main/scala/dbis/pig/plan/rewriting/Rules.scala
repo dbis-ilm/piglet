@@ -718,137 +718,134 @@ object Rules {
 
   /** Applies rewriting rule J1 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some BGPFilter objects if the input filters BGP is a star join.
     */
-  def J1(term: Any): Option[List[BGPFilter]] = term match {
-    case op@BGPFilter(_, _, patterns) =>
-      val out = op.outputs.head
-      val in = op.inputs.head
+  def J1(op: BGPFilter): Option[List[BGPFilter]] = {
+    val out = op.outputs.head
+    val in = op.inputs.head
+    val patterns = op.patterns
 
-      def isNamed(r: Ref): Option[NamedField] = r match {
-        case n@NamedField(_, _) => Some(n)
-        case _ => None
+    def isNamed(r: Ref): Option[NamedField] = r match {
+      case n@NamedField(_, _) => Some(n)
+      case _ => None
+    }
+
+    val namedFields = patterns map { p =>
+      (isNamed(p.subj), isNamed(p.pred), isNamed(p.obj))
+    } toSet
+
+    if (namedFields.size != 1) {
+      // There are either no NamedFields or they appear in more than one position in different patterns, so it's
+      // not a star join
+      return None
+    }
+
+    if (!RDF.isStarJoin(patterns)) {
+      return None
+    }
+
+    // We'll reuse in later on, so we need to remove `op` from its consumers
+    in.removeConsumer(op)
+
+    // This maps NamedField to a list of pipe names columns. Each column of that specific Pipe (produces by one of
+    // the filters) contains the value of the NamedField in the join.
+    // Its keys are also all the NamedFields that appear in `patterns`.
+    val namedFieldToPipeName: Map[NamedField, List[(String, Column.Column)]] = Map.empty
+
+    val filters = patterns map { p =>
+      val pipename = generate()
+
+      val namedFieldsOfP = RDF.namedFieldColumnPairFromPattern(p)
+      namedFieldsOfP foreach { case (nf, c) =>
+        namedFieldToPipeName(nf) = namedFieldToPipeName.getOrElse(nf, List.empty) :+(pipename, c)
       }
 
-      val namedFields = patterns map { p =>
-        (isNamed(p.subj), isNamed(p.pred), isNamed(p.obj))
-      } toSet
+      BGPFilter(Pipe(pipename), in, List(p))
+    }
 
-      if (namedFields.size != 1) {
-        // There are either no NamedFields or they appear in more than one position in different patterns, so it's
-        // not a star join
-        return None
-      }
+    val joinOutPipeName = generate()
 
-      if (!RDF.isStarJoin(patterns)) {
-        return None
-      }
+    // The NamedField that we're joining on and its position in the patterns
+    val starJoinFieldName = RDF.starJoinColumn(patterns).get._2
+    val starJoinColumnName = Column.columnToNamedField(namedFieldToPipeName(starJoinFieldName).head._2)
 
-      // We'll reuse in later on, so we need to remove `op` from its consumers
-      in.removeConsumer(op)
+    val join = Join(Pipe(joinOutPipeName),
+      filters map { f => Pipe(f.outPipeName, f) },
+      // Use map here to make sure the amount of field expressions is the same as the amount of filters
+      filters map { _ => List(starJoinColumnName) })
 
-      // This maps NamedField to a list of pipe names columns. Each column of that specific Pipe (produces by one of
-      // the filters) contains the value of the NamedField in the join.
-      // Its keys are also all the NamedFields that appear in `patterns`.
-      val namedFieldToPipeName: Map[NamedField, List[(String, Column.Column)]] = Map.empty
+    filters foreach { f =>
+      f.outputs.head.consumer = List(join)
+      f.constructSchema
+    }
 
-      val filters = patterns map { p =>
-        val pipename = generate()
+    val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+      GeneratorExpr(
+        RefExpr(
+          NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
+        Some(Field(nf.name, Types.CharArrayType)))
+    } toList
 
-        val namedFieldsOfP = RDF.namedFieldColumnPairFromPattern(p)
-        namedFieldsOfP foreach { case (nf, c) =>
-            namedFieldToPipeName(nf) = namedFieldToPipeName.getOrElse(nf, List.empty) :+ (pipename, c)
-        }
-
-        BGPFilter(Pipe(pipename), in, List(p))
-      }
-
-      val joinOutPipeName = generate()
-
-      // The NamedField that we're joining on and its position in the patterns
-      val starJoinFieldName = RDF.starJoinColumn(patterns).get._2
-      val starJoinColumnName = Column.columnToNamedField(namedFieldToPipeName(starJoinFieldName).head._2)
-
-      val join = Join(Pipe(joinOutPipeName),
-        filters map { f => Pipe(f.outPipeName, f) },
-        // Use map here to make sure the amount of field expressions is the same as the amount of filters
-        filters map { _ => List(starJoinColumnName) })
-
-      filters foreach { f =>
-        f.outputs.head.consumer = List(join)
-        f.constructSchema
-      }
-
-      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
-        GeneratorExpr(
-          RefExpr(
-            NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
-          Some(Field(nf.name, Types.CharArrayType)))
-      } toList
-
-      val foreach = Foreach(out, Pipe(joinOutPipeName, join),
-        GeneratorList(
-          generators
-        )
+    val foreach = Foreach(out, Pipe(joinOutPipeName, join),
+      GeneratorList(
+        generators
       )
-      foreach.constructSchema
+    )
+    foreach.constructSchema
 
-      Rewriter.connect(join, foreach)
-      Rewriter.replaceOpInSuccessorsInputs(op, foreach)
+    Rewriter.connect(join, foreach)
+    Rewriter.replaceOpInSuccessorsInputs(op, foreach)
 
-      Some(filters)
-
-    case _ => None
+    Some(filters)
   }
 
   /** Applies rewriting rule J2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     */
-  def J2(term: Any): Option[Foreach] = term match {
-    case op @ BGPFilter(_, _, patterns) =>
-      if (!RDF.isStarJoin(patterns)) {
-        return None
-      }
+  def J2(op: BGPFilter): Option[Foreach] = {
+    val patterns = op.patterns
+    if (!RDF.isStarJoin(patterns)) {
+      return None
+    }
 
-      val out = op.outputs.head
-      val in = op.inputs.head
+    val out = op.outputs.head
+    val in = op.inputs.head
 
-      // We'll reuse in later on, so we need to remove `op` from its consumers
-      in.removeConsumer(op)
+    // We'll reuse in later on, so we need to remove `op` from its consumers
+    in.removeConsumer(op)
 
-      val internalPipeName = generate()
+    val internalPipeName = generate()
 
-      val filters: List[Filter] = patterns map RDF.patternToConstraint flatMap { c =>
-        Some(Filter(Pipe(generate()), Pipe("stmts"), c.get))
-      }
+    val filters: List[Filter] = patterns map RDF.patternToConstraint flatMap { c =>
+      Some(Filter(Pipe(generate()), Pipe("stmts"), c.get))
+    }
 
-      val filterPipeNames = filters map (_.outputs.head.name)
+    val filterPipeNames = filters map (_.outputs.head.name)
 
-      // This generates the GENERATE *, COUNT(t1) AS cnt1, ..., COUNT(tN) as cntN; operator
-      val countAsOps: List[GeneratorExpr] = filterPipeNames.zipWithIndex.map { case (name, i) =>
-        GeneratorExpr(Func("COUNT",
-          List(RefExpr(NamedField(name)))),
-          Some(Field(s"cnt$i", Types.ByteArrayType)))
-      }
+    // This generates the GENERATE *, COUNT(t1) AS cnt1, ..., COUNT(tN) as cntN; operator
+    val countAsOps: List[GeneratorExpr] = filterPipeNames.zipWithIndex.map { case (name, i) =>
+      GeneratorExpr(Func("COUNT",
+        List(RefExpr(NamedField(name)))),
+        Some(Field(s"cnt$i", Types.ByteArrayType)))
+    }
 
-      val generatorOps: List[PigOperator] = filters :+ Generate(
-            GeneratorExpr(RefExpr(NamedField("*"))) :: countAsOps)
+    val generatorOps: List[PigOperator] = filters :+ Generate(
+      GeneratorExpr(RefExpr(NamedField("*"))) :: countAsOps)
 
-      val foreach =
-        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(generatorOps))
+    val foreach =
+      Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(generatorOps))
 
-      val countGtZeroConstraint: Predicate = filterPipeNames.zipWithIndex.map {case (_, i) =>
-          Gt(RefExpr(NamedField(s"cnt$i")), RefExpr(Value(0)))
-      } reduceLeft And
+    val countGtZeroConstraint: Predicate = filterPipeNames.zipWithIndex.map { case (_, i) =>
+      Gt(RefExpr(NamedField(s"cnt$i")), RefExpr(Value(0)))
+    } reduceLeft And
 
-      val filter = Filter(out, Pipe(internalPipeName, foreach), countGtZeroConstraint)
+    val filter = Filter(out, Pipe(internalPipeName, foreach), countGtZeroConstraint)
 
-      Rewriter.connect(foreach, filter)
-      Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
+    Rewriter.connect(foreach, filter)
+    Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
-      Some(foreach)
-    case _ => None
+    Some(foreach)
   }
 
   /** Applies rewriting rule J3 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -1138,19 +1135,19 @@ object Rules {
     addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
-    addOperatorReplacementStrategy(buildTypedCaseWrapper(R1))
+    addOperatorReplacementStrategy(buildTypedCaseWrapper(R1 _))
     addStrategy(R2)
-    addOperatorReplacementStrategy(buildTypedCaseWrapper(L2))
-    Rewriter.rewrite[op.BGPFilter] via F1
-    Rewriter rewrite (classOf[op.BGPFilter]) via F2
-    Rewriter.rewrite[op.BGPFilter] via F3
-    Rewriter.rewrite[op.BGPFilter] via F4
-    Rewriter.rewrite[op.BGPFilter] via F5
-    Rewriter.rewrite[op.BGPFilter] via F6
-    Rewriter.rewrite[op.BGPFilter] via F7
-    Rewriter.rewrite[op.BGPFilter] via F8
-    Rewriter.rewrite[op.BGPFilter] unless plainSchemaJoinEarlyAbort via (J1 _)
-    Rewriter.rewrite[op.BGPFilter] unless groupedSchemaJoinEarlyAbort via (J2 _)
+    addOperatorReplacementStrategy(buildTypedCaseWrapper(L2 _))
+    Rewriter apply F1
+    Rewriter apply F2
+    Rewriter apply F3
+    Rewriter apply F4
+    Rewriter apply F5
+    Rewriter apply F6
+    Rewriter apply F7
+    Rewriter apply F8
+    Rewriter apply J1 unless plainSchemaJoinEarlyAbort
+    Rewriter apply J2 unless groupedSchemaJoinEarlyAbort
 //    Rewriter.rewrite(classOf[op.BGPFilter]) unless plainSchemaJoinEarlyAbort via (J3 _)
 //    Rewriter.rewrite(classOf[op.BGPFilter]) when groupedSchemaEarlyAbort via (J4 _)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)

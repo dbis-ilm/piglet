@@ -14,19 +14,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting.dsl
+package dbis.pig.plan.rewriting.dsl.words
 
-import scala.reflect.ClassTag
+import dbis.pig.op.PigOperator
+import dbis.pig.plan.rewriting.dsl.builders.Builder
 
-class WhenWord[T : ClassTag](val check: (T => Boolean)) extends Word {
-  def via(f: T => Option[Any]): Unit = {
-    def func(term: T): Option[Any] ={
-      if (check(term)) {
-        f(term)
-      } else {
-        None
-      }
-    }
-    ViaWord(func _)
-  }
+/** The most general Word class. It only provides a parameterless ``apply`` method that calls the wrapped builder.
+  *
+  * @param b
+  * @tparam FROM
+  * @tparam TO
+  */
+abstract class Word[FROM <: PigOperator, TO](val b: Builder[FROM, TO]) {
+  def apply(): Unit = b()
 }

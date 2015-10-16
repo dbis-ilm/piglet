@@ -119,7 +119,7 @@ trait StrategyBuilders {
     * @tparam T
     * @return
     */
-  def buildTypedCaseWrapper[T <: PigOperator : ClassTag](f: (T => Option[PigOperator])): (Any => Option[PigOperator]) = {
+  def buildTypedCaseWrapper[T <: PigOperator : ClassTag, T2](f: (T => Option[T2])): (Any => Option[T2]) = {
     val wrapper = {term: Any => term match {
       case _ if classTag[T].runtimeClass.isInstance(term) => f(term.asInstanceOf[T])
       case _ => None

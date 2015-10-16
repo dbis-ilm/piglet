@@ -34,7 +34,7 @@ trait FastStrategyAdder {
   def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                newChild: T): T2
 
-  def buildTypedCaseWrapper[T <: PigOperator : ClassTag](f: (T => Option[PigOperator])): (Any => Option[PigOperator])
+  def buildTypedCaseWrapper[T <: PigOperator : ClassTag, T2](f: (T => Option[T2])): (Any => Option[T2])
 
   def addStrategy(f: Any => Option[PigOperator]): Unit
 
@@ -124,7 +124,7 @@ trait FastStrategyAdder {
     * @tparam T
     */
   def addTypedStrategy[T <: PigOperator : ClassTag](f: (T => Option[T])): Unit = {
-    val wrapper = buildTypedCaseWrapper[T](f)
+    val wrapper = buildTypedCaseWrapper(f)
     addStrategy(wrapper)
   }
 
@@ -137,7 +137,7 @@ trait FastStrategyAdder {
     * @tparam T
     */
   def addInputTypedStrategy[T <: PigOperator : ClassTag](f: (T => Option[PigOperator])): Unit = {
-    val wrapper = buildTypedCaseWrapper[T](f)
+    val wrapper = buildTypedCaseWrapper(f)
     addStrategy(wrapper)
   }
 }
