@@ -1148,8 +1148,6 @@ object Rules {
     Rewriter apply F8
     Rewriter apply J1 unless plainSchemaJoinEarlyAbort
     Rewriter apply J2 unless groupedSchemaJoinEarlyAbort
-//    Rewriter.rewrite(classOf[op.BGPFilter]) unless plainSchemaJoinEarlyAbort via (J3 _)
-//    Rewriter.rewrite(classOf[op.BGPFilter]) when groupedSchemaEarlyAbort via (J4 _)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }
 }
