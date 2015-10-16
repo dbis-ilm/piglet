@@ -29,4 +29,22 @@ import dbis.pig.plan.rewriting.dsl.builders.Builder
 class WhenWord[FROM <: PigOperator, TO](override val b: Builder[FROM, TO], val check: (FROM => Boolean))
   extends Word(b) {
   b.check = check
+
+  def and(check: (FROM => Boolean)) = {
+    val oldcheck = b.check.get
+    val newcheck = { t: FROM =>
+      (oldcheck(t) && check(t))
+    }
+
+    new WhenWord(b, newcheck)
+  }
+
+  def or(check: (FROM => Boolean)) = {
+    val oldcheck = b.check.get
+    val newcheck = { t: FROM =>
+      (oldcheck(t) || check(t))
+    }
+
+    new WhenWord(b, newcheck)
+  }
 }
