@@ -16,6 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
+import dbis.pig.op
 import dbis.pig.plan.{InvalidPlanException, PipeNameGenerator}
 import dbis.pig.plan.rewriting.internals.{RDF, Column, FilterUtils}
 
@@ -351,6 +352,30 @@ object Rules {
       || !RDFLoad.groupedSchemas.values.toList.contains(schema.get)) {
       return true
     }
+    false
+  }
+
+  private def groupedSchemaJoinEarlyAbort(op: BGPFilter): Boolean = {
+    if (groupedSchemaEarlyAbort(op.inputSchema)) {
+      return true
+    }
+
+    if (op.patterns.length < 2) {
+      return true
+    }
+
+    false
+  }
+
+  private def plainSchemaJoinEarlyAbort(op: BGPFilter): Boolean = {
+    if (op.inputSchema != RDFLoad.plainSchema) {
+      return true
+    }
+
+    if (op.patterns.length < 2) {
+      return true
+    }
+
     false
   }
 
@@ -700,13 +725,6 @@ object Rules {
     case op@BGPFilter(_, _, patterns) =>
       val out = op.outputs.head
       val in = op.inputs.head
-      if (op.inputSchema != RDFLoad.plainSchema) {
-        return None
-      }
-
-      if (patterns.length < 2) {
-        return None
-      }
 
       def isNamed(r: Ref): Option[NamedField] = r match {
         case n@NamedField(_, _) => Some(n)
@@ -789,14 +807,6 @@ object Rules {
     */
   def J2(term: Any): Option[Foreach] = term match {
     case op @ BGPFilter(_, _, patterns) =>
-      if (groupedSchemaEarlyAbort(op.inputSchema)) {
-        return None
-      }
-
-      if (patterns.length < 2) {
-        return None
-      }
-
       if (!RDF.isStarJoin(patterns)) {
         return None
       }
@@ -850,14 +860,6 @@ object Rules {
     case op@BGPFilter(_, _, patterns) =>
       val out = op.outputs.head
       val in = op.inputs.head
-      if (op.inputSchema != RDFLoad.plainSchema) {
-        return None
-      }
-
-      if (patterns.length < 2) {
-        return None
-      }
-
       if (!RDF.isPathJoin(patterns)) {
         return None
       }
@@ -943,10 +945,6 @@ object Rules {
     case op@BGPFilter(_, _, patterns) =>
       val out = op.outputs.head
       val in = op.inputs.head
-
-      if (groupedSchemaEarlyAbort(op.inputSchema)) {
-        return None
-      }
 
       if (!RDF.isPathJoin(patterns)) {
         return None
@@ -1143,17 +1141,18 @@ object Rules {
     addOperatorReplacementStrategy(buildTypedCaseWrapper(R1))
     addStrategy(R2)
     addOperatorReplacementStrategy(buildTypedCaseWrapper(L2))
-    addStrategy(F1)
-    addOperatorReplacementStrategy(buildTypedCaseWrapper(F2))
-    addOperatorReplacementStrategy(buildTypedCaseWrapper(F3))
-    addOperatorReplacementStrategy(buildTypedCaseWrapper(F4))
-    addOperatorReplacementStrategy(F5)
-    addOperatorReplacementStrategy(F6)
-    addTypedStrategy(F7)
-    addTypedStrategy(F8)
-    addStrategy(strategyf(t => J1(t)))
-    addStrategy(strategyf(t => J2(t)))
-    addStrategy(strategyf(t => J3(t)))
+    Rewriter.rewrite(classOf[op.BGPFilter]) via F1
+    Rewriter.rewrite(classOf[op.BGPFilter]) via F2
+    Rewriter.rewrite(classOf[op.BGPFilter]) via F3
+    Rewriter.rewrite(classOf[op.BGPFilter]) via F4
+    Rewriter.rewrite(classOf[op.BGPFilter]) via F5
+    Rewriter.rewrite(classOf[op.BGPFilter]) via F6
+    Rewriter.rewrite(classOf[op.BGPFilter]) via F7
+    Rewriter.rewrite(classOf[op.BGPFilter]) via F8
+    Rewriter.rewrite(classOf[op.BGPFilter]) unless plainSchemaJoinEarlyAbort via (J1 _)
+    Rewriter.rewrite(classOf[op.BGPFilter]) unless groupedSchemaJoinEarlyAbort via (J2 _)
+//    Rewriter.rewrite(classOf[op.BGPFilter]) unless plainSchemaJoinEarlyAbort via (J3 _)
+//    Rewriter.rewrite(classOf[op.BGPFilter]) when groupedSchemaEarlyAbort via (J4 _)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }
 }

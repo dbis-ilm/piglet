@@ -20,8 +20,10 @@ import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.op.{PigOperator, _}
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rules.registerAllRules
+import dbis.pig.plan.rewriting.dsl.RewriterDSL
 import dbis.pig.plan.rewriting.internals._
 import org.kiama.rewriting.Rewriter._
+import org.kiama.rewriting.Rewriter.{rewrite => kiamarewrite}
 import org.kiama.rewriting.Strategy
 
 import scala.collection.mutable
@@ -94,7 +96,8 @@ object Rewriter extends LazyLogging
                 with EmbedSupport
                 with MaterializationSupport
                 with Fixers
-                with FastStrategyAdder {
+                with FastStrategyAdder
+                with RewriterDSL {
   private var ourStrategy = fail
 
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
@@ -147,7 +150,7 @@ object Rewriter extends LazyLogging
     */
   private def processPigOperator(sink: PigOperator, strategy: Strategy): Any = {
     val rewriter = downup(attempt(strategy))
-    rewrite(rewriter)(sink)
+    kiamarewrite(rewriter)(sink)
   }
 
   /** Apply all rewriting rules of this Rewriter to a [[dbis.pig.plan.DataflowPlan]].
