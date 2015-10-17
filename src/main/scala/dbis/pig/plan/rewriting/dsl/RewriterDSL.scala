@@ -26,7 +26,7 @@ import scala.reflect._
   *
   */
 trait RewriterDSL {
-  def apply[FROM <: PigOperator : ClassTag, TO: ClassTag](f: (FROM => Option[TO])): RewriteWord[FROM, TO] = {
+  def applyRule[FROM <: PigOperator : ClassTag, TO: ClassTag](f: (FROM => Option[TO])): RewriteWord[FROM, TO] = {
     val b = new Builder[FROM, TO]
     b.func = f
     new RewriteWord[FROM, TO](b)

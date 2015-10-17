@@ -1138,18 +1138,18 @@ object Rules {
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
     Rewriter replace (classOf[op.RDFLoad]) via R1 end;
-    Rewriter apply R2 end;
+    Rewriter applyRule R2 end;
     Rewriter replace (classOf[op.RDFLoad]) via L2 end;
-    Rewriter apply F1 end;
+    Rewriter applyRule F1 end;
     Rewriter replace (classOf[op.BGPFilter]) via F2 end;
     Rewriter replace (classOf[op.BGPFilter]) via F3 end;
     Rewriter replace (classOf[op.BGPFilter]) via F4 end;
-    Rewriter apply F5 end;
-    Rewriter apply F6 end;
-    Rewriter apply F7 end;
-    Rewriter apply F8 end;
-    Rewriter apply J1 unless plainSchemaJoinEarlyAbort end;
-    Rewriter apply J2 unless groupedSchemaJoinEarlyAbort end;
+    Rewriter applyRule F5 end;
+    Rewriter applyRule F6 end;
+    Rewriter applyRule F7 end;
+    Rewriter applyRule F8 end;
+    Rewriter applyRule J1 unless plainSchemaJoinEarlyAbort end;
+    Rewriter applyRule J2 unless groupedSchemaJoinEarlyAbort end;
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }
 }
