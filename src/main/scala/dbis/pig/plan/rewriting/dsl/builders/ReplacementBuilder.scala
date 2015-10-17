@@ -23,6 +23,8 @@ import dbis.pig.plan.rewriting.dsl.traits.BuilderT
 import scala.reflect.ClassTag
 
 class ReplacementBuilder[FROM <: PigOperator : ClassTag, TO <: PigOperator : ClassTag] extends BuilderT[FROM, TO] {
+  override def wrapInFixer(func: (FROM => Option[TO])): (FROM => Option[TO]) = func
+
   override def addAsStrategy(func: (FROM => Option[TO])) = {
     val typeWrapped = Rewriter.buildTypedCaseWrapper(func)
     Rewriter.addStrategy(Rewriter.buildOperatorReplacementStrategy(typeWrapped))

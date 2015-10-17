@@ -54,9 +54,6 @@ abstract class BuilderT[FROM <: PigOperator, TO] {
         case ret @ (a : PigOperator, b:PigOperator) =>
           Rewriter.fixReplacementwithMultipleOperators(term, a, b)
           t
-        case a : PigOperator =>
-          Rewriter.replaceOpInSuccessorsInputs(term, a)
-          t
         case _ =>
           t
       }}
