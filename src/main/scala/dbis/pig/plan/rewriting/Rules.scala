@@ -777,11 +777,13 @@ object Rules {
       f.constructSchema
     }
 
-    val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+    val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map {
+      case (nf, (firstSourceName, firstSourceColumn) :: _) =>
       GeneratorExpr(
         RefExpr(
           NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
         Some(Field(nf.name, Types.CharArrayType)))
+      case _ => None
     } toList
 
     val foreach = Foreach(out, Pipe(joinOutPipeName, join),
@@ -907,11 +909,13 @@ object Rules {
       }
 
       // TODO this is duplicated from J1
-      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map {
+        case (nf, (firstSourceName, firstSourceColumn) :: _) =>
         GeneratorExpr(
           RefExpr(
             NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
           Some(Field(nf.name, Types.CharArrayType)))
+        case _ => None
       } toList
 
       val foreach = Foreach(out, Pipe(joinOutPipeName, join),
@@ -1014,11 +1018,13 @@ object Rules {
       }
 
       // TODO this is duplicated from J1
-      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map {
+        case (nf, (firstSourceName, firstSourceColumn) :: _) =>
         GeneratorExpr(
           RefExpr(
             NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
           Some(Field(nf.name, Types.CharArrayType)))
+        case _ => None
       } toList
 
       val foreach = Foreach(out, Pipe(joinOutPipeName, join),
