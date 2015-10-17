@@ -16,7 +16,10 @@
  */
 package dbis.pig.plan.rewriting.dsl.traits
 
-abstract class BuilderT[FROM, TO] {
+import dbis.pig.op.PigOperator
+import dbis.pig.plan.rewriting.Rewriter
+
+abstract class BuilderT[FROM <: PigOperator, TO] {
   private var _func: Option[(FROM => Option[TO])] = None
 
   def func_=(f: (FROM => Option[TO])) = _func = Some(f)
@@ -45,7 +48,22 @@ abstract class BuilderT[FROM, TO] {
     f _
   }
 
-  def wrapInFixer(func: (FROM => Option[TO])): (FROM => Option[TO]) = func
+  def wrapInFixer(func: (FROM => Option[TO])): (FROM => Option[TO]) = {
+    def f(term: FROM): Option[TO] = {
+      func(term) map {t : TO => t match {
+        case ret @ (a : PigOperator, b:PigOperator) =>
+          Rewriter.fixReplacementwithMultipleOperators(term, a, b)
+          t
+        case a : PigOperator =>
+          Rewriter.replaceOpInSuccessorsInputs(term, a)
+          t
+        case _ =>
+          t
+      }}
+    }
+
+    f _
+  }
 
   def addAsStrategy(func: (FROM => Option[TO]))
 

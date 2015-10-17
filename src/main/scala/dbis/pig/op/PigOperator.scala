@@ -278,6 +278,7 @@ trait PigOperator extends Rewritable with Serializable {
       // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
       // operators
       case ops: Seq[_] => this.reconstruct(ops, outname)
+      case (op : PigOperator, _) => this.reconstruct(List(op), outname)
       case _ => illegalArgs("PigOperator", "PigOperator", outputs)
     }
     this

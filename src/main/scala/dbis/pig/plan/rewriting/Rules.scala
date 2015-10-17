@@ -429,65 +429,63 @@ object Rules {
 
   /** Applies rewriting rule F5 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return
     */
-  def F5(term: Any): Option[Foreach] = term match {
-    case op@BGPFilter(_, _, patterns) =>
-      val in = op.inputs.head
-      val out = op.outputs.head
+  def F5(op: BGPFilter): Option[(Foreach, Filter)] = {
+    val in = op.inputs.head
+    val out = op.outputs.head
+    val patterns = op.patterns
 
-      if (groupedSchemaEarlyAbort(op.inputSchema)) {
-        return None
-      }
+    if (groupedSchemaEarlyAbort(op.inputSchema)) {
+      return None
+    }
 
-      if (patterns.length != 1) {
-        return None
-      }
+    if (patterns.length != 1) {
+      return None
+    }
 
-      // TODO we make a lot of assumptions about Options and Array lengths here
-      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
-      val pattern = patterns.head
+    // TODO we make a lot of assumptions about Options and Array lengths here
+    val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+    val pattern = patterns.head
 
-      // Check if the column that's grouped by is not bound in this pattern
-      val bound_column = RDF.getBoundColumn(pattern)
+    // Check if the column that's grouped by is not bound in this pattern
+    val bound_column = RDF.getBoundColumn(pattern)
 
-      val applies = grouped_by match {
-        case "subject" if bound_column contains Column.Subject => false
-        case "predicate" if bound_column contains Column.Predicate => false
-        case "object" if bound_column contains Column.Object => false
-        // Just in case there's no bound column
-        case _ if bound_column.isEmpty => false
-        case _ => true
-      }
+    val applies = grouped_by match {
+      case "subject" if bound_column contains Column.Subject => false
+      case "predicate" if bound_column contains Column.Predicate => false
+      case "object" if bound_column contains Column.Object => false
+      // Just in case there's no bound column
+      case _ if bound_column.isEmpty => false
+      case _ => true
+    }
 
-      // If not, this rule doesn't apply
-      if (!applies) {
-        return None
-      }
+    // If not, this rule doesn't apply
+    if (!applies) {
+      return None
+    }
 
-      val internalPipeName = generate()
-      val intermediateResultName = generate()
-      val eq = RDF.patternToConstraint(pattern).get
+    val internalPipeName = generate()
+    val intermediateResultName = generate()
+    val eq = RDF.patternToConstraint(pattern).get
 
-      val foreach =
-        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
-          Filter(Pipe(intermediateResultName), Pipe("stmts"), eq),
-          Generate(
-            List(
-              GeneratorExpr(RefExpr(NamedField("*"))),
-              GeneratorExpr(Func("COUNT",
-                List(RefExpr(NamedField(intermediateResultName)))),
-                Some(Field("cnt", Types.ByteArrayType))))))))
+    val foreach =
+      Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
+        Filter(Pipe(intermediateResultName), Pipe("stmts"), eq),
+        Generate(
+          List(
+            GeneratorExpr(RefExpr(NamedField("*"))),
+            GeneratorExpr(Func("COUNT",
+              List(RefExpr(NamedField(intermediateResultName)))),
+              Some(Field("cnt", Types.ByteArrayType))))))))
 
-      val filter = Filter(out, Pipe(internalPipeName, foreach),
-        Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
+    val filter = Filter(out, Pipe(internalPipeName, foreach),
+      Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
 
-      Rewriter.connect(foreach, filter)
-      Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
+    Rewriter.connect(foreach, filter)
 
-      Some(foreach)
-    case _ => None
+    Some((foreach, filter))
   }
 
   /** Applies rewriting rule F6 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -495,67 +493,66 @@ object Rules {
     * @param term
     * @return
     */
-  def F6(term: Any): Option[Foreach] = term match {
-    case op@BGPFilter(_, _, patterns) =>
-      val in = op.inputs.head
-      val out = op.outputs.head
+  def F6(op: BGPFilter): Option[(Foreach, Filter)] = {
+    val in = op.inputs.head
+    val out = op.outputs.head
+    val patterns = op.patterns
 
-      if (groupedSchemaEarlyAbort(op.inputSchema)) {
-        return None
-      }
+    if (groupedSchemaEarlyAbort(op.inputSchema)) {
+      return None
+    }
 
-      if (patterns.length != 1) {
-        return None
-      }
+    if (patterns.length != 1) {
+      return None
+    }
 
-      // TODO we make a lot of assumptions about Options and Array lengths here
-      val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
-      val pattern = patterns.head
+    // TODO we make a lot of assumptions about Options and Array lengths here
+    val grouped_by = op.inputSchema.get.element.valueType.fields.head.name
+    val pattern = patterns.head
 
-      // Check if the column that's grouped by is not bound in this pattern
-      val bound_columns = RDF.getAllBoundColumns(pattern)
+    // Check if the column that's grouped by is not bound in this pattern
+    val bound_columns = RDF.getAllBoundColumns(pattern)
 
-      // If the number of bound variables in the pattern isn't 2, this rule doesn't apply.
-      if (bound_columns.length != 2) {
-        return None
-      }
+    // If the number of bound variables in the pattern isn't 2, this rule doesn't apply.
+    if (bound_columns.length != 2) {
+      return None
+    }
 
-      val applies = grouped_by match {
-        case "subject" if bound_columns contains Column.Subject => false
-        case "predicate" if bound_columns contains Column.Predicate => false
-        case "object" if bound_columns contains Column.Object => false
-        // Just in case there's no bound column
-        case _ if bound_columns.isEmpty => false
-        case _ => true
-      }
+    val applies = grouped_by match {
+      case "subject" if bound_columns contains Column.Subject => false
+      case "predicate" if bound_columns contains Column.Predicate => false
+      case "object" if bound_columns contains Column.Object => false
+      // Just in case there's no bound column
+      case _ if bound_columns.isEmpty => false
+      case _ => true
+    }
 
-      // If not, this rule doesn't apply
-      if (!applies) {
-        return None
-      }
+    // If not, this rule doesn't apply
+    if (!applies) {
+      return None
+    }
 
-      val internalPipeName = generate()
-      val intermediateResultName = generate()
-      val constraint = RDF.patternToConstraint(pattern).get
+    val internalPipeName = generate()
+    val intermediateResultName = generate()
+    val constraint = RDF.patternToConstraint(pattern).get
 
-      val foreach =
-        Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
-          Filter(Pipe(intermediateResultName), Pipe("stmts"), constraint),
-          Generate(
-            List(
-              GeneratorExpr(RefExpr(NamedField("*"))),
-              GeneratorExpr(Func("COUNT",
-                List(RefExpr(NamedField(intermediateResultName)))),
-                Some(Field("cnt", Types.ByteArrayType))))))))
+    val foreach =
+      Foreach(Pipe(internalPipeName), Pipe(in.name), GeneratorPlan(List(
+        Filter(Pipe(intermediateResultName), Pipe("stmts"), constraint),
+        Generate(
+          List(
+            GeneratorExpr(RefExpr(NamedField("*"))),
+            GeneratorExpr(Func("COUNT",
+              List(RefExpr(NamedField(intermediateResultName)))),
+              Some(Field("cnt", Types.ByteArrayType))))))))
 
-      val filter = Filter(out, Pipe(internalPipeName, foreach),
-        Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
+    val filter = Filter(out, Pipe(internalPipeName, foreach),
+      Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))
 
-      Rewriter.connect(foreach, filter)
-      Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
+    Rewriter.connect(foreach, filter)
+    Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
-      Some(foreach)
-    case _ => None
+    Some((foreach, filter))
   }
 
   /** Applies rewriting rule F7 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -803,7 +800,7 @@ object Rules {
   /** Applies rewriting rule J2 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     */
-  def J2(op: BGPFilter): Option[Foreach] = {
+  def J2(op: BGPFilter): Option[(Foreach, Filter)] = {
     val patterns = op.patterns
     if (!RDF.isStarJoin(patterns)) {
       return None
@@ -843,14 +840,13 @@ object Rules {
     val filter = Filter(out, Pipe(internalPipeName, foreach), countGtZeroConstraint)
 
     Rewriter.connect(foreach, filter)
-    Rewriter.fixReplacementwithMultipleOperators(op, foreach, filter)
 
-    Some(foreach)
+    Some((foreach, filter))
   }
 
   /** Applies rewriting rule J3 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some BGPFilter objects if the input filters BGP is a star join.
     */
   def J3(op: BGPFilter): Option[List[PigOperator]] = {
@@ -934,7 +930,7 @@ object Rules {
 
   /** Applies rewriting rule J4 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return Some BGPFilter objects if the input filters BGP is a star join.
     */
   def J4(op: BGPFilter): Option[List[PigOperator]] = {
@@ -1126,7 +1122,7 @@ object Rules {
   def registerAllRules() = {
     // IMPORTANT: If you change one of the rule registration calls in here, please also change the call in the
     // corresponding test methods!
-    addStrategy(strategyf(t => replaceMacroOp(t)))
+    Rewriter apply replaceMacroOp
     addStrategy(removeDuplicateFilters)
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
