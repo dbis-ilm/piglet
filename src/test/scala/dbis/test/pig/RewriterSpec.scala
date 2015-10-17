@@ -349,8 +349,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F2)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only p._2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
     }
@@ -362,8 +361,7 @@ class RewriterSpec extends FlatSpec
         val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
         val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
         val op3 = Dump(Pipe("b"))
-        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-          (buildTypedCaseWrapper(Rules.F2 _)))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
         plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
       }
@@ -401,8 +399,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p._1))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F3)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only p._2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
     }
@@ -416,8 +413,7 @@ class RewriterSpec extends FlatSpec
         val op2 = Distinct(Pipe("b"), Pipe("a"))
         val op3 = BGPFilter(Pipe("c"), Pipe("b"), List(p._1))
         val op4 = Dump(Pipe("c"))
-        val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)), buildOperatorReplacementStrategy
-          (buildTypedCaseWrapper(Rules.F3)))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
 
         plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
       }
@@ -442,8 +438,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F4 _)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only f
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only f
     }
@@ -457,8 +452,7 @@ class RewriterSpec extends FlatSpec
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
           val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
           val op3 = Dump(Pipe("b"))
-          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-            (buildTypedCaseWrapper(Rules.F4 _)))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
           plan.operators should contain only(op1, op2, op3)
@@ -520,7 +514,7 @@ class RewriterSpec extends FlatSpec
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
           val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
           val op3 = Dump(Pipe("b"))
-          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F5))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
           plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only fo
           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
@@ -533,7 +527,7 @@ class RewriterSpec extends FlatSpec
            val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
            val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
            val op3 = Dump(Pipe("b"))
-           val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F5))
+           val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
            plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
            plan.operators should contain only(op1, op2, op3)
@@ -602,7 +596,7 @@ class RewriterSpec extends FlatSpec
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
           val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
           val op3 = Dump(Pipe("b"))
-          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F6))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
           plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only fo
           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
@@ -615,7 +609,7 @@ class RewriterSpec extends FlatSpec
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
           val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
           val op3 = Dump(Pipe("b"))
-          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy(Rules.F6))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
           plan.operators should contain only(op1, op2, op3)
@@ -682,8 +676,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F7 _)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only f1
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only f2
     }
@@ -693,8 +686,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F7 _)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -704,8 +696,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p, p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F7 _)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -715,8 +706,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F7 _)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -734,8 +724,7 @@ class RewriterSpec extends FlatSpec
           val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
           val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
           val op3 = Dump(Pipe("b"))
-          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-            (buildTypedCaseWrapper(Rules.F7 _)))
+          val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
           plan.operators should contain only(op1, op2, op3)
@@ -777,8 +766,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F8 _)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only f1
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only f2
     }
@@ -788,8 +776,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F8 _)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -807,8 +794,7 @@ class RewriterSpec extends FlatSpec
         val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
         val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(f(p)))
         val op3 = Dump(Pipe("b"))
-        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-          (buildTypedCaseWrapper(Rules.F8 _)))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
         plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
         plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
       }
@@ -819,8 +805,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p, p))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F8 _)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -830,8 +815,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), buildOperatorReplacementStrategy
-        (buildTypedCaseWrapper(Rules.F8 _)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -903,8 +887,6 @@ class RewriterSpec extends FlatSpec
         )
     )
 
-    val wrapped = buildTypedCaseWrapper(Rules.J1 _)
-
     forAll(patterns) { (p: List[TriplePattern], fs: List[BGPFilter], j: Join, fo: Foreach, sc: Option[Schema]) =>
       Random.setSeed(123456789)
       PipeNameGenerator.clearGenerated
@@ -913,7 +895,7 @@ class RewriterSpec extends FlatSpec
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), p)
       val op3 = Dump(Pipe("b"))
       val plan = new DataflowPlan(List(op1, op2, op3))
-      val rewrittenPlan = processPlan(plan, strategyf(t => wrapped(t)))
+      val rewrittenPlan = processPlan(plan)
       rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
       rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
       rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
@@ -926,7 +908,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p.head))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), strategyf(t => wrapped(t)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -936,7 +918,7 @@ class RewriterSpec extends FlatSpec
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), strategyf(t => wrapped(t)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -1028,7 +1010,7 @@ class RewriterSpec extends FlatSpec
         val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
         val op2 = BGPFilter(Pipe("b"), Pipe("a"), p)
         val op3 = Dump(Pipe("b"))
-        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), strategyf(t => wrapped(t)))
+        val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
         plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only fo
         plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
