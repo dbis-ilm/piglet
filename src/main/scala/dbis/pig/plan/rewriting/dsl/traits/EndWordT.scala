@@ -25,7 +25,7 @@ import dbis.pig.plan.rewriting.dsl.builders.Builder
   * @tparam FROM
   * @tparam TO
   */
-abstract class WordT[FROM <: PigOperator, TO](val b: BuilderT[FROM, TO]) {
+abstract class EndWordT[FROM <: PigOperator, TO](val b: BuilderT[FROM, TO]) {
   /** foo
     *
     */

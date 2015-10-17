@@ -19,7 +19,7 @@ package dbis.pig.plan.rewriting.dsl.traits
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.dsl.words.WhenWord
 
-abstract class CheckWordT[FROM <: PigOperator, TO](b: BuilderT[FROM, TO]) extends WordT[FROM, TO](b){
+abstract class CheckEndWordT[FROM <: PigOperator, TO](b: BuilderT[FROM, TO]) extends EndWordT[FROM, TO](b){
   /** Add a check before the application of the function contained in the builder. If the check returns true, the
     * function will not be called.
     */

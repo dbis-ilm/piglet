@@ -18,7 +18,7 @@ package dbis.pig.plan.rewriting.dsl.words
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.dsl.builders.Builder
-import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, CheckWordT, WordT}
+import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, CheckEndWordT, EndWordT}
 
 /** Provides several modification methods for a builder.
   *
@@ -27,5 +27,5 @@ import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, CheckWordT, WordT}
   * @tparam TO
   */
 class RewriteWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO])
-  extends CheckWordT(b) {
+  extends CheckEndWordT(b) {
 }
