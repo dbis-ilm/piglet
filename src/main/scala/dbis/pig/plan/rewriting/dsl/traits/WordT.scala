@@ -14,26 +14,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting.dsl
+package dbis.pig.plan.rewriting.dsl.traits
 
 import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.dsl.builders.{ReplacementBuilder, Builder}
-import dbis.pig.plan.rewriting.dsl.words.{ReplaceWord, RewriteWord}
+import dbis.pig.plan.rewriting.dsl.builders.Builder
 
-import scala.reflect._
-
-/** The entry point to the rewriting DSL.
+/** The most general Word class. It only provides a parameterless ``apply`` method that calls the wrapped builder.
   *
+  * @param b
+  * @tparam FROM
+  * @tparam TO
   */
-trait RewriterDSL {
-  def apply[FROM <: PigOperator : ClassTag, TO: ClassTag](f: (FROM => Option[TO])): RewriteWord[FROM, TO] = {
-    val b = new Builder[FROM, TO]
-    b.func = f
-    new RewriteWord[FROM, TO](b)
-  }
+abstract class WordT[FROM <: PigOperator, TO](val b: BuilderT[FROM, TO]) {
+  /** foo
+    *
+    */
+  def apply(): Unit = b()
 
-  def replace[FROM <: PigOperator : ClassTag](cls: Class[FROM]): ReplaceWord[FROM] = {
-    val b = new ReplacementBuilder[FROM, PigOperator]
-    new ReplaceWord[FROM](b)
-  }
+  def end(): Unit = b()
 }

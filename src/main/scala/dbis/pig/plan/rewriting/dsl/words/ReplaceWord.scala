@@ -18,13 +18,11 @@ package dbis.pig.plan.rewriting.dsl.words
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.dsl.builders.Builder
+import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, WordT}
 
-/** The most general Word class. It only provides a parameterless ``apply`` method that calls the wrapped builder.
-  *
-  * @param b
-  * @tparam FROM
-  * @tparam TO
-  */
-abstract class Word[FROM <: PigOperator, TO](val b: Builder[FROM, TO]) {
-  def apply(): Unit = b()
+class ReplaceWord[FROM <: PigOperator](override val b: BuilderT[FROM, PigOperator]) extends WordT(b) {
+  def via(f: (FROM => Option[PigOperator])): RewriteWord[FROM, PigOperator] = {
+    b.func = f
+    new RewriteWord[FROM, PigOperator](b)
+  }
 }

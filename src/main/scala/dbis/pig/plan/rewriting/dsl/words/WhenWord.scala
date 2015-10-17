@@ -18,6 +18,7 @@ package dbis.pig.plan.rewriting.dsl.words
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.dsl.builders.Builder
+import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, WordT}
 
 /** Adds ``check`` to ``b``.
   *
@@ -26,8 +27,8 @@ import dbis.pig.plan.rewriting.dsl.builders.Builder
   * @tparam FROM
   * @tparam TO
   */
-class WhenWord[FROM <: PigOperator, TO](override val b: Builder[FROM, TO], val check: (FROM => Boolean))
-  extends Word(b) {
+class WhenWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO], val check: (FROM => Boolean))
+  extends WordT(b) {
   b.check = check
 
   def and(check: (FROM => Boolean)) = {

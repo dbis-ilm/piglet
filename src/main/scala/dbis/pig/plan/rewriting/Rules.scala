@@ -1135,19 +1135,19 @@ object Rules {
     addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
-    addOperatorReplacementStrategy(buildTypedCaseWrapper(R1 _))
-    addStrategy(R2)
-    addOperatorReplacementStrategy(buildTypedCaseWrapper(L2 _))
-    Rewriter apply F1
-    Rewriter apply F2
-    Rewriter apply F3
-    Rewriter apply F4
-    Rewriter apply F5
-    Rewriter apply F6
-    Rewriter apply F7
-    Rewriter apply F8
-    Rewriter apply J1 unless plainSchemaJoinEarlyAbort
-    Rewriter apply J2 unless groupedSchemaJoinEarlyAbort
+    Rewriter replace (classOf[op.RDFLoad]) via R1 end;
+    Rewriter apply R2 end;
+    Rewriter replace (classOf[op.RDFLoad]) via L2 end;
+    Rewriter apply F1 end;
+    Rewriter replace (classOf[op.BGPFilter]) via F2 end;
+    Rewriter replace (classOf[op.BGPFilter]) via F3 end;
+    Rewriter replace (classOf[op.BGPFilter]) via F4 end;
+    Rewriter apply F5 end;
+    Rewriter apply F6 end;
+    Rewriter apply F7 end;
+    Rewriter apply F8 end;
+    Rewriter apply J1 unless plainSchemaJoinEarlyAbort end;
+    Rewriter apply J2 unless groupedSchemaJoinEarlyAbort end;
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }
 }
