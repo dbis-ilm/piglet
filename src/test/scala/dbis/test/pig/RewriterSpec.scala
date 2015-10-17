@@ -24,18 +24,29 @@ import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.{PipeNameGenerator, DataflowPlan}
 import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
 import dbis.pig.plan.rewriting.Rewriter._
+import dbis.pig.plan.rewriting.Rules._
 import dbis.pig.plan.rewriting.{Rewriter, Rules}
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
 import dbis.test.TestTools._
 import org.kiama.rewriting.Rewriter.{strategyf}
 import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterEach, PrivateMethodTester}
 
 import scala.util.Random
 
-class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks {
+class RewriterSpec extends FlatSpec
+                   with Matchers
+                   with TableDrivenPropertyChecks
+                   with BeforeAndAfterEach
+                   with PrivateMethodTester {
+  override def beforeEach(): Unit = {
+    val resetMethod = PrivateMethod[Unit]('resetStrategy)
+    Rewriter invokePrivate resetMethod()
+  }
+
   "The rewriter" should "merge two Filter operations" in {
+    merge[Filter, Filter](Rules.mergeFilters)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Neq(RefExpr(PositionalField(1)), RefExpr(Value("21")))
@@ -59,6 +70,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "remove Filter operation if it has the same predicate as an earlier one" in {
+    addStrategy(Rules.removeDuplicateFilters)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -77,6 +89,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "order Filter operations before Order By ones" in {
+    reorder[OrderBy, Filter]
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
 
@@ -98,6 +111,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "order Filter operations before Joins if only NamedFields are used" in {
+    addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
     val load_1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
     ))))
     val load_2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
@@ -129,6 +143,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "order Filter operations before Cross operators if only NamedFields are used" in {
+    addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
     val load_1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
     ))))
     val load_2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
@@ -179,6 +194,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "not reorder operators if the first one has more than one output" in {
+    Rules.registerAllRules()
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
 
@@ -196,6 +212,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "remove sink nodes that don't store a relation" in {
+    addStrategy(removeNonStorageSinks _)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
     val newPlan = processPlan(plan)
@@ -204,6 +221,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "remove sink nodes that don't store a relation and have an empty outputs list" in {
+    addStrategy(Rules.removeNonStorageSinks _)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
 
@@ -214,6 +232,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "pull up Empty nodes" in {
+    addStrategy(Rules.removeNonStorageSinks _)
+    merge[PigOperator, Empty](Rules.mergeWithEmpty)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
     val plan = new DataflowPlan(List(op1, op2))
@@ -226,6 +246,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule R1" in {
+    Rewriter replace (classOf[RDFLoad]) via Rules.R1 end;
     val URLs = Table(
       ("url"),
       ("http://www.example.com"),
@@ -242,6 +263,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule R2" in {
+    Rewriter apply Rules.R2 end;
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List(OrderBySpec(NamedField("subject"), OrderByDirection.DescendingOrder)))
     val op3 = BGPFilter(Pipe("c"), Pipe("b"),
@@ -259,6 +281,8 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "not apply rewriting rule R2 if the schema of the next BGPFilter does not match the RDFLoads schema" in {
+    Rewriter apply Rules.R1 end;
+    Rewriter apply Rules.R2 end;
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List(OrderBySpec(NamedField("subject"), OrderByDirection.DescendingOrder)))
     val op3 = BGPFilter(Pipe("c"), Pipe("b"),
@@ -279,6 +303,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule L2" in {
+    Rewriter replace (classOf[RDFLoad]) via Rules.L2 end;
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
     forAll (possibleGroupers) { (g: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
@@ -290,6 +315,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F1" in {
+    Rewriter apply Rules.F1 end;
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
     // Add something between op1 and op3 to prevent R2 from being applied
     val op2 = Distinct(Pipe("b"), Pipe("a"))
@@ -310,6 +336,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F2" in {
+    Rewriter replace (classOf[BGPFilter]) via Rules.F2 end;
     val patterns = Table(
       ("Pattern"),
       (TriplePattern(Value("subjectv"), PositionalField(1), PositionalField(2)),
@@ -344,6 +371,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F3" in {
+    Rewriter replace (classOf[BGPFilter]) via Rules.F3 end;
     val patterns = Table(
       ("Pattern"),
       // s p o bound
@@ -397,6 +425,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F4" in {
+    Rewriter replace (classOf[BGPFilter]) via Rules.F4 end;
     val patterns = Table(
       ("Pattern", "grouping column", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
@@ -439,6 +468,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F5" in {
+    Rewriter apply F5 end;
     val patterns = Table(
       ("Pattern", "grouping column", "ForEach", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
@@ -513,6 +543,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F6" in {
+    Rewriter apply F6 end;
     val patterns = Table(
       ("Pattern", "bound columns", "ForEach", "Filter"),
       (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
@@ -594,6 +625,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F7" in {
+    Rewriter apply F7 end;
     // F7 needs to build an internal pipe between the two new operators, its name is determined via Random.nextString
     // (10). The tests below include the values that are generated by Random.nextString(10) after setting the seed to
     // 123456789.
@@ -713,6 +745,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule F8" in {
+    Rewriter apply F8 end;
     // F8 needs to build an internal pipe between the two new operators, its name is determined via Random.nextString
     // (10). The tests below include the values that are generated by Random.nextString(10) after setting the seed to
     // 123456789.
@@ -805,6 +838,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule J1" in {
+    Rewriter apply J1 unless plainSchemaJoinEarlyAbort end;
     val patterns = Table(
       ("patterns", "filters", "join", "foreach", "expected schema"),
       (List(
@@ -909,6 +943,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule J2" in {
+    Rewriter apply J2 unless groupedSchemaJoinEarlyAbort end;
     val patterns = Table(
       ("Patterns", "ForEach", "Filter"),
       (List(
@@ -1004,6 +1039,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "apply rewriting rule J3" in {
+    Rewriter apply J3 unless plainSchemaJoinEarlyAbort end;
     val patterns = Table(
       ("patterns", "filters", "join", "foreach", "expected schema"),
       (List(
@@ -1076,7 +1112,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), p)
       val op3 = Dump(Pipe("b"))
       val plan = new DataflowPlan(List(op1, op2, op3))
-      val rewrittenPlan = processPlan(plan, strategyf(t => Rules.J3(t)))
+      val rewrittenPlan = processPlan(plan)
       rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
       rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
       rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
@@ -1090,7 +1126,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p.head))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), strategyf(t => Rules.J3(t)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -1100,13 +1136,14 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), strategyf(t => Rules.J3(t)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
   }
 
   it should "apply rewriting rule J4" in {
+    Rewriter apply J4 unless groupedSchemaJoinEarlyAbort end;
     val patterns = Table(
       ("patterns", "filters", "flattenning foreachs", "join", "foreach", "expected schema"),
       (List(
@@ -1246,7 +1283,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), p)
       val op3 = Dump(Pipe("b"))
       val plan = new DataflowPlan(List(op1, op2, op3))
-      val rewrittenPlan = processPlan(plan, strategyf(t => Rules.J4(t)))
+      val rewrittenPlan = processPlan(plan)
       rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
       rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
       rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
@@ -1262,7 +1299,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some("subject"))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p.head))
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), strategyf(t => Rules.J4(t)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
@@ -1273,13 +1310,14 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some("subject"))
       val op2 = BGPFilter(Pipe("b"), Pipe("a"), List.empty)
       val op3 = Dump(Pipe("b"))
-      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)), strategyf(t => Rules.J4(t)))
+      val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
       plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only op2
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
   }
 
   it should "replace GENERATE * by a list of fields" in {
+    addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     val plan = new DataflowPlan(parseScript(
       s"""A = LOAD 'file' AS (x, y, z);
          |B = FOREACH A GENERATE *;
@@ -1293,6 +1331,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "replace GENERATE *, fields" in {
+    addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     val plan = new DataflowPlan(parseScript(
       "A = LOAD 'file' AS (x, y, z);\nB = FOREACH A GENERATE *, $0, $2;\nDUMP B;"))
     val rewrittenPlan = processPlan(plan)
@@ -1307,6 +1346,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "replace GENERATE * in a nested FOREACH" in {
+    addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     val plan = new DataflowPlan(parseScript(
       """triples = LOAD 'file' AS (sub, pred, obj);
          |stmts = GROUP triples BY sub;
@@ -1414,6 +1454,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   "The SplitIntoToFilters rule" should "rewrite SplitInto operators into multiple Filter ones" in {
+    addStrategy(strategyf(t => splitIntoToFilters(t)))
     val plan = new DataflowPlan(parseScript( s"""
                                                 |a = LOAD 'file' AS (x, y);
                                                 |SPLIT a INTO b IF x < 100, c IF x >= 100;
@@ -1440,6 +1481,7 @@ class RewriterSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks
   }
 
   it should "not behave unreasonably if the next operator is a join" in {
+    addStrategy(strategyf(t => splitIntoToFilters(t)))
     val plan = new DataflowPlan(parseScript( s"""
                                                 |a = LOAD 'file' AS (x, y);
                                                 |SPLIT a INTO b IF x < 100, c IF x >= 100;

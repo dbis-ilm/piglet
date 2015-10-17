@@ -343,7 +343,7 @@ object Rules {
     * @param schema
     * @return
     */
-  private def groupedSchemaEarlyAbort(schema: Option[Schema]): Boolean = {
+  def groupedSchemaEarlyAbort(schema: Option[Schema]): Boolean = {
     if (schema == RDFLoad.plainSchema) {
       return true
     }
@@ -355,7 +355,7 @@ object Rules {
     false
   }
 
-  private def groupedSchemaJoinEarlyAbort(op: BGPFilter): Boolean = {
+  def groupedSchemaJoinEarlyAbort(op: BGPFilter): Boolean = {
     if (groupedSchemaEarlyAbort(op.inputSchema)) {
       return true
     }
@@ -367,7 +367,7 @@ object Rules {
     false
   }
 
-  private def plainSchemaJoinEarlyAbort(op: BGPFilter): Boolean = {
+  def plainSchemaJoinEarlyAbort(op: BGPFilter): Boolean = {
     if (op.inputSchema != RDFLoad.plainSchema) {
       return true
     }
@@ -853,10 +853,10 @@ object Rules {
     * @param term
     * @return Some BGPFilter objects if the input filters BGP is a star join.
     */
-  def J3(term: Any): Option[List[PigOperator]] = term match {
-    case op@BGPFilter(_, _, patterns) =>
+  def J3(op: BGPFilter): Option[List[PigOperator]] = {
       val out = op.outputs.head
       val in = op.inputs.head
+      val patterns = op.patterns
       if (!RDF.isPathJoin(patterns)) {
         return None
       }
@@ -930,7 +930,6 @@ object Rules {
       foreach.constructSchema
 
       Some(newBGPFilters)
-    case _ => None
   }
 
   /** Applies rewriting rule J4 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -938,10 +937,10 @@ object Rules {
     * @param term
     * @return Some BGPFilter objects if the input filters BGP is a star join.
     */
-  def J4(term: Any): Option[List[PigOperator]] = term match {
-    case op@BGPFilter(_, _, patterns) =>
+  def J4(op: BGPFilter): Option[List[PigOperator]] = {
       val out = op.outputs.head
       val in = op.inputs.head
+      val patterns = op.patterns
 
       if (!RDF.isPathJoin(patterns)) {
         return None
@@ -1038,7 +1037,6 @@ object Rules {
       foreach.constructSchema
 
       Some(newBGPFilters)
-    case _ => None
   }
 
   /**
@@ -1126,6 +1124,8 @@ object Rules {
   }
 
   def registerAllRules() = {
+    // IMPORTANT: If you change one of the rule registration calls in here, please also change the call in the
+    // corresponding test methods!
     addStrategy(strategyf(t => replaceMacroOp(t)))
     addStrategy(removeDuplicateFilters)
     merge[Filter, Filter](mergeFilters)

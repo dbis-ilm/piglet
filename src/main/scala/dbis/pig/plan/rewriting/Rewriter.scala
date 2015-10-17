@@ -100,6 +100,11 @@ object Rewriter extends LazyLogging
                 with RewriterDSL {
   private var ourStrategy = fail
 
+  /** Resets [[ourStrategy]] to [[fail]].
+    *
+    */
+  private def resetStrategy = ourStrategy = fail
+
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
     *
     * It will be added by [[org.kiama.rewriting.Rewriter.ior]]ing it with the already existing ones.
