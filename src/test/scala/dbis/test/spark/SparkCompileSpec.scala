@@ -16,22 +16,22 @@
  */
 package dbis.test.spark
 
-import dbis.test.TestTools._
-
 import dbis.pig.PigCompiler._
+import dbis.pig.backends.BackendManager
 import dbis.pig.codegen.BatchGenCode
 import dbis.pig.op._
-import dbis.pig.plan.{PrettyPrinter, DataflowPlan}
-import dbis.pig.schema._
-import org.scalatest.FlatSpec
-import dbis.pig.backends.BackendManager
+import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
+import dbis.pig.plan.rewriting.Rules
+import dbis.pig.schema._
+import dbis.test.TestTools._
+import org.scalatest.{BeforeAndAfterAll, FlatSpec}
 
-import java.net.URI
-
-class SparkCompileSpec extends FlatSpec {
+class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
   
-  
+  override def beforeAll()  {
+    Rules.registerAllRules()
+  }
   
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
   val backendConf = BackendManager.backend("spark") 

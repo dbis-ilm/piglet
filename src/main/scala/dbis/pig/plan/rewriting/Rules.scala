@@ -1122,7 +1122,7 @@ object Rules {
   def registerAllRules() = {
     // IMPORTANT: If you change one of the rule registration calls in here, please also change the call in the
     // corresponding test methods!
-    Rewriter apply replaceMacroOp
+    addStrategy(replaceMacroOp _)
     addStrategy(removeDuplicateFilters)
     merge[Filter, Filter](mergeFilters)
     merge[PigOperator, Empty](mergeWithEmpty)
