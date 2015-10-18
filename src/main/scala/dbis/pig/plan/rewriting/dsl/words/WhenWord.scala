@@ -48,4 +48,40 @@ class WhenWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO], val 
 
     new WhenWord(b, newcheck)
   }
+
+  /** Add a check in the form of a pattern match before the application of the function contained in the builder. If
+    * the pattern matches, the function will be called.
+    *
+    * Use it like
+    *
+    * {{{
+    *   andMatches { case _ : PigOperator => }
+    * }}}
+    */
+  def andMatches(check: scala.PartialFunction[FROM, _]) = {
+    val oldcheck = b.check.get
+    val newcheck = { t: FROM =>
+      (oldcheck(t) && check.isDefinedAt(t))
+    }
+
+    new WhenWord(b, newcheck)
+  }
+
+  /** Add a check in the form of a pattern match before the application of the function contained in the builder. If
+    * the pattern matches, the function will not be called.
+    *
+    * Use it like
+    *
+    * {{{
+    *   orMatches { case _ : PigOperator => }
+    * }}}
+    */
+  def orMatches(check: scala.PartialFunction[FROM, _]) = {
+    val oldcheck = b.check.get
+    val newcheck = { t: FROM =>
+      (oldcheck(t) || check.isDefinedAt(t))
+    }
+
+    new WhenWord(b, newcheck)
+  }
 }

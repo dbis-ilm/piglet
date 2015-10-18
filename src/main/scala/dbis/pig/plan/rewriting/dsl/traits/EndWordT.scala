@@ -26,9 +26,6 @@ import dbis.pig.plan.rewriting.dsl.builders.Builder
   * @tparam TO
   */
 abstract class EndWordT[FROM <: PigOperator, TO](val b: BuilderT[FROM, TO]) {
-  /** foo
-    *
-    */
   def apply(): Unit = b()
 
   def end(): Unit = b()
