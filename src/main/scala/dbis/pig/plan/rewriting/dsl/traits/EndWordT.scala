@@ -19,14 +19,19 @@ package dbis.pig.plan.rewriting.dsl.traits
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.dsl.builders.Builder
 
+import scala.reflect.ClassTag
+
 /** The most general Word class. It only provides a parameterless ``apply`` method that calls the wrapped builder.
   *
   * @param b
   * @tparam FROM
   * @tparam TO
   */
-abstract class EndWordT[FROM <: PigOperator, TO](val b: BuilderT[FROM, TO]) {
-  def apply(): Unit = b()
+trait EndWordT[FROM <: PigOperator, TO] {
+  val b: BuilderT[FROM, TO]
 
-  def end(): Unit = b()
+  def via(f: (FROM => Option[TO])): Unit = {
+    b.func = f
+    b.apply()
+  }
 }

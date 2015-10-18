@@ -1131,19 +1131,21 @@ object Rules {
     addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     addStrategy(removeNonStorageSinks _)
-    Rewriter replace (classOf[op.RDFLoad]) via R1 end;
-    Rewriter applyRule R2 end;
-    Rewriter replace (classOf[op.RDFLoad]) via L2 end;
-    Rewriter applyRule F1 end;
-    Rewriter replace (classOf[op.BGPFilter]) via F2 end;
-    Rewriter replace (classOf[op.BGPFilter]) via F3 end;
-    Rewriter replace (classOf[op.BGPFilter]) via F4 end;
-    Rewriter applyRule F5 end;
-    Rewriter applyRule F6 end;
-    Rewriter applyRule F7 end;
-    Rewriter applyRule F8 end;
-    Rewriter applyRule J1 unless plainSchemaJoinEarlyAbort end;
-    Rewriter applyRule J2 unless groupedSchemaJoinEarlyAbort end;
+    Rewriter replace (classOf[op.RDFLoad]) via R1
+    Rewriter applyRule R2
+    Rewriter replace (classOf[op.RDFLoad]) via L2
+    Rewriter applyRule F1
+    Rewriter replace (classOf[op.BGPFilter]) via F2
+    Rewriter replace (classOf[op.BGPFilter]) via F3
+    Rewriter replace (classOf[op.BGPFilter]) via F4
+    Rewriter applyRule F5
+    Rewriter applyRule F6
+    Rewriter applyRule F7
+    Rewriter applyRule F8
+    Rewriter unless plainSchemaJoinEarlyAbort  applyRule J1
+    Rewriter unless groupedSchemaJoinEarlyAbort applyRule J2
+    Rewriter unless plainSchemaJoinEarlyAbort applyRule Rules.J3
+    Rewriter unless groupedSchemaJoinEarlyAbort applyRule Rules.J4
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }
 }
