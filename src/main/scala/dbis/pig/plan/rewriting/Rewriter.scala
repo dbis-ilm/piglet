@@ -27,6 +27,7 @@ import org.kiama.rewriting.Rewriter.{rewrite => kiamarewrite}
 import org.kiama.rewriting.Strategy
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 case class RewriterException(msg: String) extends Exception(msg)
 
@@ -133,7 +134,8 @@ object Rewriter extends LazyLogging
     * @param f
     */
   //noinspection ScalaDocMissingParameterDescription
-  def addOperatorReplacementStrategy(f: Any => Option[PigOperator]): Unit = {
+  def addOperatorReplacementStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+    (f: T => Option[T2]): Unit = {
     addStrategy(buildOperatorReplacementStrategy(f))
   }
 

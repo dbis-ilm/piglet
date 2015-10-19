@@ -18,11 +18,8 @@ package dbis.pig.plan.rewriting.dsl.words
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.dsl.builders.Builder
-import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, EndWordT}
+import dbis.pig.plan.rewriting.dsl.traits.{CheckWordT, BuilderT, EndWordT}
 
-class ReplaceWord[FROM <: PigOperator](val b: BuilderT[FROM, PigOperator]){
-  def via(f: (FROM => Option[PigOperator])): RewriteWord[FROM, PigOperator] = {
-    b.func = f
-    new RewriteWord[FROM, PigOperator](b)
-  }
+class ReplaceWord[FROM <: PigOperator](override val b: BuilderT[FROM, PigOperator])
+  extends EndWordT[FROM, PigOperator] with CheckWordT[FROM, PigOperator] {
 }

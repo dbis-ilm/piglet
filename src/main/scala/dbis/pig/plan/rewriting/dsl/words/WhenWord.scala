@@ -20,7 +20,7 @@ import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.dsl.builders.Builder
 import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, EndWordT}
 
-/** Adds ``check`` to ``b``.
+/** Class for chaining checks to a Builder.
   *
   * @param b
   * @param check
@@ -28,7 +28,7 @@ import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, EndWordT}
   * @tparam TO
   */
 class WhenWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO], val check: (FROM => Boolean))
-  extends EndWordT(b) {
+  extends EndWordT[FROM, TO] {
   b.check = check
 
   def and(check: (FROM => Boolean)) = {
@@ -47,5 +47,46 @@ class WhenWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO], val 
     }
 
     new WhenWord(b, newcheck)
+  }
+
+  /** Add a check in the form of a pattern match before the application of the function contained in the builder. If
+    * the pattern matches, the function will be called.
+    *
+    * Use it like
+    *
+    * {{{
+    *   andMatches { case _ : PigOperator => }
+    * }}}
+    */
+  def andMatches(check: scala.PartialFunction[FROM, _]) = {
+    val oldcheck = b.check.get
+    val newcheck = { t: FROM =>
+      (oldcheck(t) && check.isDefinedAt(t))
+    }
+
+    new WhenWord(b, newcheck)
+  }
+
+  /** Add a check in the form of a pattern match before the application of the function contained in the builder. If
+    * the pattern matches, the function will not be called.
+    *
+    * Use it like
+    *
+    * {{{
+    *   orMatches { case _ : PigOperator => }
+    * }}}
+    */
+  def orMatches(check: scala.PartialFunction[FROM, _]) = {
+    val oldcheck = b.check.get
+    val newcheck = { t: FROM =>
+      (oldcheck(t) || check.isDefinedAt(t))
+    }
+
+    new WhenWord(b, newcheck)
+  }
+
+  def applyRule(f: (FROM => Option[TO])): Unit = {
+    b.func = f
+    b()
   }
 }
