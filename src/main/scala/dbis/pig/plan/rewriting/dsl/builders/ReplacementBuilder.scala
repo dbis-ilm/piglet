@@ -26,7 +26,6 @@ class ReplacementBuilder[FROM <: PigOperator : ClassTag, TO <: PigOperator : Cla
   override def wrapInFixer(func: (FROM => Option[TO])): (FROM => Option[TO]) = func
 
   override def addAsStrategy(func: (FROM => Option[TO])) = {
-    val typeWrapped = Rewriter.buildTypedCaseWrapper(func)
-    Rewriter.addStrategy(Rewriter.buildOperatorReplacementStrategy(typeWrapped))
+    Rewriter.addTypedStrategy(func)
   }
 }
