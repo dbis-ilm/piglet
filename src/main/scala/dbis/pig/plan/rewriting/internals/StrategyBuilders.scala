@@ -72,23 +72,30 @@ trait StrategyBuilders {
     * @param f
     * @return
     */
-  def buildOperatorReplacementStrategy(f: Any => Option[PigOperator]): Strategy = strategyf(t =>
-    f(t) map { op: PigOperator =>
-      op.outputs foreach { output =>
-        output.consumer foreach { consumer =>
-          consumer.inputs foreach { input =>
-            // If `t` (the old term) is the producer of any of the input pipes of `op` (the new terms) successors,
-            // replace it with `op` in that attribute. Replacing `t` with `op` in the pipes on `op` itself is not
-            // necessary because the setters of `inputs` and `outputs` do that.
-            if (input.producer == t) {
-              input.producer = op
+  def buildOperatorReplacementStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+   (f: T => Option[T2]): Strategy = {
+
+    def inner(term: T): Option[T2] = {
+      f(term) map { op: T2 =>
+        op.outputs foreach { output =>
+          output.consumer foreach { consumer =>
+            consumer.inputs foreach { input =>
+              // If `t` (the old term) is the producer of any of the input pipes of `op` (the new terms) successors,
+              // replace it with `op` in that attribute. Replacing `t` with `op` in the pipes on `op` itself is not
+              // necessary because the setters of `inputs` and `outputs` do that.
+              if (input.producer == term) {
+                input.producer = op
+              }
             }
           }
         }
+        op
       }
-      op
     }
-  )
+
+    val wrapper = buildTypedCaseWrapper[T, T2](inner)
+    strategyf(t => wrapper(t))
+  }
 
   def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
   (f: (T, T2) => Option[PigOperator]): Strategy = {
