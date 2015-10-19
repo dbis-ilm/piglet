@@ -248,7 +248,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule R1" in {
-    Rewriter replace (classOf[RDFLoad]) applyRule R1
+    Rewriter toReplace (classOf[RDFLoad]) applyRule R1
     val URLs = Table(
       ("url"),
       ("http://www.example.com"),
@@ -305,7 +305,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule L2" in {
-    Rewriter replace (classOf[RDFLoad]) applyRule L2
+    Rewriter toReplace (classOf[RDFLoad]) applyRule L2
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
     forAll (possibleGroupers) { (g: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
@@ -338,7 +338,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F2" in {
-    Rewriter replace (classOf[BGPFilter]) applyRule F2
+    Rewriter toReplace (classOf[BGPFilter]) applyRule F2
     val patterns = Table(
       ("Pattern"),
       (TriplePattern(Value("subjectv"), PositionalField(1), PositionalField(2)),
@@ -371,7 +371,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F3" in {
-    Rewriter replace (classOf[BGPFilter]) applyRule F3
+    Rewriter toReplace (classOf[BGPFilter]) applyRule F3
     val patterns = Table(
       ("Pattern"),
       // s p o bound
@@ -423,7 +423,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F4" in {
-    Rewriter replace (classOf[BGPFilter]) applyRule F4
+    Rewriter toReplace (classOf[BGPFilter]) applyRule F4
     val patterns = Table(
       ("Pattern", "grouping column", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),

@@ -33,7 +33,7 @@ trait RewriterDSL {
     * @tparam FROM
     * @return
     */
-  def replace[FROM <: PigOperator : ClassTag](cls: Class[FROM]): ReplaceWord[FROM] = {
+  def toReplace[FROM <: PigOperator : ClassTag](cls: Class[FROM]): ReplaceWord[FROM] = {
     val b = new ReplacementBuilder[FROM, PigOperator]
     new ReplaceWord[FROM](b)
   }
