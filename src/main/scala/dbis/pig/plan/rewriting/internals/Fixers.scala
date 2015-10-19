@@ -208,4 +208,27 @@ trait Fixers {
       }
     }
   }
+
+  /** Changes inputs and outputs after ``old`` has been replaced by ``new_``.
+    *
+    * @param old
+    * @param new_
+    * @tparam T
+    * @return ``new_``
+    */
+  def fixReplacement[T <: PigOperator](old: PigOperator) (new_ : T): T = {
+    new_.outputs foreach { output =>
+      output.consumer foreach { consumer =>
+        consumer.inputs foreach { input =>
+          // If `t` (the old term) is the producer of any of the input pipes of `op` (the new terms) successors,
+          // replace it with `op` in that attribute. Replacing `t` with `op` in the pipes on `op` itself is not
+          // necessary because the setters of `inputs` and `outputs` do that.
+          if (input.producer == old) {
+            input.producer = new_
+          }
+        }
+      }
+    }
+    new_
+  }
 }
