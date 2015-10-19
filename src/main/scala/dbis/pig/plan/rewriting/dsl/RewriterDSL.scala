@@ -19,7 +19,7 @@ package dbis.pig.plan.rewriting.dsl
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.dsl.builders.{ReplacementBuilder, Builder}
 import dbis.pig.plan.rewriting.dsl.traits.{CheckWordT, EndWordT}
-import dbis.pig.plan.rewriting.dsl.words.{WhenWord, ReplaceWord, RewriteWord}
+import dbis.pig.plan.rewriting.dsl.words.{ImmediateEndWord, WhenWord, ReplaceWord, RewriteWord}
 
 import scala.reflect._
 
@@ -46,8 +46,7 @@ trait RewriterDSL {
     */
   def applyRule[FROM <: PigOperator : ClassTag, TO: ClassTag](f: (FROM => Option[TO])): Unit = {
     val b = new Builder[FROM, TO]
-    b.func = f
-    b()
+    new ImmediateEndWord(b).applyRule(f)
   }
 
   /** Unconditionally apply ``f`` when rewriting.
@@ -56,11 +55,8 @@ trait RewriterDSL {
     * @tparam TO
     */
   def applyPattern[TO: ClassTag](f: scala.PartialFunction[PigOperator, TO]): Unit = {
-    val realf = f.lift
-
     val b = new Builder[PigOperator, TO]
-    b.func = realf
-    b()
+    new ImmediateEndWord(b).applyPattern(f)
   }
 
 
