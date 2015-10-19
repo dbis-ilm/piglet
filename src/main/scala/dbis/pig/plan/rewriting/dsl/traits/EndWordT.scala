@@ -30,7 +30,7 @@ import scala.reflect.ClassTag
 trait EndWordT[FROM <: PigOperator, TO] {
   val b: BuilderT[FROM, TO]
 
-  def via(f: (FROM => Option[TO])): Unit = {
+  def applyRule(f: (FROM => Option[TO])): Unit = {
     b.func = f
     b.apply()
   }
@@ -39,7 +39,7 @@ trait EndWordT[FROM <: PigOperator, TO] {
     *
     * @param f
     */
-  def viaPattern(f: scala.PartialFunction[FROM, TO]): Unit = {
+  def applyPattern(f: scala.PartialFunction[FROM, TO]): Unit = {
     val lifted = f.lift
 
     b.func = lifted

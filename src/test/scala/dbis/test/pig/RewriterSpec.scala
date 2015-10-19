@@ -248,7 +248,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule R1" in {
-    Rewriter replace (classOf[RDFLoad]) via R1
+    Rewriter replace (classOf[RDFLoad]) applyRule R1
     val URLs = Table(
       ("url"),
       ("http://www.example.com"),
@@ -305,7 +305,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule L2" in {
-    Rewriter replace (classOf[RDFLoad]) via L2
+    Rewriter replace (classOf[RDFLoad]) applyRule L2
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
     forAll (possibleGroupers) { (g: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
@@ -338,7 +338,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F2" in {
-    Rewriter replace (classOf[BGPFilter]) via F2
+    Rewriter replace (classOf[BGPFilter]) applyRule F2
     val patterns = Table(
       ("Pattern"),
       (TriplePattern(Value("subjectv"), PositionalField(1), PositionalField(2)),
@@ -371,7 +371,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F3" in {
-    Rewriter replace (classOf[BGPFilter]) via F3
+    Rewriter replace (classOf[BGPFilter]) applyRule F3
     val patterns = Table(
       ("Pattern"),
       // s p o bound
@@ -423,7 +423,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F4" in {
-    Rewriter replace (classOf[BGPFilter]) via F4
+    Rewriter replace (classOf[BGPFilter]) applyRule F4
     val patterns = Table(
       ("Pattern", "grouping column", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
@@ -1485,7 +1485,7 @@ class RewriterSpec extends FlatSpec
     dOp.inputs.map(_.producer) should have length 2
   }
 
-  "The Rewriter DSL" should "apply patterns via applyPattern" in {
+  "The Rewriter DSL" should "apply patterns via applyPattern without conditions" in {
     Rewriter applyPattern { case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ) }
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -1507,8 +1507,8 @@ class RewriterSpec extends FlatSpec
     op4.inputs.map(_.producer) should contain only op2
   }
 
-  it should "apply patterns via viaPattern" in {
-    Rewriter when { t: OrderBy => t.outputs.length > 0 } viaPattern {
+  it should "apply patterns via applyPattern with conditions" in {
+    Rewriter when { t: OrderBy => t.outputs.length > 0 } applyPattern {
       case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
 

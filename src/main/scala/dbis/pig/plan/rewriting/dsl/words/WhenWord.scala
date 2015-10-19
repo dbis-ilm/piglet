@@ -84,9 +84,4 @@ class WhenWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO], val 
 
     new WhenWord(b, newcheck)
   }
-
-  def applyRule(f: (FROM => Option[TO])): Unit = {
-    b.func = f
-    b()
-  }
 }
