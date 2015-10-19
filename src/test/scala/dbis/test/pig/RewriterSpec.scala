@@ -1508,7 +1508,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply patterns via viaPattern" in {
-    Rewriter when { (t: OrderBy) => t.outputs.length > 0 } viaPattern {
+    Rewriter when { t: OrderBy => t.outputs.length > 0 } viaPattern {
       case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
 

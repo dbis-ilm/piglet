@@ -86,8 +86,7 @@ trait RewriterDSL {
     */
   def when[FROM <: PigOperator : ClassTag, TO : ClassTag](check: (FROM => Boolean)): WhenWord[FROM, TO] = {
     val b = new Builder[FROM, TO]
-    def newcheck(term: FROM): Boolean = !check(term)
-    new WhenWord[FROM, TO](b, newcheck)
+    new WhenWord[FROM, TO](b, check)
   }
 
   /** Start describing a rewriting process by supplying a check in the form of a pattern match that needs to succeed to
