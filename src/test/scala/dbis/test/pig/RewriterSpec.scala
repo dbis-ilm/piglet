@@ -1337,8 +1337,11 @@ class RewriterSpec extends FlatSpec
          |r1 = FILTER triples BY (pred == 'aPred1');
          |r2 = FILTER triples BY (pred == 'aPred2');
          |GENERATE *, COUNT(r1) AS cnt1, COUNT(r2) AS cnt2;
-         |};""".stripMargin))
+         |};
+         |DUMP tmp;""".stripMargin))
     val rewrittenPlan = processPlan(plan)
+    val op = rewrittenPlan.findOperatorForAlias("tmp")
+    op shouldNot be (None)
   }
 
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
