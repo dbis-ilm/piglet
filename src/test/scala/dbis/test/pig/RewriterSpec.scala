@@ -1485,8 +1485,7 @@ class RewriterSpec extends FlatSpec
     dOp.inputs.map(_.producer) should have length 2
   }
 
-  "The Rewriter DSL" should "apply patterns via applyPattern without conditions" in {
-    Rewriter applyPattern { case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ) }
+  private def performDSLReorderingTest() = {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
 
@@ -1507,29 +1506,23 @@ class RewriterSpec extends FlatSpec
     op4.inputs.map(_.producer) should contain only op2
   }
 
-  it should "apply patterns via applyPattern with conditions" in {
+  "The Rewriter DSL" should "apply patterns via applyPattern without conditions" in {
+    Rewriter applyPattern { case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ) }
+    performDSLReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by when" in {
     Rewriter when { t: OrderBy => t.outputs.length > 0 } applyPattern {
       case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
+    performDSLReorderingTest()
+  }
 
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-
-    // ops before reordering
-    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
-    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
-    val op4 = Dump(Pipe("c"))
-
-    val plan = new DataflowPlan(List(op1, op2, op3, op4))
-    val pPlan = processPlan(plan)
-    val rewrittenSource = pPlan.sourceNodes.headOption.value
-
-    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
-    pPlan.findOperatorForAlias("b").value shouldBe op3
-    pPlan.sinkNodes.headOption.value shouldBe op4
-    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
-    op2.outputs.flatMap(_.consumer) should contain only op4
-    op4.inputs.map(_.producer) should contain only op2
+  it should "apply patterns via applyPattern with a condition added by unless" in {
+    Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
+      case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performDSLReorderingTest()
   }
 
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
