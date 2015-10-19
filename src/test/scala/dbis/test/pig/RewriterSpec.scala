@@ -25,6 +25,8 @@ import dbis.pig.plan.{PipeNameGenerator, DataflowPlan}
 import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules._
+import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
+import dbis.pig.plan.rewriting.rulesets.GeneralRuleset._
 import dbis.pig.plan.rewriting.{Rewriter, Rules}
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
 import dbis.test.TestTools._
@@ -46,7 +48,7 @@ class RewriterSpec extends FlatSpec
   }
 
   "The rewriter" should "merge two Filter operations" in {
-    merge[Filter, Filter](Rules.mergeFilters)
+    merge[Filter, Filter](mergeFilters)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Neq(RefExpr(PositionalField(1)), RefExpr(Value("21")))
@@ -70,7 +72,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "remove Filter operation if it has the same predicate as an earlier one" in {
-    addStrategy(Rules.removeDuplicateFilters)
+    addStrategy(removeDuplicateFilters)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -194,7 +196,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "not reorder operators if the first one has more than one output" in {
-    Rules.registerAllRules()
+    registerAllRules()
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
 
@@ -221,7 +223,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "remove sink nodes that don't store a relation and have an empty outputs list" in {
-    addStrategy(Rules.removeNonStorageSinks _)
+    addStrategy(removeNonStorageSinks _)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
 
@@ -232,8 +234,8 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "pull up Empty nodes" in {
-    addStrategy(Rules.removeNonStorageSinks _)
-    merge[PigOperator, Empty](Rules.mergeWithEmpty)
+    addStrategy(removeNonStorageSinks _)
+    merge[PigOperator, Empty](mergeWithEmpty)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
     val plan = new DataflowPlan(List(op1, op2))
@@ -246,7 +248,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule R1" in {
-    Rewriter replace (classOf[RDFLoad]) via Rules.R1
+    Rewriter replace (classOf[RDFLoad]) via R1
     val URLs = Table(
       ("url"),
       ("http://www.example.com"),
@@ -263,7 +265,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule R2" in {
-    Rewriter applyRule Rules.R2
+    Rewriter applyRule R2
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List(OrderBySpec(NamedField("subject"), OrderByDirection.DescendingOrder)))
     val op3 = BGPFilter(Pipe("c"), Pipe("b"),
@@ -281,8 +283,8 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "not apply rewriting rule R2 if the schema of the next BGPFilter does not match the RDFLoads schema" in {
-    Rewriter applyRule Rules.R1
-    Rewriter applyRule Rules.R2
+    Rewriter applyRule R1
+    Rewriter applyRule R2
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List(OrderBySpec(NamedField("subject"), OrderByDirection.DescendingOrder)))
     val op3 = BGPFilter(Pipe("c"), Pipe("b"),
@@ -303,7 +305,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule L2" in {
-    Rewriter replace (classOf[RDFLoad]) via Rules.L2
+    Rewriter replace (classOf[RDFLoad]) via L2
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
     forAll (possibleGroupers) { (g: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
@@ -315,7 +317,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F1" in {
-    Rewriter applyRule Rules.F1
+    Rewriter applyRule F1
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
     // Add something between op1 and op3 to prevent R2 from being applied
     val op2 = Distinct(Pipe("b"), Pipe("a"))
@@ -336,7 +338,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F2" in {
-    Rewriter replace (classOf[BGPFilter]) via Rules.F2
+    Rewriter replace (classOf[BGPFilter]) via F2
     val patterns = Table(
       ("Pattern"),
       (TriplePattern(Value("subjectv"), PositionalField(1), PositionalField(2)),
@@ -369,7 +371,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F3" in {
-    Rewriter replace (classOf[BGPFilter]) via Rules.F3
+    Rewriter replace (classOf[BGPFilter]) via F3
     val patterns = Table(
       ("Pattern"),
       // s p o bound
@@ -421,7 +423,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F4" in {
-    Rewriter replace (classOf[BGPFilter]) via Rules.F4
+    Rewriter replace (classOf[BGPFilter]) via F4
     val patterns = Table(
       ("Pattern", "grouping column", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
@@ -822,7 +824,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J1" in {
-    Rewriter unless plainSchemaJoinEarlyAbort applyRule Rules.J1
+    Rewriter unless plainSchemaJoinEarlyAbort applyRule J1
     val patterns = Table(
       ("patterns", "filters", "join", "foreach", "expected schema"),
       (List(
@@ -925,7 +927,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J2" in {
-    Rewriter unless groupedSchemaJoinEarlyAbort applyRule Rules.J2
+    Rewriter unless groupedSchemaJoinEarlyAbort applyRule J2
     val patterns = Table(
       ("Patterns", "ForEach", "Filter"),
       (List(
@@ -999,7 +1001,7 @@ class RewriterSpec extends FlatSpec
 
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
 
-    val wrapped = buildTypedCaseWrapper(Rules.J2 _)
+    val wrapped = buildTypedCaseWrapper(J2 _)
 
     forAll (possibleGroupers) { (g: String) =>
       forAll(patterns) { (p: List[TriplePattern], fo: Foreach, fi: Filter) =>
@@ -1021,7 +1023,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J3" in {
-    Rewriter unless plainSchemaJoinEarlyAbort applyRule Rules.J3
+    Rewriter unless plainSchemaJoinEarlyAbort applyRule J3
     val patterns = Table(
       ("patterns", "filters", "join", "foreach", "expected schema"),
       (List(
@@ -1125,7 +1127,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J4" in {
-    Rewriter unless groupedSchemaJoinEarlyAbort applyRule Rules.J4
+    Rewriter unless groupedSchemaJoinEarlyAbort applyRule J4
     val patterns = Table(
       ("patterns", "filters", "flattenning foreachs", "join", "foreach", "expected schema"),
       (List(

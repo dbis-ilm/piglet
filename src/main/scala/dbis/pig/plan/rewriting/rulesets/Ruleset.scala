@@ -14,21 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting
+package dbis.pig.plan.rewriting.rulesets
 
-import dbis.pig.plan.rewriting.rulesets.{GeneralRuleset, RDFRuleset}
-
-
-
-/** This object contains all the rewriting rules that are currently implemented
-  *
-  */
-//noinspection ScalaDocMissingParameterDescription
-object Rules {
-  val rulesets = List(GeneralRuleset, RDFRuleset)
-  def registerAllRules() = {
-    // IMPORTANT: If you change one of the rule registration calls in here, please also change the call in the
-    // corresponding test methods!
-    rulesets foreach { _.registerRules() }
-  }
+trait Ruleset {
+  def registerRules(): Unit
 }
