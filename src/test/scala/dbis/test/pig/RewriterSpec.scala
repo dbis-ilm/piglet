@@ -27,7 +27,7 @@ import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules._
 import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
 import dbis.pig.plan.rewriting.rulesets.GeneralRuleset._
-import dbis.pig.plan.rewriting.{Rewriter, Rules}
+import dbis.pig.plan.rewriting.{Functions, Rewriter, Rules}
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
 import dbis.test.TestTools._
 import org.kiama.rewriting.Rewriter.{strategyf}
@@ -1396,12 +1396,12 @@ class RewriterSpec extends FlatSpec
     val p = new PigParser()
     val op = p.parseScript("B = FOREACH A GENERATE myFunc(f1, f2);").head
     op should matchPattern {
-      case ForEachCallingFunctionE("myFunc") =>
+      case ForEachCallingFunctionE(_, "myFunc") =>
     }
 
     val op2 = p.parseScript("B = FOREACH A GENERATE notMyFunc(f1, f2);").head
     op2 should not matchPattern {
-      case ForEachCallingFunctionE("myFunc") =>
+      case ForEachCallingFunctionE(_, "myFunc") =>
     }
   }
 
@@ -1418,7 +1418,7 @@ class RewriterSpec extends FlatSpec
     new DataflowPlan(ops)
 
     load should matchPattern {
-      case OnlyFollowedByE( dump) =>
+      case OnlyFollowedByE(load, dump) =>
     }
 
     dump should not matchPattern {
@@ -1485,6 +1485,53 @@ class RewriterSpec extends FlatSpec
     dOp.inputs.map(_.producer) should have length 2
   }
 
+  "The Rewriter DSL" should "apply patterns via applyPattern" in {
+    Rewriter applyPattern { case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ) }
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
+    pPlan.findOperatorForAlias("b").value shouldBe op3
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
+    op2.outputs.flatMap(_.consumer) should contain only op4
+    op4.inputs.map(_.producer) should contain only op2
+  }
+
+  it should "apply patterns via viaPattern" in {
+    Rewriter when { (t: OrderBy) => t.outputs.length > 0 } viaPattern {
+      case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
+    pPlan.findOperatorForAlias("b").value shouldBe op3
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
+    op2.outputs.flatMap(_.consumer) should contain only op4
+    op4.inputs.map(_.producer) should contain only op2
+  }
+
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
   // other test results :-)
   "Embedsupport" should "apply rules registered by embedded code" in {
@@ -1498,7 +1545,7 @@ class RewriterSpec extends FlatSpec
         | import dbis.pig.plan.rewriting.Rewriter
         | def rule(op: Any): Option[PigOperator] = {
         | op match {
-        |   case ForEachCallingFunctionE("myFunc") =>
+        |   case ForEachCallingFunctionE(_, "myFunc") =>
         |     val fo = op.asInstanceOf[Foreach]
         |     Some(Distinct(fo.outputs.head, fo.inputs.head))
         |   case _ =>
@@ -1518,4 +1565,5 @@ class RewriterSpec extends FlatSpec
       plan.sinkNodes.headOption.value,
       Distinct(Pipe("b"), Pipe("a")))
   }
+
 }

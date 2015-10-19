@@ -44,11 +44,25 @@ trait RewriterDSL {
     * @tparam FROM
     * @tparam TO
     */
-  def applyRule[FROM <: PigOperator : ClassTag, TO : ClassTag](f: (FROM => Option[TO])): Unit = {
+  def applyRule[FROM <: PigOperator : ClassTag, TO: ClassTag](f: (FROM => Option[TO])): Unit = {
     val b = new Builder[FROM, TO]
     b.func = f
     b()
   }
+
+  /** Unconditionally apply ``f`` when rewriting.
+    *
+    * @param f
+    * @tparam TO
+    */
+  def applyPattern[TO: ClassTag](f: scala.PartialFunction[PigOperator, TO]): Unit = {
+    val realf = f.lift
+
+    val b = new Builder[PigOperator, TO]
+    b.func = realf
+    b()
+  }
+
 
   /** Start describing a rewriting process by supplying a check that needs to fail to make the rewriting happen.
     *

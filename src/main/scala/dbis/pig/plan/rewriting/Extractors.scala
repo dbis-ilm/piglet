@@ -18,7 +18,11 @@ package dbis.pig.plan.rewriting
 
 import dbis.pig.op._
 
+import scala.reflect.ClassTag
+
 /** Provides extractor objects for [[dbis.pig.op.PigOperator]]s.
+  *
+  * The first object returned by any unapply method in this object is always the input itself.
   *
   */
 object Extractors {
@@ -35,8 +39,8 @@ object Extractors {
     * this extractor returns "myFunc".
     */
   object ForEachCallingFunctionE {
-    def unapply(f: Foreach): Option[String] = f match {
-      case f @ Foreach(_, _, GeneratorList(List(GeneratorExpr(Func(funcname, _), _))), _) => Some(funcname)
+    def unapply(f: Foreach): Option[(PigOperator, String)] = f match {
+      case f @ Foreach(_, _, GeneratorList(List(GeneratorExpr(Func(funcname, _), _))), _) => Some((f, funcname))
       case _ => None
     }
   }
@@ -45,10 +49,10 @@ object Extractors {
     *
     */
   object OnlyFollowedByE {
-    def unapply(op: PigOperator): Option[PigOperator] = {
+    def unapply(op: PigOperator): Option[(PigOperator, PigOperator)] = {
       val suc = op.outputs.flatMap(_.consumer)
       if (suc.length == 1) {
-        Some(suc.head)
+        Some((op, suc.head))
       } else {
         None
       }
