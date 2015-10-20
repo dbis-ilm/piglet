@@ -91,6 +91,25 @@ class RewriterSpec extends FlatSpec
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
   }
 
+  private def performRemovalTest() = {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+
+    // ops before removing
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
+    pPlan.findOperatorForAlias("b") shouldBe empty
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op3
+    op4.inputs.map(_.producer) should contain only op3
+  }
   "The rewriter" should "merge two Filter operations" in {
     merge[Filter, Filter](mergeFilters)
     performMergeTest()
@@ -1545,23 +1564,7 @@ class RewriterSpec extends FlatSpec
 
   it should "allow removing operators" in {
     Rewriter applyPattern { case SuccE(o: OrderBy, f: Filter) => f }
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-
-    // ops before removing
-    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
-    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
-    val op4 = Dump(Pipe("c"))
-
-    val plan = new DataflowPlan(List(op1, op2, op3, op4))
-    val pPlan = processPlan(plan)
-    val rewrittenSource = pPlan.sourceNodes.headOption.value
-
-    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
-    pPlan.findOperatorForAlias("b") shouldBe empty
-    pPlan.sinkNodes.headOption.value shouldBe op4
-    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op3
-    op4.inputs.map(_.producer) should contain only op3
+    performRemovalTest()
   }
 
   "Functions" should "allow merging operators" in {
@@ -1577,6 +1580,11 @@ class RewriterSpec extends FlatSpec
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
+  }
+
+  it should "allow removing operators" in {
+    Rewriter applyPattern {case op : OrderBy => Functions.remove(op)}
+    performRemovalTest()
   }
 
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for

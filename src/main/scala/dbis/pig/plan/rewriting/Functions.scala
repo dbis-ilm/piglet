@@ -16,7 +16,8 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.PigOperator
+import dbis.pig.op.{Pipe, Empty, PigOperator}
+import org.kiama.rewriting.Strategy
 
 object Functions {
   def merge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator]
@@ -27,6 +28,40 @@ object Functions {
 
   def replace[T <: PigOperator, T2 <: PigOperator](old: T, new_ : T2): T2 =
     Rewriter.fixReplacement(old) (new_)
+
+  /** Cut off ``op`` from the data flow. If it has any child nodes, they will take its place. If it doesn't, an
+    * [[dbis.pig.op.Empty]] operator will be inserted instead.
+    *
+    * @param op
+    * @return
+    */
+  def remove(op: PigOperator): Any = {
+    val pigOp = op.asInstanceOf[PigOperator]
+    if (pigOp.inputs.isEmpty) {
+      val consumers = pigOp.outputs.flatMap(_.consumer)
+      if (consumers.isEmpty) {
+        Empty(Pipe(""))
+      }
+      else {
+        consumers foreach (_.inputs = List.empty)
+        consumers.toList
+      }
+    }
+    else {
+      val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
+        // Remove input pipes to `op` and replace them with `ops` input pipes
+        inOp.inputs = inOp.inputs.filterNot(_.producer == pigOp) ++ pigOp.inputs
+        inOp
+      })
+      // Replace `op` in its inputs output pipes with `ops` children
+      pigOp.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
+        if (out.consumer contains op) {
+          out.consumer = out.consumer.filterNot(_ == op) ++ newOps
+        }
+      }))
+      newOps
+    }
+  }
 
   def swap[T <: PigOperator, T2 <: PigOperator](parent: T, child: T2): T2 =
     Rewriter.fixInputsAndOutputs(parent, child, child, parent)

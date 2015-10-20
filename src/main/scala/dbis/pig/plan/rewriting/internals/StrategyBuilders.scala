@@ -17,6 +17,7 @@
 package dbis.pig.plan.rewriting.internals
 
 import dbis.pig.op.{Empty, PigOperator, Pipe}
+import dbis.pig.plan.rewriting.Functions
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
@@ -37,31 +38,7 @@ trait StrategyBuilders {
   def buildRemovalStrategy(rem: PigOperator): Strategy = {
     strategyf((op: Any) => {
       if (op == rem) {
-        val pigOp = op.asInstanceOf[PigOperator]
-        if (pigOp.inputs.isEmpty) {
-          val consumers = pigOp.outputs.flatMap(_.consumer)
-          if (consumers.isEmpty) {
-            Some(Empty(Pipe("")))
-          }
-          else {
-            consumers foreach (_.inputs = List.empty)
-            Some(consumers.toList)
-          }
-        }
-        else {
-          val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
-            // Remove input pipes to `op` and replace them with `ops` input pipes
-            inOp.inputs = inOp.inputs.filterNot(_.producer == pigOp) ++ pigOp.inputs
-            inOp
-          })
-          // Replace `op` in its inputs output pipes with `ops` children
-          pigOp.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
-            if (out.consumer contains op) {
-              out.consumer = out.consumer.filterNot(_ == op) ++ newOps
-            }
-          }))
-          Some(newOps)
-        }
+        Some(Functions.remove(op.asInstanceOf[PigOperator]))
       }
       else {
         None
