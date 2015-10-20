@@ -29,7 +29,7 @@ import scala.reflect.{ClassTag, classTag}
   * @tparam TO
   */
 class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends PigOperatorBuilderT[FROM, TO] {
-  override def wrapInFixer(func: (FROM => Option[TO])) = func
+//  override def wrapInFixer(func: (FROM => Option[TO])) = func
 
   def addAsStrategy(func: (FROM => Option[TO])) = {
     val typeWrapped = Rewriter.buildTypedCaseWrapper(func)
