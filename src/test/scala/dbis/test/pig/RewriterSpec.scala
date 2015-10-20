@@ -47,8 +47,28 @@ class RewriterSpec extends FlatSpec
     Rewriter invokePrivate resetMethod()
   }
 
-  "The rewriter" should "merge two Filter operations" in {
-    merge[Filter, Filter](mergeFilters)
+  private def performReorderingTest() = {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
+    pPlan.findOperatorForAlias("b").value shouldBe op3
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
+    op2.outputs.flatMap(_.consumer) should contain only op4
+    op4.inputs.map(_.producer) should contain only op2
+  }
+
+  private def performMergeTest() = {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Neq(RefExpr(PositionalField(1)), RefExpr(Value("21")))
@@ -69,6 +89,11 @@ class RewriterSpec extends FlatSpec
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be(opMerged)
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+  }
+
+  "The rewriter" should "merge two Filter operations" in {
+    merge[Filter, Filter](mergeFilters)
+    performMergeTest()
   }
 
   it should "remove Filter operation if it has the same predicate as an earlier one" in {
@@ -92,24 +117,7 @@ class RewriterSpec extends FlatSpec
 
   it should "order Filter operations before Order By ones" in {
     reorder[OrderBy, Filter]
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-
-    // ops before reordering
-    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
-    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
-    val op4 = Dump(Pipe("c"))
-
-    val plan = new DataflowPlan(List(op1, op2, op3, op4))
-    val pPlan = processPlan(plan)
-    val rewrittenSource = pPlan.sourceNodes.headOption.value
-
-    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
-    pPlan.findOperatorForAlias("b").value shouldBe op3
-    pPlan.sinkNodes.headOption.value shouldBe op4
-    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
-    op2.outputs.flatMap(_.consumer) should contain only op4
-    op4.inputs.map(_.producer) should contain only op2
+    performReorderingTest()
   }
 
   it should "order Filter operations before Joins if only NamedFields are used" in {
@@ -1485,68 +1493,28 @@ class RewriterSpec extends FlatSpec
     dOp.inputs.map(_.producer) should have length 2
   }
 
-  private def performDSLReorderingTest() = {
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-
-    // ops before reordering
-    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
-    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
-    val op4 = Dump(Pipe("c"))
-
-    val plan = new DataflowPlan(List(op1, op2, op3, op4))
-    val pPlan = processPlan(plan)
-    val rewrittenSource = pPlan.sourceNodes.headOption.value
-
-    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
-    pPlan.findOperatorForAlias("b").value shouldBe op3
-    pPlan.sinkNodes.headOption.value shouldBe op4
-    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
-    op2.outputs.flatMap(_.consumer) should contain only op4
-    op4.inputs.map(_.producer) should contain only op2
-  }
-
   "The Rewriter DSL" should "apply patterns via applyPattern without conditions" in {
     Rewriter applyPattern { case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ) }
-    performDSLReorderingTest()
+    performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by when" in {
     Rewriter when { t: OrderBy => t.outputs.length > 0 } applyPattern {
       case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
-    performDSLReorderingTest()
+    performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by unless" in {
     Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
       case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
-    performDSLReorderingTest()
+    performReorderingTest()
   }
 
   it should "allow merging operators" in {
     Rewriter toMerge(classOf[Filter], classOf[Filter]) applyRule {tup: (Filter, Filter) => mergeFilters(tup._1, tup._2)}
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val predicate2 = Neq(RefExpr(PositionalField(1)), RefExpr(Value("21")))
-    val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
-    val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
-    val op4 = Dump(Pipe("c"))
-    val op4_2 = op4.copy()
-    val opMerged = Filter(Pipe("c"), Pipe("a"), And(predicate1, predicate2))
-
-    val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
-    val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
-    val source = planUnmerged.sourceNodes.head
-    val sourceMerged = planMerged.sourceNodes.head
-
-    val rewrittenSink = processPigOperator(source)
-    rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
-
-    val pPlan = processPlan(planUnmerged)
-    pPlan.findOperatorForAlias("c").value should be(opMerged)
-    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+    performMergeTest()
   }
 
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
