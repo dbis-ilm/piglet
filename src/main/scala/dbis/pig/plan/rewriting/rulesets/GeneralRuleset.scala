@@ -16,14 +16,15 @@
  */
 package dbis.pig.plan.rewriting.rulesets
 
-import scala.collection.mutable.ListBuffer
 import dbis.pig.op._
 import dbis.pig.plan.InvalidPlanException
-import dbis.pig.plan.rewriting.internals.FilterUtils._
-import org.kiama.rewriting.Strategy
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.RewriterException
+import dbis.pig.plan.rewriting.internals.FilterUtils._
 import org.kiama.rewriting.Rewriter._
+import org.kiama.rewriting.Strategy
+
+import scala.collection.mutable.ListBuffer
 
 object GeneralRuleset extends Ruleset {
   /** Put Filters before multipleInputOp if we can figure out which input of multipleInputOp contains the fields used in the Filters predicate

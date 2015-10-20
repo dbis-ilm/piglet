@@ -1548,6 +1548,13 @@ class RewriterSpec extends FlatSpec
     performMergeTest()
   }
 
+  it should "allow swapping operators" in {
+    Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
   // other test results :-)
   "Embedsupport" should "apply rules registered by embedded code" in {
