@@ -21,19 +21,19 @@ import java.net.URI
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.parser.{LanguageFeature, PigParser}
-import dbis.pig.plan.{PipeNameGenerator, DataflowPlan}
-import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
+import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules._
-import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
 import dbis.pig.plan.rewriting.rulesets.GeneralRuleset._
-import dbis.pig.plan.rewriting.{Functions, Rewriter, Rules}
+import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
+import dbis.pig.plan.rewriting.{Functions, Rewriter}
+import dbis.pig.plan.{DataflowPlan, PipeNameGenerator}
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
 import dbis.test.TestTools._
-import org.kiama.rewriting.Rewriter.{strategyf}
+import org.kiama.rewriting.Rewriter.strategyf
 import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterEach, PrivateMethodTester}
+import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers, PrivateMethodTester}
 
 import scala.util.Random
 
@@ -1399,7 +1399,7 @@ class RewriterSpec extends FlatSpec
     op3.schema shouldBe op1.schema
   }
 
-  "The ForEachCallingFunctionE" should "extract the function name of a function called in the only GeneratorExpr of a" +
+  "ForEachCallingFunctionE" should "extract the function name of a function called in the only GeneratorExpr of a" +
     " GeneratorList in a ForEach statement" in {
     val p = new PigParser()
     val op = p.parseScript("B = FOREACH A GENERATE myFunc(f1, f2);").head
@@ -1413,7 +1413,7 @@ class RewriterSpec extends FlatSpec
     }
   }
 
-  "The OnlyFollowedByE" should "extract the single successor of a PigOperator" in {
+  "SuccE" should "extract the single successor of a PigOperator" in {
     val p = new PigParser()
     val ops = p.parseScript(
       """
@@ -1426,14 +1426,37 @@ class RewriterSpec extends FlatSpec
     new DataflowPlan(ops)
 
     load should matchPattern {
-      case OnlyFollowedByE(load, dump) =>
+      case SuccE(load, dump) =>
     }
 
     dump should not matchPattern {
-      case OnlyFollowedByE(_) =>
+      case SuccE(_) =>
     }
   }
 
+  "AllSuccE" should "extract all successors of a PigOperator" in {
+    val p = new PigParser()
+    val ops = p.parseScript(
+      """
+        | a = load 'foo' using PigStorage(':');
+        | b = filter a by $0 == 'hallo';
+        | dump b;
+        | dump a;
+      """.stripMargin)
+    val load = ops.headOption.value
+    val b = ops(1)
+    val dump = ops(3)
+
+    new DataflowPlan(ops)
+
+    load should matchPattern {
+      case AllSuccE(load, b :: dump) =>
+    }
+
+    dump should matchPattern {
+      case AllSuccE(dump, Nil) =>
+    }
+  }
   "The PipeNameGenerator" should "not generate duplicate pipe names" in {
     val seed = 1234567890
     Random.setSeed(seed)
@@ -1494,20 +1517,20 @@ class RewriterSpec extends FlatSpec
   }
 
   "The Rewriter DSL" should "apply patterns via applyPattern without conditions" in {
-    Rewriter applyPattern { case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ) }
+    Rewriter applyPattern { case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ) }
     performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by when" in {
     Rewriter when { t: OrderBy => t.outputs.length > 0 } applyPattern {
-      case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by unless" in {
     Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
-      case OnlyFollowedByE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
   }

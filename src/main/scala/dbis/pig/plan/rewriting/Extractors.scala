@@ -48,7 +48,7 @@ object Extractors {
   /** Extracts the successor of ``op`` if there is only one.
     *
     */
-  object OnlyFollowedByE {
+  object SuccE {
     def unapply(op: PigOperator): Option[(PigOperator, PigOperator)] = {
       val suc = op.outputs.flatMap(_.consumer)
       if (suc.length == 1) {
@@ -56,6 +56,16 @@ object Extractors {
       } else {
         None
       }
+    }
+  }
+
+  /** Extracts all successors of ``op``.
+    *
+    */
+  object AllSuccE {
+    def unapply(op: PigOperator): Option[(PigOperator, Seq[PigOperator])] = {
+      val succ = op.outputs.flatMap(_.consumer)
+      Some((op, succ))
     }
   }
 }
