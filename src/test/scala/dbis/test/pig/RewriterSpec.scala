@@ -1575,16 +1575,16 @@ class RewriterSpec extends FlatSpec
     performMergeTest()
   }
 
+  it should "allow removing operators" in {
+    Rewriter applyPattern {case op : OrderBy => Functions.remove(op)}
+    performRemovalTest()
+  }
+
   it should "allow swapping operators" in {
     Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
-  }
-
-  it should "allow removing operators" in {
-    Rewriter applyPattern {case op : OrderBy => Functions.remove(op)}
-    performRemovalTest()
   }
 
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
