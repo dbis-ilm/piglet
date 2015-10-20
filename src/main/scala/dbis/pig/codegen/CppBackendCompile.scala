@@ -414,6 +414,8 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
     case None => throw CompilerException("the schema should be defined to define a format")
   }
 
+  def emitSchemaClass(schema: Schema): String = ""
+
   /**
    * Generate code for the given Pig operator. The system will go through each operator and render
    * its content in the template

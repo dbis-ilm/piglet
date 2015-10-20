@@ -9,6 +9,14 @@ import dbis.pig.backends.spark._
 <\n>
 >>
 
+// ----------------- schema class -----------------
+schema_class(name, fields, getter) ::= <<
+case class <name> (<fields>) extends java.io.Serializable {
+<getter>
+}
+
+>>
+
 // ----------------- BEGIN of code building and initializing the query --------
 query_object(name, embedded_code) ::= <<
 object <name> {
@@ -25,13 +33,13 @@ begin_query(name) ::= <<
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,func,schema,params) ::=<<
-        val <out> = <func>().load(sc, "<file>"<params>)
+loader(out,file,class,func,extractor,params) ::= <<
+        val <out> = <func>[<class>]().load(sc, "<file>", <extractor><if (params)>, <params><endif>)
 >>
 
 // ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
-        <in>.collect.map(t => println(t.mkString(",")))
+        <in>.collect.map(t => println(t))
 >>
 
 // ------------------ STORE Results on disk -----------------------------------

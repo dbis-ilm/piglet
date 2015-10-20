@@ -18,6 +18,7 @@ package dbis.pig.codegen
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.schema.Schema
 import scala.collection.immutable.Map
 import scala.collection.mutable.Set
 import org.clapper.scalasti._
@@ -47,6 +48,14 @@ trait GenCodeBase {
    *
    */
   val joinKeyVars = Set[String]()
+
+  /**
+   * Generate code for a class representing a schema type.
+   *
+   * @param schema the schema for which we generate a class
+   * @return a string representing the code
+   */
+  def emitSchemaClass(schema: Schema): String
 
   /**
    * Generate code for the given Pig operator.
@@ -162,6 +171,10 @@ trait Compile {
 
     // generate import statements
     var code = codeGen.emitImport
+
+    for (schema <- plan.schemaList) {
+      code = code + codeGen.emitSchemaClass(schema)
+    }
 
     code = code + codeGen.emitHeader1(scriptName, plan.code)
 

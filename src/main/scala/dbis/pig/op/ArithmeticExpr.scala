@@ -50,6 +50,12 @@ case class RefExpr(var r: Ref) extends ArithmeticExpr {
     case None => Types.ByteArrayType
   }
 
+  override def exprName(): String = r match {
+    case NamedField(n, _) =>  n
+    case _  => ""
+  }
+
+
   def resolveReferences(mapping: Map[String, Ref]): Unit = r match {
     case nf@NamedField(n, _) => {
       val newVal = replaceReference(n, mapping)

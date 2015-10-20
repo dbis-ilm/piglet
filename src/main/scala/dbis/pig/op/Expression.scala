@@ -54,6 +54,8 @@ trait Expr extends Serializable {
    */
   def resultType(schema: Option[Schema]): PigType
 
+  def exprName(): String = ""
+
   /**
    * Try to replace all references in expressions with a leading $ via the mapping table.
    *

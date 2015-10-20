@@ -42,6 +42,8 @@ case class Load(out: Pipe,
     /*
      * Either the schema was defined or it is None.
      */
+    if (schema.isDefined)
+      schema.get.setBagName(outPipeName)
     schema
   }
 

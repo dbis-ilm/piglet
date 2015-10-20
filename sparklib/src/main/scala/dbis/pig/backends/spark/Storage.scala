@@ -25,7 +25,13 @@ import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import java.io.FileOutputStream
 
+import scala.reflect.ClassTag
 
+case class TextLine(line: String) extends java.io.Serializable
+
+case class Record(fields: Array[String]) extends java.io.Serializable
+
+/*
 class PigStorage extends java.io.Serializable {
   def load(sc: SparkContext, path: String, delim: String = "\t"): RDD[List[String]] =
     sc.textFile(path).map(line => line.split(delim, -1).toList)
@@ -38,23 +44,40 @@ object PigStorage {
     new PigStorage
   }
 }
+*/
 
 //-----------------------------------------------------------------------------------------------------
 
-class RDFFileStorage extends java.io.Serializable {
+class PigStorage[T:ClassTag] extends java.io.Serializable {
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): RDD[T] =
+    sc.textFile(path).map(line => extract(line.split(delim, -1)))
+
+  def write(path: String, rdd: RDD[T]) = rdd.saveAsTextFile(path)
+}
+
+object PigStorage extends java.io.Serializable {
+  def apply[T:ClassTag](): PigStorage[T] = {
+    new PigStorage[T]
+  }
+}
+
+//-----------------------------------------------------------------------------------------------------
+
+class RDFFileStorage[T:ClassTag] extends java.io.Serializable {
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
-  def rdfize(line: String): List[String] = {
+  def rdfize(line: String): Record = {
     val fields = pattern.findAllIn(line).map(_.trim)
-    fields.toArray.slice(0, 3).toList
+    Record(fields.toArray.slice(0, 3))
   }
 
-  def load(sc: SparkContext, path: String): RDD[List[String]] = sc.textFile(path).map(line => rdfize(line))
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[Record] =
+    sc.textFile(path).map(line => rdfize(line))
 }
 
 object RDFFileStorage {
-  def apply(): RDFFileStorage = {
-    new RDFFileStorage
+  def apply[T:ClassTag](): RDFFileStorage[T] = {
+    new RDFFileStorage[T]
   }
 }
 

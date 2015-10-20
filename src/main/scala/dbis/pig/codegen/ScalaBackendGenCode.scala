@@ -48,6 +48,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   /*                                           helper functions                                       */
   /*------------------------------------------------------------------------------------------------- */
 
+  def schemaClassName(name: String) = s"_${name}_Tuple"
+
   /**
    *
    * @param schema
@@ -188,7 +190,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
             s"${tuplePrefix}(${idx}).asInstanceOf[${typeCast}]"
           }
           else
-            s"${tuplePrefix}(${idx})"
+            s"${tuplePrefix}._${idx}"
         }
       }
       case None => throw new SchemaException(s"unknown schema for field $f")
@@ -201,7 +203,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
         val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
         s"$tuplePrefix($pos).asInstanceOf[${typeCast}]"
       }
-      else s"$tuplePrefix($pos)"
+      else s"$tuplePrefix._$pos"
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
@@ -477,15 +479,25 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return the Scala code implementing the LOAD operator
    */
   def emitLoad(node: PigOperator, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
+    def schemaExtractor(schema: Schema): String =
+      schema.fields.zipWithIndex.map{case (f, i) => s"data($i).to${scalaTypeMappingTable(f.fType)}"}.mkString(", ")
+
+    var paramMap = Map("out" -> node.outPipeName, "file" -> file.toString)
+    if (loaderFunc.isEmpty)
+      paramMap += ("func" -> BackendManager.backend.defaultConnector)
+    else {
+      paramMap += ("func" -> loaderFunc.get)
+      if (loaderParams != null && loaderParams.nonEmpty)
+        paramMap += ("params" -> loaderParams.mkString(","))
+    }
     node.schema match {
-      case Some(s) => {
-        val op = emitLoader(s"${node.outPipeName}_", file, loaderFunc, loaderParams) 
-        op +"\n" +callST("foreach", Map("out"->node.outPipeName,"in"->s"${node.outPipeName}_","expr"->s"List(${getFieldTypes(s)})"))
-      }
-      case None => {
-        emitLoader(node.outPipeName, file, loaderFunc, loaderParams)
-      }
-    }   
+      case Some(s) => paramMap += ("extractor" ->
+        s"""(data: Array[String]) => ${schemaClassName(s.element.name)}(${schemaExtractor(s)})""",
+        "class" -> schemaClassName(s.element.name))
+      case None => paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))",
+        "class" -> "TextLine")
+    }
+    callST("loader", paramMap)
   }
 
   /**
@@ -512,6 +524,22 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
+
+  /**
+   * Generate code for a class representing a schema type.
+   *
+   * @param schema the schema for which we generate a class
+   * @return a string representing the code
+   */
+  def emitSchemaClass(schema: Schema): String = {
+    val fields = schema.fields.toList
+    val fieldStr = fields.map(f => s"${f.name} : ${scalaTypeMappingTable(f.fType)}").mkString(", ")
+    val getterStr = fields.zipWithIndex.map{ case (f, i) => s"def _$i = ${f.name}"}.mkString("\n")
+
+    callST("schema_class", Map("name" -> schemaClassName(schema.element.name),
+                              "fields" -> fieldStr,
+                              "getter" -> getterStr))
+  }
 
   /**
    * Generate code for the given Pig operator.

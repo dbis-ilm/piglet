@@ -148,7 +148,10 @@ case class Foreach(out: Pipe,
         }
         // otherwise we take the field name from the expression and
         // the input schema
-        case None => val res = e.expr.resultType(inputSchema); Field("", res)
+        case None => {
+          val res = e.expr.resultType(inputSchema)
+          Field(e.expr.exprName, res)
+        }
       }
     }).toArray
 
