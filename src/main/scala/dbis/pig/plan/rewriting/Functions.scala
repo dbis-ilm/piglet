@@ -19,6 +19,9 @@ package dbis.pig.plan.rewriting
 import dbis.pig.op.PigOperator
 
 object Functions {
+  def replace[T <: PigOperator, T2 <: PigOperator](old: T, new_ : T2): T2 =
+    Rewriter.fixReplacement(old) (new_)
+
   def swap[T <: PigOperator, T2 <: PigOperator](parent: T, child: T2): T2 =
     Rewriter.fixInputsAndOutputs(parent, child, child, parent)
 }

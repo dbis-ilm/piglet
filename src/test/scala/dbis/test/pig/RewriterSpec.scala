@@ -1525,6 +1525,30 @@ class RewriterSpec extends FlatSpec
     performDSLReorderingTest()
   }
 
+  it should "allow merging operators" in {
+    Rewriter toMerge(classOf[Filter], classOf[Filter]) applyRule {tup: (Filter, Filter) => mergeFilters(tup._1, tup._2)}
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val predicate2 = Neq(RefExpr(PositionalField(1)), RefExpr(Value("21")))
+    val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
+    val op4 = Dump(Pipe("c"))
+    val op4_2 = op4.copy()
+    val opMerged = Filter(Pipe("c"), Pipe("a"), And(predicate1, predicate2))
+
+    val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
+    val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
+    val source = planUnmerged.sourceNodes.head
+    val sourceMerged = planMerged.sourceNodes.head
+
+    val rewrittenSink = processPigOperator(source)
+    rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
+
+    val pPlan = processPlan(planUnmerged)
+    pPlan.findOperatorForAlias("c").value should be(opMerged)
+    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+  }
+
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
   // other test results :-)
   "Embedsupport" should "apply rules registered by embedded code" in {

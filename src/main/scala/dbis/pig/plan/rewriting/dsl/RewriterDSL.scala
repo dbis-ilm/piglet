@@ -17,9 +17,9 @@
 package dbis.pig.plan.rewriting.dsl
 
 import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.dsl.builders.{ReplacementBuilder, Builder}
+import dbis.pig.plan.rewriting.dsl.builders.{MergeBuilder, ReplacementBuilder, Builder}
 import dbis.pig.plan.rewriting.dsl.traits.{CheckWordT, EndWordT}
-import dbis.pig.plan.rewriting.dsl.words.{ImmediateEndWord, WhenWord, ReplaceWord, RewriteWord}
+import dbis.pig.plan.rewriting.dsl.words._
 
 import scala.reflect._
 
@@ -36,6 +36,12 @@ trait RewriterDSL {
   def toReplace[FROM <: PigOperator : ClassTag](cls: Class[FROM]): ReplaceWord[FROM] = {
     val b = new ReplacementBuilder[FROM, PigOperator]
     new ReplaceWord[FROM](b)
+  }
+
+  def toMerge[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : ClassTag]
+    (cls1: Class[FROM1], cls2: Class[FROM2]): MergeWord[FROM1, FROM2] = {
+    val b = new MergeBuilder[FROM1, FROM2]
+    new MergeWord[FROM1, FROM2](b)
   }
 
   /** Unconditionally apply ``f`` when rewriting.

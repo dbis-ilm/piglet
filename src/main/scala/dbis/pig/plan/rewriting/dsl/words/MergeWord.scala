@@ -14,35 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting.dsl.traits
+package dbis.pig.plan.rewriting.dsl.words
 
 import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.plan.rewriting.dsl.traits.{CheckWordT, EndWordT, BuilderT}
 
-abstract class BuilderT[FROM, TO] {
-  protected var _func: Option[FROM => Option[TO]] = None
+import scala.reflect.ClassTag
 
-  def func_=(f: FROM => Option[TO]) = _func = Some(f)
-
-  def func = _func
-
-  private var _check: Option[FROM => Boolean] = None
-
-  def check_=(f: FROM => Boolean): Unit = _check = Some(f)
-
-  def check = _check
-
-  def wrapInCheck(func: FROM => Option[TO]): FROM => Option[TO]
-
-  def wrapInFixer(func: FROM => Option[TO]): FROM => Option[TO]
-
-  def addAsStrategy(func: (FROM => Option[TO]))
-
-  /** Add the data wrapped by this object as a strategy.
-    *
-    */
-  def apply(): Unit = {
-    val wrapped = wrapInFixer(wrapInCheck(func.get))
-    addAsStrategy(wrapped)
-  }
+class MergeWord[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : ClassTag]
+  (override val b: BuilderT[(FROM1, FROM2), PigOperator])
+  extends EndWordT[(FROM1, FROM2), PigOperator] with CheckWordT[(FROM1, FROM2), PigOperator] {
 }
