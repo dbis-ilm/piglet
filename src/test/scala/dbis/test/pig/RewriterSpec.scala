@@ -1540,6 +1540,14 @@ class RewriterSpec extends FlatSpec
     performMergeTest()
   }
 
+  "Functions" should "allow merging operators" in {
+    Rewriter toMerge(classOf[Filter], classOf[Filter]) applyRule { case (t1: Filter, t2: Filter) =>
+      def merger (f1: Filter, f2: Filter) = Filter(f2.outputs.head, f1.inputs.head, And(f1.pred, f2.pred))
+      Some(Functions.merge(t1, t2, merger))
+    }
+    performMergeTest()
+  }
+
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
   // other test results :-)
   "Embedsupport" should "apply rules registered by embedded code" in {

@@ -19,6 +19,12 @@ package dbis.pig.plan.rewriting
 import dbis.pig.op.PigOperator
 
 object Functions {
+  def merge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator]
+  (term1: T, term2: T2, f: (T, T2) => T3): T3 = {
+    val newOp = f(term1, term2)
+    Rewriter.fixInputsAndOutputs(term1, term2, newOp)
+  }
+
   def replace[T <: PigOperator, T2 <: PigOperator](old: T, new_ : T2): T2 =
     Rewriter.fixReplacement(old) (new_)
 
