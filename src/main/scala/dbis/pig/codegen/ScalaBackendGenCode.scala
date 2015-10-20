@@ -171,39 +171,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
               requiresTypeCast: Boolean = true,
               aggregate: Boolean = false): String = ref match {
-    case nf @ NamedField(f, _) => schema match {
-      case Some(s) => {
-        val idx = s.indexOfField(nf)
-        if (idx == -1) {
-          // TODO: field name not found, for now we assume that it refers to a bag (relation)
-          f
-        }
-        else {
-          if (requiresTypeCast) {
-            val field = s.field(idx)
-            val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
-
-            /* if we need to cast to anything else than string (i.e. int, double, etc) we have to
-             * cast to string before, because if we load from a BinStorage, we only get Any types
-             * that do not have a toInt or toDouble conversion method
-             */
-            s"${tuplePrefix}(${idx}).asInstanceOf[${typeCast}]"
-          }
-          else
-            s"${tuplePrefix}._${idx}"
-        }
-      }
-      case None => throw new SchemaException(s"unknown schema for field $f")
-    } // TODO: should be position of field
-    case PositionalField(pos) =>
-      if (requiresTypeCast && schema.isDefined) {
-        if (pos >= schema.get.fields.length)
-          throw new SchemaException("invalid field reference: $" + pos)
-        val field = schema.get.field(pos)
-        val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
-        s"$tuplePrefix($pos).asInstanceOf[${typeCast}]"
-      }
-      else s"$tuplePrefix._$pos"
+    case nf @ NamedField(f, _) => s"${tuplePrefix}.$f"
+    case PositionalField(pos) => s"$tuplePrefix._$pos"
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
@@ -532,13 +501,16 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return a string representing the code
    */
   def emitSchemaClass(schema: Schema): String = {
+    // TODO: handle schemas where no field names are defined
     val fields = schema.fields.toList
     val fieldStr = fields.map(f => s"${f.name} : ${scalaTypeMappingTable(f.fType)}").mkString(", ")
     val getterStr = fields.zipWithIndex.map{ case (f, i) => s"def _$i = ${f.name}"}.mkString("\n")
+    val toStr = """s"""" + fields.zipWithIndex.map{ case (f, i) => "${" + s"_$i" + "}"}.mkString("${_c}") + '"'
 
     callST("schema_class", Map("name" -> schemaClassName(schema.element.name),
                               "fields" -> fieldStr,
-                              "getter" -> getterStr))
+                              "getter" -> getterStr,
+                              "string_rep" -> toStr))
   }
 
   /**
