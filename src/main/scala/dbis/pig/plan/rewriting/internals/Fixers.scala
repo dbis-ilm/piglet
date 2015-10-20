@@ -31,8 +31,10 @@ trait Fixers {
   def connect(pred: PigOperator, succ: PigOperator): Unit = {
     require(pred.outputs.length == 1, "The new predecessor does not have exactly one output pipe")
     require(succ.inputs.length < 2, "The new successor has more than one input pipe")
-    require(succ.inputs.head.producer == null || succ.inputs.head.producer == pred,
+    require(succ.inputs.length == 0 || succ.inputs.head.producer == null || succ.inputs.head.producer == pred,
       "The new successors input pipe already has a producer that is not the same as pred")
+    require(succ.inputs.length == 0 || pred.outputs.find(_.name == succ.inPipeName).isDefined,
+      pred + " writes " + pred.outPipeName + ", but " + succ + " reads " + succ.inPipeName)
 
     // If there is an input pipe matching `pred`s output name, use it, otherwise build a new one
     val inPipe = succ.inputs.find {_.name == pred.outputs.head.name}.orElse(Some(Pipe(pred.outputs.head.name, pred))).get

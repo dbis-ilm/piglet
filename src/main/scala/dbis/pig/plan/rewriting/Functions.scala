@@ -16,8 +16,8 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.op.{Pipe, Empty, PigOperator}
-import org.kiama.rewriting.Strategy
+import dbis.pig.op.{Empty, PigOperator, Pipe}
+import dbis.pig.plan.PipeNameGenerator
 
 object Functions {
   /** Merge ``term1`` and ``term2`` into a new term by applying them to ``f``.
@@ -34,6 +34,37 @@ object Functions {
   (term1: T, term2: T2, f: (T, T2) => T3): T3 = {
     val newOp = f(term1, term2)
     Rewriter.fixInputsAndOutputs(term1, term2, newOp)
+  }
+
+  /** Set the pipes of ``ops`` such that the data flows from the first element of ``ops`` to the last.
+    *
+    * @param ops
+    * @return
+    */
+  def newFlow(ops: PigOperator*) = {
+    require(ops.length >= 2)
+    ops.reduceLeft { (op1: PigOperator, op2: PigOperator) =>
+      Rewriter.connect(op1, op2)
+      op2
+    }
+    ops.head
+  }
+
+  /** Set the pipes of ``ops`` such that the data flows from the first element of ``ops`` to the last, removing
+    * existing pipes in the process.
+    *
+    * @param ops
+    * @return
+    */
+  def newFlowIgnoringOld(ops: PigOperator*) = {
+    require(ops.length >= 2)
+    ops.reduceLeft { (op1: PigOperator, op2: PigOperator) =>
+      op1.outputs = List(Pipe(PipeNameGenerator.generate()))
+      op2.inputs = List.empty
+      Rewriter.connect(op1, op2)
+      op2
+    }
+    ops.head
   }
 
   /** Replace ``old`` with ``new_``.

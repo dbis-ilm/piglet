@@ -1567,7 +1567,73 @@ class RewriterSpec extends FlatSpec
     performRemovalTest()
   }
 
-  "Functions" should "allow merging operators" in {
+  "Functions" should "allow creating a new data flow" in {
+    val plan = new DataflowPlan(parseScript(
+      s"""A = LOAD 'file' AS (x, y, z);
+         |B = FOREACH A GENERATE *;
+         |DUMP B;
+       """.stripMargin))
+    var lastPipename = "B"
+    val newfilters = 0 until 3 map { i: Int =>
+      val name = PipeNameGenerator.generate()
+      val filter = new Filter(Pipe(name), Pipe(lastPipename), Gt(RefExpr(NamedField("a")), RefExpr(Value(i))))
+      lastPipename = name
+      filter
+    }
+
+    Rewriter applyPattern { case SuccE(f: Foreach, d: Dump) =>
+      f.outputs = List(Pipe(newfilters(0).inPipeName))
+      d.inputs = List.empty
+      Functions.newFlow(f, newfilters(0), newfilters(1), newfilters(2), d)
+    }
+
+    val newPlan = processPlan(plan)
+    newPlan.findOperatorForAlias("B").value.outputs.flatMap(_.consumer) should contain only newfilters(0)
+    newfilters reduce { (f1: Filter, f2: Filter) =>
+      newPlan.findOperatorForAlias(f1.outPipeName).value.outputs.flatMap(_.consumer) should contain only f2
+      newPlan.findOperator(_ == f2).headOption.value.inputs.map(_.producer) should contain only f1
+      f2
+    }
+
+    val dump = newPlan.sinkNodes.last
+
+    newfilters(2).outputs.flatMap(_.consumer) should contain only dump
+    dump.inputs.map(_.producer) should contain only (newfilters(2))
+  }
+
+  it should "allow creating a new data flow ignoring the old" in {
+    val plan = new DataflowPlan(parseScript(
+      s"""A = LOAD 'file' AS (x, y, z);
+         |B = FOREACH A GENERATE *;
+         |DUMP B;
+       """.stripMargin))
+    var lastPipename = "B"
+    val newfilters = 0 until 3 map { i: Int =>
+      val name = PipeNameGenerator.generate()
+      val filter = new Filter(Pipe(name), Pipe(lastPipename), Gt(RefExpr(NamedField("a")), RefExpr(Value(i))))
+      lastPipename = name
+      filter
+    }
+
+    Rewriter applyPattern { case SuccE(f: Foreach, d: Dump) =>
+      Functions.newFlowIgnoringOld(f, newfilters(0), newfilters(1), newfilters(2), d)
+    }
+
+    val newPlan = processPlan(plan)
+    newPlan.findOperator(_.isInstanceOf[Foreach]).headOption.value.outputs.flatMap(_.consumer) should contain only newfilters(0)
+    newfilters reduce { (f1: Filter, f2: Filter) =>
+      newPlan.findOperatorForAlias(f1.outPipeName).value.outputs.flatMap(_.consumer) should contain only f2
+      newPlan.findOperator(_ == f2).headOption.value.inputs.map(_.producer) should contain only f1
+      f2
+    }
+
+    val dump = newPlan.sinkNodes.last
+
+    newfilters(2).outputs.flatMap(_.consumer) should contain only dump
+    dump.inputs.map(_.producer) should contain only (newfilters(2))
+  }
+
+  it should "allow merging operators" in {
     Rewriter toMerge(classOf[Filter], classOf[Filter]) applyRule { case (t1: Filter, t2: Filter) =>
       def merger(f1: Filter, f2: Filter) = Filter(f2.outputs.head, f1.inputs.head, And(f1.pred, f2.pred))
       Some(Functions.merge(t1, t2, merger))
