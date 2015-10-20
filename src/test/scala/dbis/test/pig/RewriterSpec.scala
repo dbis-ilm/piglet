@@ -1536,7 +1536,10 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "allow merging operators" in {
-    Rewriter toMerge(classOf[Filter], classOf[Filter]) applyRule {tup: (Filter, Filter) => mergeFilters(tup._1, tup._2)}
+    Rewriter toMerge(classOf[Filter], classOf[Filter]) whenMatches {
+      case (f1 @ Filter(_, _, pred1, _), f2 @ Filter(_, _, pred2, _)) if pred1 != pred2 => } applyRule {
+        tup: (Filter, Filter) => mergeFilters(tup._1, tup ._2)
+      }
     performMergeTest()
   }
 

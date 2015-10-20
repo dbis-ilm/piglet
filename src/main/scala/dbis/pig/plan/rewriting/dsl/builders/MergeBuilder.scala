@@ -29,8 +29,18 @@ class MergeBuilder[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : Class
   }
 
   override def wrapInCheck(func: ((FROM1, FROM2)) => Option[PigOperator]):
-   ((FROM1, FROM2)) => Option[dbis.pig.op.PigOperator] =
-    func
+   ((FROM1, FROM2)) => Option[PigOperator] = {
+    def wrapped(t: Tuple2[FROM1, FROM2]): Option[PigOperator] = {
+      if (check.isEmpty || check.get(t)) {
+        func(t)
+      }
+      else {
+        None
+      }
+    }
+
+    wrapped
+  }
 
   override def wrapInFixer(func: ((FROM1, FROM2)) => Option[PigOperator]): ((FROM1, FROM2)) =>
     Option[dbis.pig.op.PigOperator] =
