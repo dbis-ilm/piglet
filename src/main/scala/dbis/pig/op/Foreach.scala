@@ -76,6 +76,7 @@ case class Foreach(out: Pipe,
          * and add our input pipe to the context of the plan.
          */
         val plan = new DataflowPlan(opList, Some(List(inputs.head)))
+        // println("--> " + plan.operators.mkString("\n"))
         opList.foreach(op => if (op.isInstanceOf[Generate]) {
           // we extract the input pipes of the GENERATE statements (which are hidden
           // inside the expressions

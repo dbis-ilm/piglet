@@ -17,9 +17,9 @@
 package dbis.pig.plan.rewriting.rulesets
 
 import dbis.pig.op._
-import dbis.pig.plan.InvalidPlanException
+import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.RewriterException
+import dbis.pig.plan.rewriting.{Rewriter, RewriterException}
 import dbis.pig.plan.rewriting.internals.FilterUtils._
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
@@ -126,6 +126,7 @@ object GeneralRuleset extends Ruleset {
     case Dump(_) => None
     // To prevent recursion, empty is ok as well
     case Empty(_) => None
+    case Generate(_) => None
     case op: PigOperator =>
       op.outputs match {
         case Pipe(_, _, Nil) :: Nil | Nil =>
@@ -203,6 +204,11 @@ object GeneralRuleset extends Ruleset {
           None
       case _ => None
     }
+  }
+
+  def foreachRecursively(fo: Foreach): Option[Foreach] = {
+    fo.subPlan foreach {d: DataflowPlan => Rewriter.processPlan(d)}
+    Some(fo)
   }
 
   def replaceMacroOp(t: Any): Option[PigOperator] = t match {
