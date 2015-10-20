@@ -20,12 +20,30 @@ import dbis.pig.op.{Pipe, Empty, PigOperator}
 import org.kiama.rewriting.Strategy
 
 object Functions {
+  /** Merge ``term1`` and ``term2`` into a new term by applying them to ``f``.
+    *
+    * @param term1
+    * @param term2
+    * @param f
+    * @tparam T
+    * @tparam T2
+    * @tparam T3
+    * @return
+    */
   def merge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator]
   (term1: T, term2: T2, f: (T, T2) => T3): T3 = {
     val newOp = f(term1, term2)
     Rewriter.fixInputsAndOutputs(term1, term2, newOp)
   }
 
+  /** Replace ``old`` with ``new_``.
+    *
+    * @param old
+    * @param new_
+    * @tparam T
+    * @tparam T2
+    * @return
+    */
   def replace[T <: PigOperator, T2 <: PigOperator](old: T, new_ : T2): T2 =
     Rewriter.fixReplacement(old) (new_)
 
@@ -63,6 +81,14 @@ object Functions {
     }
   }
 
+  /** Swap parent and child.
+    *
+    * @param parent
+    * @param child
+    * @tparam T
+    * @tparam T2
+    * @return
+    */
   def swap[T <: PigOperator, T2 <: PigOperator](parent: T, child: T2): T2 =
     Rewriter.fixInputsAndOutputs(parent, child, child, parent)
 }
