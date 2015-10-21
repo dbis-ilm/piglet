@@ -401,16 +401,17 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
           throw InvalidPlanException("invalid expression in ConstructBag")
         val fieldType = field.fType.asInstanceOf[ComplexType]
 
-        val componentType = refExpr match {
+        val (componentName, componentType) = refExpr match {
           case DerefTuple(t, r) => r match {
-            case NamedField(n, _) => fieldType.typeOfComponent(n)
-            case PositionalField(p) => fieldType.typeOfComponent(p)
+            case NamedField(n, _) => (n, fieldType.typeOfComponent(n))
+            case PositionalField(p) => ("", fieldType.typeOfComponent(p))
             case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
           }
           case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
         }
         // construct a schema from the component type
-        schema = Some(new Schema(new BagType(new TupleType(Array(Field("t", componentType))), outPipeName)))
+        println("~~~~~~~ ref = " + refExpr)
+        schema = Some(new Schema(new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName)))
 
       }
       case None => None
