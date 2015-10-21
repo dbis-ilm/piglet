@@ -16,10 +16,9 @@
  */
 package dbis.pig.plan.rewriting.dsl.traits
 
-import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.dsl.words.WhenWord
 
-trait CheckWordT[FROM <: PigOperator, TO] {
+trait CheckWordT[FROM, TO] {
   val b: BuilderT[FROM, TO]
 
   /** Add a check before the application of the function contained in the builder. If the check returns true, the

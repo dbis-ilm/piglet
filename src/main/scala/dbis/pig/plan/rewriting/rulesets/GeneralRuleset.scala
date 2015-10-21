@@ -16,14 +16,15 @@
  */
 package dbis.pig.plan.rewriting.rulesets
 
-import scala.collection.mutable.ListBuffer
 import dbis.pig.op._
-import dbis.pig.plan.InvalidPlanException
-import dbis.pig.plan.rewriting.internals.FilterUtils._
-import org.kiama.rewriting.Strategy
+import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
 import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.RewriterException
+import dbis.pig.plan.rewriting.{Rewriter, RewriterException}
+import dbis.pig.plan.rewriting.internals.FilterUtils._
 import org.kiama.rewriting.Rewriter._
+import org.kiama.rewriting.Strategy
+
+import scala.collection.mutable.ListBuffer
 
 object GeneralRuleset extends Ruleset {
   /** Put Filters before multipleInputOp if we can figure out which input of multipleInputOp contains the fields used in the Filters predicate
@@ -125,6 +126,7 @@ object GeneralRuleset extends Ruleset {
     case Dump(_) => None
     // To prevent recursion, empty is ok as well
     case Empty(_) => None
+    case Generate(_) => None
     case op: PigOperator =>
       op.outputs match {
         case Pipe(_, _, Nil) :: Nil | Nil =>
@@ -161,8 +163,9 @@ object GeneralRuleset extends Ruleset {
         if (ref.r.isInstanceOf[NamedField]) {
           val field = ref.r.asInstanceOf[NamedField]
           if (field.name == "*") {
-            if (op.inputSchema.isEmpty)
+            if (op.inputSchema.isEmpty) {
               throw RewriterException("Rewriting * in GENERATE requires a schema")
+            }
             foundStar = true
             genExprs ++= op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
           }
@@ -204,6 +207,16 @@ object GeneralRuleset extends Ruleset {
     }
   }
 
+  def foreachRecursively(fo: Foreach): Option[Foreach] = {
+    fo.subPlan = fo.subPlan map {d: DataflowPlan => Rewriter.processPlan(d)}
+    if (fo.subPlan.isDefined) {
+      fo.generator = new GeneratorPlan(fo.subPlan.get.operators)
+      Some(fo)
+    }
+    else
+      None
+  }
+
   def replaceMacroOp(t: Any): Option[PigOperator] = t match {
     case op@MacroOp(out, name, params) => {
       if (op.macroDefinition.isEmpty)
@@ -240,6 +253,7 @@ object GeneralRuleset extends Ruleset {
     addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
     addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
+    applyRule(foreachRecursively _)
     addStrategy(removeNonStorageSinks _)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }

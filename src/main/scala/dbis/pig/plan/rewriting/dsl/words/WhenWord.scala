@@ -27,7 +27,7 @@ import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, EndWordT}
   * @tparam FROM
   * @tparam TO
   */
-class WhenWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO], val check: (FROM => Boolean))
+class WhenWord[FROM, TO](override val b: BuilderT[FROM, TO], val check: (FROM => Boolean))
   extends EndWordT[FROM, TO] {
   b.check = check
 
@@ -83,10 +83,5 @@ class WhenWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO], val 
     }
 
     new WhenWord(b, newcheck)
-  }
-
-  def applyRule(f: (FROM => Option[TO])): Unit = {
-    b.func = f
-    b()
   }
 }

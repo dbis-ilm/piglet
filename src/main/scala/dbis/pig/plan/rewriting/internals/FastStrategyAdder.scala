@@ -117,26 +117,8 @@ trait FastStrategyAdder {
 
   /** Given a function `f: (T => Option[T])`, add a strategy that applies `f` if the input term is of type `T`.
     *
-    * The type constraints here are stronger than on [[addInputTypedStrategy]] in that the type `T` is applied to
-    * the input of `f` and its output.
-    *
-    * @param f
-    * @tparam T
     */
-  def addTypedStrategy[T <: PigOperator : ClassTag](f: (T => Option[T])): Unit = {
-    val wrapper = buildTypedCaseWrapper(f)
-    addStrategy(wrapper)
-  }
-
-  /** Given a function `f: (T => Option[Any])`, add a strategy that applies `f` if the input term is of type `T`.
-    *
-    * The type constraints here are weaker than in [[addTypedStrategy]] because they only apply to the type of `f`s
-    * input.
-    *
-    * @param f
-    * @tparam T
-    */
-  def addInputTypedStrategy[T <: PigOperator : ClassTag](f: (T => Option[PigOperator])): Unit = {
+  def addTypedStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T => Option[T2])): Unit = {
     val wrapper = buildTypedCaseWrapper(f)
     addStrategy(wrapper)
   }

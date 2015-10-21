@@ -59,7 +59,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   def tupleSchema(schema: Option[Schema], ref: Ref): Option[Schema] = {
     val tp = ref match {
       case nf @ NamedField(f, _) => schema match {
-        case Some(s) => s.field(nf).fType
+        case Some(s) => if (f == s.element.name) s.element.valueType else s.field(nf).fType
         case None => throw new SchemaException(s"unknown schema for field $f")
       }
       case PositionalField(p) => schema match {
@@ -146,7 +146,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    */
   def findFieldPosition(schema: Option[Schema], field: Ref): Int = field match {
     case nf @ NamedField(f, _) => schema match {
-      case Some(s) => s.indexOfField(nf)
+      case Some(s) => if (f == s.element.name) 0 else s.indexOfField(nf)
       case None => -1
     }
     case PositionalField(p) => p
