@@ -239,6 +239,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map(t => _aa_Tuple("all", t))""")
     assert(generatedCode == expectedCode)
+
+    val schemaCode = codeGenerator.emitSchemaClass(op.schema.get)
+    println("schemaCode = " + schemaCode)
+    val expectedSchemaCode = ""
   }
 
   it should "contain code for GROUP BY $0" in {
