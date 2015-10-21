@@ -314,34 +314,25 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
   }
 
   override def checkSchemaConformance: Boolean = {
-    def findFieldInInputSchema(op: PigOperator, f: String) = op.inputSchema match {
-      case Some(s) => s.field(f)
-      case None => -1
-    }
-
-    require(parentOp != null)
     // we have to extract all RefExprs
     val traverse = new RefExprExtractor
     exprs.foreach(e => e.expr.traverseAnd(null, traverse.collectRefExprs))
-    // then we have to handle the different kinds of RefExprs
-    traverse.exprs.foreach(rex => rex.r match {
-      case NamedField(n, _) => {
-        // case 1: n refers to a pipe
-        if (parentOp.findOperatorInSubplan(n).isEmpty &&
-          // case 2: n refers to a field of the input schema
-           findFieldInInputSchema(parentOp, n) == -1)
-          throw SchemaException("invalid field $n in GENERATE")
-      } // is a a valid n?
-      case PositionalField(p) => parentOp.inputSchema match { // is p a valid index in the input schema of FOREACH?
-        case Some(s) => if (p >= s.fields.length) throw SchemaException("invalid index $p in GENERATE")
-        case None => if (p > 0) throw SchemaException("invalid index $p in GENERATE")
-      }
-      case Value(v) => {} // okay
-      case DerefStreamingTuple(r1, r2) => {} // TODO: is r1 a valid ref?
-      case DerefTuple(r1, r2) => {} // TODO: is r1 a valid ref?
-      case DerefMap(r1, r2) => {} // TODO: is r1 a valid ref?
+
+    // we collect a list of fields of all input schemas
+    val fieldList = ListBuffer[Field]()
+    inputs.foreach(p => p.inputSchema match {
+      case Some(s) => fieldList ++= s.fields
+      case None => {}
     })
-    true
+    val res = traverse.exprs.map(rex => rex.r match {
+      case NamedField(n, _) => fieldList.exists(_.name == n)
+      case PositionalField(p) => if (fieldList.isEmpty) p == 0 else p < fieldList.length
+      case Value(v) => true // okay
+      case DerefStreamingTuple(r1, r2) => true // TODO: is r1 a valid ref?
+      case DerefTuple(r1, r2) => true // TODO: is r1 a valid ref?
+      case DerefMap(r1, r2) => true // TODO: is r1 a valid ref?
+    })
+    ! res.contains(false)
   }
 
   // TODO: eliminate replicated code
@@ -410,8 +401,12 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
           case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
         }
         // construct a schema from the component type
-        println("~~~~~~~ ref = " + refExpr)
-        schema = Some(new Schema(new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName)))
+//        val resSchema = new Schema(new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName))
+        val resSchema = new Schema(if (componentType.isInstanceOf[BagType])
+          componentType.asInstanceOf[BagType]
+        else
+          new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName))
+        schema = Some(resSchema)
 
       }
       case None => None

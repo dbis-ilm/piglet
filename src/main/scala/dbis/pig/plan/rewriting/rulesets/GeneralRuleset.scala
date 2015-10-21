@@ -164,11 +164,9 @@ object GeneralRuleset extends Ruleset {
           val field = ref.r.asInstanceOf[NamedField]
           if (field.name == "*") {
             if (op.inputSchema.isEmpty) {
-              println("input = " + op.inputs.mkString(","))
               throw RewriterException("Rewriting * in GENERATE requires a schema")
             }
             foundStar = true
-            println("input = " + op.inputSchema)
             genExprs ++= op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
           }
           else genExprs += ex
@@ -211,8 +209,12 @@ object GeneralRuleset extends Ruleset {
 
   def foreachRecursively(fo: Foreach): Option[Foreach] = {
     fo.subPlan = fo.subPlan map {d: DataflowPlan => Rewriter.processPlan(d)}
-    fo.generator = new GeneratorPlan(fo.subPlan.get.operators)
-    Some(fo)
+    if (fo.subPlan.isDefined) {
+      fo.generator = new GeneratorPlan(fo.subPlan.get.operators)
+      Some(fo)
+    }
+    else
+      None
   }
 
   def replaceMacroOp(t: Any): Option[PigOperator] = t match {
