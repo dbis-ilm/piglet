@@ -196,13 +196,11 @@ object GeneralRuleset extends Ruleset {
         case _ => None
       }
       case op@Generate(exprs) =>
-        println("rewrite GENERATE: " + op)
         val (genExprs, foundStar) = constructGeneratorList(exprs, op)
         if (foundStar) {
           val newOp = Generate(genExprs.toList)
           newOp.copyPipes(op)
           newOp.constructSchema
-          println("=====> FOUND STAR: " + newOp)
           Some(newOp)
         }
         else

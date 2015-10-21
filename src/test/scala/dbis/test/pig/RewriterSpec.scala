@@ -565,7 +565,9 @@ class RewriterSpec extends FlatSpec
       }
     }
   }
-
+  */
+  
+  /*
   it should "apply rewriting rule F6" in {
     Rewriter applyRule F6
     val patterns = Table(
@@ -647,6 +649,7 @@ class RewriterSpec extends FlatSpec
       }
     }
   }
+  */
 
   it should "apply rewriting rule F7" in {
     Rewriter applyRule F7
@@ -953,7 +956,7 @@ class RewriterSpec extends FlatSpec
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
   }
-
+ /*
   it should "apply rewriting rule J2" in {
     Rewriter unless groupedSchemaJoinEarlyAbort applyRule J2
     val patterns = Table(
@@ -1049,6 +1052,7 @@ class RewriterSpec extends FlatSpec
       }
     }
   }
+  */
 
   it should "apply rewriting rule J3" in {
     Rewriter unless plainSchemaJoinEarlyAbort applyRule J3
@@ -1327,8 +1331,6 @@ class RewriterSpec extends FlatSpec
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
   }
- */
-
 
   it should "replace GENERATE * by a list of fields" in {
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)

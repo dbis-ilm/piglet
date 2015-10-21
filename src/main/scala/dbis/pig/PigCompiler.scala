@@ -166,11 +166,12 @@ object PigCompiler extends PigParser with LazyLogging {
       newPlan = processPlan(newPlan)
       
       logger.debug("finished optimizations")
+      println("final plan = {\n" + newPlan.operators.mkString("\n") + "}")
 
       try {
         // if this does _not_ throw an exception, the schema is ok
         // TODO: we should do this AFTER rewriting!
-        // plan.checkSchemaConformance
+         newPlan.checkSchemaConformance
       } catch {
         case e:SchemaException => {
           logger.error(s"schema conformance error in ${e.getMessage} for plan")
@@ -180,7 +181,7 @@ object PigCompiler extends PigParser with LazyLogging {
 
       val scriptName = plan._2.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
-      
+
       FileTools.compilePlan(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, backend) match {
         // the file was created --> execute it
         case Some(jarFile) =>  
