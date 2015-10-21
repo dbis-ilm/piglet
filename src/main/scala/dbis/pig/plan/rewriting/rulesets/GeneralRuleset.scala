@@ -210,7 +210,8 @@ object GeneralRuleset extends Ruleset {
   }
 
   def foreachRecursively(fo: Foreach): Option[Foreach] = {
-    fo.subPlan foreach {d: DataflowPlan => Rewriter.processPlan(d)}
+    fo.subPlan = fo.subPlan map {d: DataflowPlan => Rewriter.processPlan(d)}
+    fo.generator = new GeneratorPlan(fo.subPlan.get.operators)
     Some(fo)
   }
 
