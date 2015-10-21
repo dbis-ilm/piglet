@@ -151,7 +151,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
                   varCnt += 1
                 }
               }
-              case None => throw new InvalidPlanException("invalid pipe: " + p.name)
+              case None => throw new InvalidPlanException("invalid pipe: " + p.name + " for " + op)
             }
           }
           else {

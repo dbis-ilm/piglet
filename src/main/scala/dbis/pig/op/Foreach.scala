@@ -49,7 +49,7 @@ case class GeneratorList(exprs: List[GeneratorExpr]) extends ForeachGenerator
  *
  * @param subPlan
  */
-case class GeneratorPlan(subPlan: List[PigOperator]) extends ForeachGenerator
+case class GeneratorPlan(var subPlan: List[PigOperator]) extends ForeachGenerator
 
 /**
  * Foreach represents the FOREACH operator of Pig.
@@ -70,14 +70,15 @@ case class Foreach(out: Pipe,
 
   override def preparePlan: Unit = {
     generator match {
-      case GeneratorPlan(opList) => {
+      case gen @ GeneratorPlan(opList) => {
         /*
          * Nested foreach require special handling: we construct a subplan for the operator list
          * and add our input pipe to the context of the plan.
          */
         val plan = new DataflowPlan(opList, Some(List(inputs.head)))
         // println("--> " + plan.operators.mkString("\n"))
-        opList.foreach(op => if (op.isInstanceOf[Generate]) {
+
+        plan.operators.foreach(op => if (op.isInstanceOf[Generate]) {
           // we extract the input pipes of the GENERATE statements (which are hidden
           // inside the expressions
           val pipes = op.asInstanceOf[Generate].findInputPipes(plan)
@@ -85,13 +86,14 @@ case class Foreach(out: Pipe,
           pipes.foreach(p => p.producer.addConsumer(p.name, op))
         }
         )
-        val genOp = opList.last
+        val genOp = plan.operators.last
         if (genOp.isInstanceOf[Generate]) {
           genOp.asInstanceOf[Generate].parentOp = this
         }
         else
           throw new InvalidPlanException("last statement in nested foreach must be a generate")
 
+        gen.subPlan = plan.operators
         subPlan = Some(plan)
       }
       case _ => {}
@@ -154,16 +156,19 @@ case class Foreach(out: Pipe,
     }).toArray
 
   override def constructSchema: Option[Schema] = {
+    if (inputSchema.isDefined)
+      inputSchema.get.setBagName(inPipeName)
+
     generator match {
       case GeneratorList(expr) => {
         val fields = constructFieldList(expr)
 
         schema = Some(new Schema(new BagType(new TupleType(fields), outPipeName)))
       }
-      case GeneratorPlan(plan) => {
+      case GeneratorPlan(_) => {
+        val plan = subPlan.get.operators
         // if we have ConstructBag operators in our subplan, we should add schema information
         plan.filter(p => p.isInstanceOf[ConstructBag]).foreach(p => p.asInstanceOf[ConstructBag].parentSchema = inputSchema)
-
         // we invoke constructSchema for all operators of the subplan
         plan.foreach(op => op.constructSchema)
 
@@ -364,8 +369,7 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
 /**
  * This operator is a pseudo operator used inside a nested FOREACH to construct a new bag from an expression.
  *
- * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
- *                           can be changed later.
+ * @param out the output pipe (relation).
  * @param refExpr a reference referring to an expression constructing a relation (bag).
  */
 case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
@@ -381,11 +385,16 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
         // first, we determine the field in the schema
         val field = refExpr match {
           case DerefTuple(t, r) => t match {
-            case nf @ NamedField(_, _) => s.field(nf)
+            case nf @ NamedField(n, _) => {
+              if (s.element.name == n)
+                Field(n, s.element)
+              else
+                s.field(nf)
+            }
             case PositionalField(p) => s.field(p)
-            case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
+            case _ => throw new InvalidPlanException("unexpected expression in ConstructBag")
           }
-          case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
+          case _ => throw new InvalidPlanException("unexpected expression in ConstructBag")
         }
         // 2. we extract the type (which should be a BagType, MapType or TupleType)
         if (!field.fType.isInstanceOf[ComplexType])
@@ -405,7 +414,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
 
       }
       case None => None
-    }
+  }
     schema
   }
 }

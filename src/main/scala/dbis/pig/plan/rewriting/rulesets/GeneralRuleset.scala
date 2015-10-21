@@ -163,9 +163,12 @@ object GeneralRuleset extends Ruleset {
         if (ref.r.isInstanceOf[NamedField]) {
           val field = ref.r.asInstanceOf[NamedField]
           if (field.name == "*") {
-            if (op.inputSchema.isEmpty)
+            if (op.inputSchema.isEmpty) {
+              println("input = " + op.inputs.mkString(","))
               throw RewriterException("Rewriting * in GENERATE requires a schema")
+            }
             foundStar = true
+            println("input = " + op.inputSchema)
             genExprs ++= op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
           }
           else genExprs += ex
@@ -193,11 +196,13 @@ object GeneralRuleset extends Ruleset {
         case _ => None
       }
       case op@Generate(exprs) =>
+        println("rewrite GENERATE: " + op)
         val (genExprs, foundStar) = constructGeneratorList(exprs, op)
         if (foundStar) {
           val newOp = Generate(genExprs.toList)
           newOp.copyPipes(op)
           newOp.constructSchema
+          println("=====> FOUND STAR: " + newOp)
           Some(newOp)
         }
         else
@@ -247,6 +252,7 @@ object GeneralRuleset extends Ruleset {
     addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
     addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
     addStrategy(strategyf(t => splitIntoToFilters(t)))
+    applyRule(foreachRecursively _)
     addStrategy(removeNonStorageSinks _)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
   }
