@@ -17,11 +17,16 @@
 
 package dbis.pig.backends.spark.test
 
-import dbis.pig.backends.spark.{Record, TextLine, PigStorage, PigFuncs}
+import java.io.File
+
+import dbis.pig.backends.spark._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest._
+import org.apache.commons.io.FileUtils
 
-case class Person(name: String, age: Int) extends java.io.Serializable
+case class Person(name: String, age: Int) extends java.io.Serializable with SchemaClass {
+  override def mkString(delim: String) = s"${name}${delim}${age}"
+}
 
 class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
   var sc: SparkContext = _
@@ -51,6 +56,16 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
     res.collect() should be (Array(Person("Anna", 21), Person("John", 53), Person("Mike", 32)))
   }
 
+  it should "save and load records" in {
+    val res = PigStorage[Person]().load(sc, "sparklib/src/test/resources/person.csv",
+      (data: Array[String]) => Person(data(0), data(1).toInt), ",")
+    PigStorage[Person]().write("person.data", res, "|")
+    val otherRes = PigStorage[Person]().load(sc, "person.data",
+      (data: Array[String]) => Person(data(0), data(1).toInt), "[|]")
+    res.collect() should be (otherRes.collect())
+    FileUtils.deleteDirectory(new File("person.data"))
+   }
+
   it should "load simple text lines" in {
     val extractor = (data: Array[String]) => TextLine(data(0))
 
@@ -67,5 +82,17 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
     resArray(0).fields should be (Array("Anna", "21"))
     resArray(1).fields should be (Array("John", "53"))
     resArray(2).fields should be (Array("Mike", "32"))
+  }
+
+  "BinStorage" should "save and load a RDD" in {
+    val data = PigStorage[Person]().load(sc, "sparklib/src/test/resources/person.csv",
+      (data: Array[String]) => Person(data(0), data(1).toInt), ",")
+    BinStorage[Person]().write("person.ser", data)
+
+    val otherData = BinStorage[Person]().load(sc, "person.ser",
+      (data: Array[String]) => Person(data(0), data(1).toInt))
+    otherData.collect().length should be (3)
+    data.collect() should be (otherData.collect())
+    FileUtils.deleteDirectory(new File("person.ser"))
   }
 }

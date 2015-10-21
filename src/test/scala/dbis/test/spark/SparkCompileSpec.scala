@@ -756,18 +756,18 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
     """
-      |case class _B_Tuple (f1 : Int, f2 : String, f3 : Double) extends java.io.Serializable {
+      |case class _B_Tuple (f1 : Int, f2 : String, f3 : Double) extends java.io.Serializable with SchemaClass {
       |def _0 = f1
       |def _1 = f2
       |def _2 = f3
-      |def mkString(_c: String = ",") = s"${_0}${_c}${_1}${_c}${_2}"
+      |override def mkString(_c: String = ",") = s"${_0}${_c}${_1}${_c}${_2}"
       |}
-      |case class _C_Tuple (f1 : Int, f2 : String, f3 : Double, f4 : Int) extends java.io.Serializable {
+      |case class _C_Tuple (f1 : Int, f2 : String, f3 : Double, f4 : Int) extends java.io.Serializable with SchemaClass {
       |def _0 = f1
       |def _1 = f2
       |def _2 = f3
       |def _3 = f4
-      |def mkString(_c: String = ",") = s"${_0}${_c}${_1}${_c}${_2}${_c}${_3}"
+      |override def mkString(_c: String = ",") = s"${_0}${_c}${_1}${_c}${_2}${_c}${_3}"
       |}
     """.stripMargin
     )

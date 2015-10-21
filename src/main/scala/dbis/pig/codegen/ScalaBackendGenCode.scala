@@ -472,21 +472,25 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   /**
    * Generates code for the STORE operator.
    *
-   * @param in name of the input bag
+   * @param node the STORE operator
    * @param file the URI of the target file
    * @param storeFunc a storage function
+   * @param params an (optional) parameter list for the storage function
    * @return the Scala code implementing the STORE operator
    */
-  def emitStore(in: String, file: URI, storeFunc: Option[String]): String = {
-    
-    /* for BinStorage we do not convert the tuple into a string because
-     * we want to keep our fields as is
-     */
-    val func = storeFunc.getOrElse(BackendManager.backend.defaultConnector)
-    if(func == "BinStorage")
-      callST("store", Map("in"->in,"file"->file.toString(),"func"->func))
-    else
-      callST("store", Map("in"->in,"file"->file.toString(),"schema"->s"tuple${in}ToString(t)","func"->func))
+  def emitStore(node: PigOperator, file: URI, storeFunc: Option[String], params: List[String]): String = {
+    var paramMap = Map("in" -> node.inPipeName,
+      "file" -> file.toString,
+      "func" -> storeFunc.getOrElse(BackendManager.backend.defaultConnector))
+    node.schema match {
+      case Some(s) => paramMap += ("class" -> schemaClassName(s.element.name))
+      case None => paramMap += ("class" -> "TextLine")
+    }
+
+    if (params != null && params.nonEmpty)
+      paramMap += ("params" -> params.mkString(","))
+
+    callST("store", paramMap)
   }
 
 
@@ -528,7 +532,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
          */
       case Load(out, file, schema, func, params) => emitLoad(node, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inPipeName))
-      case Store(in, file, func, params) => emitStore(node.inPipeName, file, func)
+      case Store(in, file, func, params) => emitStore(node, file, func, params)
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))
       case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->node.inPipeName,"others"->node.inPipeNames.tail))

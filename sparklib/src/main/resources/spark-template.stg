@@ -11,9 +11,9 @@ import dbis.pig.backends.spark._
 
 // ----------------- schema class -----------------
 schema_class(name, fields, getter, string_rep) ::= <<
-case class <name> (<fields>) extends java.io.Serializable {
+case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
 <getter>
-def mkString(_c: String = ",") = <string_rep>
+override def mkString(_c: String = ",") = <string_rep>
 }
 
 >>
@@ -34,7 +34,7 @@ begin_query(name) ::= <<
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,class,func,extractor,params) ::= <<
+loader(out, file, class, func, extractor, params) ::= <<
         val <out> = <func>[<class>]().load(sc, "<file>", <extractor><if (params)>, <params><endif>)
 >>
 
@@ -45,14 +45,8 @@ dump(in) ::=<<
 
 // ------------------ STORE Results on disk -----------------------------------
 
-store(in,file,schema,func) ::=<<
-	<if (schema)>
-    	val <in>_storehelper = <in>.map(t => <schema>).coalesce(1, true)
-	<else>
-		val <in>_storehelper = <in>
-	<endif>
-	
-    <func>().write("<file>", <in>_storehelper)
+store(in, file, class, func, params) ::= <<
+    <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)
 >>
 
 // ------------------ FILTER for a predicate ----------------------------------

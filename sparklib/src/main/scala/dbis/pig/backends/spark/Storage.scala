@@ -27,36 +27,30 @@ import java.io.FileOutputStream
 
 import scala.reflect.ClassTag
 
-case class TextLine(line: String) extends java.io.Serializable
-
-case class Record(fields: Array[String]) extends java.io.Serializable
-
-/*
-class PigStorage extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, delim: String = "\t"): RDD[List[String]] =
-    sc.textFile(path).map(line => line.split(delim, -1).toList)
-
-  def write(path: String, rdd: RDD[String]) = rdd.saveAsTextFile(path)
+trait SchemaClass {
+  def mkString(delim: String): String
 }
 
-object PigStorage {
-  def apply(): PigStorage = {
-    new PigStorage
-  }
+case class TextLine(line: String) extends java.io.Serializable with SchemaClass {
+  override def toString = line
+  override def mkString(delim: String) = toString
 }
-*/
+
+case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
+  override def mkString(delim: String) = fields.mkString(delim)
+}
 
 //-----------------------------------------------------------------------------------------------------
 
-class PigStorage[T:ClassTag] extends java.io.Serializable {
+class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
   def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): RDD[T] =
     sc.textFile(path).map(line => extract(line.split(delim, -1)))
 
-  def write(path: String, rdd: RDD[T]) = rdd.saveAsTextFile(path)
+  def write(path: String, rdd: RDD[T], delim: String = "\t") = rdd.map(_.mkString(delim)).saveAsTextFile(path)
 }
 
 object PigStorage extends java.io.Serializable {
-  def apply[T:ClassTag](): PigStorage[T] = {
+  def apply[T <: SchemaClass :ClassTag](): PigStorage[T] = {
     new PigStorage[T]
   }
 }
@@ -83,15 +77,15 @@ object RDFFileStorage {
 
 //-----------------------------------------------------------------------------------------------------
 
-class BinStorage extends java.io.Serializable {
+class BinStorage[T:ClassTag] extends java.io.Serializable {
   
-  def load(sc: SparkContext, path: String): RDD[List[Any]] = sc.objectFile[List[Any]](path)
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[T] = sc.objectFile[T](path)
 
-  def write(path: String, rdd: RDD[_]) = rdd.saveAsObjectFile(path)
+  def write(path: String, rdd: RDD[T]) = rdd.saveAsObjectFile(path)
 }
 
 object BinStorage {
-  def apply(): BinStorage = new BinStorage
+  def apply[T:ClassTag](): BinStorage[T] = new BinStorage[T]
 }
 
 //-----------------------------------------------------------------------------------------------------
