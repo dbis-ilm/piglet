@@ -98,23 +98,22 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     * Generates code for the CROSS operator.
     *
     * @param node the Cross Operator node
-    * @param out name of the output bag
-    * @param rels list of Pipes to cross
     * @return the Scala code implementing the CROSS operator
     */
-  def emitCross(node: PigOperator, out: String, rels: List[Pipe]): String = {
-    callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name)))
+
+   def emitCross(node: PigOperator): String = {
+    val rels = node.inputs
+    callST("cross", Map("out" -> node.outPipeName,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name)))
   }
 
   /**
     * Generates code for the DISTINCT Operator
     *
-    * @param out name of the output bag
-    * @param in name of the input bag
-    * @return the Scala code implementing the DISTINCT operator
+    * @param node the DISTINCT operator
+     * @return the Scala code implementing the DISTINCT operator
     */
-  def emitDistinct(out: String, in: String): String = {
-    callST("distinct", Map("out"->out,"in"->in))
+  def emitDistinct(node: PigOperator): String = {
+    callST("distinct", Map("out" -> node.outPipeName, "in" -> node.inPipeName))
   }
 
   /** 
@@ -154,21 +153,25 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
   /**
     * Generates code for the GROUPING Operator
     *
-    * @param schema the nodes input schema
-    * @param out name of the output bag
-    * @param in name of the input bag
+    * @param node the GROUPING operator
     * @param groupExpr the grouping expression
     * @return the Scala code implementing the GROUPING operator
     */
-  def emitGrouping(schema: Option[Schema], out: String, in: String, groupExpr: GroupingExpression): String = {
+  def emitGrouping(node: PigOperator, groupExpr: GroupingExpression): String = {
+    val className = node.schema match {
+      case Some(s) => schemaClassName(s.element.name)
+      case None => "TextLine"
+    }
     if (groupExpr.keyList.isEmpty)
-      callST("groupBy", Map("out"->out,"in"->in))
+      callST("groupBy", Map("out"->node.outPipeName, "in"->node.inPipeName, "class" -> className))
     else {
       val keyExtr = if (groupExpr.keyList.size > 1)
-        "List(" + (for (i <- 1 to groupExpr.keyList.size) yield s"k._$i").mkString(", ") + ")"
+        "(" + (for (i <- 1 to groupExpr.keyList.size) yield s"k._$i").mkString(", ") + ")"
       else "k"
 
-      callST("groupBy", Map("out" -> out, "in" -> in, "expr" -> emitGroupExpr(schema, groupExpr), "keyExtr" -> keyExtr))
+      callST("groupBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className,
+        "expr" -> emitGroupExpr(node.inputSchema, groupExpr),
+        "keyExtr" -> keyExtr))
     }
   }
 
@@ -254,11 +257,11 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
        * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
        *       after changing the pipe name. Instead, use node.outPipeName
        */
-      case Cross(out, rels, _) => emitCross(node, node.outPipeName, node.inputs)
-      case Distinct(out, in, _) => emitDistinct(node.outPipeName, node.inPipeName)
+      case Cross(out, rels, _) => emitCross(node)
+      case Distinct(out, in, _) => emitDistinct(node)
       case Filter(out, in, pred, _) => emitFilter(node.schema, node.outPipeName, node.inPipeName, pred)
       case Foreach(out, in, gen, _) => emitForeach(node, node.outPipeName, node.inPipeName, gen)
-      case Grouping(out, in, groupExpr, _) => emitGrouping(node.inputSchema, node.outPipeName, node.inPipeName, groupExpr)
+      case Grouping(out, in, groupExpr, _) => emitGrouping(node, groupExpr)
       case Join(out, rels, exprs, _) => emitJoin(node, node.outPipeName, node.inputs, exprs)
       case Limit(out, in, num) => emitLimit(node.outPipeName, node.inPipeName, num)
       case OrderBy(out, in, orderSpec, _) => emitOrderBy(node, node.outPipeName, node.inPipeName, orderSpec)

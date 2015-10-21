@@ -420,6 +420,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
    * @return the Scala code implementing the LOAD operator
    */
+  /*
   def emitLoader(out: String, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
     if (loaderFunc.isEmpty)
       callST("loader", Map("out"->out,"file"->file.toString(), "func"-> BackendManager.backend.defaultConnector))
@@ -428,7 +429,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       callST("loader", Map("out"->out,"file"->file.toString(),"func"->loaderFunc.get,"params"->params))
     }
   }
-  
+  */
   /**
    * Generates code for the LOAD operator.
    *

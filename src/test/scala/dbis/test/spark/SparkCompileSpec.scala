@@ -227,26 +227,47 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
 
   
   it should "contain code for GROUP BY ALL" in {
-    val op = Grouping(Pipe("aa"), Pipe("bb"), GroupingExpression(List()))
+    val ops = parseScript(
+      """
+        |bb = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
+        |aa = GROUP bb ALL;
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("aa").get
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map(t => List("all", t.toList))""")
+    val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map(t => _aa_Tuple("all", t))""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for GROUP BY $0" in {
-    val op = Grouping(Pipe("aa"), Pipe("bb"), GroupingExpression(List(PositionalField(0))))
+    val ops = parseScript(
+      """
+        |bb = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
+        |aa = GROUP bb BY f1;
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("aa").get
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.groupBy(t => {t._0}).map{case (k,v) => _aa_Tuple(k,v)}")
+    val expectedCode = cleanString("val aa = bb.groupBy(t => {t.f1}).map{case (k,v) => _aa_Tuple(k,v)}")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for GROUP BY with multiple keys" in {
-    val op = Grouping(Pipe("aa"), Pipe("bb"), GroupingExpression(List(PositionalField(0), PositionalField(1))))
+    val ops = parseScript(
+      """
+        |bb = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
+        |aa = GROUP bb BY ($0, $1);
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("aa").get
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.groupBy(t => {(t._0,t._1)}).map{case (k,v) => List(List(k._1, k._2),v)}")
+    val expectedCode = cleanString("val aa = bb.groupBy(t => {(t._0,t._1)}).map{case (k,v) => _aa_Tuple((k._1, k._2),v)}")
     assert(generatedCode == expectedCode)
   }
 
@@ -547,7 +568,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.keyBy(t => custKey_a_b(t(0).asInstanceOf[String],t(2).asInstanceOf[Int])).sortByKey(true).map{case (k,v) => v}""".stripMargin)
+        |val a = b.keyBy(t => custKey_a_b(t.f1,t.f3)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
 
     val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(op))

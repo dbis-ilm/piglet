@@ -27,15 +27,34 @@ import java.io.FileOutputStream
 
 import scala.reflect.ClassTag
 
+/**
+ * The trait for all case classes implementing record types in Piglet.
+ */
 trait SchemaClass {
+  /**
+   * Produces a string representation of the object using the given delimiter.
+   *
+   * @param delim the delimiter string
+   * @return a string representation
+   */
   def mkString(delim: String): String
 }
 
+/**
+ * A record class for representing just a single line of text.
+ *
+ * @param line the text line
+ */
 case class TextLine(line: String) extends java.io.Serializable with SchemaClass {
   override def toString = line
   override def mkString(delim: String) = toString
 }
 
+/**
+ * A record class for an array of string values.
+ *
+ * @param fields the array of values
+ */
 case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = fields.mkString(delim)
 }

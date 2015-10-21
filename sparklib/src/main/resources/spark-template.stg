@@ -65,11 +65,11 @@ foreachFlatMap(out,in,expr) ::=<<
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
-groupBy(out,in,expr,keyExtr) ::=<<
+groupBy(out, in, expr, class, keyExtr) ::=<<
 <if (expr)>
-        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(<keyExtr>,v)}
+        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => <class>(<keyExtr>,v)}
 <else>
-        val <out> = <in>.coalesce(1).glom.map(t => List("all", t.toList))
+        val <out> = <in>.coalesce(1).glom.map(t => <class>("all", t))
 <endif>
 >>
 
@@ -105,7 +105,7 @@ sample(out,in,expr) ::=<<
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------
-orderBy(out,in,key,asc) ::=<<
+orderBy(out, in, key, asc) ::=<<
         val <out> = <in>.keyBy(t => <key>).sortByKey(<asc>).map{case (k,v) => v}
 >>
 
