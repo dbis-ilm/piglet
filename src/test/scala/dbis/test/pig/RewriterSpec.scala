@@ -1379,6 +1379,8 @@ class RewriterSpec extends FlatSpec
     println("rewritten plan = \n" + rewrittenPlan.operators.mkString("\n"))
     val op = rewrittenPlan.findOperatorForAlias("tmp")
     op shouldNot be (None)
+    op.value.asInstanceOf[Foreach].subPlan.value.operators.last.asInstanceOf[Generate].exprs.map(_.expr) should
+      contain (RefExpr(NamedField("t")))
   }
 
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {

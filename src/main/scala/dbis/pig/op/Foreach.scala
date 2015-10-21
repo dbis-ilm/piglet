@@ -41,7 +41,7 @@ case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None)
  *
  * @param exprs
  */
-case class GeneratorList(exprs: List[GeneratorExpr]) extends ForeachGenerator
+case class GeneratorList(var exprs: List[GeneratorExpr]) extends ForeachGenerator
 
 /**
  * GeneratorPlan implements the ForeachGenerator trait and is used to represent
@@ -61,7 +61,7 @@ case class GeneratorPlan(var subPlan: List[PigOperator]) extends ForeachGenerato
  */
 case class Foreach(out: Pipe,
                    in: Pipe,
-                   generator: ForeachGenerator,
+                   var generator: ForeachGenerator,
                    var windowMode: Boolean = false) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
