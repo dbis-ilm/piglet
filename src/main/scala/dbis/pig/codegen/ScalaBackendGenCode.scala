@@ -391,15 +391,6 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
 
         callST("orderHelper", Map("params"->params))
       }
-      case Store(in, file,_,params) => { s"""
-        |def tuple${node.inPipeName}ToString(t: List[Any]): String = {
-        |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
-        |
-        |  val sb = new StringBuilder
-        |  sb${genStringRepOfTuple(node.schema, if(params != null && params.isDefinedAt(0)) params(0) else "','")}
-        |  sb.toString
-        |}""".stripMargin
-      }
       case _ => ""
     }
   }

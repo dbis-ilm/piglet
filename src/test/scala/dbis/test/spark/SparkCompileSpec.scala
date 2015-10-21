@@ -179,18 +179,16 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
   }
 
   it should "contain code for STORE" in {
-    
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Store(Pipe("A"), file)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-//    val expectedCode = cleanString(s"""A.map(t => tupleAToString(t)).coalesce(1, true).saveAsTextFile("${file}")""")
-    val expectedCode = cleanString(s"""val A_storehelper = A.map(t => tupleAToString(t)).coalesce(1, true) PigStorage().write("$file", A_storehelper)""")
+    val expectedCode = cleanString(s"""PigStorage[TextLine]().write("$file", A)""")
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for the STORE helper function" in {
+  it should "contain code for STORE with a known schema" in {
     val op = Store(Pipe("A"), "input/file.csv")
     op.schema = Some(new Schema(BagType(TupleType(Array(
       Field("f1", Types.IntType),
@@ -198,38 +196,22 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     ), "t"), "s")))
 
     val codeGenerator = new BatchGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitHelperClass(op))
-    val expectedCode = cleanString("""
-        |def tupleAToString(t: List[Any]): String = {
-        |implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
-        |val sb = new StringBuilder
-        |sb.append(t(0))
-        |.append(',')
-        |.append(t(1).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))
-        |sb.toString
-        |}""".stripMargin)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(s"""PigStorage[_s_Tuple]().write("input/file.csv", A)""")
     assert(generatedCode == expectedCode)
   }
   
-  it should "contain code for the STORE helper function with delimiter" in {
-    val op = Store(Pipe("A"), "input/file.csv", Some("PigStorage"), List("'#'"))
+  it should "contain code for STORE with delimiter" in {
+    val op = Store(Pipe("A"), "input/file.csv", Some("PigStorage"), List(""""#""""))
     op.schema = Some(new Schema(BagType(TupleType(Array(
       Field("f1", Types.IntType),
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
     ), "t"), "s")))
 
     val codeGenerator = new BatchGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitHelperClass(op))
-    val expectedCode = cleanString("""
-        |def tupleAToString(t: List[Any]): String = {
-        |implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
-        |val sb = new StringBuilder
-        |sb.append(t(0))
-        |.append('#')
-        |.append(t(1).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))
-        |sb.toString
-        |}""".stripMargin)
-    assert(generatedCode == expectedCode)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(s"""PigStorage[_s_Tuple]().write("input/file.csv", A, "#")""")
+   assert(generatedCode == expectedCode)
   }
   
   it should "contain code for STORE with using clause" in {
@@ -239,7 +221,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     
-    val expectedCode = cleanString(s"""val A_storehelper = A BinStorage().write("$file", A_storehelper)""")
+    val expectedCode = cleanString(s"""BinStorage[TextLine]().write("$file", A)""")
     assert(generatedCode == expectedCode)
   }
 
