@@ -566,7 +566,7 @@ class RewriterSpec extends FlatSpec
     }
   }
   */
-  
+
   /*
   it should "apply rewriting rule F6" in {
     Rewriter applyRule F6
