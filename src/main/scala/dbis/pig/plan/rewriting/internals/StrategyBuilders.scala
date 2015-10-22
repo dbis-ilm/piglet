@@ -17,6 +17,7 @@
 package dbis.pig.plan.rewriting.internals
 
 import dbis.pig.op.{Empty, PigOperator, Pipe}
+import dbis.pig.plan.rewriting.Functions
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
@@ -26,6 +27,8 @@ import scala.reflect.{ClassTag, classTag}
   *
   */
 trait StrategyBuilders {
+  def fixReplacement[T <: PigOperator](old: PigOperator) (new_ : T): T
+
   /** Returns a strategy to remove `rem` from a DataflowPlan
     *
     * @param rem
@@ -35,37 +38,12 @@ trait StrategyBuilders {
   def buildRemovalStrategy(rem: PigOperator): Strategy = {
     strategyf((op: Any) => {
       if (op == rem) {
-        val pigOp = op.asInstanceOf[PigOperator]
-        if (pigOp.inputs.isEmpty) {
-          val consumers = pigOp.outputs.flatMap(_.consumer)
-          if (consumers.isEmpty) {
-            Some(Empty(Pipe("")))
-          }
-          else {
-            consumers foreach (_.inputs = List.empty)
-            Some(consumers.toList)
-          }
-        }
-        else {
-          val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
-            // Remove input pipes to `op` and replace them with `ops` input pipes
-            inOp.inputs = inOp.inputs.filterNot(_.producer == pigOp) ++ pigOp.inputs
-            inOp
-          })
-          // Replace `op` in its inputs output pipes with `ops` children
-          pigOp.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
-            if (out.consumer contains op) {
-              out.consumer = out.consumer.filterNot(_ == op) ++ newOps
-            }
-          }))
-          Some(newOps)
-        }
+        Some(Functions.remove(op.asInstanceOf[PigOperator]))
       }
       else {
         None
       }
     })}
-
 
   /** Builds the strategy for [[dbis.pig.plan.rewriting.Rewriter.addOperatorReplacementStrategy]].
     *
@@ -76,21 +54,7 @@ trait StrategyBuilders {
    (f: T => Option[T2]): Strategy = {
 
     def inner(term: T): Option[T2] = {
-      f(term) map { op: T2 =>
-        op.outputs foreach { output =>
-          output.consumer foreach { consumer =>
-            consumer.inputs foreach { input =>
-              // If `t` (the old term) is the producer of any of the input pipes of `op` (the new terms) successors,
-              // replace it with `op` in that attribute. Replacing `t` with `op` in the pipes on `op` itself is not
-              // necessary because the setters of `inputs` and `outputs` do that.
-              if (input.producer == term) {
-                input.producer = op
-              }
-            }
-          }
-        }
-        op
-      }
+      f(term) map (fixReplacement[T2](term))
     }
 
     val wrapper = buildTypedCaseWrapper[T, T2](inner)

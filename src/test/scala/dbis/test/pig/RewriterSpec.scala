@@ -21,19 +21,19 @@ import java.net.URI
 import dbis.pig.PigCompiler._
 import dbis.pig.op._
 import dbis.pig.parser.{LanguageFeature, PigParser}
-import dbis.pig.plan.{PipeNameGenerator, DataflowPlan}
-import dbis.pig.plan.rewriting.Extractors.{OnlyFollowedByE, ForEachCallingFunctionE}
+import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules._
-import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
 import dbis.pig.plan.rewriting.rulesets.GeneralRuleset._
-import dbis.pig.plan.rewriting.{Rewriter, Rules}
+import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
+import dbis.pig.plan.rewriting.{Functions, Rewriter}
+import dbis.pig.plan.{DataflowPlan, PipeNameGenerator}
 import dbis.pig.schema.{BagType, Schema, TupleType, _}
 import dbis.test.TestTools._
-import org.kiama.rewriting.Rewriter.{strategyf}
+import org.kiama.rewriting.Rewriter.strategyf
 import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
-import org.scalatest.{FlatSpec, Matchers, BeforeAndAfterEach, PrivateMethodTester}
+import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers, PrivateMethodTester}
 
 import scala.util.Random
 
@@ -47,8 +47,28 @@ class RewriterSpec extends FlatSpec
     Rewriter invokePrivate resetMethod()
   }
 
-  "The rewriter" should "merge two Filter operations" in {
-    merge[Filter, Filter](mergeFilters)
+  private def performReorderingTest() = {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+
+    // ops before reordering
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
+    pPlan.findOperatorForAlias("b").value shouldBe op3
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
+    op2.outputs.flatMap(_.consumer) should contain only op4
+    op4.inputs.map(_.producer) should contain only op2
+  }
+
+  private def performMergeTest() = {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Neq(RefExpr(PositionalField(1)), RefExpr(Value("21")))
@@ -69,6 +89,30 @@ class RewriterSpec extends FlatSpec
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be(opMerged)
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+  }
+
+  private def performRemovalTest() = {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+
+    // ops before removing
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
+    pPlan.findOperatorForAlias("b") shouldBe empty
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op3
+    op4.inputs.map(_.producer) should contain only op3
+  }
+  "The rewriter" should "merge two Filter operations" in {
+    merge[Filter, Filter](mergeFilters)
+    performMergeTest()
   }
 
   it should "remove Filter operation if it has the same predicate as an earlier one" in {
@@ -92,24 +136,7 @@ class RewriterSpec extends FlatSpec
 
   it should "order Filter operations before Order By ones" in {
     reorder[OrderBy, Filter]
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-
-    // ops before reordering
-    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
-    val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
-    val op4 = Dump(Pipe("c"))
-
-    val plan = new DataflowPlan(List(op1, op2, op3, op4))
-    val pPlan = processPlan(plan)
-    val rewrittenSource = pPlan.sourceNodes.headOption.value
-
-    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
-    pPlan.findOperatorForAlias("b").value shouldBe op3
-    pPlan.sinkNodes.headOption.value shouldBe op4
-    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
-    op2.outputs.flatMap(_.consumer) should contain only op4
-    op4.inputs.map(_.producer) should contain only op2
+    performReorderingTest()
   }
 
   it should "order Filter operations before Joins if only NamedFields are used" in {
@@ -248,7 +275,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule R1" in {
-    Rewriter replace (classOf[RDFLoad]) via R1
+    Rewriter toReplace (classOf[RDFLoad]) applyRule R1
     val URLs = Table(
       ("url"),
       ("http://www.example.com"),
@@ -305,7 +332,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule L2" in {
-    Rewriter replace (classOf[RDFLoad]) via L2
+    Rewriter toReplace (classOf[RDFLoad]) applyRule L2
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
     forAll (possibleGroupers) { (g: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
@@ -338,7 +365,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F2" in {
-    Rewriter replace (classOf[BGPFilter]) via F2
+    Rewriter toReplace (classOf[BGPFilter]) applyRule F2
     val patterns = Table(
       ("Pattern"),
       (TriplePattern(Value("subjectv"), PositionalField(1), PositionalField(2)),
@@ -371,7 +398,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F3" in {
-    Rewriter replace (classOf[BGPFilter]) via F3
+    Rewriter toReplace (classOf[BGPFilter]) applyRule F3
     val patterns = Table(
       ("Pattern"),
       // s p o bound
@@ -423,7 +450,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F4" in {
-    Rewriter replace (classOf[BGPFilter]) via F4
+    Rewriter toReplace (classOf[BGPFilter]) applyRule F4
     val patterns = Table(
       ("Pattern", "grouping column", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
@@ -1391,21 +1418,21 @@ class RewriterSpec extends FlatSpec
     op3.schema shouldBe op1.schema
   }
 
-  "The ForEachCallingFunctionE" should "extract the function name of a function called in the only GeneratorExpr of a" +
+  "ForEachCallingFunctionE" should "extract the function name of a function called in the only GeneratorExpr of a" +
     " GeneratorList in a ForEach statement" in {
     val p = new PigParser()
     val op = p.parseScript("B = FOREACH A GENERATE myFunc(f1, f2);").head
     op should matchPattern {
-      case ForEachCallingFunctionE("myFunc") =>
+      case ForEachCallingFunctionE(_, "myFunc") =>
     }
 
     val op2 = p.parseScript("B = FOREACH A GENERATE notMyFunc(f1, f2);").head
     op2 should not matchPattern {
-      case ForEachCallingFunctionE("myFunc") =>
+      case ForEachCallingFunctionE(_, "myFunc") =>
     }
   }
 
-  "The OnlyFollowedByE" should "extract the single successor of a PigOperator" in {
+  "SuccE" should "extract the single successor of a PigOperator" in {
     val p = new PigParser()
     val ops = p.parseScript(
       """
@@ -1418,14 +1445,37 @@ class RewriterSpec extends FlatSpec
     new DataflowPlan(ops)
 
     load should matchPattern {
-      case OnlyFollowedByE( dump) =>
+      case SuccE(load, dump) =>
     }
 
     dump should not matchPattern {
-      case OnlyFollowedByE(_) =>
+      case SuccE(_) =>
     }
   }
 
+  "AllSuccE" should "extract all successors of a PigOperator" in {
+    val p = new PigParser()
+    val ops = p.parseScript(
+      """
+        | a = load 'foo' using PigStorage(':');
+        | b = filter a by $0 == 'hallo';
+        | dump b;
+        | dump a;
+      """.stripMargin)
+    val load = ops.headOption.value
+    val b = ops(1)
+    val dump = ops(3)
+
+    new DataflowPlan(ops)
+
+    load should matchPattern {
+      case AllSuccE(load, b :: dump) =>
+    }
+
+    dump should matchPattern {
+      case AllSuccE(dump, Nil) =>
+    }
+  }
   "The PipeNameGenerator" should "not generate duplicate pipe names" in {
     val seed = 1234567890
     Random.setSeed(seed)
@@ -1485,6 +1535,124 @@ class RewriterSpec extends FlatSpec
     dOp.inputs.map(_.producer) should have length 2
   }
 
+  "The Rewriter DSL" should "apply patterns via applyPattern without conditions" in {
+    Rewriter applyPattern { case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ) }
+    performReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by when" in {
+    Rewriter when { t: OrderBy => t.outputs.length > 0 } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by unless" in {
+    Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
+  it should "allow merging operators" in {
+    Rewriter toMerge(classOf[Filter], classOf[Filter]) whenMatches {
+      case (f1 @ Filter(_, _, pred1, _), f2 @ Filter(_, _, pred2, _)) if pred1 != pred2 => } applyRule {
+        tup: (Filter, Filter) => mergeFilters(tup._1, tup ._2)
+      }
+    performMergeTest()
+  }
+
+  it should "allow removing operators" in {
+    Rewriter applyPattern { case SuccE(o: OrderBy, f: Filter) => f }
+    performRemovalTest()
+  }
+
+  "Functions" should "allow creating a new data flow" in {
+    val plan = new DataflowPlan(parseScript(
+      s"""A = LOAD 'file' AS (x, y, z);
+         |B = FOREACH A GENERATE *;
+         |DUMP B;
+       """.stripMargin))
+    var lastPipename = "B"
+    val newfilters = 0 until 3 map { i: Int =>
+      val name = PipeNameGenerator.generate()
+      val filter = new Filter(Pipe(name), Pipe(lastPipename), Gt(RefExpr(NamedField("a")), RefExpr(Value(i))))
+      lastPipename = name
+      filter
+    }
+
+    Rewriter applyPattern { case SuccE(f: Foreach, d: Dump) =>
+      f.outputs = List(Pipe(newfilters(0).inPipeName))
+      d.inputs = List.empty
+      Functions.newFlow(f, newfilters(0), newfilters(1), newfilters(2), d)
+    }
+
+    val newPlan = processPlan(plan)
+    newPlan.findOperatorForAlias("B").value.outputs.flatMap(_.consumer) should contain only newfilters(0)
+    newfilters reduce { (f1: Filter, f2: Filter) =>
+      newPlan.findOperatorForAlias(f1.outPipeName).value.outputs.flatMap(_.consumer) should contain only f2
+      newPlan.findOperator(_ == f2).headOption.value.inputs.map(_.producer) should contain only f1
+      f2
+    }
+
+    val dump = newPlan.sinkNodes.last
+
+    newfilters(2).outputs.flatMap(_.consumer) should contain only dump
+    dump.inputs.map(_.producer) should contain only (newfilters(2))
+  }
+
+  it should "allow creating a new data flow ignoring the old" in {
+    val plan = new DataflowPlan(parseScript(
+      s"""A = LOAD 'file' AS (x, y, z);
+         |B = FOREACH A GENERATE *;
+         |DUMP B;
+       """.stripMargin))
+    var lastPipename = "B"
+    val newfilters = 0 until 3 map { i: Int =>
+      val name = PipeNameGenerator.generate()
+      val filter = new Filter(Pipe(name), Pipe(lastPipename), Gt(RefExpr(NamedField("a")), RefExpr(Value(i))))
+      lastPipename = name
+      filter
+    }
+
+    Rewriter applyPattern { case SuccE(f: Foreach, d: Dump) =>
+      Functions.newFlowIgnoringOld(f, newfilters(0), newfilters(1), newfilters(2), d)
+    }
+
+    val newPlan = processPlan(plan)
+    newPlan.findOperator(_.isInstanceOf[Foreach]).headOption.value.outputs.flatMap(_.consumer) should contain only newfilters(0)
+    newfilters reduce { (f1: Filter, f2: Filter) =>
+      newPlan.findOperatorForAlias(f1.outPipeName).value.outputs.flatMap(_.consumer) should contain only f2
+      newPlan.findOperator(_ == f2).headOption.value.inputs.map(_.producer) should contain only f1
+      f2
+    }
+
+    val dump = newPlan.sinkNodes.last
+
+    newfilters(2).outputs.flatMap(_.consumer) should contain only dump
+    dump.inputs.map(_.producer) should contain only (newfilters(2))
+  }
+
+  it should "allow merging operators" in {
+    Rewriter toMerge(classOf[Filter], classOf[Filter]) applyRule { case (t1: Filter, t2: Filter) =>
+      def merger(f1: Filter, f2: Filter) = Filter(f2.outputs.head, f1.inputs.head, And(f1.pred, f2.pred))
+      Some(Functions.merge(t1, t2, merger))
+    }
+    performMergeTest()
+  }
+
+  it should "allow removing operators" in {
+    Rewriter applyPattern {case op : OrderBy => Functions.remove(op)}
+    performRemovalTest()
+  }
+
+  it should "allow swapping operators" in {
+    Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
   // other test results :-)
   "Embedsupport" should "apply rules registered by embedded code" in {
@@ -1498,7 +1666,7 @@ class RewriterSpec extends FlatSpec
         | import dbis.pig.plan.rewriting.Rewriter
         | def rule(op: Any): Option[PigOperator] = {
         | op match {
-        |   case ForEachCallingFunctionE("myFunc") =>
+        |   case ForEachCallingFunctionE(_, "myFunc") =>
         |     val fo = op.asInstanceOf[Foreach]
         |     Some(Distinct(fo.outputs.head, fo.inputs.head))
         |   case _ =>
@@ -1518,4 +1686,5 @@ class RewriterSpec extends FlatSpec
       plan.sinkNodes.headOption.value,
       Distinct(Pipe("b"), Pipe("a")))
   }
+
 }

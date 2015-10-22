@@ -17,9 +17,9 @@
 package dbis.pig.plan.rewriting.dsl
 
 import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.dsl.builders.{ReplacementBuilder, Builder}
+import dbis.pig.plan.rewriting.dsl.builders.{MergeBuilder, ReplacementBuilder, Builder}
 import dbis.pig.plan.rewriting.dsl.traits.{CheckWordT, EndWordT}
-import dbis.pig.plan.rewriting.dsl.words.{WhenWord, ReplaceWord, RewriteWord}
+import dbis.pig.plan.rewriting.dsl.words._
 
 import scala.reflect._
 
@@ -33,9 +33,15 @@ trait RewriterDSL {
     * @tparam FROM
     * @return
     */
-  def replace[FROM <: PigOperator : ClassTag](cls: Class[FROM]): ReplaceWord[FROM] = {
+  def toReplace[FROM <: PigOperator : ClassTag](cls: Class[FROM]): ReplaceWord[FROM] = {
     val b = new ReplacementBuilder[FROM, PigOperator]
     new ReplaceWord[FROM](b)
+  }
+
+  def toMerge[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : ClassTag]
+    (cls1: Class[FROM1], cls2: Class[FROM2]): MergeWord[FROM1, FROM2] = {
+    val b = new MergeBuilder[FROM1, FROM2]
+    new MergeWord[FROM1, FROM2](b)
   }
 
   /** Unconditionally apply ``f`` when rewriting.
@@ -44,11 +50,21 @@ trait RewriterDSL {
     * @tparam FROM
     * @tparam TO
     */
-  def applyRule[FROM <: PigOperator : ClassTag, TO : ClassTag](f: (FROM => Option[TO])): Unit = {
+  def applyRule[FROM <: PigOperator : ClassTag, TO: ClassTag](f: (FROM => Option[TO])): Unit = {
     val b = new Builder[FROM, TO]
-    b.func = f
-    b()
+    new ImmediateEndWord(b).applyRule(f)
   }
+
+  /** Unconditionally apply ``f`` when rewriting.
+    *
+    * @param f
+    * @tparam TO
+    */
+  def applyPattern[TO: ClassTag](f: scala.PartialFunction[PigOperator, TO]): Unit = {
+    val b = new Builder[PigOperator, TO]
+    new ImmediateEndWord(b).applyPattern(f)
+  }
+
 
   /** Start describing a rewriting process by supplying a check that needs to fail to make the rewriting happen.
     *
@@ -72,8 +88,7 @@ trait RewriterDSL {
     */
   def when[FROM <: PigOperator : ClassTag, TO : ClassTag](check: (FROM => Boolean)): WhenWord[FROM, TO] = {
     val b = new Builder[FROM, TO]
-    def newcheck(term: FROM): Boolean = !check(term)
-    new WhenWord[FROM, TO](b, newcheck)
+    new WhenWord[FROM, TO](b, check)
   }
 
   /** Start describing a rewriting process by supplying a check in the form of a pattern match that needs to succeed to

@@ -18,19 +18,31 @@ package dbis.pig.plan.rewriting.dsl.builders
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.plan.rewriting.dsl.traits.{PigOperatorBuilderT, BuilderT}
+import dbis.pig.plan.rewriting.dsl.traits.BuilderT
 
-import org.kiama.rewriting.Rewriter.strategyf
-import scala.reflect.{ClassTag, classTag}
+import scala.reflect.ClassTag
 
-/** Wraps strategy data, such as the rewriting function and pre-checks and adds strategies from them.
-  *
-  * @tparam FROM
-  * @tparam TO
-  */
-class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends PigOperatorBuilderT[FROM, TO] {
-  def addAsStrategy(func: (FROM => Option[TO])) = {
-    val typeWrapped = Rewriter.buildTypedCaseWrapper(func)
-    Rewriter.addStrategy(strategyf(t => typeWrapped(t)))
+class MergeBuilder[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : ClassTag]
+  extends BuilderT[(FROM1, FROM2), PigOperator] {
+  override def addAsStrategy(func: ((FROM1, FROM2)) => Option[PigOperator]): Unit = {
+    Rewriter.merge[FROM1, FROM2]{ (term1: FROM1, term2: FROM2) => func((term1, term2))}
   }
+
+  override def wrapInCheck(func: ((FROM1, FROM2)) => Option[PigOperator]):
+   ((FROM1, FROM2)) => Option[PigOperator] = {
+    def wrapped(t: Tuple2[FROM1, FROM2]): Option[PigOperator] = {
+      if (check.isEmpty || check.get(t)) {
+        func(t)
+      }
+      else {
+        None
+      }
+    }
+
+    wrapped
+  }
+
+  override def wrapInFixer(func: ((FROM1, FROM2)) => Option[PigOperator]): ((FROM1, FROM2)) =>
+    Option[dbis.pig.op.PigOperator] =
+    func
 }
