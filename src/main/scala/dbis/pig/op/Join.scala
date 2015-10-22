@@ -48,7 +48,7 @@ case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]],
       }
       case None => newFields += Field("", Types.ByteArrayType)
     })
-    schema = Some(new Schema(BagType(TupleType(newFields.toArray))))
+    schema = Some(new Schema(BagType(TupleType(newFields.toArray), outPipeName)))
     schema
   }
 

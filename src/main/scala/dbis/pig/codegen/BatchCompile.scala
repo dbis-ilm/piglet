@@ -39,8 +39,10 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
                        requiresTypeCast: Boolean = true,
                        aggregate: Boolean = false): String = ref match {
       case DerefTuple(r1, r2) => 
-        if (aggregate) s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]].map(e => e${emitRef(tupleSchema(schema, r1), r2, "", false)})"
-        else s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false, aggregate)}"
+        if (aggregate)
+          s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]].map(e => e${emitRef(tupleSchema(schema, r1), r2, "", false)})"
+        else
+          s"${emitRef(schema, r1, "t", false)}${emitRef(tupleSchema(schema, r1), r2, "", false, aggregate)}"
       case _ => super.emitRef(schema, ref, tuplePrefix, requiresTypeCast, aggregate)
   }
 
@@ -77,11 +79,11 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     gen match {
       case GeneratorList(expr) => {
-        if (requiresFlatMap) emitBagFlattenGenerator(node.inputSchema, expr)
-          else {
-          if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
-            else emitGenerator(node.inputSchema, expr)
-        }
+        if (requiresFlatMap)
+          emitBagFlattenGenerator(node.inputSchema, expr)
+        else if (requiresPlainFlatten)
+          emitFlattenGenerator(node.inputSchema, expr)
+        else emitGenerator(node.inputSchema, expr)
       }
       case GeneratorPlan(plan) => {
         val subPlan = node.asInstanceOf[Foreach].subPlan.get
@@ -110,7 +112,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     * Generates code for the DISTINCT Operator
     *
     * @param node the DISTINCT operator
-     * @return the Scala code implementing the DISTINCT operator
+    * @return the Scala code implementing the DISTINCT operator
     */
   def emitDistinct(node: PigOperator): String = {
     callST("distinct", Map("out" -> node.outPipeName, "in" -> node.inPipeName))
@@ -119,14 +121,13 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
   /** 
     * Generates code for the FILTER Operator
     *
-    * @param schema the nodes schema
-    * @param out name of the output bag
-    * @param in name of the input bag
+    * @param node the FILTER operator
     * @param pred the filter predicate
     * @return the Scala code implementing the FILTER operator
     */
-  def emitFilter(schema: Option[Schema], out: String, in: String, pred: Predicate): String = { 
-    callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(schema, pred)))
+  def emitFilter(node: PigOperator, pred: Predicate): String = {
+    callST("filter", Map("out" -> node.outPipeName,"in" -> node.inPipeName,
+      "pred" -> emitPredicate(node.schema, pred)))
   }
 
   /** 
@@ -138,16 +139,18 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     * @param gen the generate expression
     * @return the Scala code implementing the FOREACH operator
     */
-  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator): String = { 
-    // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
+  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator): String = {
+    require(node.schema.isDefined)
+    val className = schemaClassName(node.schema.get.element.name)
 
+    // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
     val expr = emitForeachExpr(node, gen)
 
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     if (requiresFlatMap)
       callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->expr))
     else
-      callST("foreach", Map("out"->out,"in"->in,"expr"->expr))
+      callST("foreach", Map("out" -> out, "in" -> in, "class" -> className, "expr" -> expr))
   }
 
   /**
@@ -158,10 +161,9 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     * @return the Scala code implementing the GROUPING operator
     */
   def emitGrouping(node: PigOperator, groupExpr: GroupingExpression): String = {
-    val className = node.schema match {
-      case Some(s) => schemaClassName(s.element.name)
-      case None => "TextLine"
-    }
+    require(node.schema.isDefined)
+    val className = schemaClassName(node.schema.get.element.name)
+
     if (groupExpr.keyList.isEmpty)
       callST("groupBy", Map("out"->node.outPipeName, "in"->node.inPipeName, "class" -> className))
     else {
@@ -178,13 +180,14 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
   /**
     * Generates code for the JOIN operator.
     *
-    * @param node the Join Operator node
-    * @param out name of the output bag
+    * @param node the JOIN operator node
     * @param rels list of Pipes to join
     * @param exprs list of join keys
     * @return the Scala code implementing the JOIN operator
     */
-  def emitJoin(node: PigOperator, out: String, rels: List[Pipe], exprs: List[List[Ref]]): String = {
+  def emitJoin(node: PigOperator, rels: List[Pipe], exprs: List[List[Ref]]): String = {
+    require(node.schema.isDefined)
+
     val res = node.inputs.zip(exprs)
     val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
 
@@ -203,10 +206,35 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     val dkeys = keys.zipWithIndex.filter{k => duplicates(k._2) == 0}.map(_._1)
 
     /*
-     * And finally, create the join kv vars for them.
+     * And finally, create the join kv vars for them...
      */
-    var str = callST("join_key_map", Map("rels"->drels.map(_.name), "keys"->dkeys))
-    str += callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
+    var str = callST("join_key_map", Map("rels" -> drels.map(_.name), "keys" -> dkeys))
+
+    /*
+     * We construct a string v._0, v._1 ... w._0, w._1 ... (with field names instead of
+     * _0, _1). The numbers of v's and w's are determined by the size of the input schemas.
+     */
+    val vsize = rels.head.inputSchema.get.fields.length
+    val fieldList = node.schema.get.fields.zipWithIndex
+      .map{case (f, i) => if (i < vsize) s"v.${f.name}" else s"w.${f.name}"}.mkString(", ")
+    println("join fields: " + fieldList)
+
+    val className = node.schema match {
+      case Some(s) => schemaClassName(s.element.name)
+      case None => schemaClassName(node.outPipeName)
+    }
+
+    /*
+      *  ...as well as the actual join.
+      */
+    str += callST("join",
+      Map("out" -> node.outPipeName,
+        "rel1" -> rels.head.name,
+        "class" -> className,
+        "key1" -> keys.head,
+        "rel2" -> rels.tail.map(_.name),
+        "key2" -> keys.tail,
+        "fields" -> fieldList))
 
     joinKeyVars += rels.head.name
     joinKeyVars ++= rels.tail.map(_.name)
@@ -216,13 +244,12 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
   /**
     * Generates code for the LIMIT Operator
     *
-    * @param out name of the output bag
-    * @param in name of the input bag
+    * @param node the LIMIT operator
     * @param num amount of retruned records
     * @return the Scala code implementing the LIMIT operator
     */
-  def emitLimit(out: String, in: String, num: Int): String = {
-    callST("limit", Map("out"->out,"in"->in,"num"->num))
+  def emitLimit(node: PigOperator, num: Int): String = {
+    callST("limit", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "num" -> num))
   }
 
   /**
@@ -259,11 +286,11 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
        */
       case Cross(out, rels, _) => emitCross(node)
       case Distinct(out, in, _) => emitDistinct(node)
-      case Filter(out, in, pred, _) => emitFilter(node.schema, node.outPipeName, node.inPipeName, pred)
+      case Filter(out, in, pred, _) => emitFilter(node, pred)
       case Foreach(out, in, gen, _) => emitForeach(node, node.outPipeName, node.inPipeName, gen)
       case Grouping(out, in, groupExpr, _) => emitGrouping(node, groupExpr)
-      case Join(out, rels, exprs, _) => emitJoin(node, node.outPipeName, node.inputs, exprs)
-      case Limit(out, in, num) => emitLimit(node.outPipeName, node.inPipeName, num)
+      case Join(out, rels, exprs, _) => emitJoin(node, node.inputs, exprs)
+      case Limit(out, in, num) => emitLimit(node, num)
       case OrderBy(out, in, orderSpec, _) => emitOrderBy(node, node.outPipeName, node.inPipeName, orderSpec)
       case _ => super.emitNode(node)
     }

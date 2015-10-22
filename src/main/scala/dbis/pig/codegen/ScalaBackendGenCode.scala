@@ -35,9 +35,8 @@ import scala.collection.mutable.ListBuffer
  * a template file for the backend-specific code.
  *
  * The main idea of the generated code is the following: a record of the backend-specific data
- * structure (e.g. RDD in Spark) is represented by List[Any] to allow variable-sized tuples as
- * supported in Pig. This requires to always map the output of any backend transformation back
- * to such a list.
+ * structure (e.g. RDD in Spark) is represented by an instance of a specific case class which is
+ * generated according to the schema of an operator.
  *
  * @param template the name of the backend-specific template fle
  */
@@ -171,12 +170,12 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
               requiresTypeCast: Boolean = true,
               aggregate: Boolean = false): String = ref match {
-    case nf @ NamedField(f, _) => s"${tuplePrefix}.$f"
+    case nf @ NamedField(f, _) => s"$tuplePrefix.$f"
     case PositionalField(pos) => s"$tuplePrefix._$pos"
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
-    case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
+    case DerefMap(m, k) => s"${emitRef(schema, m)}(${k})"
     case _ => { "" }
   }
 
@@ -254,10 +253,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       UDFTable.findUDF(f, pTypes) match {
         case Some(udf) => { 
           if (udf.isAggregate) {
-            if (!f.equalsIgnoreCase("count"))
-              s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)}.map(e => e.asInstanceOf[Number].doubleValue))"
-            else
-               s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)}.asInstanceOf[Seq[Any]])"  
+            s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)})"
           }
           else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
         }
@@ -289,7 +285,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return
    */
   def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"List(${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(",")})"
+    s"${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(",")}"
   }
 
   /**
@@ -411,25 +407,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
         ) }
       castList.mkString(",")
   }
-  /**
-   * Generates code for the LOAD operator.
-   *
-   * @param out name of the output bag
-   * @param file the name of the file to be loaded
-   * @param loaderFunc an optional loader function (we assume a corresponding Scala function is available)
-   * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
-   * @return the Scala code implementing the LOAD operator
-   */
-  /*
-  def emitLoader(out: String, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
-    if (loaderFunc.isEmpty)
-      callST("loader", Map("out"->out,"file"->file.toString(), "func"-> BackendManager.backend.defaultConnector))
-    else {
-      val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams.mkString(",") else ""
-      callST("loader", Map("out"->out,"file"->file.toString(),"func"->loaderFunc.get,"params"->params))
-    }
-  }
-  */
+
   /**
    * Generates code for the LOAD operator.
    *
@@ -498,8 +476,15 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    */
   def emitSchemaClass(schema: Schema): String = {
     // TODO: handle schemas where no field names are defined
+    def typeName(f: PigType) = scalaTypeMappingTable.get(f) match {
+      case Some(n) => n
+      case None => f match {
+        case BagType(v, s) => s
+        case _ => "????"
+      }
+    }
     val fields = schema.fields.toList
-    val fieldStr = fields.map(f => s"${f.name} : ${scalaTypeMappingTable(f.fType)}").mkString(", ")
+    val fieldStr = fields.map(f => s"${f.name} : ${typeName(f.fType)}").mkString(", ")
     val getterStr = fields.zipWithIndex.map{ case (f, i) => s"def _$i = ${f.name}"}.mkString("\n")
     val toStr = """s"""" + fields.zipWithIndex.map{ case (f, i) => "${" + s"_$i" + "}"}.mkString("${_c}") + '"'
 

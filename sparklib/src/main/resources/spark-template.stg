@@ -55,8 +55,8 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element -----------
-foreach(out,in,expr,aggrs) ::=<<
-        val <out> = <in>.map(t => <expr>)
+foreach(out, in, expr, class) ::=<<
+        val <out> = <in>.map(t => <class>(<expr>))
 >>
 
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
@@ -74,23 +74,23 @@ groupBy(out, in, expr, class, keyExtr) ::=<<
 >>
 
 // ------------------ Outputs only distinct values ----------------------------
-distinct(out,in) ::=<<
+distinct(out, in) ::=<<
         val <out> = <in>.distinct
 >>
 
 // ------------------ Outputs only num records --------------------------------
-limit(out,in,num) ::=<<
+limit(out, in, num) ::=<<
         val <out> = sc.parallelize(<in>.take(<num>))
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
-join_key_map(rels,keys) ::=<<
+join_key_map(rels, keys) ::=<<
         <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
         }>
 >>
 
-join(out,rel1,key1,rel2,key2) ::=<<
-        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => (k, v ++ w)\}}>.map{case (k,v) => v}
+join(out, class, rel1, key1, rel2, key2, fields) ::=<<
+        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => <class>(<fields>)\}}>
 
 >>
 
