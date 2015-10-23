@@ -70,7 +70,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
       Field("t", TupleType(Array(Field("f1", Types.IntType), Field("f2", Types.IntType)))),
       Field("b", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))))
-    assert(parseScript("""a = load 'file.csv' as (a:int, t:tuple(f1: int, f2:int), b:{t2:tuple(f3:double, f4:double)}); """) ==
+    assert(parseScript("""a = load 'file.csv' as (a:int, t:tuple(f1: int, f2:int), b:{tuple(f3:double, f4:double)}); """) ==
       List(Load(Pipe("a"), uri, Some(Schema(schema)))))
   }
 
