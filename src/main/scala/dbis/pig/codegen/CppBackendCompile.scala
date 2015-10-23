@@ -119,7 +119,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
     if (tp == None)
       None
     else
-      Some(new Schema(if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType(tp.asInstanceOf[TupleType])))
+      Some(Schema(if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType(tp.asInstanceOf[TupleType])))
   }
 
   private def getFieldInfo(schema: Option[Schema], ref: Ref): (Int, PigType) = schema match {
@@ -548,7 +548,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
       val inputs = node.inputs
       for (i <- rels.length - 1 to 2 by -1) {
         fields ++= inputs(i - 1).producer.schema.get.fields ++ inputs(i).producer.schema.get.fields
-        val joinSchema = Some(new Schema(BagType(TupleType(fields.toArray))))
+        val joinSchema = Some(Schema(BagType(TupleType(fields.toArray))))
         types += callST("tuple_typedef", Map("tuple_struct" -> schemaToTupleStruct(joinSchema),
           "type_name" -> s"${node.outPipeName}_${i}_TupleType"))
       }

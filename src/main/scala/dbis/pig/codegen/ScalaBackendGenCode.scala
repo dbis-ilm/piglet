@@ -363,9 +363,9 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     def genStringRepOfTuple(schema: Option[Schema], stringDelim: String = "','"): String = schema match {
       case Some(s) => (0 to s.fields.length-1).toList.map{ i => s.field(i).fType match {
           // TODO: this should be processed recursively
-        case BagType(n, t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
-        case TupleType(n, f) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
-        case MapType(t, n) => s""".append(t(${i}).asInstanceOf[Map[String,Any]].map{case (k,v) => k + "#" + v}.mkString("[", ",", "]"))"""
+        case BagType(t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
+        case TupleType(t, _) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
+        case MapType(t) => s""".append(t(${i}).asInstanceOf[Map[String,Any]].map{case (k,v) => k + "#" + v}.mkString("[", ",", "]"))"""
         case _ => s".append(t($i))"
       }}.mkString(s"\n    .append($stringDelim)\n")
       case None => s".append(t(0))\n"
@@ -431,8 +431,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     }
     node.schema match {
       case Some(s) => paramMap += ("extractor" ->
-        s"""(data: Array[String]) => ${schemaClassName(s.element.name)}(${schemaExtractor(s)})""",
-        "class" -> schemaClassName(s.element.name))
+        s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
+        "class" -> schemaClassName(s.className))
       case None => paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))",
         "class" -> "TextLine")
     }
@@ -453,7 +453,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       "file" -> file.toString,
       "func" -> storeFunc.getOrElse(BackendManager.backend.defaultConnector))
     node.schema match {
-      case Some(s) => paramMap += ("class" -> schemaClassName(s.element.name))
+      case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
       case None => paramMap += ("class" -> "TextLine")
     }
 
@@ -490,7 +490,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       case None => f match {
         // if we have a bag without a name then we assume that we have got
         // a case class with _<field_name>_Tuple
-        case BagType(v, s) => if (s.isEmpty) s"Iterable[_${n}_Tuple]" else s
+        case BagType(v) => s"Iterable[_${v.className}_Tuple]"
         case _ => f.descriptionString
       }
     }
@@ -505,7 +505,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     // construct the mkString method
     val toStr = """s"""" + fields.zipWithIndex.map{ case (f, i) => "${" + s"_$i" + "}"}.mkString("${_c}") + '"'
 
-    callST("schema_class", Map("name" -> schemaClassName(schema.element.name),
+    callST("schema_class", Map("name" -> schemaClassName(schema.className),
                               "fields" -> fieldStr,
                               "getter" -> getterStr,
                               "string_rep" -> toStr))

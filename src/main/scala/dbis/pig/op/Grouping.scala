@@ -91,7 +91,7 @@ case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var wind
     val groupingType = groupExpr.resultType(inputSchema)
     val fields = Array(Field("group", groupingType),
       Field(inputs.head.name, BagType(inputType)))
-    schema = Some(new Schema(new BagType(new TupleType(fields), outPipeName)))
+    schema = Some(Schema(BagType(TupleType(fields))))
     schema
   }
 

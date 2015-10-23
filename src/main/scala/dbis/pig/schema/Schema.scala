@@ -17,6 +17,7 @@
 package dbis.pig.schema
 
 import dbis.pig.op.NamedField
+import scala.collection.mutable.Map
 
 /**
  * An exception indicating failures in schema handling.
@@ -37,10 +38,21 @@ case class AmbiguousFieldnameException(private val msg: String) extends  Excepti
  * We assume that the element type is a bag of tuple types.
  *
  * @param element the type definition - in most cases a bag of tuples
+ * @param className a unique name for the schema which is used to generate classes
+ *                  representing tuples. The className is assigned later.
  *
  */
-case class Schema(var element: BagType) {
-  def setBagName(s: String) =  element.name = s
+case class Schema(var element: BagType, var className: String = "") {
+
+  def setBagName(s: String): Unit =  {} // element.name = s
+
+  /**
+   * Returns a compact representation of the schema which is used to compare two
+   * schemas for equality.
+   *
+   * @return a string representation
+   */
+  def schemaCode(): String = element.encode
 
   /**
    * Returns the index of the field in the schema.
@@ -65,7 +77,7 @@ case class Schema(var element: BagType) {
   def indexOfField(nf: NamedField): Int = {
     if (! element.valueType.isInstanceOf[TupleType])
       throw new SchemaException("schema type isn't a bag of tuples")
-    val tupleType = element.valueType.asInstanceOf[TupleType]
+    val tupleType = element.valueType
     tupleType.fields.count(_.name == nf.name) match {
       case 0 => -1
       case 1 =>
@@ -105,7 +117,7 @@ case class Schema(var element: BagType) {
   def field(pos: Int): Field = {
     if (! element.valueType.isInstanceOf[TupleType])
       throw SchemaException("schema type isn't a bag of tuples")
-    val tupleType = element.valueType.asInstanceOf[TupleType]
+    val tupleType = element.valueType
     tupleType.fields(pos)
   }
 
@@ -149,7 +161,7 @@ case class Schema(var element: BagType) {
   def fields: Array[Field] = {
     if (! element.valueType.isInstanceOf[TupleType])
       throw SchemaException("schema type isn't a bag of tuples")
-    val tupleType = element.valueType.asInstanceOf[TupleType]
+    val tupleType = element.valueType
     tupleType.fields
   }
 
@@ -159,4 +171,31 @@ case class Schema(var element: BagType) {
    * @return the string representation
    */
   override def toString = "Schema(" + element.toString + "," + element.name + ")"
+}
+
+object Schema {
+  private val schemaSet = Map[String, Schema]()
+  private var cnt = 0
+
+  def apply(b: BagType) = {
+    val s = new Schema(b)
+    registerSchema(s)
+  }
+
+  def init(): Unit = {
+    schemaSet.clear()
+    cnt = 0
+  }
+
+  def registerSchema(schema: Schema): Schema = {
+    val code = schema.schemaCode
+    if (schemaSet.contains(code))
+      schemaSet(code)
+    else {
+      schema.className = s"t${cnt}"
+      schemaSet += code -> schema
+      cnt += 1
+      schema
+    }
+  }
 }

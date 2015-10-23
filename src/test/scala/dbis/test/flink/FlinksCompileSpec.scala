@@ -182,8 +182,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
     val op = Store(Pipe("A"), file)
     op.schema = Some(new Schema(BagType(TupleType(Array(
         Field("f1", Types.IntType),
-        Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))), "b"))
-    ), "t"), "s")))
+        Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))))))
 
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitHelperClass(op))
@@ -237,8 +236,7 @@ class FlinksCompileSpec extends FlatSpec with LazyLogging {
                                                  OrderBySpec(NamedField("f3"), OrderByDirection.AscendingOrder)))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
                                                     Field("f2", Types.DoubleType),
-                                                    Field("f3", Types.IntType)
-    ), "t"), "s"))
+                                                    Field("f3", Types.IntType)))))
     op.schema = Some(schema)
     val codeGenerator = new StreamingGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))

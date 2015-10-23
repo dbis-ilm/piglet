@@ -27,21 +27,14 @@ class SchemaSpec extends FlatSpec with OptionValues with Matchers {
 
   "The schema" should "contain f1, f2" in {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.DoubleType),
-                                                              Field("f2", Types.CharArrayType)), "t"), "s"))
+                                                              Field("f2", Types.CharArrayType)))))
     assert(schema.indexOfField("f1") == 0)
     assert(schema.indexOfField("f2") == 1)
     assert(schema.field(0) == Field("f1", Types.DoubleType))
     assert(schema.field(1) == Field("f2", Types.CharArrayType))
   }
 
-  it should "allow to change the bag name" in {
-    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.DoubleType),
-      Field("f2", Types.CharArrayType)), "t"), "s"))
-    schema.setBagName("bag")
-    assert(schema.element.name == "bag")
-  }
-
-  "A Fields toString" should "contain its lineage information after a JOIN" in {
+  "A fields toString" should "contain its lineage information after a JOIN" in {
     val plan = new DataflowPlan(parseScript(
       """
         | A = LOAD '$inbase/input/joinInput.csv' USING PigStorage(',') AS (a1:int,a2:int);

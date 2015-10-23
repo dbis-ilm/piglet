@@ -375,7 +375,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
   def containsOperator(op: PigOperator): Boolean = operators.contains(op)
 
   /**
-   * Returns the set of schema objects constructed in the dataflow plan. If this set
+   * Returns the list of schema objects constructed in the dataflow plan. If this set
    * wasn't retrieved before, the set is constructed.
    *
    * @return a list (set) of schema objects
@@ -383,16 +383,18 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
   def schemaList(): List[Schema] = {
     if (schemaSet.isEmpty) {
       operators.foreach(op => {
-        op.constructSchema match {
+        // first, we collect all schemas
+        op.schema match {
           case Some(schema) => {
             println("schema: " + schema + " of operator: " + op)
+            // and store them in a set
             schemaSet += schema
           }
           case None => { /* ????? */ }
         }
       })
     }
-    schemaSet.toList.sortWith(_.toString < _.toString)
+    schemaSet.toList.sortWith(_.schemaCode() < _.schemaCode())
   }
 
   def printPlan(tab: Int = 0): Unit = {

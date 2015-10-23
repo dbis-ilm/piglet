@@ -876,7 +876,7 @@ class RewriterSpec extends FlatSpec
             Some(Field("s", Types.CharArrayType))
           )
         ))),
-        Some(Schema(BagType(TupleType(Array(Field("s", Types.CharArrayType))), "b")))
+        Some(Schema(BagType(TupleType(Array(Field("s", Types.CharArrayType))))))
         ),
       (List(
         TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
@@ -896,7 +896,7 @@ class RewriterSpec extends FlatSpec
             Some(Field("p", Types.CharArrayType))
           )
         ))),
-        Some(Schema(BagType(TupleType(Array(Field("p", Types.CharArrayType))), "b")))
+        Some(Schema(BagType(TupleType(Array(Field("p", Types.CharArrayType))))))
         ),
       (List(
         TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")),
@@ -916,7 +916,7 @@ class RewriterSpec extends FlatSpec
             Some(Field("o", Types.CharArrayType))
           )
         ))),
-        Some(Schema(BagType(TupleType(Array(Field("o", Types.CharArrayType))), "b")))
+        Some(Schema(BagType(TupleType(Array(Field("o", Types.CharArrayType))))))
         )
     )
 
@@ -1076,7 +1076,7 @@ class RewriterSpec extends FlatSpec
             Some(Field("s", Types.CharArrayType))
           )
         ))),
-        Some(Schema(BagType(TupleType(Array(Field("s", Types.CharArrayType))), "b")))
+        Some(Schema(BagType(TupleType(Array(Field("s", Types.CharArrayType))))))
         ),
       (List(
         TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
@@ -1096,7 +1096,7 @@ class RewriterSpec extends FlatSpec
             Some(Field("p", Types.CharArrayType))
           )
         ))),
-        Some(Schema(BagType(TupleType(Array(Field("p", Types.CharArrayType))), "b")))
+        Some(Schema(BagType(TupleType(Array(Field("p", Types.CharArrayType))))))
         ),
       (List(
         TriplePattern(NamedField("o"), Value("pred1"), PositionalField(2)),
@@ -1116,7 +1116,7 @@ class RewriterSpec extends FlatSpec
             Some(Field("o", Types.CharArrayType))
           )
         ))),
-        Some(Schema(BagType(TupleType(Array(Field("o", Types.CharArrayType))), "b")))
+        Some(Schema(BagType(TupleType(Array(Field("o", Types.CharArrayType))))))
         )
     )
 
@@ -1202,7 +1202,7 @@ class RewriterSpec extends FlatSpec
             Some(Field("s", Types.CharArrayType))
           )
         ))),
-        Some(Schema(BagType(TupleType(Array(Field("s", Types.CharArrayType))), "b")))
+        Some(Schema(BagType(TupleType(Array(Field("s", Types.CharArrayType))))))
         ),
       (List(
         TriplePattern(PositionalField(0), NamedField("p"), Value("obj1")),
@@ -1244,7 +1244,7 @@ class RewriterSpec extends FlatSpec
             Some(Field("p", Types.CharArrayType))
           )
         ))),
-        Some(Schema(BagType(TupleType(Array(Field("p", Types.CharArrayType))), "b")))
+        Some(Schema(BagType(TupleType(Array(Field("p", Types.CharArrayType))))))
         ),
       (List(
         TriplePattern(NamedField("o"), Value("pred1"), PositionalField(2)),
@@ -1286,7 +1286,7 @@ class RewriterSpec extends FlatSpec
             Some(Field("o", Types.CharArrayType))
           )
         ))),
-        Some(Schema(BagType(TupleType(Array(Field("o", Types.CharArrayType))), "b")))
+        Some(Schema(BagType(TupleType(Array(Field("o", Types.CharArrayType))))))
         )
     )
 

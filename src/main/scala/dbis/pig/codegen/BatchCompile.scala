@@ -141,7 +141,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     */
   def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator): String = {
     require(node.schema.isDefined)
-    val className = schemaClassName(node.schema.get.element.name)
+    val className = schemaClassName(node.schema.get.className)
 
     // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
     val expr = emitForeachExpr(node, gen)
@@ -162,7 +162,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     */
   def emitGrouping(node: PigOperator, groupExpr: GroupingExpression): String = {
     require(node.schema.isDefined)
-    val className = schemaClassName(node.schema.get.element.name)
+    val className = schemaClassName(node.schema.get.className)
 
     if (groupExpr.keyList.isEmpty)
       callST("groupBy", Map("out"->node.outPipeName, "in"->node.inPipeName, "class" -> className))
@@ -220,7 +220,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     println("join fields: " + fieldList)
 
     val className = node.schema match {
-      case Some(s) => schemaClassName(s.element.name)
+      case Some(s) => schemaClassName(s.className)
       case None => schemaClassName(node.outPipeName)
     }
 

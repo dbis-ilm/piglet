@@ -168,7 +168,7 @@ case class Foreach(out: Pipe,
       case GeneratorList(expr) => {
         val fields = constructFieldList(expr)
 
-        schema = Some(new Schema(new BagType(new TupleType(fields), outPipeName)))
+        schema = Some(Schema(BagType(TupleType(fields))))
       }
       case GeneratorPlan(_) => {
         val plan = subPlan.get.operators
@@ -324,7 +324,7 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
   // TODO: what do we need here?
   override def constructSchema: Option[Schema] = {
     val fields = constructFieldList(exprs)
-    schema = Some(new Schema(new BagType(new TupleType(fields))))
+    schema = Some(Schema(BagType(TupleType(fields))))
     schema
   }
 
@@ -435,10 +435,10 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
         }
         // construct a schema from the component type
         //        val resSchema = new Schema(new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName))
-        val resSchema = new Schema(if (componentType.isInstanceOf[BagType])
+        val resSchema = Schema(if (componentType.isInstanceOf[BagType])
           componentType.asInstanceOf[BagType]
         else
-          new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName))
+          BagType(TupleType(Array(Field(componentName, componentType)))))
         schema = Some(resSchema)
 
       }
