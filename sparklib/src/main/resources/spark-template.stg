@@ -46,7 +46,8 @@ dump(in) ::=<<
 // ------------------ STORE Results on disk -----------------------------------
 
 store(in, file, class, func, params) ::= <<
-    <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)
+    val <in>_helper = <in>.coalesce(1, true)
+    <func>[<class>]().write("<file>", <in>_helper<if (params)>, <params><endif>)
 >>
 
 // ------------------ FILTER for a predicate ----------------------------------

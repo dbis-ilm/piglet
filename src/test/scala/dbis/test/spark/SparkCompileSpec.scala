@@ -760,7 +760,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     """
       |A = LOAD 'file' AS (f1: int, f2: chararray, f3: double);
       |B = FILTER A BY f1 > 0;
-      |C = FOREACH B GENERATE f1, f2, f3, $2 + 44 AS f4:int;
+      |C = FOREACH B GENERATE f1, f2, f3 + 5, $2 + 44 AS f4:int;
       |DUMP C;
     """.stripMargin
     )
@@ -776,20 +776,54 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
     """
+      |case class _C_Tuple (f1 : Int, f2 : String, _2 : Double, f4 : Int) extends java.io.Serializable with SchemaClass {
+      |def _0 = f1
+      |def _1 = f2
+      |def _3 = f4
+      |override def mkString(_c: String = ",") = s"${_0}${_c}${_1}${_c}${_2}${_c}${_3}"
+      |}
       |case class _B_Tuple (f1 : Int, f2 : String, f3 : Double) extends java.io.Serializable with SchemaClass {
       |def _0 = f1
       |def _1 = f2
       |def _2 = f3
       |override def mkString(_c: String = ",") = s"${_0}${_c}${_1}${_c}${_2}"
       |}
-      |case class _C_Tuple (f1 : Int, f2 : String, f3 : Double, f4 : Int) extends java.io.Serializable with SchemaClass {
-      |def _0 = f1
-      |def _1 = f2
-      |def _2 = f3
-      |def _3 = f4
-      |override def mkString(_c: String = ",") = s"${_0}${_c}${_1}${_c}${_2}${_c}${_3}"
-      |}
-    """.stripMargin
+      |""".stripMargin
+    )
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for nested schema classes" in {
+    val ops = parseScript(
+      """
+        |daily = load 'file' using PigStorage(',') as (exchange, symbol);
+        |grpd  = group daily by exchange;
+        |DUMP grpd;
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new BatchGenCode(templateFile)
+
+    var code: String = ""
+    for (schema <- plan.schemaList) {
+      code = code + codeGenerator.emitSchemaClass(schema)
+    }
+
+    val generatedCode = cleanString(code)
+    val expectedCode = cleanString(
+      """
+        |case class _daily_Tuple (exchange : String, symbol : String) extends java.io.Serializable with SchemaClass {
+        |def _0 = exchange
+        |def _1 = symbol
+        |override def mkString(_c: String = ",") = s"${_0}${_c}${_1}"
+        |}
+        |case class _grpd_Tuple (group : String, daily : List[_daily_Tuple]) extends java.io.Serializable with SchemaClass {
+        |def _0 = group
+        |def _1 = daily
+        |override def mkString(_c: String = ",") = s"${_0}${_c}${_1}"
+        |}
+        |""".stripMargin
     )
     assert(generatedCode == expectedCode)
   }

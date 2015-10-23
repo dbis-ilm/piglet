@@ -395,7 +395,10 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     schemaSet.toList.sortWith(_.toString < _.toString)
   }
 
-  /**
+  def printPlan(tab: Int = 0): Unit = {
+    operators.foreach(_.printOperator(tab))
+  }
+   /**
    * Swaps two successive operators in the dataflow plan. Both operators are unary operators and have to be already
    * part of the plan.
    *

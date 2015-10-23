@@ -166,7 +166,9 @@ object PigCompiler extends PigParser with LazyLogging {
       newPlan = processPlan(newPlan)
       
       logger.debug("finished optimizations")
-      println("final plan = {\n" + newPlan.operators.mkString("\n") + "}")
+      println("final plan = {")
+      newPlan.printPlan()
+      println("}")
 
       try {
         // if this does _not_ throw an exception, the schema is ok

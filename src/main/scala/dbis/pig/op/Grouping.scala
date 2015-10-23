@@ -107,6 +107,14 @@ case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var wind
       }
     }
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"GROUPING { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "group on = " + groupExpr)
+  }
+
 }
 
 

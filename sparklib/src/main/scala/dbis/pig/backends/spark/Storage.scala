@@ -65,7 +65,7 @@ class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
   def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): RDD[T] =
     sc.textFile(path).map(line => extract(line.split(delim, -1)))
 
-  def write(path: String, rdd: RDD[T], delim: String = "\t") = rdd.map(_.mkString(delim)).saveAsTextFile(path)
+  def write(path: String, rdd: RDD[T], delim: String = ",") = rdd.map(_.mkString(delim)).saveAsTextFile(path)
 }
 
 object PigStorage extends java.io.Serializable {

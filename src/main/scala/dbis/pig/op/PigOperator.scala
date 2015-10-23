@@ -270,7 +270,7 @@ trait PigOperator extends Rewritable with Serializable {
       case op: PigOperator =>
         val idx = this.outputs.indexWhere(_.name == outname)
         if (idx > -1) {
-          // There already is a Pipe to `outname`
+          // There is already  a pipe to `outname`
           this.outputs(idx).consumer = this.outputs(idx).consumer :+ op
         } else {
           this.outputs = this.outputs :+ Pipe(outname, this, List(op))
@@ -282,5 +282,11 @@ trait PigOperator extends Rewritable with Serializable {
       case _ => illegalArgs("PigOperator", "PigOperator", outputs)
     }
     this
+  }
+
+  def indent(tab: Int): String = new String((for (i <-1 to tab) yield ' ').toArray)
+
+  def printOperator(tab: Int): Unit = {
+    println(indent(tab) + this.toString + s" { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
   }
 }

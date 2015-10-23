@@ -475,17 +475,34 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return a string representing the code
    */
   def emitSchemaClass(schema: Schema): String = {
-    // TODO: handle schemas where no field names are defined
-    def typeName(f: PigType) = scalaTypeMappingTable.get(f) match {
+    /**
+     * Create the field name: either the original name or - if no name was given -
+     * a name like "_<i>".
+     *
+     * @param n the field name (if exist)
+     * @param i the position of the field
+     * @return a non-empty field name
+     */
+    def fieldName(n: String, i: Int): String = if (n.isEmpty) s"_$i" else n
+
+    def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
       case Some(n) => n
       case None => f match {
-        case BagType(v, s) => s
-        case _ => "????"
+        // if we have a bag without a name then we assume that we have got
+        // a case class with _<field_name>_Tuple
+        case BagType(v, s) => if (s.isEmpty) s"Iterable[_${n}_Tuple]" else s
+        case _ => f.descriptionString
       }
     }
     val fields = schema.fields.toList
-    val fieldStr = fields.map(f => s"${f.name} : ${typeName(f.fType)}").mkString(", ")
-    val getterStr = fields.zipWithIndex.map{ case (f, i) => s"def _$i = ${f.name}"}.mkString("\n")
+    // build the list of field names
+    val fieldStr = fields.zipWithIndex.map{ case (f, i) => s"${fieldName(f.name, i)} : ${typeName(f.fType, f.name)}"}.mkString(", ")
+
+    // construct the getter methods, e.g. def _0 = field1, but leave out fields without names
+    val getterStr = fields.zipWithIndex.filter{ case (f, i) => ! f.name.isEmpty }
+      .map{ case (f, i) => s"def _$i = ${f.name}"}.mkString("\n")
+
+    // construct the mkString method
     val toStr = """s"""" + fields.zipWithIndex.map{ case (f, i) => "${" + s"_$i" + "}"}.mkString("${_c}") + '"'
 
     callST("schema_class", Map("name" -> schemaClassName(schema.element.name),

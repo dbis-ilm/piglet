@@ -33,7 +33,9 @@ trait ForeachGenerator {}
  * @param expr
  * @param alias
  */
-case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None)
+case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None) {
+  override def toString = expr + (if (alias.isDefined) s" -> ${alias.get}" else "")
+}
 
 /**
  * GeneratorList implements the ForeachGenerator trait and is used to represent
@@ -244,6 +246,16 @@ case class Foreach(out: Pipe,
         false // TODO: what happens if GENERATE contains flatten?
     }
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"FOREACH { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    generator match {
+      case GeneratorList(exprs) => println(indent(tab + 2) + "exprs = " + exprs.mkString(","))
+      case GeneratorPlan(_) => subPlan.get.printPlan(tab + 5)
+    }
+  }
 }
 
 class NamedFieldExtractor {
@@ -317,18 +329,28 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
   }
 
   override def checkSchemaConformance: Boolean = {
+    // return true
     // we have to extract all RefExprs
     val traverse = new RefExprExtractor
     exprs.foreach(e => e.expr.traverseAnd(null, traverse.collectRefExprs))
 
-    // we collect a list of fields of all input schemas
+    // we collect a list of fields of all input schemas + parentSchema
     val fieldList = ListBuffer[Field]()
     inputs.foreach(p => p.inputSchema match {
       case Some(s) => fieldList ++= s.fields
       case None => {}
     })
     val res = traverse.exprs.map(rex => rex.r match {
-      case NamedField(n, _) => fieldList.exists(_.name == n)
+      case NamedField(n, _) =>
+        // is n just a simple field in our input?
+        if (fieldList.exists(_.name == n)) true
+        // otherwise we check whether n refers to a pipe
+        else if (parentOp.findOperatorInSubplan(n).isDefined) true
+        else {
+          // finally we look in the parentSchema
+          println("=======> looking for " + n + " in " + parentOp.schema)
+          true
+        }
       case PositionalField(p) => if (fieldList.isEmpty) p == 0 else p < fieldList.length
       case Value(v) => true // okay
       case DerefStreamingTuple(r1, r2) => true // TODO: is r1 a valid ref?
@@ -358,6 +380,14 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
         case None => val res = e.expr.resultType(inputSchema); Field("", res)
       }
     }).toArray
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"GENERATE { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "exprs = " + exprs.mkString(","))
+  }
+
 }
 
 /**
@@ -379,7 +409,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
         // first, we determine the field in the schema
         val field = refExpr match {
           case DerefTuple(t, r) => t match {
-            case nf @ NamedField(n, _) => {
+            case nf@NamedField(n, _) => {
               if (s.element.name == n)
                 Field(n, s.element)
               else
@@ -404,7 +434,7 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
           case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
         }
         // construct a schema from the component type
-//        val resSchema = new Schema(new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName))
+        //        val resSchema = new Schema(new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName))
         val resSchema = new Schema(if (componentType.isInstanceOf[BagType])
           componentType.asInstanceOf[BagType]
         else
@@ -413,7 +443,14 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
 
       }
       case None => None
-  }
+    }
     schema
+  }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"CONSTRUCT_BAG { out = ${outPipeNames.mkString(",")}  }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "ref = " + refExpr)
   }
 }
