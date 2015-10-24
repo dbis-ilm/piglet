@@ -491,6 +491,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
         // if we have a bag without a name then we assume that we have got
         // a case class with _<field_name>_Tuple
         case BagType(v) => s"Iterable[_${v.className}_Tuple]"
+        case TupleType(f, c) => schemaClassName(c)
         case _ => f.descriptionString
       }
     }
@@ -503,7 +504,24 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       .map{ case (f, i) => s"def _$i = ${f.name}"}.mkString("\n")
 
     // construct the mkString method
-    val toStr = """s"""" + fields.zipWithIndex.map{ case (f, i) => "${" + s"_$i" + "}"}.mkString("${_c}") + '"'
+    //   we have to handle the different types here:
+    //      TupleType -> ()
+    //      BagType -> {}
+    /*
+    val toStr = """s"""" + fields.zipWithIndex.map{
+      case (f, i) => f.fType match {
+        case BagType(_) => "{${" + s"_$i" + "}}"
+        case TupleType(f, _) => "(${" + s"_$i" + "})"
+        case _ => "${" + s"_$i" + "}"
+      }
+    }.mkString("${_c}") + '"'
+    */
+    val toStr = fields.zipWithIndex.map{
+      case (f, i) => f.fType match {
+        case BagType(_) => s""""{" + _$i.mkString(",") + "}""""
+        case _ => s"_$i"
+      }
+    }.mkString(" + _c + ")
 
     callST("schema_class", Map("name" -> schemaClassName(schema.className),
                               "fields" -> fieldStr,

@@ -769,7 +769,6 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
     Schema.init()
-    TupleType.init()
     parseScript(new CharSequenceReader(s), feature)
   }
 

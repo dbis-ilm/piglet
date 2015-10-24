@@ -160,16 +160,26 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     * @param groupExpr the grouping expression
     * @return the Scala code implementing the GROUPING operator
     */
-  def emitGrouping(node: PigOperator, groupExpr: GroupingExpression): String = {
+  def emitGrouping(node: Grouping, groupExpr: GroupingExpression): String = {
     require(node.schema.isDefined)
     val className = schemaClassName(node.schema.get.className)
 
+    // GROUP ALL: no need to generate a key
     if (groupExpr.keyList.isEmpty)
       callST("groupBy", Map("out"->node.outPipeName, "in"->node.inPipeName, "class" -> className))
     else {
-      val keyExtr = if (groupExpr.keyList.size > 1)
-        "(" + (for (i <- 1 to groupExpr.keyList.size) yield s"k._$i").mkString(", ") + ")"
-      else "k"
+      val keyExtr = if (groupExpr.keyList.size > 1) {
+        // the grouping key consists of multiple fields, i.e. we have
+        // to construct a tuple where the type is the TupleType of the group field
+        val field = node.schema.get.field("group")
+        val className = field.fType match {
+          case TupleType(f, c) => schemaClassName(c)
+          case _ => throw TemplateException("unknown type for grouping key")
+        }
+
+        s"${className}(" + (for (i <- 1 to groupExpr.keyList.size) yield s"k._$i").mkString(", ") + ")"
+      }
+      else "k" // the simple case: the key is a single field
 
       callST("groupBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className,
         "expr" -> emitGroupExpr(node.inputSchema, groupExpr),
@@ -288,7 +298,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
       case Distinct(out, in, _) => emitDistinct(node)
       case Filter(out, in, pred, _) => emitFilter(node, pred)
       case Foreach(out, in, gen, _) => emitForeach(node, node.outPipeName, node.inPipeName, gen)
-      case Grouping(out, in, groupExpr, _) => emitGrouping(node, groupExpr)
+      case op@Grouping(out, in, groupExpr, _) => emitGrouping(op, groupExpr)
       case Join(out, rels, exprs, _) => emitJoin(node, node.inputs, exprs)
       case Limit(out, in, num) => emitLimit(node, num)
       case OrderBy(out, in, orderSpec, _) => emitOrderBy(node, node.outPipeName, node.inPipeName, orderSpec)

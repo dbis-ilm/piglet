@@ -173,28 +173,60 @@ case class Schema(var element: BagType, var className: String = "") {
   override def toString = "Schema(" + element.toString + "," + element.name + ")"
 }
 
+/**
+ * Companion object for class Schema. The main purpose is to provide a convenient
+ * constructor as well as a mechanism to assign unique names for the generated
+ * schema classes where different schema instances with the same structure have
+ * the same name. We achieve this by collecting all created schemas in a Map where
+ * the schema code acts as the key.
+ */
 object Schema {
   private val schemaSet = Map[String, Schema]()
   private var cnt = 0
+
+  /**
+   * Increments the counter used for creating unique class names
+   * and returns the current value.
+   *
+   * @return the next value of the counter
+   */
+  def nextCounter(): Int = { cnt += 1; cnt }
 
   def apply(b: BagType) = {
     val s = new Schema(b)
     registerSchema(s)
   }
 
+  def apply(fields: Array[Field]) = {
+    val s = new Schema(BagType(TupleType(fields)))
+    registerSchema(s)
+  }
+
+  /**
+   * Clears the map of all schemas and resets the counter.
+   */
   def init(): Unit = {
     schemaSet.clear()
     cnt = 0
   }
 
+  /**
+   * Registers a schema by inserting it into the Map and
+   * deriving a unique class name. If a schema with the
+   * same structure already exists then it is just returned
+   * without creating a new one.
+   *
+   * @param schema the schema to be registered
+   * @return either a new schema or an already existing schema with
+   *         the same structure
+   */
   def registerSchema(schema: Schema): Schema = {
     val code = schema.schemaCode
     if (schemaSet.contains(code))
       schemaSet(code)
     else {
-      schema.className = s"t${cnt}"
+      schema.className = s"t${nextCounter}"
       schemaSet += code -> schema
-      cnt += 1
       schema
     }
   }

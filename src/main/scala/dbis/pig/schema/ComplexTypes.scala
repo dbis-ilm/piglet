@@ -89,29 +89,15 @@ case class TupleType(var fields: Array[Field],var className: String = "") extend
 }
 
 object TupleType {
-  private val typeSet = scala.collection.mutable.Map[String, TupleType]()
-  private var cnt = 0
-
   def apply(fields: Array[Field]) = {
     val t = new TupleType(fields)
     registerType(t)
   }
 
-  def init(): Unit = {
-    typeSet.clear()
-    cnt = 0
-  }
-
   def registerType(tt: TupleType): TupleType = {
-    val code = tt.encode
-    if (typeSet.contains(code))
-      typeSet(code)
-    else {
-      tt.className = s"t${cnt}"
-      typeSet += code -> tt
-      cnt += 1
-      tt
-    }
+    val schema = Schema.registerSchema(Schema(BagType(tt)))
+    tt.className = schema.className
+    tt
   }
 
 }

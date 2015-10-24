@@ -134,6 +134,6 @@ class TypeSpec extends FlatSpec with Matchers {
       Field("t2", Types.ByteArrayType)))
     val tup = TupleType(Array(Field("f1", Types.IntType),
       Field("f2", tup0)))
-    BagType(tup).encode should be ("{(i(aa))}")
+    BagType(tup).encode should be ("{(f1:if2:(t1:at2:a))}")
   }
 }

@@ -37,7 +37,14 @@ trait SchemaClass {
    * @param delim the delimiter string
    * @return a string representation
    */
-  def mkString(delim: String): String
+  def mkString(delim: String = ","): String
+
+  /**
+   * Overrides the default toString method.
+   *
+   * @return a string representation
+   */
+  override def toString() = "(" + mkString() + ")"
 }
 
 /**

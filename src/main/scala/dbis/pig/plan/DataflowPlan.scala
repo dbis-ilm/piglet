@@ -386,7 +386,6 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
         // first, we collect all schemas
         op.schema match {
           case Some(schema) => {
-            println("schema: " + schema + " of operator: " + op)
             // and store them in a set
             schemaSet += schema
           }
