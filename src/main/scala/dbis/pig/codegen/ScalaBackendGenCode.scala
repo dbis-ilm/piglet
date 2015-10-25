@@ -488,6 +488,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
         // a case class with _<field_name>_Tuple
         case BagType(v) => s"Iterable[_${v.className}_Tuple]"
         case TupleType(f, c) => schemaClassName(c)
+        case MapType(v) => s"Map[String,${scalaTypeMappingTable(v)}]"
         case _ => f.descriptionString
       }
     }
