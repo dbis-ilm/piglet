@@ -271,7 +271,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
         }
       }
     }
-    case FlattenExpr(e) => emitExpr(schema, e, false)
+    case FlattenExpr(e) => flattenExpr(schema, e)
     case ConstructTupleExpr(exprs) => s"PigFuncs.toTuple(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case ConstructBagExpr(exprs) => s"PigFuncs.toBag(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
     case ConstructMapExpr(exprs) => s"PigFuncs.toMap(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
@@ -279,25 +279,43 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   }
 
   /**
+   * Constructs the Scala code for flattening a tuple. We have to determine the field in the
+   * input schema refering to a tuple type and extract all fields of this tuple type.
    *
-   * @param schema
-   * @param genExprs
-   * @return
+   * @param schema the input schema of the FOREACH operator
+   * @param e the expression to be flattened (should be a RefExpr)
+   * @return a string representation of the Scala code
    */
-  def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(",")}"
+  def flattenExpr(schema: Option[Schema], e: ArithmeticExpr): String = {
+    if (schema.isEmpty) throw new TemplateException("cannot flatten a tuple without a schema")
+    // we need the field name used in Scala (either the actual name or _<position>) as well as
+    // the actual field
+    val (refName, field) = e match {
+      case RefExpr(r) => r match {
+        case nf@NamedField(n, _) => (n, schema.get.field(nf))
+        case PositionalField(p) => ("_" + p.toString, schema.get.field(p))
+          // either a named or a positional field: all other cases are not allowed!?
+        case _ => throw new TemplateException("invalid flatten expression: argument isn't a reference")
+      }
+      case _ => throw new TemplateException("invalid flatten expression: argument isn't a reference")
+    }
+    if (field.fType.tc != TypeCode.TupleType)
+      // make sure it is really a tuple type: other types cannot be flattened
+      throw new TemplateException("invalid flatten expression: argument doesn't refer to a tuple")
+    val tupleType = field.fType.asInstanceOf[TupleType]
+    // finally, produce a list of t.<refName>.<fieldname>
+    tupleType.fields.map(f => s"t.${refName}.${f.name}").mkString(", ")
   }
 
   /**
-   * Constructs the GENERATE expression list in FOREACH for cases where this list contains the FLATTEN
-   * operator. This case requires to unwrap the list in flatten.
+   * Constructs the GENERATE expression list in FOREACH.
    *
-   * @param schema
-   * @param genExprs
-   * @return
+   * @param schema the input schema
+   * @param genExprs the list of expressions in the GENERATE clause
+   * @return a string representation of the Scala code
    */
-  def emitFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"PigFuncs.flatTuple(${emitGenerator(schema, genExprs)})"
+  def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
+    s"${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(", ")}"
   }
 
   /**
@@ -312,7 +330,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     if (flattenExprs.size == 1) {
       val ex = flattenExprs.head.expr
       if (otherExprs.nonEmpty)
-        s"List(${emitExpr(schema, ex, false)}.asInstanceOf[Seq[Any]].map(s => (${otherExprs.map(e => emitExpr(schema, e.expr, false))}, s))"
+        s"???(${emitExpr(schema, ex, false)}.map(s => (${otherExprs.map(e => emitExpr(schema, e.expr, false))}, s))"
       else
         s"${emitExpr(schema, ex, false)}"
     }
@@ -396,18 +414,6 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   /*                                   Node code generators                                           */
   /*------------------------------------------------------------------------------------------------- */
  
-  private def getFieldTypes(s: Schema): String = {
-      val fieldList = s.fields.zipWithIndex
-      val castList = fieldList.map { case (f, i) => ( 
-          if (f.fType == Types.CharArrayType || f.fType == Types.ByteArrayType || f.fType.isInstanceOf[ComplexType])
-            s"t($i)" 
-          else
-            s"t($i).to${scalaTypeMappingTable(f.fType)}"
-         // s"t($i).asInstanceOf[${scalaTypeMappingTable(f.fType)}]"
-        ) }
-      castList.mkString(",")
-  }
-
   /**
    * Generates code for the LOAD operator.
    *
@@ -497,7 +503,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     }
     val fields = schema.fields.toList
     // build the list of field names
-    val fieldStr = fields.zipWithIndex.map{ case (f, i) => s"${fieldName(f.name, i)} : ${typeName(f.fType, f.name)}"}.mkString(", ")
+    val fieldStr = fields.zipWithIndex.map{ case (f, i) =>
+      s"${fieldName(f.name, i)} : ${typeName(f.fType, f.name)}"}.mkString(", ")
 
     // construct the getter methods, e.g. def _0 = field1, but leave out fields without names
     val getterStr = fields.zipWithIndex.filter{ case (f, i) => ! f.name.isEmpty }
@@ -507,15 +514,6 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     //   we have to handle the different types here:
     //      TupleType -> ()
     //      BagType -> {}
-    /*
-    val toStr = """s"""" + fields.zipWithIndex.map{
-      case (f, i) => f.fType match {
-        case BagType(_) => "{${" + s"_$i" + "}}"
-        case TupleType(f, _) => "(${" + s"_$i" + "})"
-        case _ => "${" + s"_$i" + "}"
-      }
-    }.mkString("${_c}") + '"'
-    */
     val toStr = fields.zipWithIndex.map{
       case (f, i) => f.fType match {
         case BagType(_) => s""""{" + _$i.mkString(",") + "}""""

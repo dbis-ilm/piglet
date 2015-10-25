@@ -164,8 +164,8 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
       case GeneratorList(expr) => {
         if (requiresFlatMap) emitBagFlattenGenerator(node.inputSchema, expr)
           else {
-          if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
-            else emitGenerator(node.inputSchema, expr)
+          /*if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
+            else*/ emitGenerator(node.inputSchema, expr)
         }
       }
       case GeneratorPlan(plan) => {

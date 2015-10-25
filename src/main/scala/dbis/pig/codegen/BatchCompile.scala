@@ -75,15 +75,14 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
 
   def emitForeachExpr(node: PigOperator, gen: ForeachGenerator): String = {
     // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
-    val requiresPlainFlatten =  node.asInstanceOf[Foreach].containsFlatten(onBag = false)
+    // val requiresPlainFlatten =  node.asInstanceOf[Foreach].containsFlatten(onBag = false)
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     gen match {
       case GeneratorList(expr) => {
         if (requiresFlatMap)
           emitBagFlattenGenerator(node.inputSchema, expr)
-        else if (requiresPlainFlatten)
-          emitFlattenGenerator(node.inputSchema, expr)
-        else emitGenerator(node.inputSchema, expr)
+        else
+          emitGenerator(node.inputSchema, expr)
       }
       case GeneratorPlan(plan) => {
         val subPlan = node.asInstanceOf[Foreach].subPlan.get
@@ -148,7 +147,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
 
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     if (requiresFlatMap)
-      callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->expr))
+      callST("foreachFlatMap", Map("out" -> out,"in" -> in,"expr" -> expr))
     else
       callST("foreach", Map("out" -> out, "in" -> in, "class" -> className, "expr" -> expr))
   }

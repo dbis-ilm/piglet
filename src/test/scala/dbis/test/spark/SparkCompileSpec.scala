@@ -440,7 +440,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     op.constructSchema
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t._0,PigFuncs.count(t._1)))")
+    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t._0, PigFuncs.count(t._1)))")
     assert(generatedCode == expectedCode)
   }
 
@@ -451,7 +451,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     op.constructSchema
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t._0,Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
+    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
     assert(generatedCode == expectedCode)
   }
 
@@ -469,7 +469,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     // this is just a hack for this test: normally, the udfAliases map is set in compile
     codeGenerator.udfAliases = Some(plan.udfAliases.toMap)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t._0,Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
+    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
     assert(generatedCode == expectedCode)
   }
 
@@ -482,7 +482,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val a = b.map(t => _t1_Tuple(t._0("k1"),t._1("k2")))""".stripMargin)
+      |val a = b.map(t => _t1_Tuple(t._0("k1"), t._1("k2")))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -495,7 +495,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.map(t => _t1_Tuple(t._0._1,t._2._0))""".stripMargin)
+        |val a = b.map(t => _t1_Tuple(t._0._1, t._2._0))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -528,9 +528,12 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("out").get))
 
     val expectedCode = cleanString(
-      """val out = data.map(t => List(PigFuncs.toTuple(t(0).asInstanceOf[Int],t(1).asInstanceOf[Int]),PigFuncs.toBag(t(0).asInstanceOf[Int],t(1).asInstanceOf[Int]),PigFuncs.toMap(t(2).asInstanceOf[String],t(0).asInstanceOf[Int])))""".stripMargin)
+      """val out = data.map(t => _t3_Tuple(PigFuncs.toTuple(t._0,t._1),PigFuncs.toBag(t._0,t._1),
+        |PigFuncs.toMap(t._2,t._0)))""".stripMargin)
 
     assert(generatedCode == expectedCode)
+    val op = plan.findOperatorForAlias("out").get
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
   }
 
   it should "contain code for a union operator on two relations" in {
@@ -633,14 +636,17 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
 
   it should "contain code for flattening a tuple in FOREACH" in {
     val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
-    val schema = Schema(Array(Field("f1", Types.CharArrayType),
-      Field("f2", TupleType(Array(Field("f3", Types.IntType))))))
+    val schema = Schema(Array(
+      Field("f1", Types.CharArrayType),
+      Field("f2", TupleType(Array(
+        Field("f3", Types.IntType),
+        Field("f4", Types.CharArrayType))))))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.map(t => PigFuncs.flatTuple(List(t(0),t(1))))""".stripMargin)
+        |val a = b.map(t => _t3_Tuple(t._0, t._1.f3, t._1.f4))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -743,13 +749,13 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
-        |val out = in.map(t => _t4_Tuple(t._0 + 42,t._1))
+        |val out = in.map(t => _t4_Tuple(t._0 + 42, t._1))
         |""".stripMargin)
     assert(generatedCode1 == expectedCode1)
     val generatedCode2 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out2").get))
     val expectedCode2 = cleanString(
       """
-        |val out2 = out.map(t => _t4_Tuple(t._0,t._1 - 5))
+        |val out2 = out.map(t => _t4_Tuple(t._0, t._1 - 5))
         |""".stripMargin)
     assert(generatedCode2 == expectedCode2)
   }
