@@ -60,8 +60,8 @@ foreach(out, in, expr, class) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
-foreachFlatMap(out,in,expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
+foreachFlatMap(out, in, expr, class) ::=<<
+        val <out> = <in>.flatMap(t => <expr>).map(t => <class>(t))
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------

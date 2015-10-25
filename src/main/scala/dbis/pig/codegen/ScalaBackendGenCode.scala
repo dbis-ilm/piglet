@@ -297,7 +297,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
           // either a named or a positional field: all other cases are not allowed!?
         case _ => throw new TemplateException("invalid flatten expression: argument isn't a reference")
       }
-      case _ => throw new TemplateException("invalid flatten expression: argument isn't a reference")
+      case _ => throw new TemplateException(s"invalid flatten expression: argument $e isn't a reference")
     }
     if (field.fType.tc != TypeCode.TupleType)
       // make sure it is really a tuple type: other types cannot be flattened
@@ -319,20 +319,29 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   }
 
   /**
+   * Creates the Scala code needed for a flatten expression where the argument is a bag.
+   * It requires a flatMap transformation.
    *
-   * @param schema
-   * @param genExprs
-   * @return
+   * @param schema the optional input schema
+   * @param genExprs the list of generator expressions
+   * @return a string representation of the Scala code
    */
   def emitBagFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
+    // extract the flatten expression from the generator list
     val flattenExprs = genExprs.filter(e => e.expr.traverseOr(schema.getOrElse(null), Expr.containsFlattenOnBag))
+    // determine the remaining expressions
     val otherExprs = genExprs.diff(flattenExprs)
     if (flattenExprs.size == 1) {
-      val ex = flattenExprs.head.expr
+      // there is only a single flatten expression
+      val ex: FlattenExpr = flattenExprs.head.expr.asInstanceOf[FlattenExpr]
       if (otherExprs.nonEmpty)
+        // we have to cross join the flatten expression with the others
         s"???(${emitExpr(schema, ex, false)}.map(s => (${otherExprs.map(e => emitExpr(schema, e.expr, false))}, s))"
-      else
-        s"${emitExpr(schema, ex, false)}"
+      else {
+        // there is no other expression: we just construct an expression for flatMap
+        println("----> " + ex.a)
+        s"${emitExpr(schema, ex.a, false)}"
+      }
     }
     else
       s"" // i.flatMap(t => t(1).asInstanceOf[Seq[Any]].map(s => List(t(0),s)))

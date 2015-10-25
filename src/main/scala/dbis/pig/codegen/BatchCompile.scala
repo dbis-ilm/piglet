@@ -147,7 +147,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
 
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     if (requiresFlatMap)
-      callST("foreachFlatMap", Map("out" -> out,"in" -> in,"expr" -> expr))
+      callST("foreachFlatMap", Map("out" -> out,"in" -> in, "class" -> className, "expr" -> expr))
     else
       callST("foreach", Map("out" -> out, "in" -> in, "class" -> className, "expr" -> expr))
   }

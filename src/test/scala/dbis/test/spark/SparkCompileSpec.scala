@@ -657,14 +657,16 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
   }
 
   it should "contain code for flattening a bag function in FOREACH" in {
-    val ops = parseScript("b = load 'file'; a = foreach b generate flatten(tokenize($0));")
+    val ops = parseScript("""
+                         |b = load 'file';
+                         |a = foreach b generate flatten(tokenize($0));""".stripMargin)
     val schema = Schema(Array(Field("f1", Types.CharArrayType)))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.flatMap(t => PigFuncs.tokenize(t._0)).map(t => _t1_Tuple(t))""".stripMargin)
+        |val a = b.flatMap(t => PigFuncs.tokenize(t._0)).map(t => _t2_Tuple(t))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
