@@ -66,6 +66,10 @@ case class Union(out: Pipe, in: List[Pipe]) extends PigOperator {
     schema
   }
 
-
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"UNION { out = ${outPipeName} , in = ${inPipeNames.mkString(",")} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+  }
 }
 

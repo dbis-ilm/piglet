@@ -170,7 +170,7 @@ case class Schema(var element: BagType, var className: String = "") {
    *
    * @return the string representation
    */
-  override def toString = "Schema(" + element.toString + "," + element.name + ")"
+  override def toString = element.descriptionString
 }
 
 /**
@@ -230,4 +230,6 @@ object Schema {
       schema
     }
   }
+
+  def schemaList(): List[Schema] = schemaSet.values.toList.sortWith(_.schemaCode() < _.schemaCode())
 }

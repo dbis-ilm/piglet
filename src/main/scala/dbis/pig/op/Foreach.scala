@@ -347,9 +347,10 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
         // otherwise we check whether n refers to a pipe
         else if (parentOp.findOperatorInSubplan(n).isDefined) true
         else {
-          // finally we look in the parentSchema
+          // TODO: finally we look in the parentSchema
           println("=======> looking for " + n + " in " + parentOp.schema)
-          true
+          parentOp.schema.get.indexOfField(n) != -1
+          // true
         }
       case PositionalField(p) => if (fieldList.isEmpty) p == 0 else p < fieldList.length
       case Value(v) => true // okay

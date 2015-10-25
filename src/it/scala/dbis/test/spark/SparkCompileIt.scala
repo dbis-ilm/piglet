@@ -28,7 +28,6 @@ import org.apache.commons.exec.environment.EnvironmentUtils
 class SparkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
     ("script", "result", "truth", "inOrder"), // only the header of the table
-  /*
     ("load.pig", "result1.out", "truth/result1.data", true),
     ("load2.pig", "result2.out", "truth/result2.data", true),
     ("selfjoin.pig", "joined.out", "truth/joined.data", true),
@@ -39,17 +38,16 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("sort.pig", "sorted.out", "truth/sorted.data", true),
     ("filter.pig", "filtered.out", "truth/filtered.data", true),
     ("foreach1.pig", "distances.out", "truth/distances.data", true),
-    */
     //("nforeach.pig", "nested.out", "truth/nested.data", true),
-    // ("grouping.pig", "grouping.out", "truth/grouping.data", false),
+    ("grouping.pig", "grouping.out", "truth/grouping.data", false),
     ("groupall.pig", "groupall.out", "truth/groupall.data", false),
-    ("wordcount.pig", "marycounts.out", "truth/marycount.data", false),
+    // ("wordcount.pig", "marycounts.out", "truth/marycount.data", false),
     // ("construct.pig", "result3.out", "truth/result3.data", true),
-    // ("union.pig", "united.out", "truth/united.data", true),
+    ("union.pig", "united.out", "truth/united.data", true),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false),
     // ("embedded.pig", "embedded.out", "truth/embedded.data", true),
-    // ("macro1.pig", "macro1.out", "truth/macro1.data", true),
+    ("macro1.pig", "macro1.out", "truth/macro1.data", true),
     /* Works, but requires a R installation
     ("rscript.pig", "cluster.out", "truth/cluster.data", true)
     */
