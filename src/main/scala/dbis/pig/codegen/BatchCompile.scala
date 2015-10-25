@@ -220,12 +220,12 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     var str = callST("join_key_map", Map("rels" -> drels.map(_.name), "keys" -> dkeys))
 
     /*
-     * We construct a string v._0, v._1 ... w._0, w._1 ... (with field names instead of
-     * _0, _1). The numbers of v's and w's are determined by the size of the input schemas.
+     * We construct a string v._0, v._1 ... w._0, w._1 ...
+     * The numbers of v's and w's are determined by the size of the input schemas.
      */
     val vsize = rels.head.inputSchema.get.fields.length
     val fieldList = node.schema.get.fields.zipWithIndex
-      .map{case (f, i) => if (i < vsize) s"v.${f.name}" else s"w.${f.name}"}.mkString(", ")
+      .map{case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}"}.mkString(", ")
     println("join fields: " + fieldList)
 
     val className = node.schema match {

@@ -170,7 +170,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
               requiresTypeCast: Boolean = true,
               aggregate: Boolean = false): String = ref match {
-    case nf @ NamedField(f, _) => s"$tuplePrefix.$f"
+    case nf @ NamedField(f, _) => s"$tuplePrefix._${schema.get.indexOfField(nf)}" // s"$tuplePrefix.$f"
     case PositionalField(pos) => s"$tuplePrefix._$pos"
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
@@ -292,7 +292,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     // the actual field
     val (refName, field) = e match {
       case RefExpr(r) => r match {
-        case nf@NamedField(n, _) => (n, schema.get.field(nf))
+        case nf@NamedField(n, _) => ("_" + schema.get.indexOfField(nf), schema.get.field(nf))
         case PositionalField(p) => ("_" + p.toString, schema.get.field(p))
           // either a named or a positional field: all other cases are not allowed!?
         case _ => throw new TemplateException("invalid flatten expression: argument isn't a reference")
@@ -303,8 +303,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       // make sure it is really a tuple type: other types cannot be flattened
       throw new TemplateException("invalid flatten expression: argument doesn't refer to a tuple")
     val tupleType = field.fType.asInstanceOf[TupleType]
-    // finally, produce a list of t.<refName>.<fieldname>
-    tupleType.fields.map(f => s"t.${refName}.${f.name}").mkString(", ")
+    // finally, produce a list of t.<refName>.<fieldPos>
+    tupleType.fields.zipWithIndex.map{ case (f, i) => s"t.${refName}._$i"}.mkString(", ")
   }
 
   /**
@@ -481,16 +481,6 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return a string representing the code
    */
   def emitSchemaClass(schema: Schema): String = {
-    /**
-     * Create the field name: either the original name or - if no name was given -
-     * a name like "_<i>".
-     *
-     * @param n the field name (if exist)
-     * @param i the position of the field
-     * @return a non-empty field name
-     */
-    def fieldName(n: String, i: Int): String = if (n.isEmpty) s"_$i" else n
-
     def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
       case Some(n) => n
       case None => f match {
@@ -502,13 +492,9 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       }
     }
     val fields = schema.fields.toList
-    // build the list of field names
+    // build the list of field names (_0, ..., _n)
     val fieldStr = fields.zipWithIndex.map{ case (f, i) =>
-      s"${fieldName(f.name, i)} : ${typeName(f.fType, f.name)}"}.mkString(", ")
-
-    // construct the getter methods, e.g. def _0 = field1, but leave out fields without names
-    val getterStr = fields.zipWithIndex.filter{ case (f, i) => ! f.name.isEmpty }
-      .map{ case (f, i) => s"def _$i = ${f.name}"}.mkString("\n")
+           s"_$i : ${typeName(f.fType, f.name)}"}.mkString(", ")
 
     // construct the mkString method
     //   we have to handle the different types here:
@@ -523,7 +509,6 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
 
     callST("schema_class", Map("name" -> schemaClassName(schema.className),
                               "fields" -> fieldStr,
-                              "getter" -> getterStr,
                               "string_rep" -> toStr))
   }
 

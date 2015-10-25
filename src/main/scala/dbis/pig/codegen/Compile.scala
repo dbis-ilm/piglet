@@ -172,7 +172,8 @@ trait Compile {
     // generate import statements
     var code = codeGen.emitImport
 
-    for (schema <- Schema.schemaList /*plan.schemaList */) {
+    // generate schema classes for all registered types and schemas
+    for (schema <- Schema.schemaList) {
       code = code + codeGen.emitSchemaClass(schema)
     }
 
