@@ -850,6 +850,27 @@ class RewriterSpec extends FlatSpec
     }
   }
 
+  it should "apply rewriting rule F9" in {
+    Rewriter applyRule F9
+    Random.setSeed(123456789)
+    PipeNameGenerator.clearGenerated
+
+    val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), None)
+    val p1 = TriplePattern(Value("hello"), NamedField("a"), PositionalField(2))
+    val p2 = TriplePattern(NamedField("b"), Value("world"), PositionalField(2))
+    val op2 = BGPFilter(Pipe("b"), Pipe("a"), List(p1, p2))
+    val op3 = Dump(Pipe("b"))
+    val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
+    val first_filter = plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer).head.asInstanceOf[BGPFilter]
+    first_filter.patterns should contain only p1
+
+    val second_filter = plan.sinkNodes.headOption.value.inputs.map(_.producer).head.asInstanceOf[BGPFilter]
+    second_filter.patterns should contain only p2
+
+    first_filter.outputs.flatMap(_.consumer) should contain only second_filter
+    second_filter.inputs.map(_.producer) should contain only first_filter
+  }
+
   it should "apply rewriting rule J1" in {
     Rewriter unless plainSchemaJoinEarlyAbort applyRule J1
     val patterns = Table(
