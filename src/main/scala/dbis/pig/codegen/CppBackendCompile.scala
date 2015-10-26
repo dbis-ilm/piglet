@@ -167,10 +167,9 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * to render the content.
    * @param schema the schema of the operator
    * @param expr a part from the complete arithmetic expression
-   * @param requiresTypeCast a boolean to indicate if the expression need to be casted or not
    * @return C++ code for the arithmetic expression
    */
-  private def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true): String = expr match {
+  private def emitExpr(schema: Option[Schema], expr: ArithmeticExpr): String = expr match {
     /*
     case CastExpr(t, e) => {
       // TODO: check for invalid type
@@ -298,7 +297,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * @param genExprs a list of the generator expressions to be translated to C++ Code
    */
   private def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(",")}"
+    s"${genExprs.map(e => emitExpr(schema, e.expr)).mkString(",")}"
 
   }
 

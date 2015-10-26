@@ -59,6 +59,11 @@ foreach(out, in, expr, class) ::=<<
         val <out> = <in>.map(t => <class>(<expr>))
 >>
 
+// ------------------ Executes an expression FOREACH input element where the expression is a nested plan -----------
+foreachNested(out, in, expr) ::=<<
+        val <out> = <in>.map(t => <expr>)
+>>
+
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
 foreachFlatMap(out, in, expr, class) ::=<<
         val <out> = <in>.flatMap(t => <expr>).map(t => <class>(t))

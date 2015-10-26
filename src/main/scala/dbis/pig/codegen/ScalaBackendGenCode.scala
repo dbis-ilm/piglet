@@ -163,14 +163,29 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     * @param schema the (optional) schema decribing the tuple structure
     * @param ref
     * @param tuplePrefix the variable name
-    * @param requiresTypeCast true if we should generate a typecase using asInstanceOf
     * @param aggregate ??
     * @return the generated code
     */
-  def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
-              requiresTypeCast: Boolean = true,
-              aggregate: Boolean = false): String = ref match {
-    case nf @ NamedField(f, _) => s"$tuplePrefix._${schema.get.indexOfField(nf)}" // s"$tuplePrefix.$f"
+  def emitRef(schema: Option[Schema],
+              ref: Ref,
+              tuplePrefix: String = "t",
+              aggregate: Boolean = false,
+              namedRef: Boolean = false): String = ref match {
+    case nf @ NamedField(f, _) => if (namedRef) {
+      // check if f exists in the schema
+      schema match {
+        case Some(s) => {
+          val p = s.indexOfField(nf)
+          if (p != -1)
+            s"$tuplePrefix._$p"
+          else
+            f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
+        }
+        case None => throw new TemplateException(s"invalid field name $f") // if we don't have a schema this is not allows
+      }
+    }
+    else
+        s"$tuplePrefix._${schema.get.indexOfField(nf)}" // s"$tuplePrefix.$f"
     case PositionalField(pos) => s"$tuplePrefix._$pos"
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
@@ -210,9 +225,9 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    */
   def emitGroupExpr(schema: Option[Schema], groupingExpr: GroupingExpression): String = {
     if (groupingExpr.keyList.size == 1)
-      groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString
+      groupingExpr.keyList.map(e => emitRef(schema, e)).mkString
     else
-      "(" + groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",") + ")"
+      "(" + groupingExpr.keyList.map(e => emitRef(schema, e)).mkString(",") + ")"
   }
 
   /**
@@ -232,49 +247,51 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    *
    * @param schema
    * @param expr
-   * @param requiresTypeCast
    * @return
    */
-  def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = expr match {
+  def emitExpr(schema: Option[Schema],
+               expr: ArithmeticExpr,
+               aggregate: Boolean = false,
+               namedRef: Boolean = false): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
       val targetType = scalaTypeMappingTable(t)
-      s"${emitExpr(schema, e)}.to$targetType"
+      s"${emitExpr(schema, e, namedRef = namedRef)}.to$targetType"
     }
-    case PExpr(e) => s"(${emitExpr(schema, e)})"
-    case MSign(e) => s"-${emitExpr(schema, e)}"
-    case Add(e1, e2) => s"${emitExpr(schema, e1)} + ${emitExpr(schema, e2)}"
-    case Minus(e1, e2) => s"${emitExpr(schema, e1)} - ${emitExpr(schema, e2)}"
-    case Mult(e1, e2) => s"${emitExpr(schema, e1)} * ${emitExpr(schema, e2)}"
-    case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
-    case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast, aggregate)}"
+    case PExpr(e) => s"(${emitExpr(schema, e, namedRef = namedRef)})"
+    case MSign(e) => s"-${emitExpr(schema, e, namedRef = namedRef)}"
+    case Add(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} + ${emitExpr(schema, e2, namedRef = namedRef)}"
+    case Minus(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} - ${emitExpr(schema, e2, namedRef = namedRef)}"
+    case Mult(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} * ${emitExpr(schema, e2, namedRef = namedRef)}"
+    case Div(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} / ${emitExpr(schema, e2, namedRef = namedRef)}"
+    case RefExpr(e) => s"${emitRef(schema, e, "t", aggregate, namedRef = namedRef)}"
     case Func(f, params) => {
       val pTypes = params.map(p => p.resultType(schema))
       UDFTable.findUDF(f, pTypes) match {
         case Some(udf) => { 
           if (udf.isAggregate) {
-            s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)})"
+            s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
           }
-          else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+          else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
         }
         case None => {
           // check if we have have an alias in DataflowPlan
           if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
             val alias = udfAliases.get(f)
-            val paramList = alias._2 ::: params.map(e => emitExpr(schema, e))
+            val paramList = alias._2 ::: params.map(e => emitExpr(schema, e, namedRef = namedRef))
             s"${alias._1}(${paramList.mkString(",")})"
           }
           else {
             // we don't know the function yet, let's assume there is a corresponding Scala function
-            s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+            s"$f(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
           }
         }
       }
     }
     case FlattenExpr(e) => flattenExpr(schema, e)
-    case ConstructTupleExpr(exprs) => s"PigFuncs.toTuple(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
-    case ConstructBagExpr(exprs) => s"PigFuncs.toBag(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
-    case ConstructMapExpr(exprs) => s"PigFuncs.toMap(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
+    case ConstructTupleExpr(exprs) => s"_???_Tuple(${exprs.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+    case ConstructBagExpr(exprs) => s"List(${exprs.map(e => s"_???_Tuple(${emitExpr(schema, e, namedRef = namedRef)})").mkString(",")})"
+    case ConstructMapExpr(exprs) => s"Map[String,???](${exprs.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
     case _ => println("unsupported expression: " + expr); ""
   }
 
@@ -314,8 +331,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @param genExprs the list of expressions in the GENERATE clause
    * @return a string representation of the Scala code
    */
-  def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(", ")}"
+  def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr], namedRef: Boolean = false): String = {
+    s"${genExprs.map(e => emitExpr(schema, e.expr, aggregate = false, namedRef = namedRef)).mkString(", ")}"
   }
 
   /**
@@ -336,11 +353,11 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       val ex: FlattenExpr = flattenExprs.head.expr.asInstanceOf[FlattenExpr]
       if (otherExprs.nonEmpty)
         // we have to cross join the flatten expression with the others
-        s"???(${emitExpr(schema, ex, false)}.map(s => (${otherExprs.map(e => emitExpr(schema, e.expr, false))}, s))"
+        s"???(${emitExpr(schema, ex)}.map(s => (${otherExprs.map(e => emitExpr(schema, e.expr))}, s))"
       else {
         // there is no other expression: we just construct an expression for flatMap
         println("----> " + ex.a)
-        s"${emitExpr(schema, ex.a, false)}"
+        s"${emitExpr(schema, ex.a)}"
       }
     }
     else
@@ -377,26 +394,6 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     def genCmpExpr(col: Int, num: Int) : String =
       if (col == num) s"{ this.c$col compare that.c$col }"
       else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col+1, num)} else this.c$col compare that.c$col }"
-
-    /**
-     * Generates a function for producing a string representation of a tuple. This is needed because
-     * Spark's saveAsTextFile simply calls the toString method which results in "List(...)" or
-     * "CompactBuffer(...)" in the output.
-     *
-     * @param schema a schema describing the tuple structure
-     * @param stringDelim delimiter character
-     * @return the string representation
-     */
-    def genStringRepOfTuple(schema: Option[Schema], stringDelim: String = "','"): String = schema match {
-      case Some(s) => (0 to s.fields.length-1).toList.map{ i => s.field(i).fType match {
-          // TODO: this should be processed recursively
-        case BagType(t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
-        case TupleType(t, _) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
-        case MapType(t) => s""".append(t(${i}).asInstanceOf[Map[String,Any]].map{case (k,v) => k + "#" + v}.mkString("[", ",", "]"))"""
-        case _ => s".append(t($i))"
-      }}.mkString(s"\n    .append($stringDelim)\n")
-      case None => s".append(t(0))\n"
-    }
 
     node match {
       case OrderBy(out, in, orderSpec, _) => {

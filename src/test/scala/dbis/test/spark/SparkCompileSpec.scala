@@ -519,8 +519,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("uniqcnt").get))
 
     val expectedCode = cleanString(
-      """val uniqcnt = grpd.map(t => { val sym = t(1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]](1))
-        |val uniq_sym = sym.distinct ( List(t(0),PigFuncs.count(uniq_sym.asInstanceOf[Seq[Any]])) )})""".stripMargin)
+      """val uniqcnt = grpd.map(t => {
+        |val sym = t._1.map(l => l._1)
+        |val uniq_sym = sym.distinct
+        |_t5_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 
     assert(generatedCode == expectedCode)
   }
@@ -534,8 +536,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("out").get))
 
     val expectedCode = cleanString(
-      """val out = data.map(t => _t3_Tuple(PigFuncs.toTuple(t._0,t._1),PigFuncs.toBag(t._0,t._1),
-        |PigFuncs.toMap(t._2,t._0)))""".stripMargin)
+      """val out = data.map(t => _t3_Tuple(_t2_Tuple(t._0,t._1), List(_t4_Tuple(t._0),_t4_Tuple(t._1)),
+        |Map[String,Int](t._2 -> t._0)))""".stripMargin)
 
     assert(generatedCode == expectedCode)
     val op = plan.findOperatorForAlias("out").get

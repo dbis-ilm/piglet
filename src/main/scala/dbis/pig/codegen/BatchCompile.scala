@@ -32,36 +32,41 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     *
     * @param schema
     * @param tuplePrefix
-    * @param requiresTypeCast
     * @return
     */
-  override def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
-                       requiresTypeCast: Boolean = true,
-                       aggregate: Boolean = false): String = ref match {
+  override def emitRef(schema: Option[Schema], ref: Ref,
+                       tuplePrefix: String = "t",
+                       aggregate: Boolean = false,
+                       namedRef: Boolean = false): String = ref match {
       case DerefTuple(r1, r2) => 
         if (aggregate)
-          s"${emitRef(schema, r1, "t", false)}.map(e => e${emitRef(tupleSchema(schema, r1), r2, "", false)})"
+          s"${emitRef(schema, r1, "t")}.map(e => e${emitRef(tupleSchema(schema, r1), r2, "")})"
         else
-          s"${emitRef(schema, r1, "t", false)}${emitRef(tupleSchema(schema, r1), r2, "", false, aggregate)}"
-      case _ => super.emitRef(schema, ref, tuplePrefix, requiresTypeCast, aggregate)
+          s"${emitRef(schema, r1, "t")}${emitRef(tupleSchema(schema, r1), r2, "", aggregate, namedRef)}"
+      case _ => super.emitRef(schema, ref, tuplePrefix, aggregate, namedRef)
   }
 
   /**
     * Generates Scala code for a nested plan, i.e. statements within nested FOREACH.
     *
-    * @param schema the input schema of the FOREACH statement
+    * @param parent the parent FOREACH statement
     * @param plan the dataflow plan representing the nested statements
     * @return the generated code
     */
-  def emitNestedPlan(schema: Option[Schema], plan: DataflowPlan): String = {
+  def emitNestedPlan(parent: PigOperator, plan: DataflowPlan): String = {
+    val schema = parent.inputSchema
+
+    require(parent.schema.isDefined)
+    val className = schemaClassName(parent.schema.get.className)
+
     "{\n" + plan.operators.map {
-      case Generate(expr) => s"""( ${emitGenerator(schema, expr)} )"""
+      case Generate(expr) => s"""${className}(${emitGenerator(schema, expr, namedRef = true)})"""
       case n@ConstructBag(out, ref) => ref match {
         case DerefTuple(r1, r2) => {
           val p1 = findFieldPosition(schema, r1)
           val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
           require(p1 >= 0 && p2 >= 0)
-          s"""val ${n.outPipeName} = t($p1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]]($p2))"""
+          s"""val ${n.outPipeName} = t._$p1.map(l => l._$p2).toList"""
         }
         case _ => "" // should not happen
       }
@@ -86,7 +91,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
       }
       case GeneratorPlan(plan) => {
         val subPlan = node.asInstanceOf[Foreach].subPlan.get
-        emitNestedPlan(node.inputSchema, subPlan)
+        emitNestedPlan(node, subPlan)
       }
     }
   }
@@ -133,23 +138,27 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     * Generates code for the FOREACH Operator
     *
     * @param node the FOREACH Operator node
-    * @param out name of the output bag
-    * @param in name of the input bag
     * @param gen the generate expression
     * @return the Scala code implementing the FOREACH operator
     */
-  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator): String = {
+  def emitForeach(node: PigOperator, gen: ForeachGenerator): String = {
     require(node.schema.isDefined)
     val className = schemaClassName(node.schema.get.className)
 
-    // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
     val expr = emitForeachExpr(node, gen)
-
-    val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
-    if (requiresFlatMap)
-      callST("foreachFlatMap", Map("out" -> out,"in" -> in, "class" -> className, "expr" -> expr))
-    else
-      callST("foreach", Map("out" -> out, "in" -> in, "class" -> className, "expr" -> expr))
+    // in case of a nested FOREACH the tuples are creates as part of the GENERATE clause
+    // -> no need to give the schema class
+    if (gen.isInstanceOf[GeneratorPlan]) {
+      callST("foreachNested", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "expr" -> expr))
+    }
+    else {
+      // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
+      val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
+      if (requiresFlatMap)
+        callST("foreachFlatMap", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className, "expr" -> expr))
+      else
+        callST("foreach", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className, "expr" -> expr))
+    }
   }
 
   /**
@@ -296,7 +305,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
       case Cross(out, rels, _) => emitCross(node)
       case Distinct(out, in, _) => emitDistinct(node)
       case Filter(out, in, pred, _) => emitFilter(node, pred)
-      case Foreach(out, in, gen, _) => emitForeach(node, node.outPipeName, node.inPipeName, gen)
+      case Foreach(out, in, gen, _) => emitForeach(node, gen)
       case op@Grouping(out, in, groupExpr, _) => emitGrouping(op, groupExpr)
       case Join(out, rels, exprs, _) => emitJoin(node, node.inputs, exprs)
       case Limit(out, in, num) => emitLimit(node, num)

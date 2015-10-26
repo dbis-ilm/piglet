@@ -80,13 +80,17 @@ case class Foreach(out: Pipe,
         val plan = new DataflowPlan(opList, Some(List(inputs.head)))
         // println("--> " + plan.operators.mkString("\n"))
 
-        plan.operators.foreach(op => if (op.isInstanceOf[Generate]) {
-          // we extract the input pipes of the GENERATE statements (which are hidden
-          // inside the expressions
-          val pipes = op.asInstanceOf[Generate].findInputPipes(plan)
-          // and update the other ends of the pipes accordingly
-          pipes.foreach(p => p.producer.addConsumer(p.name, op))
-        }
+        plan.operators.foreach(op =>
+          if (op.isInstanceOf[Generate]) {
+            // we extract the input pipes of the GENERATE statements (which are hidden
+            // inside the expressions
+            val pipes = op.asInstanceOf[Generate].findInputPipes(plan)
+            // and update the other ends of the pipes accordingly
+            pipes.foreach(p => p.producer.addConsumer(p.name, op))
+          }
+          else if (op.isInstanceOf[ConstructBag]) {
+            op.asInstanceOf[ConstructBag].parentOp = Some(this)
+          }
         )
         val genOp = plan.operators.last
         if (genOp.isInstanceOf[Generate]) {
@@ -348,8 +352,8 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
         else if (parentOp.findOperatorInSubplan(n).isDefined) true
         else {
           // TODO: finally we look in the parentSchema
-          println("=======> looking for " + n + " in " + parentOp.schema)
-          parentOp.schema.get.indexOfField(n) != -1
+          println("=======> looking for " + n + " in " + parentOp.inputSchema)
+          parentOp.inputSchema.get.indexOfField(n) != -1
           // true
         }
       case PositionalField(p) => if (fieldList.isEmpty) p == 0 else p < fieldList.length
@@ -386,6 +390,7 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
     println(indent(tab) + s"GENERATE { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
     println(indent(tab + 2) + "inSchema = " + inputSchema)
     println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "parentSchema = " + parentOp.inputSchema)
     println(indent(tab + 2) + "exprs = " + exprs.mkString(","))
   }
 
@@ -404,6 +409,8 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
   // TODO: what do we need here?
   var parentSchema: Option[Schema] = None
 
+  var parentOp: Option[PigOperator] = None
+
   override def constructSchema: Option[Schema] = {
     parentSchema match {
       case Some(s) => {
@@ -411,9 +418,12 @@ case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
         val field = refExpr match {
           case DerefTuple(t, r) => t match {
             case nf@NamedField(n, _) => {
-              if (s.element.name == n)
+              // Either we refer to the input pipe (inputSchema) ...
+              if (parentOp.isDefined && parentOp.get.inPipeName == n)
+                // then we create a temporary pseudo field ...
                 Field(n, s.element)
               else
+                // ... or we refer to a real field of the schema
                 s.field(nf)
             }
             case PositionalField(p) => s.field(p)
