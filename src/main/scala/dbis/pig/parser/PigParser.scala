@@ -453,7 +453,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * REGISTER <JarFile>
    */
-  def registerStmt: Parser[PigOperator] = registerKeyword ~ stringLiteral ^^{ case _ ~ uri => new RegisterCmd(uri) }
+  def registerStmt: Parser[PigOperator] = registerKeyword ~ fileName ^^{ case _ ~ uri => new RegisterCmd(uri) }
 
   /*
    * DEFINE <Alias> <FuncName>

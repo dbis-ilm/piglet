@@ -68,7 +68,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
      * 1. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
      *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
      */
-    ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
+    ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += op.asInstanceOf[RegisterCmd].jarFile)
     ops.filter(_.isInstanceOf[DefineCmd]).foreach { op =>
       val defineOp = op.asInstanceOf[DefineCmd]
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))

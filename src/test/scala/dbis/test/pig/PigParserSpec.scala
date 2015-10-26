@@ -424,7 +424,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a register statement" in {
-    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(RegisterCmd("\"/usr/local/share/myfile.jar\"")))
+    assert(parseScript("""register '/usr/local/share/myfile.jar';""") == List(RegisterCmd("/usr/local/share/myfile.jar")))
   }
 
   it should "parse a define (function alias) statement" in {
