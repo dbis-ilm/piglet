@@ -520,7 +520,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
 
     val expectedCode = cleanString(
       """val uniqcnt = grpd.map(t => {
-        |val sym = t._1.map(l => l._1)
+        |val sym = t._1.map(l => l._1).toList
         |val uniq_sym = sym.distinct
         |_t5_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 

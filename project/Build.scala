@@ -31,6 +31,7 @@ object PigBuild extends Build {
 
   lazy val sparklib = (project in file("sparklib")).
     settings(commonSettings: _*).
+    settings(libraryDependencies += Dependencies.h2Database).
     dependsOn(common)
 
   lazy val flinklib = (project in file("flinklib")).

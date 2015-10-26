@@ -187,7 +187,7 @@ case class Foreach(out: Pipe,
         val genOp = plan.last
         if (genOp.isInstanceOf[Generate]) {
           schema = genOp.schema
-          schema.get.setBagName(outPipeName)
+          // schema.get.setBagName(outPipeName)
         }
         else
           throw new InvalidPlanException("last statement in nested foreach must be a generate")

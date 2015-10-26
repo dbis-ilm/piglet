@@ -130,8 +130,8 @@ object JsonStorage {
 
 //-----------------------------------------------------------------------------------------------------
 
-class JdbcStorage extends java.io.Serializable {
-  def load(sc: SparkContext, table: String, driver: String, url: String): RDD[List[String]] = {
+class JdbcStorage[T <: SchemaClass :ClassTag]  extends java.io.Serializable {
+  def load(sc: SparkContext, table: String, driver: String, url: String, extract: Row => T): RDD[T] = {
     // sc.addJar("/Users/kai/Projects/h2/bin/h2-1.4.189.jar")
     var params = scala.collection.immutable.Map[String, String]()
     params += ("driver" -> driver)
@@ -147,11 +147,11 @@ class JdbcStorage extends java.io.Serializable {
       }
     }
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
-    // TODO: convert a DataFrame to a RDD with generic components
-    sqlContext.load("jdbc", params).rdd.map(_.toSeq.map(v => v.toString).toList)
+    // TODO: DataFrame -> RDD[T]
+    sqlContext.load("jdbc", params).rdd.map(t => extract(t))
   }
 }
 
 object JdbcStorage {
-  def apply(): JdbcStorage = new JdbcStorage
+  def apply[T <: SchemaClass :ClassTag] (): JdbcStorage[T] = new JdbcStorage[T]
 }
