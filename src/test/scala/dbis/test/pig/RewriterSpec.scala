@@ -1513,6 +1513,7 @@ class RewriterSpec extends FlatSpec
       case AllSuccE(dump, Nil) =>
     }
   }
+
   "The PipeNameGenerator" should "not generate duplicate pipe names" in {
     val seed = 1234567890
     Random.setSeed(seed)
