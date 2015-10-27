@@ -85,7 +85,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     gen match {
       case GeneratorList(expr) => {
         if (requiresFlatMap)
-          emitBagFlattenGenerator(node.inputSchema, expr)
+          emitBagFlattenGenerator(node, expr)
         else
           emitGenerator(node.inputSchema, expr)
       }
@@ -144,7 +144,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
   def emitForeach(node: PigOperator, gen: ForeachGenerator): String = {
     require(node.schema.isDefined)
     val className = schemaClassName(node.schema.get.className)
-
+    println("emitForeach: className = " + className)
     val expr = emitForeachExpr(node, gen)
     // in case of a nested FOREACH the tuples are creates as part of the GENERATE clause
     // -> no need to give the schema class
@@ -155,7 +155,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
       // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
       val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
       if (requiresFlatMap)
-        callST("foreachFlatMap", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className, "expr" -> expr))
+        callST("foreachFlatMap", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "expr" -> expr))
       else
         callST("foreach", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className, "expr" -> expr))
     }

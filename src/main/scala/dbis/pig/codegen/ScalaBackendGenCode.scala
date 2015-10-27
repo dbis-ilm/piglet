@@ -316,12 +316,20 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       }
       case _ => throw new TemplateException(s"invalid flatten expression: argument $e isn't a reference")
     }
-    if (field.fType.tc != TypeCode.TupleType)
-      // make sure it is really a tuple type: other types cannot be flattened
-      throw new TemplateException("invalid flatten expression: argument doesn't refer to a tuple")
-    val tupleType = field.fType.asInstanceOf[TupleType]
-    // finally, produce a list of t.<refName>.<fieldPos>
-    tupleType.fields.zipWithIndex.map{ case (f, i) => s"t.${refName}._$i"}.mkString(", ")
+    if (field.fType.tc == TypeCode.TupleType) {
+      // we flatten a tuple
+      val tupleType = field.fType.asInstanceOf[TupleType]
+      // finally, produce a list of t.<refName>.<fieldPos>
+      tupleType.fields.zipWithIndex.map { case (f, i) => s"t.${refName}._$i" }.mkString(", ")
+    }
+    else if (field.fType.tc == TypeCode.BagType) {
+      // we flatten a bag
+      val bagType = field.fType.asInstanceOf[BagType]
+      s"t.${refName}"
+    }
+    else
+      // other types than tuple and bag cannot be flattened
+      throw new TemplateException("invalid flatten expression: argument doesn't refer to a tuple or bag")
   }
 
   /**
@@ -339,25 +347,30 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * Creates the Scala code needed for a flatten expression where the argument is a bag.
    * It requires a flatMap transformation.
    *
-   * @param schema the optional input schema
+   * @param node the FOREACH operator containing the flatten in the GENERATE clause
    * @param genExprs the list of generator expressions
    * @return a string representation of the Scala code
    */
-  def emitBagFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
+  def emitBagFlattenGenerator(node: PigOperator, genExprs: List[GeneratorExpr]): String = {
+    require(node.schema.isDefined)
+    val className = schemaClassName(node.schema.get.className)
     // extract the flatten expression from the generator list
-    val flattenExprs = genExprs.filter(e => e.expr.traverseOr(schema.getOrElse(null), Expr.containsFlattenOnBag))
+    val flattenExprs = genExprs.filter(e => e.expr.traverseOr(node.inputSchema.getOrElse(null), Expr.containsFlattenOnBag))
     // determine the remaining expressions
     val otherExprs = genExprs.diff(flattenExprs)
     if (flattenExprs.size == 1) {
       // there is only a single flatten expression
       val ex: FlattenExpr = flattenExprs.head.expr.asInstanceOf[FlattenExpr]
-      if (otherExprs.nonEmpty)
-        // we have to cross join the flatten expression with the others
-        s"???(${emitExpr(schema, ex)}.map(s => (${otherExprs.map(e => emitExpr(schema, e.expr))}, s))"
+      if (otherExprs.nonEmpty) {
+        // we have to cross join the flatten expression with the others:
+        // t._1.map(s => <class>(<expr))
+        val exs = otherExprs.map(e => emitExpr(node.inputSchema, e.expr)).mkString(",")
+        s"${emitExpr(node.inputSchema, ex)}.map(s => ${className}($exs, s))"
+      }
       else {
-        // there is no other expression: we just construct an expression for flatMap
-        println("----> " + ex.a)
-        s"${emitExpr(schema, ex.a)}"
+        // there is no other expression: we just construct an expression for flatMap:
+        // (<expr>).map(t => <class>(t))
+        s"${emitExpr(node.inputSchema, ex.a)}).map(t => ${className}(t))"
       }
     }
     else

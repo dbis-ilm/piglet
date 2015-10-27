@@ -161,7 +161,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     gen match {
       case GeneratorList(expr) => {
-        if (requiresFlatMap) emitBagFlattenGenerator(node.inputSchema, expr)
+        if (requiresFlatMap) emitBagFlattenGenerator(node, expr)
           else {
           /*if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
             else*/ emitGenerator(node.inputSchema, expr)

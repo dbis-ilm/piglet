@@ -65,8 +65,9 @@ foreachNested(out, in, expr) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
-foreachFlatMap(out, in, expr, class) ::=<<
-        val <out> = <in>.flatMap(t => <expr>).map(t => <class>(t))
+// Note, that the closing parenthesis is intentionally missing
+foreachFlatMap(out, in, expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
