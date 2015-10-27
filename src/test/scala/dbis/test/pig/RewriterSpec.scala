@@ -497,6 +497,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
         "subject",
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")
           ))),
           Generate(
@@ -509,6 +510,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
         "predicate",
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value
             ("predicate")))),
           Generate(
@@ -521,6 +523,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
         "object",
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
           Generate(
             List(
@@ -572,6 +575,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
         List("subject", "predicate"),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             And(
               Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
@@ -586,6 +590,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
         List("predicate", "object"),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             And(
               Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
@@ -600,6 +605,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
         List("subject", "object"),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             And(
               Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
@@ -982,8 +988,10 @@ class RewriterSpec extends FlatSpec
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             Eq(RefExpr(NamedField("object")), RefExpr(Value("obj1")))),
+          ConstructBag(Pipe("stmts_2"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipeEgkYzrkOZO"), Pipe("stmts_2"),
             Eq(RefExpr(NamedField("object")), RefExpr(Value("obj2")))),
           Generate(
@@ -1005,8 +1013,10 @@ class RewriterSpec extends FlatSpec
           TriplePattern(Value("subj1"), NamedField("p"), PositionalField(3)),
           TriplePattern(Value("subj2"), NamedField("p"), PositionalField(3))),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             Eq(RefExpr(NamedField("subject")), RefExpr(Value("subj1")))),
+          ConstructBag(Pipe("stmts_2"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipeEgkYzrkOZO"), Pipe("stmts_2"),
             Eq(RefExpr(NamedField("subject")), RefExpr(Value("subj2")))),
           Generate(
@@ -1028,8 +1038,10 @@ class RewriterSpec extends FlatSpec
         TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")),
         TriplePattern(PositionalField(0), Value("pred2"), NamedField("o"))),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             Eq(RefExpr(NamedField("predicate")), RefExpr(Value("pred1")))),
+          ConstructBag(Pipe("stmts_2"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipeEgkYzrkOZO"), Pipe("stmts_2"),
             Eq(RefExpr(NamedField("predicate")), RefExpr(Value("pred2")))),
           Generate(
@@ -1379,6 +1391,7 @@ class RewriterSpec extends FlatSpec
 
   it should "replace GENERATE * in a nested FOREACH" in {
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
+    applyRule (foreachRecursively _)
     addStrategy(removeNonStorageSinks _)
     val plan = new DataflowPlan(parseScript(
       """triples = LOAD 'file' AS (sub, pred, obj);
@@ -1387,8 +1400,11 @@ class RewriterSpec extends FlatSpec
          |r1 = FILTER triples BY (pred == 'aPred1');
          |r2 = FILTER triples BY (pred == 'aPred2');
          |GENERATE *, COUNT(r1) AS cnt1, COUNT(r2) AS cnt2;
-         |};""".stripMargin))
+         |};
+         |DUMP tmp;""".stripMargin))
     val rewrittenPlan = processPlan(plan)
+    val op = rewrittenPlan.findOperatorForAlias("tmp")
+    op shouldNot be (None)
   }
 
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {

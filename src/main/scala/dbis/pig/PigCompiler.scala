@@ -166,11 +166,22 @@ object PigCompiler extends PigParser with LazyLogging {
       newPlan = processPlan(newPlan)
       
       logger.debug("finished optimizations")
-      
-  
+      println("final plan = {\n" + newPlan.operators.mkString("\n") + "}")
+
+      try {
+        // if this does _not_ throw an exception, the schema is ok
+        // TODO: we should do this AFTER rewriting!
+         newPlan.checkSchemaConformance
+      } catch {
+        case e:SchemaException => {
+          logger.error(s"schema conformance error in ${e.getMessage} for plan")
+          return
+        }
+      }
+
       val scriptName = plan._2.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
-      
+
       FileTools.compilePlan(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, backend) match {
         // the file was created --> execute it
         case Some(jarFile) =>  
@@ -206,16 +217,6 @@ object PigCompiler extends PigParser with LazyLogging {
       val plan = new DataflowPlan(parseScriptFromSource(source, params, backend))
       
 
-      try {
-        // if this does _not_ throw an exception, the schema is ok
-        plan.checkSchemaConformance
-      } catch {
-        case e:SchemaException => {
-          logger.error(s"schema conformance error in ${e.getMessage} for plan $inputFile")
-          return None
-        }
-      }
-      
       if (!plan.checkConnectivity) {
         logger.error(s"dataflow plan not connected for $inputFile")
         return None

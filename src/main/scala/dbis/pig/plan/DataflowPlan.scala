@@ -57,10 +57,11 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
 
     // This maps a String (the relation name, a string) to the pipe that writes it and the list of
     // operators that read it.
-    val pipes = Map[String, Pipe]()
-    // This maps macro names to their definitions
+    var pipes = Map[String, Pipe]()
 
+    // This maps macro names to their definitions
     val macros = Map[String, DefineMacroCmd]()
+
     /*
      * 1. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
      *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
@@ -140,12 +141,17 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
             outerPipe match {
               case Some(oPipe) => {
                 if (oPipe.name != p.name) {
+                  /*
+                   * The outer pipe name is different from the input pipe. Thus, we have to insert
+                   * a ConstructBag operator before the current operator. For this purpose, we collect
+                   * pairs of (ConstructBag, operator) which we later insert.
+                   */
                   val cbOp = ConstructBag(Pipe(s"${p.name}_${varCnt}"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
                   newOps += ((cbOp, op))
                   varCnt += 1
                 }
               }
-              case None => throw new InvalidPlanException("invalid pipe: " + p.name)
+              case None => throw new InvalidPlanException("invalid pipe: " + p.name + " for " + op)
             }
           }
           else {
@@ -162,14 +168,15 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     /*
      * 7. If new operators were constructed we have to insert them now.
      */
-    val resolvedPlanOps = insertOperators(planOps, newOps.toList, pipes)
+    val (newOpList, newPipes) = insertOperators(planOps, newOps.toList, pipes)
+    pipes = newPipes
 
     /*
-     * 4. Because we have completed only the pipes from the operator outputs
+     * 8. Because we have completed only the pipes from the operator outputs
      *    we have to replace the inputs list of each operator
      */
     try {
-      resolvedPlanOps.foreach(op => {
+      newOpList.foreach(op => {
         // we ignore $name here because this appears only inside a macro
         if (op.inputs.filter(p => p.name.startsWith("$")).isEmpty) {
           val newPipes = op.inputs.map(p => pipes(p.name))
@@ -182,17 +189,22 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     catch {
       case e: java.util.NoSuchElementException => throw new InvalidPlanException("invalid pipe: " + e.getMessage)
     }
-    operators = resolvedPlanOps.toList
+    operators = newOpList.toList
   }
 
   /**
+   * Insert an operator from the newOps list into the list opList. The position of the new operator
+   * is specified by the newOps pair (newOp, currOp), i.e. newOp is inserted before currOp and the pipes
+   * are updated accordingly.
    *
-   * @param opList
-   * @param newOps
-   * @param pipes
-   * @return
+   * @param opList the current list of operators
+   * @param newOps a list of pairs (newOp, currOp) determining the operators to be inserted as well as
+   *               their position
+   * @param pipes the map of pipes
+   * @return the updated operator list + the updated pipe map
    */
-  def insertOperators(opList: List[PigOperator], newOps: List[(PigOperator, PigOperator)], pipes: Map[String, Pipe]): List[PigOperator] = {
+  def insertOperators(opList: List[PigOperator], newOps: List[(PigOperator, PigOperator)],
+                      pipes: Map[String, Pipe]): (List[PigOperator], Map[String, Pipe]) = {
 
     /*
      * Replace the name of the pipe with the oName by the name of the pipe.
@@ -226,10 +238,10 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
         val pos = newOpList.indexOf(consumer)
         newOpList.insert(pos, op)
       })
-      newOpList.toList
+      (newOpList.toList, pipes)
     }
     else
-      opList
+      (opList, pipes)
   }
 
   /**
