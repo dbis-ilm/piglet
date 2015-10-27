@@ -22,6 +22,11 @@ import dbis.pig.plan.rewriting.dsl.traits.{PigOperatorBuilderT, BuilderT}
 
 import scala.reflect.ClassTag
 
+/** A builder for applying a rewriting method that rewrites a single [[dbis.pig.op.PigOperator]] to another one.
+ *
+ * @tparam FROM
+ * @tparam TO
+ */
 class ReplacementBuilder[FROM <: PigOperator : ClassTag, TO <: PigOperator : ClassTag] extends
   PigOperatorBuilderT[FROM, TO] {
   override def wrapInFixer(func: (FROM => Option[TO])): (FROM => Option[TO]) = func

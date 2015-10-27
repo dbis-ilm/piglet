@@ -18,6 +18,11 @@ package dbis.pig.plan.rewriting.dsl.traits
 
 import dbis.pig.plan.rewriting.dsl.words.WhenWord
 
+/** A trait supplying methods for adding checks to a [[dbis.pig.plan.rewriting.dsl.traits.BuilderT]].
+  *
+  * @tparam FROM
+  * @tparam TO
+  */
 trait CheckWordT[FROM, TO] {
   val b: BuilderT[FROM, TO]
 

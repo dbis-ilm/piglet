@@ -19,6 +19,11 @@ package dbis.pig.plan.rewriting.dsl.traits
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.Rewriter
 
+/** A builder for applying a rewriting operation to a [[dbis.pig.op.PigOperator]].
+  *
+  * @tparam FROM
+  * @tparam TO
+  */
 abstract class PigOperatorBuilderT[FROM <: PigOperator, TO] extends BuilderT[FROM, TO] {
   override def wrapInCheck(func: FROM => Option[TO]) = {
     def f(term: FROM): Option[TO] = {

@@ -68,6 +68,10 @@ case class RewriterException(msg: String) extends Exception(msg)
   *
   * - [[reorder]] for reordering two operators
   *
+  * ==DSL==
+  *
+  * A DSL for easily adding rewriting operations is provided as well, its documented in [[dbis.pig.plan.rewriting.dsl]].
+  *
   * ==DataflowPlan helper methods==
   *
   * Some operations provided by [[DataflowPlan]] objects are not implemented there, but on this object. These include
