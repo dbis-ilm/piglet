@@ -490,7 +490,6 @@ class RewriterSpec extends FlatSpec
     }
   }
 
-  /*
   it should "apply rewriting rule F5" in {
     Rewriter applyRule F5
     val patterns = Table(
@@ -498,6 +497,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
         "subject",
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject")
           ))),
           Generate(
@@ -510,6 +510,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(PositionalField(0), Value("predicate"), PositionalField(2)),
         "predicate",
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("predicate")), RefExpr(Value
             ("predicate")))),
           Generate(
@@ -522,6 +523,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(PositionalField(0), PositionalField(1), Value("object")),
         "object",
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"), Eq(RefExpr(NamedField("object")), RefExpr(Value("object")))),
           Generate(
             List(
@@ -565,9 +567,7 @@ class RewriterSpec extends FlatSpec
       }
     }
   }
-  */
 
-  /*
   it should "apply rewriting rule F6" in {
     Rewriter applyRule F6
     val patterns = Table(
@@ -575,6 +575,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(Value("subject"), Value("predicate"), PositionalField(2)),
         List("subject", "predicate"),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             And(
               Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
@@ -589,6 +590,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(PositionalField(0), Value("predicate"), Value("object")),
         List("predicate", "object"),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             And(
               Eq(RefExpr(NamedField("predicate")), RefExpr(Value("predicate"))),
@@ -603,6 +605,7 @@ class RewriterSpec extends FlatSpec
       (TriplePattern(Value("subject"), PositionalField(1), Value("object")),
         List("subject", "object"),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             And(
               Eq(RefExpr(NamedField("subject")), RefExpr(Value("subject"))),
@@ -649,7 +652,6 @@ class RewriterSpec extends FlatSpec
       }
     }
   }
-  */
 
   it should "apply rewriting rule F7" in {
     Rewriter applyRule F7
@@ -956,7 +958,7 @@ class RewriterSpec extends FlatSpec
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
   }
- /*
+
   it should "apply rewriting rule J2" in {
     Rewriter unless groupedSchemaJoinEarlyAbort applyRule J2
     val patterns = Table(
@@ -965,8 +967,10 @@ class RewriterSpec extends FlatSpec
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj1")),
         TriplePattern(NamedField("s"), PositionalField(1), Value("obj2"))),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             Eq(RefExpr(NamedField("object")), RefExpr(Value("obj1")))),
+          ConstructBag(Pipe("stmts_2"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipeEgkYzrkOZO"), Pipe("stmts_2"),
             Eq(RefExpr(NamedField("object")), RefExpr(Value("obj2")))),
           Generate(
@@ -988,8 +992,10 @@ class RewriterSpec extends FlatSpec
           TriplePattern(Value("subj1"), NamedField("p"), PositionalField(3)),
           TriplePattern(Value("subj2"), NamedField("p"), PositionalField(3))),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             Eq(RefExpr(NamedField("subject")), RefExpr(Value("subj1")))),
+          ConstructBag(Pipe("stmts_2"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipeEgkYzrkOZO"), Pipe("stmts_2"),
             Eq(RefExpr(NamedField("subject")), RefExpr(Value("subj2")))),
           Generate(
@@ -1011,8 +1017,10 @@ class RewriterSpec extends FlatSpec
         TriplePattern(PositionalField(0), Value("pred1"), NamedField("o")),
         TriplePattern(PositionalField(0), Value("pred2"), NamedField("o"))),
         Foreach(Pipe("pipePClecYbNXF"), Pipe("a"), GeneratorPlan(List(
+          ConstructBag(Pipe("stmts_1"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipevHyYGvOfsZ"), Pipe("stmts_1"),
             Eq(RefExpr(NamedField("predicate")), RefExpr(Value("pred1")))),
+          ConstructBag(Pipe("stmts_2"), DerefTuple(NamedField("a"), NamedField("stmts"))),
           Filter(Pipe("pipeEgkYzrkOZO"), Pipe("stmts_2"),
             Eq(RefExpr(NamedField("predicate")), RefExpr(Value("pred2")))),
           Generate(
@@ -1052,7 +1060,6 @@ class RewriterSpec extends FlatSpec
       }
     }
   }
-  */
 
   it should "apply rewriting rule J3" in {
     Rewriter unless plainSchemaJoinEarlyAbort applyRule J3
