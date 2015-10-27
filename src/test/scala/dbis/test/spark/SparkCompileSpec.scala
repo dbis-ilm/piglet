@@ -515,16 +515,20 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
         |           generate group, COUNT(uniq_sym);
         |};""".stripMargin)
     val plan = new DataflowPlan(ops)
+    val foreachOp = plan.findOperatorForAlias("uniqcnt").get
+    println("schema = " + foreachOp.schema)
     val codeGenerator = new BatchGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("uniqcnt").get))
+    val generatedCode = cleanString(codeGenerator.emitNode(foreachOp))
 
     val expectedCode = cleanString(
       """val uniqcnt = grpd.map(t => {
         |val sym = t._1.map(l => l._1).toList
         |val uniq_sym = sym.distinct
-        |_t5_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
+        |_t4_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 
     assert(generatedCode == expectedCode)
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(foreachOp.schema.get))
+    println("schema class = " + schemaClassCode)
   }
 
   it should "contain code for a foreach statement with constructors for tuple, bag, and map" in {

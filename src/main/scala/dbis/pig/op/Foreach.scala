@@ -95,6 +95,7 @@ case class Foreach(out: Pipe,
         val genOp = plan.operators.last
         if (genOp.isInstanceOf[Generate]) {
           genOp.asInstanceOf[Generate].parentOp = this
+          genOp.constructSchema
         }
         else
           throw new InvalidPlanException("last statement in nested foreach must be a generate")
@@ -327,24 +328,41 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
 
   // TODO: what do we need here?
   override def constructSchema: Option[Schema] = {
-    val fields = constructFieldList(exprs)
-    schema = Some(Schema(BagType(TupleType(fields))))
+     val fields = constructFieldList(exprs)
+     schema = Some(Schema(BagType(TupleType(fields))))
     schema
   }
 
+  /**
+   * Collect the list of fields available for this operator.
+   *
+   * @return a pair of lists
+   */
+  def collectInputFields(): List[Field] = {
+    // we collect a list of fields of all input schemas + parentSchema
+    val fieldList = ListBuffer[Field]()
+    inputs.foreach(p => {println("-> p = " + p); p.inputSchema match {
+      case Some(s) => fieldList += Field(p.name, p.inputSchema.get.element)// fieldList ++= s.fields
+      case None => {}
+    }})
+    if (parentOp != null)
+      parentOp.inputSchema match {
+        case Some(s) => fieldList ++= s.fields
+        case None => {}
+      }
+
+    fieldList.toList
+  }
+
   override def checkSchemaConformance: Boolean = {
-    // return true
     // we have to extract all RefExprs
     val traverse = new RefExprExtractor
     exprs.foreach(e => e.expr.traverseAnd(null, traverse.collectRefExprs))
+    val refExprs = traverse.exprs.toList
 
-    // we collect a list of fields of all input schemas + parentSchema
-    val fieldList = ListBuffer[Field]()
-    inputs.foreach(p => p.inputSchema match {
-      case Some(s) => fieldList ++= s.fields
-      case None => {}
-    })
-    val res = traverse.exprs.map(rex => rex.r match {
+    val fieldList = collectInputFields()
+
+    val res = refExprs.map(rex => rex.r match {
       case NamedField(n, _) =>
         // is n just a simple field in our input?
         if (fieldList.exists(_.name == n)) true
@@ -352,7 +370,6 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
         else if (parentOp.findOperatorInSubplan(n).isDefined) true
         else {
           // TODO: finally we look in the parentSchema
-          println("=======> looking for " + n + " in " + parentOp.inputSchema)
           parentOp.inputSchema.get.indexOfField(n) != -1
           // true
         }
@@ -366,15 +383,18 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
   }
 
   // TODO: eliminate replicated code
-  def constructFieldList(exprs: List[GeneratorExpr]): Array[Field] =
+  def constructFieldList(exprs: List[GeneratorExpr]): Array[Field] = {
+    // println("GENERATE.constructFieldList: " + exprs.mkString(","))
+    val inSchema = Some(new Schema(new BagType(new TupleType(collectInputFields().toArray))))
+    // println("inSchema = " + inSchema)
     exprs.map(e => {
-      e.alias match {
+       e.alias match {
         // if we have an explicit schema (i.e. a field) then we use it
         case Some(f) => {
           if (f.fType == Types.ByteArrayType) {
             // if the type was only bytearray, we should check the expression if we have a more
             // specific type
-            val res = e.expr.resultType(inputSchema)
+            val res = e.expr.resultType(inSchema)
             Field(f.name, res)
           }
           else
@@ -382,9 +402,14 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
         }
         // otherwise we take the field name from the expression and
         // the input schema
-        case None => val res = e.expr.resultType(inputSchema); Field("", res)
+        case None => {
+          var res = e.expr.resultType(inSchema)
+          // println(" ===> " + e + " type = " + res)
+          Field("", res)
+        }
       }
     }).toArray
+  }
 
   override def printOperator(tab: Int): Unit = {
     println(indent(tab) + s"GENERATE { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")

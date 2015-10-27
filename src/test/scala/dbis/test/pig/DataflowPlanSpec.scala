@@ -100,7 +100,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "eliminate register statements" in {
     val plan = new DataflowPlan(parseScript("""
-         |register "myfile.jar";
+         |register 'myfile.jar';
          |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
          |b = filter a by f1 > 0;
          |""".stripMargin))

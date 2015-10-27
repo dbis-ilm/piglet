@@ -171,6 +171,15 @@ case class Schema(var element: BagType, var className: String = "") {
    * @return the string representation
    */
   override def toString = element.descriptionString
+
+  /**
+   * Check if the schema is valid, i.e. all fields have defined types (at least bytearray).
+   *
+   * @return true if valid
+   */
+  def isValid(): Boolean = {
+    fields.filter(_.fType.tc == TypeCode.AnyType).isEmpty
+  }
 }
 
 /**
@@ -225,8 +234,11 @@ object Schema {
     if (schemaSet.contains(code))
       schemaSet(code)
     else {
-      schema.className = s"t${nextCounter}"
-      schemaSet += code -> schema
+      if (schema.isValid) {
+        // we do not register invalid schemas - they will be replaced later anyway
+        schema.className = s"t${nextCounter}"
+        schemaSet += code -> schema
+      }
       schema
     }
   }
