@@ -268,6 +268,25 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     plan.operators(1).checkSchemaConformance should be (true)
   }
 
+  it should "infer the schema for ConstructBag" in {
+    val plan = new DataflowPlan(parseScript("""
+                                              |a = load 'file.csv' as (f1: chararray, f2: double);
+                                              |b = group a by f1;
+                                              |""".stripMargin))
+    val op = ConstructBag(Pipe("c"), DerefTuple(NamedField("b"), NamedField("a")))
+    op.parentSchema = plan.operators(1).schema
+    val schema = op.constructSchema
+    schema match {
+      case Some(s) => {
+        s.fields.length should be (2)
+        s.field(0) should equal (Field("f1", Types.CharArrayType))
+        s.field(1) should equal (Field("f2", Types.DoubleType))
+      }
+      case None => fail()
+    }
+    op.checkSchemaConformance should be (true)
+  }
+
   it should "detect an invalid schema for group by" in {
     val plan = new DataflowPlan(parseScript( """
                                               |a = load 'file.csv' as (f1: int, f2: double, f3:map[]);
@@ -555,7 +574,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     }
   }
 
-  it should "propage set parameters to the operators" in {
+  it should "propagate set parameters to the operators" in {
     val plan = new DataflowPlan(parseScript(s"""
        |A = LOAD 'file' AS (x, y);
        |SET parallelismHint 5;

@@ -26,6 +26,7 @@ import dbis.pig.udf._
 
 import java.net.URI
 import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Set
 
 
 // import scala.collection.mutable.Map
@@ -57,7 +58,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   def tupleSchema(schema: Option[Schema], ref: Ref): Option[Schema] = {
     val tp = ref match {
       case nf @ NamedField(f, _) => schema match {
-        case Some(s) => s.field(nf).fType
+        case Some(s) => if (f == s.element.name) s.element.valueType else s.field(nf).fType
         case None => throw new SchemaException(s"unknown schema for field $f")
       }
       case PositionalField(p) => schema match {
@@ -97,6 +98,14 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",
     Types.ByteArrayType -> "String")
+    
+//  val javaTypeMappingTable = Map[PigType, String](
+//    Types.IntType -> "java.lang.Integer",
+//    Types.LongType -> "java.lang.Long",
+//    Types.FloatType -> "java.lang.Float",
+//    Types.DoubleType -> "java.lang.Double",
+//    Types.CharArrayType -> "java.lang.String",
+//    Types.ByteArrayType -> "java.lang.String")
 
   /**
    * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
@@ -144,7 +153,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    */
   def findFieldPosition(schema: Option[Schema], field: Ref): Int = field match {
     case nf @ NamedField(f, _) => schema match {
-      case Some(s) => s.indexOfField(nf)
+      case Some(s) => if (f == s.element.name) 0 else s.indexOfField(nf)
       case None => -1
     }
     case PositionalField(p) => p
@@ -378,6 +387,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     else
       s"custKey_${out}_${in}(${orderSpec.map(r => emitRef(schema, r.field)).mkString(",")})"
   }
+  
+  val castMethods = Set.empty[String]
 
   def emitHelperClass(node: PigOperator): String = {
     def genCmpExpr(col: Int, num: Int) : String =
@@ -429,6 +440,25 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
         |  sb.toString
         |}""".stripMargin
       }
+      
+//      /* We need to add helper methods to convert strings read by the loaders into the given type.
+//       * Currently, we do this for all loaders but the BinStorage because it doesn't produce strings 
+//       */
+//      case Load(_,_,Some(schema),func:Option[String],_) if(func.isEmpty || func.get != "BinStorage") =>  { 
+//        
+//        schema.fields.map { f => f.fType }
+//          .distinct          // if the same type is used multiple times in the same LOAD op
+//          .filter { f => f.isInstanceOf[SimpleType] }  // allow only simple types
+//          .map{f => javaTypeMappingTable(f) }         // convert to Scala type names
+//          .filterNot { t => t == "String" || castMethods.contains(t) } // no need to process strings or types, that we already processed (for other loads)
+//          .map { f => 
+//            castMethods += f                      // remember this type to be already to processed
+//            s"""
+//            |def make${f}(s: String): ${f} = if(s.isEmpty) null.asInstanceOf[$f] else s.to${f}
+//            """.stripMargin                       // create the method string
+//            
+//          }.mkString("\n")                        // combine all created method strings and return it
+//      }
       case _ => ""
     }
   }
@@ -438,15 +468,20 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   /*                                   Node code generators                                           */
   /*------------------------------------------------------------------------------------------------- */
  
-  private def getFieldTypes(s: Schema): String = {
+  private def getFieldTypes(s: Schema, useCast: Boolean = false): String = {
       val fieldList = s.fields.zipWithIndex
-      val castList = fieldList.map { case (f, i) => ( 
+      val castList = fieldList.map { case (f, i) => 
           if (f.fType == Types.CharArrayType || f.fType == Types.ByteArrayType || f.fType.isInstanceOf[ComplexType])
             s"t($i)" 
-          else
-            s"t($i).to${scalaTypeMappingTable(f.fType)}"
-         // s"t($i).asInstanceOf[${scalaTypeMappingTable(f.fType)}]"
-        ) }
+          else { 
+            if(useCast)
+              s"t($i).asInstanceOf[${scalaTypeMappingTable(f.fType)}]"
+            else { 
+//            s"make${javaTypeMappingTable(f.fType)}(t($i))"
+              s"t($i).to${scalaTypeMappingTable(f.fType)}"
+            }
+          }
+        }
       castList.mkString(",")
   }
   /**
@@ -479,8 +514,9 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   def emitLoad(node: PigOperator, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
     node.schema match {
       case Some(s) => {
+        val useCast = loaderFunc.getOrElse("") == "BinStorage" // use a cast only for BinStorage
         val op = emitLoader(s"${node.outPipeName}_", file, loaderFunc, loaderParams) 
-        op +"\n" +callST("foreach", Map("out"->node.outPipeName,"in"->s"${node.outPipeName}_","expr"->s"List(${getFieldTypes(s)})"))
+        op +"\n" +callST("foreach", Map("out"->node.outPipeName,"in"->s"${node.outPipeName}_","expr"->s"List(${getFieldTypes(s, useCast)})"))
       }
       case None => {
         emitLoader(node.outPipeName, file, loaderFunc, loaderParams)

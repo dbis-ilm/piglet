@@ -14,24 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting.dsl.builders
+package dbis.pig.plan.rewriting.dsl.words
 
 import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.plan.rewriting.dsl.traits.{PigOperatorBuilderT, BuilderT}
+import dbis.pig.plan.rewriting.dsl.traits.{CheckWordT, EndWordT, BuilderT}
 
 import scala.reflect.ClassTag
 
-/** A builder for applying a rewriting method that rewrites a single [[dbis.pig.op.PigOperator]] to another one.
- *
- * @tparam FROM
- * @tparam TO
- */
-class ReplacementBuilder[FROM <: PigOperator : ClassTag, TO <: PigOperator : ClassTag] extends
-  PigOperatorBuilderT[FROM, TO] {
-  override def wrapInFixer(func: (FROM => Option[TO])): (FROM => Option[TO]) = func
-
-  override def addAsStrategy(func: (FROM => Option[TO])) = {
-    Rewriter.addTypedStrategy(func)
-  }
+class MergeWord[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : ClassTag]
+  (override val b: BuilderT[(FROM1, FROM2), PigOperator])
+  extends EndWordT[(FROM1, FROM2), PigOperator] with CheckWordT[(FROM1, FROM2), PigOperator] {
 }

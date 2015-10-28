@@ -18,7 +18,7 @@ package dbis.pig.plan.rewriting.dsl.builders
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.plan.rewriting.dsl.traits.BuilderT
+import dbis.pig.plan.rewriting.dsl.traits.{PigOperatorBuilderT, BuilderT}
 
 import org.kiama.rewriting.Rewriter.strategyf
 import scala.reflect.{ClassTag, classTag}
@@ -28,9 +28,7 @@ import scala.reflect.{ClassTag, classTag}
   * @tparam FROM
   * @tparam TO
   */
-class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends BuilderT[FROM, TO] {
-  override def wrapInFixer(func: (FROM => Option[TO])) = func
-
+class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends PigOperatorBuilderT[FROM, TO] {
   def addAsStrategy(func: (FROM => Option[TO])) = {
     val typeWrapped = Rewriter.buildTypedCaseWrapper(func)
     Rewriter.addStrategy(strategyf(t => typeWrapped(t)))

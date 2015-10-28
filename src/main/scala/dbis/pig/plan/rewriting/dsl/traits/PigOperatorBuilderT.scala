@@ -16,39 +16,55 @@
  */
 package dbis.pig.plan.rewriting.dsl.traits
 
-/** A builder for rewriting operations.
-  *
-  * It wraps a function performing the rewriting in a conditional check and can automatically apply fixup operations
-  * to the operations return value.
-  *
-  * Specific behaviour must be implemented by classes implementing this class.
+import dbis.pig.op.PigOperator
+import dbis.pig.plan.rewriting.Rewriter
+
+/** A builder for applying a rewriting operation to a [[dbis.pig.op.PigOperator]].
   *
   * @tparam FROM
   * @tparam TO
   */
-abstract class BuilderT[FROM, TO] {
-  protected var _func: Option[FROM => Option[TO]] = None
+abstract class PigOperatorBuilderT[FROM <: PigOperator, TO] extends BuilderT[FROM, TO] {
+  override def wrapInCheck(func: FROM => Option[TO]) = {
+    def f(term: FROM): Option[TO] = {
+      if (check.isEmpty) {
+        func(term)
+      } else {
+        if (check.get(term)) {
+          func(term)
+        } else {
+          None
+        }
+      }
+    }
 
-  def func_=(f: FROM => Option[TO]) = _func = Some(f)
+    f _
+  }
 
-  def func = _func
+  override def wrapInFixer(func: FROM => Option[TO]): FROM => Option[TO] = {
+    def f(term: FROM): Option[TO] = {
+      func(term) map {t : TO => t match {
+        case ret @ (a : PigOperator, b:PigOperator) =>
+          Rewriter.fixReplacementwithMultipleOperators(term, a, b)
+          t
+        case op : TO if op.isInstanceOf[PigOperator] =>
+          val o = op.asInstanceOf[PigOperator]
+          o.inputs = term.inputs
+          o.asInstanceOf[TO]
+        case _ =>
+          t
+      }}
+    }
 
-  private var _check: Option[FROM => Boolean] = None
-
-  def check_=(f: FROM => Boolean): Unit = _check = Some(f)
-
-  def check = _check
-
-  def wrapInCheck(func: FROM => Option[TO]): FROM => Option[TO]
-
-  def wrapInFixer(func: FROM => Option[TO]): FROM => Option[TO]
+    f _
+  }
 
   def addAsStrategy(func: (FROM => Option[TO]))
 
   /** Add the data wrapped by this object as a strategy.
     *
     */
-  def apply(): Unit = {
+  override def apply(): Unit = {
     val wrapped = wrapInFixer(wrapInCheck(func.get))
     addAsStrategy(wrapped)
   }

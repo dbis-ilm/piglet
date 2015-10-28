@@ -18,7 +18,7 @@ package dbis.pig.plan.rewriting.rulesets
 
 import dbis.pig.op._
 import dbis.pig.plan.PipeNameGenerator._
-import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.plan.rewriting.{Functions, Rewriter}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.internals.Column.Column
 import dbis.pig.plan.rewriting.internals.{Column, RDF}
@@ -585,6 +585,30 @@ object RDFRuleset extends Ruleset {
     group_filter
   }
 
+  /** Applies rewriting rule F9 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    */
+  def F9(op: BGPFilter): Option[BGPFilter] = {
+    val patterns = op.patterns
+    val in = op.inputs.head
+    val out = op.outputs.head
+
+    if (patterns.length < 2) {
+      return None
+    }
+
+    if (RDF.isPathJoin(patterns) || RDF.isStarJoin(patterns)) {
+      return None
+    }
+
+    val new_filters: Seq[BGPFilter] = patterns map { p: TriplePattern =>
+      BGPFilter(Pipe(generate()), Pipe(generate()), List(p))
+    }
+
+    Functions.newFlowIgnoringOld(new_filters:_*)
+    Some(fixReplacementwithMultipleOperators(op, new_filters.head, new_filters.last))
+  }
+
   /** Applies rewriting rule J1 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param op
@@ -908,13 +932,13 @@ object RDFRuleset extends Ruleset {
   }
 
   def registerRules() = {
-    Rewriter replace (classOf[RDFLoad]) via R1
+    Rewriter toReplace (classOf[RDFLoad]) applyRule R1
     Rewriter applyRule R2
-    Rewriter replace (classOf[RDFLoad]) via L2
+    Rewriter toReplace (classOf[RDFLoad]) applyRule L2
     Rewriter applyRule F1
-    Rewriter replace (classOf[BGPFilter]) via F2
-    Rewriter replace (classOf[BGPFilter]) via F3
-    Rewriter replace (classOf[BGPFilter]) via F4
+    Rewriter toReplace (classOf[BGPFilter]) applyRule F2
+    Rewriter toReplace (classOf[BGPFilter]) applyRule F3
+    Rewriter toReplace (classOf[BGPFilter]) applyRule F4
     Rewriter applyRule F5
     Rewriter applyRule F6
     Rewriter applyRule F7

@@ -27,6 +27,8 @@ lodhub_data
 *.class
 *.log
 
+__my_script/
+
 # sbt specific
 .cache
 .cache-*
