@@ -101,9 +101,9 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
   }
 
   "JDBCStorage" should "load data from a H2 database" in {
-    val data = JdbcStorage[DataRecord]().load(sc, "data", "org.h2.Driver",
-      "jdbc:h2:file:./src/it/resources/input/test?user=sa",
-      (row: org.apache.spark.sql.Row) => DataRecord(row.getInt(0), row.getString(1)))
+    val data = JdbcStorage[DataRecord]().load(sc, "data",
+      (row: org.apache.spark.sql.Row) => DataRecord(row.getInt(0), row.getString(1)), "org.h2.Driver",
+      "jdbc:h2:file:./src/it/resources/input/test?user=sa")
     data.collect() should be (Array(DataRecord(1, "One"), DataRecord(2, "Two"), DataRecord(3, "Three"),
       DataRecord(4, "Four"), DataRecord(5, "Five"), DataRecord(6, "Six")))
   }

@@ -131,7 +131,7 @@ object JsonStorage {
 //-----------------------------------------------------------------------------------------------------
 
 class JdbcStorage[T <: SchemaClass :ClassTag]  extends java.io.Serializable {
-  def load(sc: SparkContext, table: String, driver: String, url: String, extract: Row => T): RDD[T] = {
+  def load(sc: SparkContext, table: String, extract: Row => T, driver: String, url: String): RDD[T] = {
     // sc.addJar("/Users/kai/Projects/h2/bin/h2-1.4.189.jar")
     var params = scala.collection.immutable.Map[String, String]()
     params += ("driver" -> driver)

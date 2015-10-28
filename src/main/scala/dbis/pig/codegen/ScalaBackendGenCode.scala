@@ -464,6 +464,9 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     def schemaExtractor(schema: Schema): String =
       schema.fields.zipWithIndex.map{case (f, i) => s"data($i).to${scalaTypeMappingTable(f.fType)}"}.mkString(", ")
 
+    def jdbcSchemaExtractor(schema: Schema): String =
+      schema.fields.zipWithIndex.map{case (f, i) => s"data.get${scalaTypeMappingTable(f.fType)}($i)"}.mkString(", ")
+
     var paramMap = Map("out" -> node.outPipeName, "file" -> file.toString)
     if (loaderFunc.isEmpty)
       paramMap += ("func" -> BackendManager.backend.defaultConnector)
@@ -473,8 +476,15 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
         paramMap += ("params" -> loaderParams.mkString(","))
     }
     node.schema match {
-      case Some(s) => paramMap += ("extractor" ->
-        s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
+      case Some(s) => if (loaderFunc.nonEmpty && loaderFunc.get == "JdbcStorage")
+        // JdbcStorage provides already types results, therefore we need an extractor which calls
+        // only the appropriate get functions on sql.Row
+        paramMap += ("extractor" ->
+          s"""(data: org.apache.spark.sql.Row) => ${schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
+          "class" -> schemaClassName(s.className))
+        else
+        paramMap += ("extractor" ->
+          s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
         "class" -> schemaClassName(s.className))
       case None => paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))",
         "class" -> "TextLine")
