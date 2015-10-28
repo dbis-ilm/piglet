@@ -366,7 +366,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
-    op.inputs=List(input1,input2,input3)
+    op.inputs = List(input1,input2,input3)
+    op.constructSchema
+
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -537,15 +539,17 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
         |out = foreach data generate (f1, f2), {f1, f2}, [name, f1];""".stripMargin)
     val plan = new DataflowPlan(ops)
     val codeGenerator = new BatchGenCode(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("out").get))
+    val op = plan.findOperatorForAlias("out").get
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    println("schema class = " + schemaClassCode)
 
     val expectedCode = cleanString(
-      """val out = data.map(t => _t3_Tuple(_t2_Tuple(t._0,t._1), List(_t4_Tuple(t._0),_t4_Tuple(t._1)),
+      """val out = data.map(t => _t4_Tuple(_t2_Tuple(t._0,t._1), List(_t3_Tuple(t._0),_t3_Tuple(t._1)),
         |Map[String,Int](t._2 -> t._0)))""".stripMargin)
 
     assert(generatedCode == expectedCode)
-    val op = plan.findOperatorForAlias("out").get
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
   }
 
   it should "contain code for a union operator on two relations" in {

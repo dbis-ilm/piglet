@@ -113,6 +113,13 @@ case class BagType(var valueType: TupleType) extends ComplexType {
   override def tc = TypeCode.BagType
   override def name = "bag"
 
+  /**
+   * Returns a string representation of the type object.
+   *
+   * @return the string repesentation
+   */
+  override def toString = s"${name}{${valueType}}"
+
   override def encode: String = s"{${valueType.encode}}"
 
   override def descriptionString = "{" + valueType.plainDescriptionString + "}"

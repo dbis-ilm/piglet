@@ -289,9 +289,27 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       }
     }
     case FlattenExpr(e) => flattenExpr(schema, e)
-    case ConstructTupleExpr(exprs) => s"_???_Tuple(${exprs.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
-    case ConstructBagExpr(exprs) => s"List(${exprs.map(e => s"_???_Tuple(${emitExpr(schema, e, namedRef = namedRef)})").mkString(",")})"
-    case ConstructMapExpr(exprs) => s"Map[String,???](${exprs.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+    case ConstructTupleExpr(exprs) => {
+      val exType = expr.resultType(schema).asInstanceOf[TupleType]
+      val s = Schema(new BagType(exType))
+      s"${schemaClassName(s.className)}(${exprs.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+    }
+    case ConstructBagExpr(exprs) => {
+      val exType = expr.resultType(schema).asInstanceOf[BagType]
+      val s = Schema(exType)
+      s"List(${exprs.map(e => s"${schemaClassName(s.className)}(${emitExpr(schema, e, namedRef = namedRef)})").mkString(",")})"
+    }
+    case ConstructMapExpr(exprs) => {
+      val exType = expr.resultType(schema).asInstanceOf[MapType]
+      println("MapType = " + exType)
+      val valType = exType.valueType
+      val exprList = exprs.map(e => emitExpr(schema, e, namedRef = namedRef))
+      // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
+      val mapStr = exprList.zip(exprList.tail).zipWithIndex.filter{
+        case (p, i) => i % 2 == 0
+      }.map{case (p, i) => s"${p._1} -> ${p._2}"}.mkString(",")
+      s"Map[String,${scalaTypeMappingTable(valType)}](${mapStr})"
+    }
     case _ => println("unsupported expression: " + expr); ""
   }
 

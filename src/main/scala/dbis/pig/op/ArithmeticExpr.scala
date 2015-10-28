@@ -216,7 +216,8 @@ trait ConstructExpr extends ArithmeticExpr {
   override def resolveReferences(mapping: Map[String, Ref]): Unit = exprs.foreach(_.resolveReferences(mapping))
 
   def exprListToTuple(schema: Option[Schema]): Array[Field] =
-    exprs.map(e => e.resultType(schema)).zipWithIndex.map(f => Field(s"f${f._2}", f._1)).toArray
+    exprs.map(e => e.resultType(schema)).zipWithIndex.map(f => Field("", f._1)).toArray
+    //exprs.map(e => e.resultType(schema)).zipWithIndex.map(f => Field(s"f${f._2}", f._1)).toArray
 }
 
 case class ConstructTupleExpr(ex: List[ArithmeticExpr]) extends ConstructExpr {
@@ -225,14 +226,38 @@ case class ConstructTupleExpr(ex: List[ArithmeticExpr]) extends ConstructExpr {
   override def resultType(schema: Option[Schema]): PigType = TupleType(exprListToTuple(schema))
 }
 
+/**
+ * An expression for constructing a bag from a list of expressions.
+ *
+ * @param ex the expression list given as argument to the bag constructor
+ */
 case class ConstructBagExpr(ex: List[ArithmeticExpr]) extends ConstructExpr {
   exprs = ex
 
-  override def resultType(schema: Option[Schema]): PigType = BagType(TupleType(exprListToTuple(schema)))
+  /**
+   * Returns the type of the expression: we take the most general type of the argument list
+   * and construct a bag from it.
+   *
+   * @param schema The input schema for the operator providing the context of this expression (if defined).
+   * @return the result type
+   */
+  override def resultType(schema: Option[Schema]): PigType = {
+    val argTypes = exprs.map(e => e.resultType(schema))
+    BagType(TupleType(Array(Field("", argTypes.head))))
+  }
 }
 
 case class ConstructMapExpr(ex: List[ArithmeticExpr]) extends ConstructExpr {
   exprs = ex
 
-  override def resultType(schema: Option[Schema]): PigType = MapType(exprs(0).resultType(schema))
+  /**
+   * Returns the type of the expression: assuming an expression [key, value] we simply take
+   * the  type of the value expression as the result type.
+   *
+   * @param schema The input schema for the operator providing the context of this expression (if defined).
+   * @return the result type
+   */
+  override def resultType(schema: Option[Schema]): PigType = {
+    MapType(exprs(1).resultType(schema))
+  }
 }
