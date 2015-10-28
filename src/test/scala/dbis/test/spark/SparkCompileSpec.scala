@@ -368,14 +368,14 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs = List(input1,input2,input3)
     op.constructSchema
-
+    println("multiway join result = " + op.schema)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (t._0,t))
       |val c_kv = c.map(t => (t._0,t))
       |val d_kv = d.map(t => (t._0,t))
-      |val a = b_kv.join(c_kv).map{case (k,(v,w)) => (k, v ++ w)}.join(d_kv).map{case (k,(v,w)) => (k, v ++ w)}.map{case (k,v) => v}""".stripMargin)
+      |val a = b_kv.join(c_kv).join(d_kv).map{case (k,((v1,v2),v3)) => _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2)}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 

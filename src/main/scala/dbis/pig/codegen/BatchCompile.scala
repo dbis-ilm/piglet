@@ -20,6 +20,8 @@ import dbis.pig.op._
 import dbis.pig.schema._
 import dbis.pig.plan.DataflowPlan
 
+import scala.collection.mutable.ArrayBuffer
+
 
 class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
 
@@ -232,11 +234,6 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
      * We construct a string v._0, v._1 ... w._0, w._1 ...
      * The numbers of v's and w's are determined by the size of the input schemas.
      */
-    val vsize = rels.head.inputSchema.get.fields.length
-    val fieldList = node.schema.get.fields.zipWithIndex
-      .map{case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}"}.mkString(", ")
-    println("join fields: " + fieldList)
-
     val className = node.schema match {
       case Some(s) => schemaClassName(s.className)
       case None => schemaClassName(node.outPipeName)
@@ -245,15 +242,40 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     /*
       *  ...as well as the actual join.
       */
-    str += callST("join",
+    if (rels.length == 2) {
+      val vsize = rels.head.inputSchema.get.fields.length
+      val fieldList = node.schema.get.fields.zipWithIndex
+        .map{case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}"}.mkString(", ")
+      println("join fields: " + fieldList)
+
+      str += callST("join",
+        Map("out" -> node.outPipeName,
+          "rel1" -> rels.head.name,
+          "class" -> className,
+          "rel2" -> rels.tail.map(_.name),
+          "fields" -> fieldList))
+    }
+    else {
+      var pairs = "(v1,v2)"
+      for (i <- 3 to rels.length) {
+        pairs = s"($pairs,v$i)"
+      }
+      val fieldList = ArrayBuffer[String]()
+      for (i <- 1 to node.inputs.length) {
+        node.inputs(i-1).producer.schema match {
+          case Some(s) => fieldList ++= s.fields.zipWithIndex.map{ case (f, k) => s"v$i._$k" }
+          case None => fieldList += s"v$i._0"
+        }
+      }
+
+      str += callST("m_join",
       Map("out" -> node.outPipeName,
         "rel1" -> rels.head.name,
         "class" -> className,
-        "key1" -> keys.head,
         "rel2" -> rels.tail.map(_.name),
-        "key2" -> keys.tail,
-        "fields" -> fieldList))
-
+        "pairs" -> pairs,
+        "fields" -> fieldList.mkString(", ")))
+    }
     joinKeyVars += rels.head.name
     joinKeyVars ++= rels.tail.map(_.name)
     str
