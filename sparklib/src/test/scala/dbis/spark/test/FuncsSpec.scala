@@ -89,33 +89,4 @@ class FuncsSpec extends FlatSpec with Matchers {
     PigFuncs.tokenize(s, "&") should be (List("1", "2", "3", "4", "5", "6"))
   }
 
-  "The toMap function" should "produce a map from a list" in {
-    PigFuncs.toMap("a", 1, "b", 2, "c", 3, "d", 4) should be (
-      Map("a" -> 1, "b" -> 2, "c" -> 3, "d" -> 4)
-    )
-  }
-
-  "The toTuple function" should "produce a tuple from a list" in {
-    PigFuncs.toTuple(1, 2, 3, 4) should be (
-      List(1, 2, 3, 4)
-    )
-  }
-
-  "The toBag function" should "produce a bag of tuples from a list of values" in {
-    PigFuncs.toBag(1, 2, 3, 4) should be (
-      List(List(1), List(2), List(3), List(4))
-    )
-  }
-
-  it should "produce a bag of tuples from a list of tuples" in {
-    PigFuncs.toBag(List(1), List(2), List(3), List(4)) should be (
-      List(List(1), List(2), List(3), List(4))
-    )
-  }
-
-  "The flatTuple function" should "produce a flat list from a nested list" in {
-    PigFuncs.flatTuple(List(1, 2, List(3, 4, 5), 6)) should be (
-      List(1, 2, 3, 4, 5, 6)
-    )
-  }
-}
+ }
