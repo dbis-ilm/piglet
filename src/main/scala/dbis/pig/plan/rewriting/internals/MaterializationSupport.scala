@@ -16,13 +16,16 @@
  */
 package dbis.pig.plan.rewriting.internals
 import java.net.URI
-
 import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.op.{Load, Materialize, Store}
 import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
-
 import scala.collection.mutable.ListBuffer
+import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.DataflowPlan
+import dbis.pig.tools.DepthFirstTopDownWalker
+import dbis.pig.op.PigOperator
+import dbis.pig.op.PigOperator
 
 /** Provides methods to deal with Materialization in a [[dbis.pig.plan.DataflowPlan]].
   *
@@ -100,4 +103,26 @@ trait MaterializationSupport extends LazyLogging {
     newPlan
   }
 
+  def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = {
+    
+    
+    val mergedPlan = schedule.head
+    
+    val walker = new DepthFirstTopDownWalker
+    
+    def visitor(op: PigOperator): Unit = {
+      
+//      if(!mergedPlan.containsOperator(op))
+//        mergedPlan.addAndConnect(op)
+      
+    }
+    
+    
+    schedule.drop(1) // skip first plan as we already copied it into mergedPlan
+            .foreach { plan => walker.walk(plan)(visitor) }  // for all remaining: visit each op and add to merged plan    
+    
+    mergedPlan
+    
+  }
+  
 }

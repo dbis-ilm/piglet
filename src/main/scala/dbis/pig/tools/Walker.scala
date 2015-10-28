@@ -88,3 +88,28 @@ class BreadthFirstTopDownWalker extends Walker[PigOperator] {
     }
   } 
 }
+
+class DepthFirstTopDownWalker extends Walker[PigOperator] {
+  
+  @Override
+  override def walk(plan: DataflowPlan)(visit: (PigOperator => Unit)) = {
+    
+    val todo = Stack(plan.sourceNodes.toSeq: _*)
+    val seen = Set.empty[String]
+   
+    while(!todo.isEmpty) {
+      val op = todo.pop()
+      
+      val sig = op.lineageSignature 
+  
+      // if the signature of the current op has been seen before
+      if(!seen.contains(sig)) {
+        seen += sig  // mark as seen
+        visit(op)    // apply the visitor to the current op
+      }
+      
+      val children = op.outputs.flatMap(_.consumer).filter { o => !seen.contains(o.lineageSignature) } 
+      todo.pushAll(children)
+    }
+  }
+}

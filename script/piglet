@@ -108,11 +108,11 @@ function getBackend {
 function checkBackendJar {
 
     if [ "$backend" == "spark" ]; then
-	if [ -z "$SPARK_JAR" ]; then
-	    echo "Please set SPARK_JAR to your spark-assembly-hadoop jar file"
+	if [ -z "$SPARK_JAR1" ]; then
+	    echo "Please set SPARK_JAR1 to your spark-assembly-hadoop jar file"
 	    exit 1
 	else
-	    CP=$SPARK_JAR:$CP
+	    CP=$SPARK_JAR1:$CP
 	fi
     elif [ "$backend" == "flink" ] || [ "$backend" == "flinks" ]; then
 	if [ -z "$FLINK_JAR" ]; then

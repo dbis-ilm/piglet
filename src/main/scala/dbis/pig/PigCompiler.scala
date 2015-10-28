@@ -37,8 +37,14 @@ import java.nio.file.Paths
 import scala.collection.mutable.ListBuffer
 import dbis.pig.backends.BackendConf
 
+object MergeMode extends Enumeration {
+  type MergeMode = Value
+  val NONE, MULTI, SINGLE = Value
+}
 
 object PigCompiler extends PigParser with LazyLogging {
+
+  import MergeMode._
   
   case class CompilerConfig(master: String = "local",
                             inputs: Seq[File] = Seq.empty,
@@ -47,7 +53,8 @@ object PigCompiler extends PigParser with LazyLogging {
                             params: Map[String,String] = Map(),
                             backend: String = Conf.defaultBackend,
                             updateConfig: Boolean = false,
-                            backendArgs: Map[String, String] = Map()
+                            backendArgs: Map[String, String] = Map(),
+                            merge: String = MergeMode.NONE.toString()
                           )
 
   def main(args: Array[String]): Unit = {
@@ -59,6 +66,7 @@ object PigCompiler extends PigParser with LazyLogging {
     var backend: String = null
     var updateConfig = false
     var backendArgs: Map[String, String] = null
+    var merge: MergeMode = NONE
 
     val parser = new OptionParser[CompilerConfig]("PigCompiler") {
       head("PigCompiler", "0.2")
@@ -69,6 +77,7 @@ object PigCompiler extends PigParser with LazyLogging {
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
       opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in program home (see config file)")
       opt[Map[String,String]]("backend-args") valueName("key1==value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text("parameter(s) to subsitute")
+      opt[String]("merge") optional() action { (x,c) => c.copy(merge = x) } text ("Try to merge given plans into one")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
       arg[File]("<file>...") unbounded() required() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
@@ -85,7 +94,16 @@ object PigCompiler extends PigParser with LazyLogging {
         backend = config.backend
         updateConfig = config.updateConfig
         backendArgs = config.backendArgs
+        try {
+          merge = MergeMode.withName(config.merge.toUpperCase())
+        } catch {
+        case e: NoSuchElementException =>  {
+          logger.warn(s"No such merge type: ${config.merge}. Merging will not be performed")
+          merge = NONE
+          }
+        }
       }
+      
       case None =>
         // arguments are bad, error message will have been displayed
         return
@@ -101,17 +119,20 @@ object PigCompiler extends PigParser with LazyLogging {
     	Conf.copyConfigFile()
     
     // start processing
-    run(files, outDir, compileOnly, master, backend, params, backendArgs)
+    run(files, outDir, compileOnly, merge, master, backend, params, backendArgs)
   }
 
-  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendArgs: Map[String,String]): Unit = {
-    run(Seq(inputFile), outDir, compileOnly, master, backend, params, backendArgs)
+  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, merge: MergeMode, master: String, backend: String, 
+      params: Map[String,String], backendArgs: Map[String,String]): Unit = {
+    
+    run(Seq(inputFile), outDir, compileOnly, merge, master, backend, params, backendArgs)
   }
   
   /**
    * Start compiling the Pig script into a the desired program
    */
-  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendArgs: Map[String,String]): Unit = {
+  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, merge: MergeMode, master: String, backend: String, 
+      params: Map[String,String], backendArgs: Map[String,String]): Unit = {
     
     val backendConf = BackendManager.backend(backend)
     
@@ -124,10 +145,13 @@ object PigCompiler extends PigParser with LazyLogging {
         return
       }
       
+      if(merge != NONE)
+        logger.warn("Cannot merge plans for raw backends. Continuing with sequential execution")
+      
       inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
       
     } else {
-      runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf, backendArgs)
+      runWithCodeGeneration(inputFiles, outDir, compileOnly, merge, master, backend, params, backendConf, backendArgs)
     }
   }
   
@@ -137,9 +161,12 @@ object PigCompiler extends PigParser with LazyLogging {
     runner.executeRaw(file, master, backendArgs)
   }
   
-  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf, backendArgs: Map[String,String]) {
+  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, merge: MergeMode, master: String, backend: String, 
+      params: Map[String,String], backendConf: BackendConf, backendArgs: Map[String,String]) {
+    
     logger.debug("start parsing input files")
-    val schedule = ListBuffer.empty[(DataflowPlan,Path)]
+    
+    var schedule = ListBuffer.empty[(DataflowPlan,Path)]
     for(file <- inputFiles) {
       createDataflowPlan(file, params, backend) match {
         case Some(v) => schedule += ((v,file))
@@ -149,6 +176,14 @@ object PigCompiler extends PigParser with LazyLogging {
       }
     }
 
+    if(merge != NONE) {
+      logger.debug("Start merging plans")
+      
+      val mergedPlan = mergePlans(schedule.map{case (plan, _) => plan })
+      schedule = ListBuffer((mergedPlan, Paths.get(s"merged_${System.currentTimeMillis()}.pig")))  
+    }
+    
+    
     logger.debug("start processing created dataflow plans")
  
 
