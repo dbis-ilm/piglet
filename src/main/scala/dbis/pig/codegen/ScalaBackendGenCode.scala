@@ -541,7 +541,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     val toStr = fields.zipWithIndex.map{
       case (f, i) => f.fType match {
         case BagType(_) => s""""{" + _$i.mkString(",") + "}""""
-        case _ => s"_$i"
+        case MapType(v) => s""""[" + _$i.map{ case (k,v) => s"$$k#$$v" }.mkString(",") + "]""""
+        case _ => s"_$i" + (if (f.fType.tc != TypeCode.CharArrayType && fields.length == 1) ".toString" else "")
       }
     }.mkString(" + _c + ")
 
