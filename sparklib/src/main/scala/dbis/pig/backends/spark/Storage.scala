@@ -86,13 +86,13 @@ object PigStorage extends java.io.Serializable {
 class RDFFileStorage[T:ClassTag] extends java.io.Serializable {
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
-  def rdfize(line: String): Record = {
+  def rdfize(line: String): Array[String] = {
     val fields = pattern.findAllIn(line).map(_.trim)
-    Record(fields.toArray.slice(0, 3))
+    fields.toArray.slice(0, 3)
   }
 
-  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[Record] =
-    sc.textFile(path).map(line => rdfize(line))
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[T] =
+    sc.textFile(path).map(line => extract(rdfize(line)))
 }
 
 object RDFFileStorage {

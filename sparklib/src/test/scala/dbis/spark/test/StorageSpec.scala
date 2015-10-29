@@ -107,4 +107,11 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
     data.collect() should be (Array(DataRecord(1, "One"), DataRecord(2, "Two"), DataRecord(3, "Three"),
       DataRecord(4, "Four"), DataRecord(5, "Five"), DataRecord(6, "Six")))
   }
+
+  "RDFStorage" should "load RDF data from NTriple file" in {
+    val res = RDFFileStorage[Record]().load(sc, "sparklib/src/test/resources/person.csv",
+      (data: Array[String]) => Record(data), ",")
+    val resArray = res.collect()
+
+  }
 }

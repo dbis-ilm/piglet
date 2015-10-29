@@ -21,7 +21,7 @@ package dbis.pig
 import java.io.File
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
-import dbis.pig.parser.LanguageFeature._
+import dbis.pig.parser.LanguageFeature
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.schema.SchemaException
@@ -39,13 +39,14 @@ import dbis.pig.backends.BackendConf
 
 
 object PigCompiler extends PigParser with LazyLogging {
-  
+
   case class CompilerConfig(master: String = "local",
                             inputs: Seq[File] = Seq.empty,
                             compile: Boolean = false,
                             outDir: String = ".",
                             params: Map[String,String] = Map(),
                             backend: String = Conf.defaultBackend,
+                            language: String = "pig",
                             updateConfig: Boolean = false,
                             backendArgs: Map[String, String] = Map()
                           )
@@ -57,15 +58,17 @@ object PigCompiler extends PigParser with LazyLogging {
     var outDir: Path = null
     var params: Map[String,String] = null
     var backend: String = null
+    var languageFeature = LanguageFeature.PlainPig
     var updateConfig = false
     var backendArgs: Map[String, String] = null
 
     val parser = new OptionParser[CompilerConfig]("PigCompiler") {
-      head("PigCompiler", "0.2")
+      head("PigCompiler", "0.3")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text ("compile only (don't execute the script)")
-      opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
-      opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
+      opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
+      opt[String]('b', "backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
+      opt[String]('l', "language") optional() action { (x,c) => c.copy(language = x)} text ("Accepted language (pig = default, sparql, streaming)")
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
       opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in program home (see config file)")
       opt[Map[String,String]]("backend-args") valueName("key1==value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text("parameter(s) to subsitute")
@@ -85,6 +88,13 @@ object PigCompiler extends PigParser with LazyLogging {
         backend = config.backend
         updateConfig = config.updateConfig
         backendArgs = config.backendArgs
+        languageFeature = config.language match {
+          case "sparql" => LanguageFeature.SparqlPig
+          case "streaming" => LanguageFeature.StreamingPig
+          case "pig" => LanguageFeature.PlainPig
+          case _ => LanguageFeature.PlainPig
+        }
+        // note: for some backends we could determine the language automatically
       }
       case None =>
         // arguments are bad, error message will have been displayed
@@ -101,17 +111,19 @@ object PigCompiler extends PigParser with LazyLogging {
     	Conf.copyConfigFile()
     
     // start processing
-    run(files, outDir, compileOnly, master, backend, params, backendArgs)
+    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendArgs)
   }
 
-  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendArgs: Map[String,String]): Unit = {
-    run(Seq(inputFile), outDir, compileOnly, master, backend, params, backendArgs)
+  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
+          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String]): Unit = {
+    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendArgs)
   }
   
   /**
    * Start compiling the Pig script into a the desired program
    */
-  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendArgs: Map[String,String]): Unit = {
+  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
+          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String]): Unit = {
     
     val backendConf = BackendManager.backend(backend)
     
@@ -127,7 +139,7 @@ object PigCompiler extends PigParser with LazyLogging {
       inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
       
     } else {
-      runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf, backendArgs)
+      runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeature, params, backendConf, backendArgs)
     }
   }
   
@@ -137,11 +149,13 @@ object PigCompiler extends PigParser with LazyLogging {
     runner.executeRaw(file, master, backendArgs)
   }
   
-  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf, backendArgs: Map[String,String]) {
+  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
+                            langFeature: LanguageFeature.LanguageFeature, params: Map[String,String],
+                            backendConf: BackendConf, backendArgs: Map[String,String]) {
     logger.debug("start parsing input files")
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
     for(file <- inputFiles) {
-      createDataflowPlan(file, params, backend) match {
+      createDataflowPlan(file, params, backend, langFeature) match {
         case Some(v) => schedule += ((v,file))
         case None => 
           logger.error(s"failed to create dataflow plan for $file - aborting")
@@ -209,14 +223,14 @@ object PigCompiler extends PigParser with LazyLogging {
    * @param params Key value pairs to replace placeholders in the script
    * @param backend The name of the backend
    */
-  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String): Option[DataflowPlan] = {
+  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String, langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
       // 1. we read the Pig file
       val source = Source.fromFile(inputFile.toFile())
       
       logger.debug(s"""loaded pig script from "$inputFile" """)
   
       // 2. then we parse it and construct a dataflow plan
-      val plan = new DataflowPlan(parseScriptFromSource(source, params, backend))
+      val plan = new DataflowPlan(parseScriptFromSource(source, params, backend, langFeature))
       
 
       if (!plan.checkConnectivity) {
@@ -271,8 +285,8 @@ object PigCompiler extends PigParser with LazyLogging {
     buf.toIterator
   }
 
-  private def parseScriptFromSource(source: Source, params: Map[String,String], backend: String): List[PigOperator] = {
-    /*
+  private def parseScriptFromSource(source: Source, params: Map[String,String], backend: String, langFeature: LanguageFeature.LanguageFeature): List[PigOperator] = {
+     /*
      * Handle IMPORT statements.
      */
     val sourceLines = resolveImports(source.getLines())
@@ -283,16 +297,10 @@ object PigCompiler extends PigParser with LazyLogging {
         /* TODO: can we provide a config value "language_feature" in the backend config ?
          * So we could parse this value and pass it here for all backends in the same way
          */
-        if (backend == "flinks")
-          parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"), StreamingPig)
-        else
-          parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"))
+        parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"), langFeature)
       }
       else {
-        if (backend == "flinks")
-          parseScript(sourceLines.mkString("\n"), StreamingPig)
-        else
-          parseScript(sourceLines.mkString("\n"))
+        parseScript(sourceLines.mkString("\n"), langFeature)
       }
   }
 }
