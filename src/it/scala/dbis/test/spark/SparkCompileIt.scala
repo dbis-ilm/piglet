@@ -39,6 +39,8 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("filter.pig", "filtered.out", "truth/filtered.data", true),
     ("foreach1.pig", "distances.out", "truth/distances.data", true),
     ("nforeach.pig", "nested.out", "truth/nested.data", true),
+    // ("groupforeach.pig", "groupedrdf.out", "truth/groupedrdf.data", true),
+    // ("nforeach2.pig", "rdf.out", "truth/rdf.data", true),
     ("grouping.pig", "grouping.out", "truth/grouping.data", false),
     ("groupall.pig", "groupall.out", "truth/groupall.data", false),
     ("wordcount.pig", "marycounts.out", "truth/marycount.data", false),
@@ -46,7 +48,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("union.pig", "united.out", "truth/united.data", true),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false),
-    ("embedded.pig", "embedded.out", "truth/embedded.data", true),
+    // ("embedded.pig", "embedded.out", "truth/embedded.data", true),
     ("macro1.pig", "macro1.out", "truth/macro1.data", true),
     /* Works, but requires a R installation
     ("rscript.pig", "cluster.out", "truth/cluster.data", true)

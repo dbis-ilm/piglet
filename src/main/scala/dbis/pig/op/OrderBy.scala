@@ -60,4 +60,11 @@ case class OrderBy(out: Pipe, in: Pipe, orderSpec: List[OrderBySpec], var window
     }
     true
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"ORDER BY { out = ${outPipeName} , in = ${inPipeName} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "by = " + orderSpec.mkString(","))
+  }
 }

@@ -119,7 +119,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
     if (tp == None)
       None
     else
-      Some(new Schema(if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType(tp.asInstanceOf[TupleType])))
+      Some(Schema(if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType(tp.asInstanceOf[TupleType])))
   }
 
   private def getFieldInfo(schema: Option[Schema], ref: Ref): (Int, PigType) = schema match {
@@ -167,10 +167,9 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * to render the content.
    * @param schema the schema of the operator
    * @param expr a part from the complete arithmetic expression
-   * @param requiresTypeCast a boolean to indicate if the expression need to be casted or not
    * @return C++ code for the arithmetic expression
    */
-  private def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true): String = expr match {
+  private def emitExpr(schema: Option[Schema], expr: ArithmeticExpr): String = expr match {
     /*
     case CastExpr(t, e) => {
       // TODO: check for invalid type
@@ -298,7 +297,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * @param genExprs a list of the generator expressions to be translated to C++ Code
    */
   private def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(",")}"
+    s"${genExprs.map(e => emitExpr(schema, e.expr)).mkString(",")}"
 
   }
 
@@ -413,6 +412,8 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
     }.mkString(s"$stringDelim<<")
     case None => throw CompilerException("the schema should be defined to define a format")
   }
+
+  def emitSchemaClass(schema: Schema): String = ""
 
   /**
    * Generate code for the given Pig operator. The system will go through each operator and render
@@ -546,7 +547,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
       val inputs = node.inputs
       for (i <- rels.length - 1 to 2 by -1) {
         fields ++= inputs(i - 1).producer.schema.get.fields ++ inputs(i).producer.schema.get.fields
-        val joinSchema = Some(new Schema(BagType(TupleType(fields.toArray))))
+        val joinSchema = Some(Schema(BagType(TupleType(fields.toArray))))
         types += callST("tuple_typedef", Map("tuple_struct" -> schemaToTupleStruct(joinSchema),
           "type_name" -> s"${node.outPipeName}_${i}_TupleType"))
       }

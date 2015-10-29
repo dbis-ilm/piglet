@@ -18,7 +18,7 @@ package dbis.pig.plan
 
 import dbis.pig.op._
 import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.schema.SchemaException
+import dbis.pig.schema.{Schema, SchemaException}
 
 import scala.collection.mutable.{ListBuffer, Map}
 
@@ -43,6 +43,8 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
   var code: String = ""
   var extraRuleCode: Seq[String] = List.empty
 
+  val schemaSet = scala.collection.mutable.Set[Schema]()
+
   constructPlan(operators)
 
   /**
@@ -66,7 +68,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
      * 1. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
      *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
      */
-    ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
+    ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += op.asInstanceOf[RegisterCmd].jarFile)
     ops.filter(_.isInstanceOf[DefineCmd]).foreach { op =>
       val defineOp = op.asInstanceOf[DefineCmd]
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
@@ -364,9 +366,40 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
    */
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
 
-  def containsOperator(op: PigOperator): Boolean = operators.contains(op)
-  
   /**
+   * Checks whether the plan contains the given operator.
+   *
+   * @param op the operator we are looking for
+   * @return true if the operator exists
+   */
+  def containsOperator(op: PigOperator): Boolean = operators.contains(op)
+
+  /**
+   * Returns the list of schema objects constructed in the dataflow plan. If this set
+   * wasn't retrieved before, the set is constructed.
+   *
+   * @return a list (set) of schema objects
+   */
+  def schemaList(): List[Schema] = {
+    if (schemaSet.isEmpty) {
+      operators.foreach(op => {
+        // first, we collect all schemas
+        op.schema match {
+          case Some(schema) => {
+            // and store them in a set
+            schemaSet += schema
+          }
+          case None => { /* ????? */ }
+        }
+      })
+    }
+    schemaSet.toList.sortWith(_.schemaCode() < _.schemaCode())
+  }
+
+  def printPlan(tab: Int = 0): Unit = {
+    operators.foreach(_.printOperator(tab))
+  }
+   /**
    * Swaps two successive operators in the dataflow plan. Both operators are unary operators and have to be already
    * part of the plan.
    *

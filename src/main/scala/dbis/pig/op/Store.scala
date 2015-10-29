@@ -42,4 +42,13 @@ case class Store(in: Pipe,
   override def lineageString: String = {
     s"""STORE%${file}%""" + super.lineageString
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"STORE { in = ${inPipeName} }")
+    println(indent(tab + 2) + "file = " + file.toString)
+    if (func.isDefined) {
+      println(indent(tab + 2) + "func = " + func.get)
+    }
+  }
+
 }

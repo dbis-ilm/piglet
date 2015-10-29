@@ -275,7 +275,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
       /*
        * bag schema: bag{<tuple>} or {<tuple>}
        */
-    | ("bag"?) ~ "{" ~ ident ~ ":" ~ tupleTypeSpec ~ "}" ^^{ case _ ~ _ ~ id ~ _ ~ tup ~ _ => tup.name = id; BagType(tup) }
+    | ("bag"?) ~ "{" ~ tupleTypeSpec ~ "}" ^^{ case _ ~  _ ~ tup ~ _ => BagType(tup) }
       /*
        * map schema: map[<list of fields>] or [<list of fields>]
        */
@@ -453,7 +453,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * REGISTER <JarFile>
    */
-  def registerStmt: Parser[PigOperator] = registerKeyword ~ stringLiteral ^^{ case _ ~ uri => new RegisterCmd(uri) }
+  def registerStmt: Parser[PigOperator] = registerKeyword ~ fileName ^^{ case _ ~ uri => new RegisterCmd(uri) }
 
   /*
    * DEFINE <Alias> <FuncName>
@@ -768,6 +768,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /* ---------------------------------------------------------------------------------------------------------------- */
 
   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
+    Schema.init()
     parseScript(new CharSequenceReader(s), feature)
   }
 

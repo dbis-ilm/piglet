@@ -33,7 +33,9 @@ trait ForeachGenerator {}
  * @param expr
  * @param alias
  */
-case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None)
+case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None) {
+  override def toString = expr + (if (alias.isDefined) s" -> ${alias.get}" else "")
+}
 
 /**
  * GeneratorList implements the ForeachGenerator trait and is used to represent
@@ -78,20 +80,31 @@ case class Foreach(out: Pipe,
         val plan = new DataflowPlan(opList, Some(List(inputs.head)))
         // println("--> " + plan.operators.mkString("\n"))
 
-        plan.operators.foreach(op => if (op.isInstanceOf[Generate]) {
-          // we extract the input pipes of the GENERATE statements (which are hidden
-          // inside the expressions
-          val pipes = op.asInstanceOf[Generate].findInputPipes(plan)
-          // and update the other ends of the pipes accordingly
-          pipes.foreach(p => p.producer.addConsumer(p.name, op))
-        }
+        plan.operators.foreach(op =>
+          if (op.isInstanceOf[Generate]) {
+            val genOp = op.asInstanceOf[Generate]
+
+            // we extract the input pipes of the GENERATE statements (which are hidden
+            // inside the expressions
+            val pipes = genOp.findInputPipes(plan)
+            // and update the other ends of the pipes accordingly
+            pipes.foreach(p => p.producer.addConsumer(p.name, op))
+            // we need these pipes only to avoid the removal of disconnected operators
+
+            genOp.parentOp = this
+            genOp.setAdditionalPipesFromPlan(plan)
+          }
+          else if (op.isInstanceOf[ConstructBag]) {
+            op.asInstanceOf[ConstructBag].parentOp = Some(this)
+          }
         )
-        val genOp = plan.operators.last
-        if (genOp.isInstanceOf[Generate]) {
-          genOp.asInstanceOf[Generate].parentOp = this
+        val lastOp = plan.operators.last
+        if (lastOp.isInstanceOf[Generate]) {
+          lastOp.asInstanceOf[Generate].parentOp = this
+          lastOp.constructSchema
         }
         else
-          throw new InvalidPlanException("last statement in nested foreach must be a generate")
+          throw new InvalidPlanException("last statement in nested foreach must be a generate: " + lastOp)
 
         gen.subPlan = plan.operators
         subPlan = Some(plan)
@@ -108,10 +121,14 @@ case class Foreach(out: Pipe,
   }
 
   override def checkConnectivity: Boolean = {
+    def referencedInGenerate(op: Generate, pipe: Pipe): Boolean =
+      op.additionalPipes.filter(p => p.name == pipe.name).nonEmpty
+
     generator match {
       case GeneratorList(expr) => true
       case GeneratorPlan(plan) => {
         var result: Boolean = true
+        val genOp = plan.last.asInstanceOf[Generate]
         plan.foreach { op => {
           /*
           // println("check operator: " + op)
@@ -120,11 +137,12 @@ case class Foreach(out: Pipe,
             result = false
           }
           */
+          println("plan size = " + plan.length)
           if (!op.inputs.forall(p => p.producer != null)) {
             println("op: " + op + " : invalid input pipes: " + op.inputs.mkString(","))
             result = false
           }
-          if (!op.outputs.forall(p => p.consumer.nonEmpty)) {
+          if (!op.outputs.forall(p => p.consumer.nonEmpty || referencedInGenerate(genOp, p))) {
             println("op: " + op + " : invalid output pipes: " + op.outputs.mkString(","))
             result = false
           }
@@ -151,7 +169,10 @@ case class Foreach(out: Pipe,
         }
         // otherwise we take the field name from the expression and
         // the input schema
-        case None => val res = e.expr.resultType(inputSchema); Field("", res)
+        case None => {
+          val res = e.expr.resultType(inputSchema)
+          Field(e.expr.exprName, res)
+        }
       }
     }).toArray
 
@@ -163,7 +184,7 @@ case class Foreach(out: Pipe,
       case GeneratorList(expr) => {
         val fields = constructFieldList(expr)
 
-        schema = Some(new Schema(new BagType(new TupleType(fields), outPipeName)))
+        schema = Some(Schema(BagType(TupleType(fields))))
       }
       case GeneratorPlan(_) => {
         val plan = subPlan.get.operators
@@ -178,7 +199,7 @@ case class Foreach(out: Pipe,
         val genOp = plan.last
         if (genOp.isInstanceOf[Generate]) {
           schema = genOp.schema
-          schema.get.setBagName(outPipeName)
+          // schema.get.setBagName(outPipeName)
         }
         else
           throw new InvalidPlanException("last statement in nested foreach must be a generate")
@@ -241,6 +262,16 @@ case class Foreach(out: Pipe,
         false // TODO: what happens if GENERATE contains flatten?
     }
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"FOREACH { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    generator match {
+      case GeneratorList(exprs) => println(indent(tab + 2) + "exprs = " + exprs.mkString(","))
+      case GeneratorPlan(_) => subPlan.get.printPlan(tab + 5)
+    }
+  }
 }
 
 class NamedFieldExtractor {
@@ -273,144 +304,3 @@ class FuncExtractor {
   }
 }
 
-/**
- * GENERATE represents the final generate statement inside a nested FOREACH.
- *
- * @param exprs list of generator expressions
- */
-case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
-  _outputs = List()
-  _inputs = List()
-
-  var parentOp: Foreach = null
-
-  def copyPipes(op: Generate): Unit = {
-    _inputs = op._inputs
-    _outputs = op._outputs
-  }
-
-  /**
-   * Check all generate expressions and derive from the NamedField objects all possible
-   * input pipes. Input pipes are pipes which are output pipes of other operators.
-   *
-   * @param plan
-   */
-  def findInputPipes(plan: DataflowPlan): List[Pipe] = {
-    val traverse = new NamedFieldExtractor
-    exprs.foreach(e => e.expr.traverseAnd(null, traverse.collectNamedFields))
-    val newInput: List[Pipe] = traverse.fields.map(field => plan.findOperatorForAlias(field.name) match {
-      case Some(op) => Pipe(field.name, op, List(this))
-      case None => Pipe("")
-    }).filter(p => p.name != "").toList
-   _inputs =  newInput
-    _inputs
-  }
-
-  // TODO: what do we need here?
-  override def constructSchema: Option[Schema] = {
-    val fields = constructFieldList(exprs)
-    schema = Some(new Schema(new BagType(new TupleType(fields))))
-    schema
-  }
-
-  override def checkSchemaConformance: Boolean = {
-    // we have to extract all RefExprs
-    val traverse = new RefExprExtractor
-    exprs.foreach(e => e.expr.traverseAnd(null, traverse.collectRefExprs))
-
-    // we collect a list of fields of all input schemas
-    val fieldList = ListBuffer[Field]()
-    inputs.foreach(p => p.inputSchema match {
-      case Some(s) => fieldList ++= s.fields
-      case None => {}
-    })
-    val res = traverse.exprs.map(rex => rex.r match {
-      case NamedField(n, _) => fieldList.exists(_.name == n)
-      case PositionalField(p) => if (fieldList.isEmpty) p == 0 else p < fieldList.length
-      case Value(v) => true // okay
-      case DerefStreamingTuple(r1, r2) => true // TODO: is r1 a valid ref?
-      case DerefTuple(r1, r2) => true // TODO: is r1 a valid ref?
-      case DerefMap(r1, r2) => true // TODO: is r1 a valid ref?
-    })
-    ! res.contains(false)
-  }
-
-  // TODO: eliminate replicated code
-  def constructFieldList(exprs: List[GeneratorExpr]): Array[Field] =
-    exprs.map(e => {
-      e.alias match {
-        // if we have an explicit schema (i.e. a field) then we use it
-        case Some(f) => {
-          if (f.fType == Types.ByteArrayType) {
-            // if the type was only bytearray, we should check the expression if we have a more
-            // specific type
-            val res = e.expr.resultType(inputSchema)
-            Field(f.name, res)
-          }
-          else
-            f
-        }
-        // otherwise we take the field name from the expression and
-        // the input schema
-        case None => val res = e.expr.resultType(inputSchema); Field("", res)
-      }
-    }).toArray
-}
-
-/**
- * This operator is a pseudo operator used inside a nested FOREACH to construct a new bag from an expression.
- *
- * @param out the output pipe (relation).
- * @param refExpr a reference referring to an expression constructing a relation (bag).
- */
-case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List()
-
-  // TODO: what do we need here?
-  var parentSchema: Option[Schema] = None
-
-  override def constructSchema: Option[Schema] = {
-    parentSchema match {
-      case Some(s) => {
-        // first, we determine the field in the schema
-        val field = refExpr match {
-          case DerefTuple(t, r) => t match {
-            case nf @ NamedField(n, _) => {
-              if (s.element.name == n)
-                Field(n, s.element)
-              else
-                s.field(nf)
-            }
-            case PositionalField(p) => s.field(p)
-            case _ => throw new InvalidPlanException("unexpected expression in ConstructBag")
-          }
-          case _ => throw new InvalidPlanException("unexpected expression in ConstructBag")
-        }
-        // 2. we extract the type (which should be a BagType, MapType or TupleType)
-        if (!field.fType.isInstanceOf[ComplexType])
-          throw InvalidPlanException("invalid expression in ConstructBag")
-        val fieldType = field.fType.asInstanceOf[ComplexType]
-
-        val (componentName, componentType) = refExpr match {
-          case DerefTuple(t, r) => r match {
-            case NamedField(n, _) => (n, fieldType.typeOfComponent(n))
-            case PositionalField(p) => ("", fieldType.typeOfComponent(p))
-            case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
-          }
-          case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
-        }
-        // construct a schema from the component type
-//        val resSchema = new Schema(new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName))
-        val resSchema = new Schema(if (componentType.isInstanceOf[BagType])
-          componentType.asInstanceOf[BagType]
-        else
-          new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName))
-        schema = Some(resSchema)
-
-      }
-      case None => None
-  }
-    schema
-  }
-}
