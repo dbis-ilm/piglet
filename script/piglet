@@ -7,7 +7,6 @@ local=$TRUE        # will be set by isLocalMode function
 backend=""         # will be set by getBackend function
 interactive=false
 
-echo "args = $@"
 ##############################################################
 # printLogo - function to print the logo
 # @params: $1 = spark | flink |shell
@@ -156,6 +155,13 @@ isLocalMode $*
 
 ## search for the backend option
 getBackend $*
+
+## if no backend was specified we should exit here, but only
+# if no --help was given.
+if [ "$backend" == "" ] && [[ ! $@ =~ .*--help.* ]] ; then
+    echo "No backend specified: please use --backend (spark|flink|...)"
+    exit 1
+fi
 
 checkInteractiveShell $*
 

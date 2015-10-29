@@ -18,7 +18,7 @@
 package dbis.pig
 
 import java.io.File
-import dbis.pig.op.PigOperator
+import dbis.pig.op.{Dump, PigOperator}
 import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
@@ -56,7 +56,34 @@ object PigREPL extends PigParser with LazyLogging {
                         backendArgs: Map[String,String] = Map())
 
   val consoleReader = new ConsoleReader()
+
   val defaultScriptName = "__my_script"
+
+  /**
+   * A counter to make script names unique - it will be
+   * set to the system time.
+   */
+  var scriptCounter: Long = 0
+
+  /**
+   * Returns the current script name. Multiple calls will return
+   * the same name until nextScriptName is called.
+   *
+   * @return the script name
+   */
+  def scriptName(): String = {
+    defaultScriptName + scriptCounter
+  }
+
+  /**
+   * Creates and returns a new unique script name used also for the jar file.
+   *
+   * @return a name for the script
+   */
+  def nextScriptName() : String = {
+    scriptCounter = System.currentTimeMillis()
+    defaultScriptName + scriptCounter
+  }
 
   def cleanupResult(dir: String): Unit = {
     import scalax.file.Path
@@ -127,7 +154,6 @@ object PigREPL extends PigParser with LazyLogging {
         finished = handler(EmptyLine)
       }
       else if (line.size > 0) {
-        println("add to lineBuffer: " + line)
         lineBuffer += line
         if (line.startsWith("<%") || line.startsWith("<!")) {
           insideEmbeddedCode = true
@@ -183,7 +209,7 @@ object PigREPL extends PigParser with LazyLogging {
     var backendArgs: Map[String, String] = null
     var interactive: Boolean = true
     val parser = new OptionParser[REPLConfig]("PigShell") {
-      head("PigShell", "0.2")
+      head("PigShell", "0.3")
       opt[Unit]('i', "interactive") hidden() action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
@@ -212,8 +238,6 @@ object PigREPL extends PigParser with LazyLogging {
         return
     }
 
-   //  val backend = if(args.length==0) Conf.defaultBackend else args(0)
-    
     logger debug s"""Running REPL with backend "$backend" """
 
     val backendConf = BackendManager.backend(backend)
@@ -232,10 +256,13 @@ object PigREPL extends PigParser with LazyLogging {
         val mm = new MaterializationManager
         plan = processMaterializations(plan, mm)
         plan = processPlan(plan)
-        
+
+        plan.printPlan(0)
+        /*
         for(sink <- plan.sinkNodes) {
           println(pretty(sink))
         }
+        */
         false
       }
       case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => {
@@ -288,7 +315,17 @@ object PigREPL extends PigParser with LazyLogging {
                             s.toLowerCase().startsWith(s"store ") ||
                             s.toLowerCase.startsWith(s"socket_write "))=> {
         try {
+          if (s.toLowerCase.startsWith("dump ")) {
+            // if we have multiple dumps in our script then only the first one
+            // is executed. Thus, we have to remove all other DUMP statements in
+            // our list of operators.
+            val dumps = buf.filter(p => p.isInstanceOf[Dump])
+            dumps.foreach(d => d.inputs.head.removeConsumer(d))
+            buf --= dumps
+          }
+
           buf ++= parseScript(s, languageFeature)
+
           var plan = new DataflowPlan(buf.toList)
 
           val mm = new MaterializationManager
@@ -298,10 +335,12 @@ object PigREPL extends PigParser with LazyLogging {
           val templateFile = backendConf.templateFile
           val jobJar = Conf.backendJar(backend)
 
-          FileTools.compilePlan(plan, defaultScriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
+          nextScriptName()
+          FileTools.compilePlan(plan, scriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
             case Some(jarFile) =>
               val runner = backendConf.runnerClass
-              runner.execute(master, defaultScriptName, jarFile, backendArgs)
+              runner.execute(master, scriptName, jarFile, backendArgs)
+              cleanupResult(scriptName)
 
             case None => Console.err.println("failed to build jar file for job")
           }
@@ -310,6 +349,7 @@ object PigREPL extends PigParser with LazyLogging {
           case e : Throwable => 
             Console.err.println(s"error while executing: ${e.getMessage}")
             e.printStackTrace(Console.err)
+            cleanupResult(scriptName)
         }
 
         // buf.clear()
