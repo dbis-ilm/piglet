@@ -32,6 +32,10 @@ case class DataRecord(col1: Int, col2: String) extends java.io.Serializable with
   override def mkString(delim: String) = s"${col1}${delim}${col2}"
 }
 
+case class DoubleRecord(col1: Double, col2: Double) extends java.io.Serializable with SchemaClass {
+  override def mkString(delim: String) = s"${col1}${delim}${col2}"
+}
+
 class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
   var sc: SparkContext = _
   var conf: SparkConf = _
@@ -98,6 +102,18 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
     otherData.collect().length should be (3)
     data.collect() should be (otherData.collect())
     FileUtils.deleteDirectory(new File("person.ser"))
+  }
+
+  "BinStorage" should "save and load a RDD with doubles" in {
+    val data = PigStorage[DoubleRecord]().load(sc, "sparklib/src/test/resources/values.csv",
+      (data: Array[String]) => DoubleRecord(data(0).toDouble, data(1).toDouble), ",")
+    BinStorage[DoubleRecord]().write("values.ser", data)
+
+    val otherData = BinStorage[DoubleRecord]().load(sc, "values.ser",
+      (data: Array[String]) => DoubleRecord(data(0).toDouble, data(1).toDouble))
+    otherData.collect().length should be (3)
+    data.collect() should be (otherData.collect())
+    FileUtils.deleteDirectory(new File("values.ser"))
   }
 
   "JDBCStorage" should "load data from a H2 database" in {
