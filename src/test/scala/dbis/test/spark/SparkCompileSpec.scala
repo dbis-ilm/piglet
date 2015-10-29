@@ -526,7 +526,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
       """val uniqcnt = grpd.map(t => {
         |val sym = t._1.map(l => l._1).toList
         |val uniq_sym = sym.distinct
-        |_t4_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
+        |_t3_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 
     assert(generatedCode == expectedCode)
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(foreachOp.schema.get))

@@ -70,14 +70,14 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
           //    inserted ConstructBag operators)
           if (r1.toString == parent.inPipeName) {
             val pos = findFieldPosition(schema, r2)
-            println("pos = " + pos)
+            // println("pos = " + pos)
             s"""val ${n.outPipeName} = t._$pos.toList"""
           }
           else {
             // 2. r1 refers to a field in the schema
             val p1 = findFieldPosition(schema, r1)
             val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
-            println("pos2 = " + p1 + ", " + p2)
+            // println("pos2 = " + p1 + ", " + p2)
             s"""val ${n.outPipeName} = t._$p1.map(l => l._$p2).toList"""
           }
         }
@@ -157,8 +157,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
   def emitForeach(node: PigOperator, gen: ForeachGenerator): String = {
     require(node.schema.isDefined)
     val className = schemaClassName(node.schema.get.className)
-    println("emitForeach: className = " + className)
-    val expr = emitForeachExpr(node, gen)
+     val expr = emitForeachExpr(node, gen)
     // in case of a nested FOREACH the tuples are creates as part of the GENERATE clause
     // -> no need to give the schema class
     if (gen.isInstanceOf[GeneratorPlan]) {
@@ -257,7 +256,6 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
       val vsize = rels.head.inputSchema.get.fields.length
       val fieldList = node.schema.get.fields.zipWithIndex
         .map{case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}"}.mkString(", ")
-      println("join fields: " + fieldList)
 
       str += callST("join",
         Map("out" -> node.outPipeName,
