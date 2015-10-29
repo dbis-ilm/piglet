@@ -39,6 +39,8 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("filter.pig", "filtered.out", "truth/filtered.data", true),
     ("foreach1.pig", "distances.out", "truth/distances.data", true),
     ("nforeach.pig", "nested.out", "truth/nested.data", true),
+    // ("groupforeach.pig", "groupedrdf.out", "truth/groupedrdf.data", true),
+    // ("nforeach2.pig", "rdf.out", "truth/rdf.data", true),
     ("grouping.pig", "grouping.out", "truth/grouping.data", false),
     ("groupall.pig", "groupall.out", "truth/groupall.data", false),
     ("wordcount.pig", "marycounts.out", "truth/marycount.data", false),

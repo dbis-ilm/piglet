@@ -181,7 +181,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
           else
             f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
         }
-        case None => throw new TemplateException(s"invalid field name $f") // if we don't have a schema this is not allows
+        case None => throw new TemplateException(s"invalid field name $f") // if we don't have a schema this is not allowed
       }
     }
     else

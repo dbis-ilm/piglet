@@ -1377,6 +1377,7 @@ class RewriterSpec extends FlatSpec
     val rewrittenPlan = processPlan(plan)
     val op = rewrittenPlan.findOperatorForAlias("tmp")
     op shouldNot be (None)
+    rewrittenPlan.checkSchemaConformance
   }
 
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {

@@ -65,10 +65,21 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
       case Generate(expr) => s"""${className}(${emitGenerator(schema, expr, namedRef = true)})"""
       case n@ConstructBag(out, ref) => ref match {
         case DerefTuple(r1, r2) => {
-          val p1 = findFieldPosition(schema, r1)
-          val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
-          require(p1 >= 0 && p2 >= 0)
-          s"""val ${n.outPipeName} = t._$p1.map(l => l._$p2).toList"""
+          // there are two options of ConstructBag
+          // 1. r1 refers to the input pipe of the outer operator (for automatically
+          //    inserted ConstructBag operators)
+          if (r1.toString == parent.inPipeName) {
+            val pos = findFieldPosition(schema, r2)
+            println("pos = " + pos)
+            s"""val ${n.outPipeName} = t._$pos.toList"""
+          }
+          else {
+            // 2. r1 refers to a field in the schema
+            val p1 = findFieldPosition(schema, r1)
+            val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
+            println("pos2 = " + p1 + ", " + p2)
+            s"""val ${n.outPipeName} = t._$p1.map(l => l._$p2).toList"""
+          }
         }
         case _ => "" // should not happen
       }
