@@ -277,13 +277,15 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     case Func(f, params) => {
       val pTypes = params.map(p => p.resultType(schema))
       UDFTable.findUDF(f, pTypes) match {
-        case Some(udf) => { 
+        case Some(udf) => {
+          println(s"udf: $f found: " + udf)
           if (udf.isAggregate) {
             s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
           }
           else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
         }
         case None => {
+          println(s"udf: $f not found")
           // check if we have have an alias in DataflowPlan
           if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
             val alias = udfAliases.get(f)

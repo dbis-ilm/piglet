@@ -18,7 +18,8 @@ package dbis.pig.plan
 
 import dbis.pig.op._
 import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.schema.{Schema, SchemaException}
+import dbis.pig.schema.{Types, PigType, Schema, SchemaException}
+import dbis.pig.udf.{UDFTable, UDF}
 
 import scala.collection.mutable.{ListBuffer, Map}
 
@@ -29,6 +30,15 @@ import scala.collection.mutable.{ListBuffer, Map}
  */
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
+/**
+ * A DataflowPlan is a graph of operators representing a Piglet script and provides methods
+ * to construct the graph from a list of PigOperators with their pipes as well as to check and manipulate
+ * the graph.
+ *
+ * @param operators a list of operators used to construct the plan
+ * @param ctx an optional list of pipes representing the context, i.e. the
+ *            pipes of a nesting operator (e.g. FOREACH).
+ */
 class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable {
   /**
    * A list of JAR files specified by the REGISTER statement
@@ -42,8 +52,6 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
 
   var code: String = ""
   var extraRuleCode: Seq[String] = List.empty
-
-  val schemaSet = scala.collection.mutable.Set[Schema]()
 
   constructPlan(operators)
 
@@ -74,8 +82,9 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
     }
     ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => {
-      code += op.asInstanceOf[EmbedCmd].code
       val castedOp = op.asInstanceOf[EmbedCmd]
+      code += castedOp.code
+      castedOp.extractUDFs
       castedOp.ruleCode.foreach { c: String => extraRuleCode = extraRuleCode :+ c}
     })
 
@@ -375,30 +384,12 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
   def containsOperator(op: PigOperator): Boolean = operators.contains(op)
 
   /**
-   * Returns the list of schema objects constructed in the dataflow plan. If this set
-   * wasn't retrieved before, the set is constructed.
+   * Prints a textual representation of the plan to standard output.
    *
-   * @return a list (set) of schema objects
+   * @param tab the number of whitespaces for indention
    */
-  def schemaList(): List[Schema] = {
-    if (schemaSet.isEmpty) {
-      operators.foreach(op => {
-        // first, we collect all schemas
-        op.schema match {
-          case Some(schema) => {
-            // and store them in a set
-            schemaSet += schema
-          }
-          case None => { /* ????? */ }
-        }
-      })
-    }
-    schemaSet.toList.sortWith(_.schemaCode() < _.schemaCode())
-  }
+  def printPlan(tab: Int = 0): Unit = operators.foreach(_.printOperator(tab))
 
-  def printPlan(tab: Int = 0): Unit = {
-    operators.foreach(_.printOperator(tab))
-  }
    /**
    * Swaps two successive operators in the dataflow plan. Both operators are unary operators and have to be already
    * part of the plan.

@@ -290,12 +290,12 @@ object PigREPL extends PigParser with LazyLogging {
               plan = processPlan(plan)
               val op_after_rewriting = plan.findOperatorForAlias(alias)
               op match {
-                case Some (op) => println (op.schemaToString)
+                case Some (o) => println (o.schemaToString)
                 case None => println (s"unknown alias '$alias'")
               }
               op_after_rewriting match {
                 case Some(_) => op match {
-                  case Some(o) if (o.schema != op_after_rewriting.get.schema) =>
+                  case Some(o) if o.schema != op_after_rewriting.get.schema =>
                     val r_schema = op_after_rewriting.get.schema.toString
                     println(s"After rewriting, '$alias''s schema is '$r_schema'.")
                   case _ => ()
@@ -311,9 +311,9 @@ object PigREPL extends PigParser with LazyLogging {
 
         false
       }
-      case Line(s, buf) if (s.toLowerCase.startsWith(s"dump ") ||
-                            s.toLowerCase().startsWith(s"store ") ||
-                            s.toLowerCase.startsWith(s"socket_write "))=> {
+      case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
+                            s.toLowerCase.startsWith(s"store ") ||
+                            s.toLowerCase.startsWith(s"socket_write ") => {
         try {
           if (s.toLowerCase.startsWith("dump ")) {
             // if we have multiple dumps in our script then only the first one
@@ -355,7 +355,7 @@ object PigREPL extends PigParser with LazyLogging {
         // buf.clear()
         false
       }
-      case Line(s, buf) if (s.toLowerCase().startsWith(s"fs ")) => {
+      case Line(s, buf) if s.toLowerCase.startsWith(s"fs ") => {
         processFsCmd(s)
       }
       case Line(s, buf) => try {

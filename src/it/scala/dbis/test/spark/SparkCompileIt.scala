@@ -48,7 +48,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "spark"),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "spark"),
-    // ("embedded.pig", "embedded.out", "truth/embedded.data", true),
+    ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "spark"),
     ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "spark"),
     /* Works, but requires a R installation
     ("rscript.pig", "cluster.out", "truth/cluster.data", true)

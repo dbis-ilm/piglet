@@ -339,7 +339,7 @@ class RewriterSpec extends FlatSpec
       val op2 = Dump(Pipe("a"))
       val plan = processPlan(new DataflowPlan(List(op1, op2)))
       val source = plan.sourceNodes.headOption.value
-      source shouldBe Load(Pipe("a"), "hdfs://somewhere", op1.schema, Some("BinStorage"))
+      source shouldBe Load(Pipe("a"), "hdfs://somewhere", op1.schema, Some("RDFFileStorage"))
     }
   }
 

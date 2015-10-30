@@ -24,10 +24,11 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules
 import dbis.pig.schema._
+import dbis.pig.udf.UDFTable
 import dbis.test.TestTools._
-import org.scalatest.{BeforeAndAfterAll, FlatSpec}
+import org.scalatest.{Matchers, BeforeAndAfterAll, FlatSpec}
 
-class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
+class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   
   override def beforeAll()  {
     Rules.registerAllRules()
@@ -718,6 +719,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
         | s
         |}
       """.stripMargin))
+    val udf = UDFTable.findUDF("someFunc", Types.AnyType)
+    udf shouldBe defined
   }
 
   it should "contain code for macros" in {
@@ -822,7 +825,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val codeGenerator = new BatchGenCode(templateFile)
 
     var code: String = ""
-    for (schema <- plan.schemaList) {
+    for (schema <- Schema.schemaList) {
       code = code + codeGenerator.emitSchemaClass(schema)
     }
 
@@ -853,7 +856,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll {
     val codeGenerator = new BatchGenCode(templateFile)
 
     var code: String = ""
-    for (schema <- plan.schemaList) {
+    for (schema <- Schema.schemaList) {
       code = code + codeGenerator.emitSchemaClass(schema)
     }
 
