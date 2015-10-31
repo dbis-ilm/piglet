@@ -294,9 +294,6 @@ object PigCompiler extends PigParser with LazyLogging {
         /*
          * Replace placeholders by parameters.
          */
-        /* TODO: can we provide a config value "language_feature" in the backend config ?
-         * So we could parse this value and pass it here for all backends in the same way
-         */
         parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"), langFeature)
       }
       else {
