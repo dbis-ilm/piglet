@@ -25,13 +25,13 @@ import scala.reflect.ClassTag
   *
   */
 trait FastStrategyAdder {
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
+  def fixMerge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                   newParent: T3): T3
   def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
   (f: (T, T2) => Option[PigOperator]): Strategy
   def addStrategy(strategy: Strategy): Unit
 
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
+  def fixReordering[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                newChild: T): T2
 
   def buildTypedCaseWrapper[T <: PigOperator : ClassTag, T2](f: (T => Option[T2])): (Any => Option[T2])
@@ -60,7 +60,7 @@ trait FastStrategyAdder {
   def merge[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[PigOperator]):
   Unit = {
     val strategy = (parent: T, child: T2) =>
-      f(parent, child).map(fixInputsAndOutputs(parent, child, _))
+      f(parent, child).map(fixMerge(parent, child, _))
     addBinaryPigOperatorStrategy(strategy)
   }
 
@@ -82,7 +82,7 @@ trait FastStrategyAdder {
   def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[(T2, T)]):
   Unit = {
     val strategy = (parent: T, child: T2) =>
-      f(parent, child).map(tup => fixInputsAndOutputs(tup._2, tup._1, tup._1, tup._2))
+      f(parent, child).map(tup => fixReordering(tup._2, tup._1, tup._1, tup._2))
     addBinaryPigOperatorStrategy(strategy)
   }
 
@@ -99,7 +99,7 @@ trait FastStrategyAdder {
   def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]:
   Unit = {
     val strategy = (parent: T, child: T2) =>
-      Some(fixInputsAndOutputs(parent, child, child, parent))
+      Some(fixReordering(parent, child, child, parent))
     addBinaryPigOperatorStrategy(strategy)
   }
 

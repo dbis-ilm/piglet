@@ -88,8 +88,8 @@ case class RewriterException(msg: String) extends Exception(msg)
   *
   * After a rewriting operation, the `inputs` and `outputs` attribute of operators other than the rewritten ones
   * might be changed (for example to accommodate new or deleted operators). To help maintaining these relationships,
-  * the methods [[fixInputsAndOutputs]] and [[pullOpAcrossMultipleInputOp]] in several versions is provided. Their
-  * documentation include hints in which cases they apply.
+  * the methods [[fixMerge]], [[fixReordering]] and [[pullOpAcrossMultipleInputOp]] in several versions is provided.
+  * Their documentation include hints in which cases they apply.
   *
   * @todo Not all links in this documentation link to the correct methods, most notably links to overloaded ones.
   *

@@ -54,7 +54,7 @@ trait Fixers {
     * @tparam T3 The type of the new operator.
     * @return
     */
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
+  def fixMerge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                   newParent: T3): T3 = {
     newParent.inputs = oldParent.inputs
     newParent.outputs = oldChild.outputs
@@ -76,7 +76,7 @@ trait Fixers {
     * @tparam T2 The type of the old child and new parent operators.
     * @return
     */
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
+  def fixReordering[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                newChild: T): T2 = {
     // If oldParent == newChild (for example when this is called from `swap`, we need to save oldParent.outPipename
     // because it depends on oldParent.outputs
