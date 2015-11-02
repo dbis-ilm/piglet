@@ -111,6 +111,8 @@ trait Fixers {
     */
   def pullOpAcrossMultipleInputOp(toBePulled: PigOperator, multipleInputOp: PigOperator, indicator: PigOperator):
   PigOperator = {
+    require(multipleInputOp.inputs.map(_.producer) contains indicator, "indicator is not a predecessor of " +
+      "multipleInputOp")
     require(multipleInputOp.outputs.flatMap(_.consumer) contains toBePulled, "toBePulled is not a consumer of " +
       "multipleInputOp")
     // First, make the toBePulled a consumer of the correct input
