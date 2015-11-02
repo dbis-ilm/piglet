@@ -38,6 +38,9 @@ trait FastStrategyAdder {
 
   def addStrategy(f: Any => Option[PigOperator]): Unit
 
+  def buildOperatorReplacementStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+   (f: T => Option[T2]): Strategy
+
   /** Add a new strategy for merging operators of two types.
     *
     * An example method to merge Filter operators is
@@ -122,4 +125,19 @@ trait FastStrategyAdder {
     val wrapper = buildTypedCaseWrapper(f)
     addStrategy(wrapper)
   }
+
+  /** Adds a function `f` that replaces a single [[PigOperator]] with another one as a [[org.kiama.rewriting.Strategy]]
+    * to this object.
+    *
+    * If applying `f` to a term succeeded (Some(_)) was returned, the input term will be replaced by the new term in
+    * the input pipes of the new terms successors (the consumers of its output pipes).
+    *
+    * @param f
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  def addOperatorReplacementStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+  (f: T => Option[T2]): Unit = {
+    addStrategy(buildOperatorReplacementStrategy(f))
+  }
+
 }

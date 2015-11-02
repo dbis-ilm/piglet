@@ -129,20 +129,6 @@ object Rewriter extends LazyLogging
   //noinspection ScalaDocMissingParameterDescription
   def addStrategy(f: Any => Option[PigOperator]): Unit = addStrategy(strategyf(t => f(t)))
 
-  /** Adds a function `f` that replaces a single [[PigOperator]] with another one as a [[org.kiama.rewriting.Strategy]]
-    * to this object.
-    *
-    * If applying `f` to a term succeeded (Some(_)) was returned, the input term will be replaced by the new term in
-    * the input pipes of the new terms successors (the consumers of its output pipes).
-    *
-    * @param f
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  def addOperatorReplacementStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
-    (f: T => Option[T2]): Unit = {
-    addStrategy(buildOperatorReplacementStrategy(f))
-  }
-
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
     * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
     *
