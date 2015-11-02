@@ -219,6 +219,8 @@ trait Fixers {
     * @return ``new_``
     */
   def fixReplacement[T <: PigOperator](old: PigOperator) (new_ : T): T = {
+    new_.inputs = old.inputs
+    new_.outputs = old.outputs
     new_.outputs foreach { output =>
       output.consumer foreach { consumer =>
         consumer.inputs foreach { input =>
