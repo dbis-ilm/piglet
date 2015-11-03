@@ -62,6 +62,13 @@ trait StrategyBuilders {
     strategyf(t => wrapper(t))
   }
 
+  /** Builds the strategy for [[dbis.pig.plan.rewriting.Rewriter.addBinaryPigOperatorStrategy]].
+    *
+    * @param f
+    * @tparam T
+    * @tparam T2
+    * @return
+    */
   def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
   (f: (T, T2) => Option[PigOperator]): Strategy = {
     strategyf(op => {
