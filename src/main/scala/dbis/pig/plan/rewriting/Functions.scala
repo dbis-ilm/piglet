@@ -33,7 +33,7 @@ object Functions {
   def merge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator]
   (term1: T, term2: T2, f: (T, T2) => T3): T3 = {
     val newOp = f(term1, term2)
-    Rewriter.fixInputsAndOutputs(term1, term2, newOp)
+    Rewriter.fixMerge(term1, term2, newOp)
   }
 
   /** Set the pipes of ``ops`` such that the data flows from the first element of ``ops`` to the last.
@@ -121,5 +121,5 @@ object Functions {
     * @return
     */
   def swap[T <: PigOperator, T2 <: PigOperator](parent: T, child: T2): T2 =
-    Rewriter.fixInputsAndOutputs(parent, child, child, parent)
+    Rewriter.fixReordering(parent, child, child, parent)
 }

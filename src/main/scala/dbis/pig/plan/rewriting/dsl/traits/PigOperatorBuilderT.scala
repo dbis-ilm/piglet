@@ -47,7 +47,7 @@ abstract class PigOperatorBuilderT[FROM <: PigOperator, TO] extends BuilderT[FRO
         case ret @ (a : PigOperator, b:PigOperator) =>
           Rewriter.fixReplacementwithMultipleOperators(term, a, b)
           t
-        case op : TO if op.isInstanceOf[PigOperator] =>
+        case op if op.isInstanceOf[PigOperator] =>
           val o = op.asInstanceOf[PigOperator]
           o.inputs = term.inputs
           o.asInstanceOf[TO]

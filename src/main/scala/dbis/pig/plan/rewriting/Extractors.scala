@@ -36,7 +36,14 @@ object Extractors {
     *   B = FOREACH A GENERATE myFunc(f1, f2);
     * }}}
     *
-    * this extractor returns "myFunc".
+    * the pattern
+    *
+    * {{{
+    *   case ForEachCallingFunctionE(op, "myFunc") =>
+    * }}}
+    *
+    * will match bind ``op`` to the [[dbis.pig.op.Foreach]] operator if the function called in its ``GENERATE``
+    * statement is ``myFunc``.
     */
   object ForEachCallingFunctionE {
     def unapply(f: Foreach): Option[(PigOperator, String)] = f match {
@@ -46,6 +53,14 @@ object Extractors {
   }
 
   /** Extracts the successor of ``op`` if there is only one.
+    *
+    * The pattern
+    *
+    * {{{
+    *   case SuccE(op, succ) =>
+    * }}}
+    *
+    * will bind ``op`` to a [[dbis.pig.op.PigOperator]] object and ``succ`` to its successor.
     *
     */
   object SuccE {
@@ -60,6 +75,22 @@ object Extractors {
   }
 
   /** Extracts all successors of ``op``.
+    *
+    * The pattern
+    *
+    * {{{
+    *  case AllSuccE(op, succs) =>
+    * }}}
+    *
+    * will bind ``op`` to a [[dbis.pig.op.PigOperator]] object and ``succs`` to its successors.
+    *
+    * Of course, this can be combined with other patterns like
+    *
+    * {{{
+    *  case AllSuccE(op, first :: second) =>
+    * }}}
+    *
+    * to only match and bind ``op`` if it has only two successors, namely ``first`` and ``second``.
     *
     */
   object AllSuccE {
