@@ -16,7 +16,8 @@
  */
 package dbis.pig.plan.rewriting.internals
 
-import dbis.pig.op.{Empty, PigOperator, Pipe}
+import dbis.pig.op.PigOperator
+import dbis.pig.plan.rewriting.Extractors.SuccE
 import dbis.pig.plan.rewriting.Functions
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
@@ -65,20 +66,8 @@ trait StrategyBuilders {
   (f: (T, T2) => Option[PigOperator]): Strategy = {
     strategyf(op => {
       op match {
-        case `op` if classTag[T].runtimeClass.isInstance(op) =>
-          val parent = op.asInstanceOf[T]
-          if (parent.outputs.length == 1 && parent.outputs.head.consumer.length == 1) {
-            val op2 = parent.outputs.head.consumer.head
-            op2 match {
-              case `op2` if classTag[T2].runtimeClass.isInstance(op2) && op2.inputs.length == 1 =>
-                val child = op2.asInstanceOf[T2]
-                f(parent, child)
-              case _ => None
-            }
-          }
-          else {
-            None
-          }
+        case SuccE(op, succ) if classTag[T].runtimeClass.isInstance(op) && classTag[T2].runtimeClass.isInstance(succ)
+          && succ.inputs.length == 1 => f(op.asInstanceOf[T], succ.asInstanceOf[T2])
         case _ => None
       }
     })
