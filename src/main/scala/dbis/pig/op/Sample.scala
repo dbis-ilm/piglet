@@ -41,4 +41,12 @@ case class Sample(out: Pipe, in: Pipe, expr: ArithmeticExpr) extends PigOperator
       }
     }
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"SAMPLE { out = ${outPipeName} , in = ${inPipeName} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "expr = " + expr)
+  }
+
 }

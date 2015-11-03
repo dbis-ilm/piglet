@@ -103,7 +103,7 @@ object RDFRuleset extends Ruleset {
       return None
     }
 
-    Some(Load(op.out, op.uri, op.schema, Some("BinStorage")))
+    Some(Load(op.out, op.uri, op.schema, Some("RDFFileStorage")))
   }
 
   /** Applies rewriting rule F1 of the paper [[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].

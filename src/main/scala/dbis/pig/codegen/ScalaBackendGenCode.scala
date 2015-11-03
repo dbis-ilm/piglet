@@ -36,9 +36,8 @@ import scala.collection.mutable.Set
  * a template file for the backend-specific code.
  *
  * The main idea of the generated code is the following: a record of the backend-specific data
- * structure (e.g. RDD in Spark) is represented by List[Any] to allow variable-sized tuples as
- * supported in Pig. This requires to always map the output of any backend transformation back
- * to such a list.
+ * structure (e.g. RDD in Spark) is represented by an instance of a specific case class which is
+ * generated according to the schema of an operator.
  *
  * @param template the name of the backend-specific template fle
  */
@@ -48,6 +47,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   /*------------------------------------------------------------------------------------------------- */
   /*                                           helper functions                                       */
   /*------------------------------------------------------------------------------------------------- */
+
+  def schemaClassName(name: String) = s"_${name}_Tuple"
 
   /**
    *
@@ -171,50 +172,34 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     * @param schema the (optional) schema decribing the tuple structure
     * @param ref
     * @param tuplePrefix the variable name
-    * @param requiresTypeCast true if we should generate a typecase using asInstanceOf
     * @param aggregate ??
     * @return the generated code
     */
-  def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
-              requiresTypeCast: Boolean = true,
-              aggregate: Boolean = false): String = ref match {
-    case nf @ NamedField(f, _) => schema match {
-      case Some(s) => {
-        val idx = s.indexOfField(nf)
-        if (idx == -1) {
-          // TODO: field name not found, for now we assume that it refers to a bag (relation)
-          f
-        }
-        else {
-          if (requiresTypeCast) {
-            val field = s.field(idx)
-            val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
-
-            /* if we need to cast to anything else than string (i.e. int, double, etc) we have to
-             * cast to string before, because if we load from a BinStorage, we only get Any types
-             * that do not have a toInt or toDouble conversion method
-             */
-            s"${tuplePrefix}(${idx}).asInstanceOf[${typeCast}]"
-          }
+  def emitRef(schema: Option[Schema],
+              ref: Ref,
+              tuplePrefix: String = "t",
+              aggregate: Boolean = false,
+              namedRef: Boolean = false): String = ref match {
+    case nf @ NamedField(f, _) => if (namedRef) {
+      // check if f exists in the schema
+      schema match {
+        case Some(s) => {
+          val p = s.indexOfField(nf)
+          if (p != -1)
+            s"$tuplePrefix._$p"
           else
-            s"${tuplePrefix}(${idx})"
+            f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
         }
+        case None => throw new TemplateException(s"invalid field name $f") // if we don't have a schema this is not allowed
       }
-      case None => throw new SchemaException(s"unknown schema for field $f")
-    } // TODO: should be position of field
-    case PositionalField(pos) =>
-      if (requiresTypeCast && schema.isDefined) {
-        if (pos >= schema.get.fields.length)
-          throw new SchemaException("invalid field reference: $" + pos)
-        val field = schema.get.field(pos)
-        val typeCast = if (field.fType.isInstanceOf[BagType]) s"List" else scalaTypeMappingTable(field.fType)
-        s"$tuplePrefix($pos).asInstanceOf[${typeCast}]"
-      }
-      else s"$tuplePrefix($pos)"
+    }
+    else
+        s"$tuplePrefix._${schema.get.indexOfField(nf)}" // s"$tuplePrefix.$f"
+    case PositionalField(pos) => s"$tuplePrefix._$pos"
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
-    case DerefMap(m, k) => s"${emitRef(schema, m)}.asInstanceOf[Map[String,Any]](${k})"
+    case DerefMap(m, k) => s"${emitRef(schema, m)}(${k})"
     case _ => { "" }
   }
 
@@ -249,9 +234,9 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    */
   def emitGroupExpr(schema: Option[Schema], groupingExpr: GroupingExpression): String = {
     if (groupingExpr.keyList.size == 1)
-      groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString
+      groupingExpr.keyList.map(e => emitRef(schema, e)).mkString
     else
-      "(" + groupingExpr.keyList.map(e => emitRef(schema, e, requiresTypeCast = false)).mkString(",") + ")"
+      "(" + groupingExpr.keyList.map(e => emitRef(schema, e)).mkString(",") + ")"
   }
 
   /**
@@ -271,92 +256,151 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    *
    * @param schema
    * @param expr
-   * @param requiresTypeCast
    * @return
    */
-  def emitExpr(schema: Option[Schema], expr: ArithmeticExpr, requiresTypeCast: Boolean = true, aggregate: Boolean = false): String = expr match {
+  def emitExpr(schema: Option[Schema],
+               expr: ArithmeticExpr,
+               aggregate: Boolean = false,
+               namedRef: Boolean = false): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
       val targetType = scalaTypeMappingTable(t)
-      s"${emitExpr(schema, e)}.to$targetType"
+      s"${emitExpr(schema, e, namedRef = namedRef)}.to$targetType"
     }
-    case PExpr(e) => s"(${emitExpr(schema, e)})"
-    case MSign(e) => s"-${emitExpr(schema, e)}"
-    case Add(e1, e2) => s"${emitExpr(schema, e1)} + ${emitExpr(schema, e2)}"
-    case Minus(e1, e2) => s"${emitExpr(schema, e1)} - ${emitExpr(schema, e2)}"
-    case Mult(e1, e2) => s"${emitExpr(schema, e1)} * ${emitExpr(schema, e2)}"
-    case Div(e1, e2) => s"${emitExpr(schema, e1)} / ${emitExpr(schema, e2)}"
-    case RefExpr(e) => s"${emitRef(schema, e, "t", requiresTypeCast, aggregate)}"
+    case PExpr(e) => s"(${emitExpr(schema, e, namedRef = namedRef)})"
+    case MSign(e) => s"-${emitExpr(schema, e, namedRef = namedRef)}"
+    case Add(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} + ${emitExpr(schema, e2, namedRef = namedRef)}"
+    case Minus(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} - ${emitExpr(schema, e2, namedRef = namedRef)}"
+    case Mult(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} * ${emitExpr(schema, e2, namedRef = namedRef)}"
+    case Div(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} / ${emitExpr(schema, e2, namedRef = namedRef)}"
+    case RefExpr(e) => s"${emitRef(schema, e, "t", aggregate, namedRef = namedRef)}"
     case Func(f, params) => {
       val pTypes = params.map(p => p.resultType(schema))
       UDFTable.findUDF(f, pTypes) match {
-        case Some(udf) => { 
+        case Some(udf) => {
+          println(s"udf: $f found: " + udf)
           if (udf.isAggregate) {
-            if (!f.equalsIgnoreCase("count"))
-              s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)}.map(e => e.asInstanceOf[Number].doubleValue))"
-            else
-               s"${udf.scalaName}(${emitExpr(schema, params.head, false, true)}.asInstanceOf[Seq[Any]])"  
+            s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
           }
-          else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+          else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
         }
         case None => {
+          println(s"udf: $f not found")
           // check if we have have an alias in DataflowPlan
           if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
             val alias = udfAliases.get(f)
-            val paramList = alias._2 ::: params.map(e => emitExpr(schema, e))
+            val paramList = alias._2 ::: params.map(e => emitExpr(schema, e, namedRef = namedRef))
             s"${alias._1}(${paramList.mkString(",")})"
           }
           else {
             // we don't know the function yet, let's assume there is a corresponding Scala function
-            s"$f(${params.map(e => emitExpr(schema, e)).mkString(",")})"
+            s"$f(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
           }
         }
       }
     }
-    case FlattenExpr(e) => emitExpr(schema, e, false)
-    case ConstructTupleExpr(exprs) => s"PigFuncs.toTuple(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
-    case ConstructBagExpr(exprs) => s"PigFuncs.toBag(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
-    case ConstructMapExpr(exprs) => s"PigFuncs.toMap(${exprs.map(e => emitExpr(schema, e)).mkString(",")})"
+    case FlattenExpr(e) => flattenExpr(schema, e)
+    case ConstructTupleExpr(exprs) => {
+      val exType = expr.resultType(schema).asInstanceOf[TupleType]
+      val s = Schema(new BagType(exType))
+      s"${schemaClassName(s.className)}(${exprs.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+    }
+    case ConstructBagExpr(exprs) => {
+      val exType = expr.resultType(schema).asInstanceOf[BagType]
+      val s = Schema(exType)
+      s"List(${exprs.map(e => s"${schemaClassName(s.className)}(${emitExpr(schema, e, namedRef = namedRef)})").mkString(",")})"
+    }
+    case ConstructMapExpr(exprs) => {
+      val exType = expr.resultType(schema).asInstanceOf[MapType]
+      println("MapType = " + exType)
+      val valType = exType.valueType
+      val exprList = exprs.map(e => emitExpr(schema, e, namedRef = namedRef))
+      // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
+      val mapStr = exprList.zip(exprList.tail).zipWithIndex.filter{
+        case (p, i) => i % 2 == 0
+      }.map{case (p, i) => s"${p._1} -> ${p._2}"}.mkString(",")
+      s"Map[String,${scalaTypeMappingTable(valType)}](${mapStr})"
+    }
     case _ => println("unsupported expression: " + expr); ""
   }
 
   /**
+   * Constructs the Scala code for flattening a tuple. We have to determine the field in the
+   * input schema refering to a tuple type and extract all fields of this tuple type.
    *
-   * @param schema
-   * @param genExprs
-   * @return
+   * @param schema the input schema of the FOREACH operator
+   * @param e the expression to be flattened (should be a RefExpr)
+   * @return a string representation of the Scala code
    */
-  def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"List(${genExprs.map(e => emitExpr(schema, e.expr, false)).mkString(",")})"
+  def flattenExpr(schema: Option[Schema], e: ArithmeticExpr): String = {
+    if (schema.isEmpty) throw new TemplateException("cannot flatten a tuple without a schema")
+    // we need the field name used in Scala (either the actual name or _<position>) as well as
+    // the actual field
+    val (refName, field) = e match {
+      case RefExpr(r) => r match {
+        case nf@NamedField(n, _) => ("_" + schema.get.indexOfField(nf), schema.get.field(nf))
+        case PositionalField(p) => ("_" + p.toString, schema.get.field(p))
+          // either a named or a positional field: all other cases are not allowed!?
+        case _ => throw new TemplateException("invalid flatten expression: argument isn't a reference")
+      }
+      case _ => throw new TemplateException(s"invalid flatten expression: argument $e isn't a reference")
+    }
+    if (field.fType.tc == TypeCode.TupleType) {
+      // we flatten a tuple
+      val tupleType = field.fType.asInstanceOf[TupleType]
+      // finally, produce a list of t.<refName>.<fieldPos>
+      tupleType.fields.zipWithIndex.map { case (f, i) => s"t.${refName}._$i" }.mkString(", ")
+    }
+    else if (field.fType.tc == TypeCode.BagType) {
+      // we flatten a bag
+      val bagType = field.fType.asInstanceOf[BagType]
+      s"t.${refName}"
+    }
+    else
+      // other types than tuple and bag cannot be flattened
+      throw new TemplateException("invalid flatten expression: argument doesn't refer to a tuple or bag")
   }
 
   /**
-   * Constructs the GENERATE expression list in FOREACH for cases where this list contains the FLATTEN
-   * operator. This case requires to unwrap the list in flatten.
+   * Constructs the GENERATE expression list in FOREACH.
    *
-   * @param schema
-   * @param genExprs
-   * @return
+   * @param schema the input schema
+   * @param genExprs the list of expressions in the GENERATE clause
+   * @return a string representation of the Scala code
    */
-  def emitFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    s"PigFuncs.flatTuple(${emitGenerator(schema, genExprs)})"
+  def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr], namedRef: Boolean = false): String = {
+    s"${genExprs.map(e => emitExpr(schema, e.expr, aggregate = false, namedRef = namedRef)).mkString(", ")}"
   }
 
   /**
+   * Creates the Scala code needed for a flatten expression where the argument is a bag.
+   * It requires a flatMap transformation.
    *
-   * @param schema
-   * @param genExprs
-   * @return
+   * @param node the FOREACH operator containing the flatten in the GENERATE clause
+   * @param genExprs the list of generator expressions
+   * @return a string representation of the Scala code
    */
-  def emitBagFlattenGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr]): String = {
-    val flattenExprs = genExprs.filter(e => e.expr.traverseOr(schema.getOrElse(null), Expr.containsFlattenOnBag))
+  def emitBagFlattenGenerator(node: PigOperator, genExprs: List[GeneratorExpr]): String = {
+    require(node.schema.isDefined)
+    val className = schemaClassName(node.schema.get.className)
+    // extract the flatten expression from the generator list
+    val flattenExprs = genExprs.filter(e => e.expr.traverseOr(node.inputSchema.getOrElse(null), Expr.containsFlattenOnBag))
+    // determine the remaining expressions
     val otherExprs = genExprs.diff(flattenExprs)
     if (flattenExprs.size == 1) {
-      val ex = flattenExprs.head.expr
-      if (otherExprs.nonEmpty)
-        s"List(${emitExpr(schema, ex, false)}.asInstanceOf[Seq[Any]].map(s => (${otherExprs.map(e => emitExpr(schema, e.expr, false))}, s))"
-      else
-        s"${emitExpr(schema, ex, false)}"
+      // there is only a single flatten expression
+      val ex: FlattenExpr = flattenExprs.head.expr.asInstanceOf[FlattenExpr]
+      if (otherExprs.nonEmpty) {
+        // we have to cross join the flatten expression with the others:
+        // t._1.map(s => <class>(<expr))
+        val exs = otherExprs.map(e => emitExpr(node.inputSchema, e.expr)).mkString(",")
+        s"${emitExpr(node.inputSchema, ex)}.map(s => ${className}($exs, s))"
+      }
+      else {
+        // there is no other expression: we just construct an expression for flatMap:
+        // (<expr>).map(t => <class>(t))
+        s"${emitExpr(node.inputSchema, ex.a)}).map(t => ${className}(t))"
+      }
     }
     else
       s"" // i.flatMap(t => t(1).asInstanceOf[Seq[Any]].map(s => List(t(0),s)))
@@ -395,26 +439,6 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       if (col == num) s"{ this.c$col compare that.c$col }"
       else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col+1, num)} else this.c$col compare that.c$col }"
 
-    /**
-     * Generates a function for producing a string representation of a tuple. This is needed because
-     * Spark's saveAsTextFile simply calls the toString method which results in "List(...)" or
-     * "CompactBuffer(...)" in the output.
-     *
-     * @param schema a schema describing the tuple structure
-     * @param stringDelim delimiter character
-     * @return the string representation
-     */
-    def genStringRepOfTuple(schema: Option[Schema], stringDelim: String = "','"): String = schema match {
-      case Some(s) => (0 to s.fields.length-1).toList.map{ i => s.field(i).fType match {
-          // TODO: this should be processed recursively
-        case BagType(n, t) => s""".append(t(${i}).map(s => s.mkString("(", ",", ")")).mkString("{", ",", "}"))"""
-        case TupleType(n, f) => s""".append(t(${i}).map(s => s.toString).mkString("(", ",", ")"))"""
-        case MapType(t, n) => s""".append(t(${i}).asInstanceOf[Map[String,Any]].map{case (k,v) => k + "#" + v}.mkString("[", ",", "]"))"""
-        case _ => s".append(t($i))"
-      }}.mkString(s"\n    .append($stringDelim)\n")
-      case None => s".append(t(0))\n"
-    }
-
     node match {
       case OrderBy(out, in, orderSpec, _) => {
         var params = Map[String,Any]()
@@ -431,34 +455,6 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
 
         callST("orderHelper", Map("params"->params))
       }
-      case Store(in, file,_,params) => { s"""
-        |def tuple${node.inPipeName}ToString(t: List[Any]): String = {
-        |  implicit def anyToSeq(a: Any) = a.asInstanceOf[Seq[Any]]
-        |
-        |  val sb = new StringBuilder
-        |  sb${genStringRepOfTuple(node.schema, if(params != null && params.isDefinedAt(0)) params(0) else "','")}
-        |  sb.toString
-        |}""".stripMargin
-      }
-      
-//      /* We need to add helper methods to convert strings read by the loaders into the given type.
-//       * Currently, we do this for all loaders but the BinStorage because it doesn't produce strings 
-//       */
-//      case Load(_,_,Some(schema),func:Option[String],_) if(func.isEmpty || func.get != "BinStorage") =>  { 
-//        
-//        schema.fields.map { f => f.fType }
-//          .distinct          // if the same type is used multiple times in the same LOAD op
-//          .filter { f => f.isInstanceOf[SimpleType] }  // allow only simple types
-//          .map{f => javaTypeMappingTable(f) }         // convert to Scala type names
-//          .filterNot { t => t == "String" || castMethods.contains(t) } // no need to process strings or types, that we already processed (for other loads)
-//          .map { f => 
-//            castMethods += f                      // remember this type to be already to processed
-//            s"""
-//            |def make${f}(s: String): ${f} = if(s.isEmpty) null.asInstanceOf[$f] else s.to${f}
-//            """.stripMargin                       // create the method string
-//            
-//          }.mkString("\n")                        // combine all created method strings and return it
-//      }
       case _ => ""
     }
   }
@@ -467,41 +463,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   /*------------------------------------------------------------------------------------------------- */
   /*                                   Node code generators                                           */
   /*------------------------------------------------------------------------------------------------- */
- 
-  private def getFieldTypes(s: Schema, useCast: Boolean = false): String = {
-      val fieldList = s.fields.zipWithIndex
-      val castList = fieldList.map { case (f, i) => 
-          if (f.fType == Types.CharArrayType || f.fType == Types.ByteArrayType || f.fType.isInstanceOf[ComplexType])
-            s"t($i)" 
-          else { 
-            if(useCast)
-              s"t($i).asInstanceOf[${scalaTypeMappingTable(f.fType)}]"
-            else { 
-//            s"make${javaTypeMappingTable(f.fType)}(t($i))"
-              s"t($i).to${scalaTypeMappingTable(f.fType)}"
-            }
-          }
-        }
-      castList.mkString(",")
-  }
-  /**
-   * Generates code for the LOAD operator.
-   *
-   * @param out name of the output bag
-   * @param file the name of the file to be loaded
-   * @param loaderFunc an optional loader function (we assume a corresponding Scala function is available)
-   * @param loaderParams an optional list of parameters to a loader function (e.g. separators)
-   * @return the Scala code implementing the LOAD operator
-   */
-  def emitLoader(out: String, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
-    if (loaderFunc.isEmpty)
-      callST("loader", Map("out"->out,"file"->file.toString(), "func"-> BackendManager.backend.defaultConnector))
-    else {
-      val params = if (loaderParams != null && loaderParams.nonEmpty) ", " + loaderParams.mkString(",") else ""
-      callST("loader", Map("out"->out,"file"->file.toString(),"func"->loaderFunc.get,"params"->params))
-    }
-  }
-  
+
   /**
    * Generates code for the LOAD operator.
    *
@@ -512,42 +474,105 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return the Scala code implementing the LOAD operator
    */
   def emitLoad(node: PigOperator, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
+    def schemaExtractor(schema: Schema): String =
+      schema.fields.zipWithIndex.map{case (f, i) => s"data($i).to${scalaTypeMappingTable(f.fType)}"}.mkString(", ")
+
+    def jdbcSchemaExtractor(schema: Schema): String =
+      schema.fields.zipWithIndex.map{case (f, i) => s"data.get${scalaTypeMappingTable(f.fType)}($i)"}.mkString(", ")
+
+    var paramMap = Map("out" -> node.outPipeName, "file" -> file.toString)
+    if (loaderFunc.isEmpty)
+      paramMap += ("func" -> BackendManager.backend.defaultConnector)
+    else {
+      paramMap += ("func" -> loaderFunc.get)
+      if (loaderParams != null && loaderParams.nonEmpty)
+        paramMap += ("params" -> loaderParams.mkString(","))
+    }
     node.schema match {
-      case Some(s) => {
-        val useCast = loaderFunc.getOrElse("") == "BinStorage" // use a cast only for BinStorage
-        val op = emitLoader(s"${node.outPipeName}_", file, loaderFunc, loaderParams) 
-        op +"\n" +callST("foreach", Map("out"->node.outPipeName,"in"->s"${node.outPipeName}_","expr"->s"List(${getFieldTypes(s, useCast)})"))
-      }
-      case None => {
-        emitLoader(node.outPipeName, file, loaderFunc, loaderParams)
-      }
-    }   
+      case Some(s) => if (loaderFunc.nonEmpty && loaderFunc.get == "JdbcStorage")
+        // JdbcStorage provides already types results, therefore we need an extractor which calls
+        // only the appropriate get functions on sql.Row
+        paramMap += ("extractor" ->
+          s"""(data: org.apache.spark.sql.Row) => ${schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
+          "class" -> schemaClassName(s.className))
+        else
+        paramMap += ("extractor" ->
+          s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
+        "class" -> schemaClassName(s.className))
+      case None => paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))",
+        "class" -> "TextLine")
+    }
+    callST("loader", paramMap)
   }
 
   /**
    * Generates code for the STORE operator.
    *
-   * @param in name of the input bag
+   * @param node the STORE operator
    * @param file the URI of the target file
    * @param storeFunc a storage function
+   * @param params an (optional) parameter list for the storage function
    * @return the Scala code implementing the STORE operator
    */
-  def emitStore(in: String, file: URI, storeFunc: Option[String]): String = {
-    
-    /* for BinStorage we do not convert the tuple into a string because
-     * we want to keep our fields as is
-     */
-    val func = storeFunc.getOrElse(BackendManager.backend.defaultConnector)
-    if(func == "BinStorage")
-      callST("store", Map("in"->in,"file"->file.toString(),"func"->func))
-    else
-      callST("store", Map("in"->in,"file"->file.toString(),"schema"->s"tuple${in}ToString(t)","func"->func))
+  def emitStore(node: PigOperator, file: URI, storeFunc: Option[String], params: List[String]): String = {
+    var paramMap = Map("in" -> node.inPipeName,
+      "file" -> file.toString,
+      "func" -> storeFunc.getOrElse(BackendManager.backend.defaultConnector))
+    node.schema match {
+      case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
+      case None => paramMap += ("class" -> "TextLine")
+    }
+
+    if (params != null && params.nonEmpty)
+      paramMap += ("params" -> params.mkString(","))
+
+    callST("store", paramMap)
   }
 
 
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
+
+  /**
+   * Generate code for a class representing a schema type.
+   *
+   * @param schema the schema for which we generate a class
+   * @return a string representing the code
+   */
+  def emitSchemaClass(schema: Schema): String = {
+    def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
+      case Some(n) => n
+      case None => f match {
+        // if we have a bag without a name then we assume that we have got
+        // a case class with _<field_name>_Tuple
+        case BagType(v) => s"Iterable[_${v.className}_Tuple]"
+        case TupleType(f, c) => schemaClassName(c)
+        case MapType(v) => s"Map[String,${scalaTypeMappingTable(v)}]"
+        case _ => f.descriptionString
+      }
+    }
+    val fields = schema.fields.toList
+    // build the list of field names (_0, ..., _n)
+    val fieldStr = fields.zipWithIndex.map{ case (f, i) =>
+           s"_$i : ${typeName(f.fType, f.name)}"}.mkString(", ")
+
+    // construct the mkString method
+    //   we have to handle the different types here:
+    //      TupleType -> ()
+    //      BagType -> {}
+    val toStr = fields.zipWithIndex.map{
+      case (f, i) => f.fType match {
+        case BagType(_) => s""""{" + _$i.mkString(",") + "}""""
+        case MapType(v) => s""""[" + _$i.map{ case (k,v) => s"$$k#$$v" }.mkString(",") + "]""""
+        case _ => s"_$i" + (if (f.fType.tc != TypeCode.CharArrayType && fields.length == 1) ".toString" else "")
+      }
+    }.mkString(" + _c + ")
+
+    callST("schema_class", Map("name" -> schemaClassName(schema.className),
+                              "fields" -> fieldStr,
+                              "string_rep" -> toStr))
+  }
 
   /**
    * Generate code for the given Pig operator.
@@ -564,7 +589,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
          */
       case Load(out, file, schema, func, params) => emitLoad(node, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inPipeName))
-      case Store(in, file, func, params) => emitStore(node.inPipeName, file, func)
+      case Store(in, file, func, params) => emitStore(node, file, func, params)
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))
       case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->node.inPipeName,"others"->node.inPipeNames.tail))

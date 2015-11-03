@@ -18,7 +18,8 @@ package dbis.pig.plan
 
 import dbis.pig.op._
 import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.schema.SchemaException
+import dbis.pig.schema.{Types, PigType, Schema, SchemaException}
+import dbis.pig.udf.{UDFTable, UDF}
 
 import scala.collection.mutable.{ListBuffer, Map}
 
@@ -29,6 +30,15 @@ import scala.collection.mutable.{ListBuffer, Map}
  */
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
+/**
+ * A DataflowPlan is a graph of operators representing a Piglet script and provides methods
+ * to construct the graph from a list of PigOperators with their pipes as well as to check and manipulate
+ * the graph.
+ *
+ * @param operators a list of operators used to construct the plan
+ * @param ctx an optional list of pipes representing the context, i.e. the
+ *            pipes of a nesting operator (e.g. FOREACH).
+ */
 class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable {
   /**
    * A list of JAR files specified by the REGISTER statement
@@ -66,14 +76,15 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
      * 1. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
      *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
      */
-    ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
+    ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += op.asInstanceOf[RegisterCmd].jarFile)
     ops.filter(_.isInstanceOf[DefineCmd]).foreach { op =>
       val defineOp = op.asInstanceOf[DefineCmd]
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
     }
     ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => {
-      code += op.asInstanceOf[EmbedCmd].code
       val castedOp = op.asInstanceOf[EmbedCmd]
+      code += castedOp.code
+      castedOp.extractUDFs
       castedOp.ruleCode.foreach { c: String => extraRuleCode = extraRuleCode :+ c}
     })
 
@@ -364,9 +375,22 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
    */
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
 
-  def containsOperator(op: PigOperator): Boolean = operators.contains(op)
-  
   /**
+   * Checks whether the plan contains the given operator.
+   *
+   * @param op the operator we are looking for
+   * @return true if the operator exists
+   */
+  def containsOperator(op: PigOperator): Boolean = operators.contains(op)
+
+  /**
+   * Prints a textual representation of the plan to standard output.
+   *
+   * @param tab the number of whitespaces for indention
+   */
+  def printPlan(tab: Int = 0): Unit = operators.foreach(_.printOperator(tab))
+
+   /**
    * Swaps two successive operators in the dataflow plan. Both operators are unary operators and have to be already
    * part of the plan.
    *

@@ -50,24 +50,20 @@ class TypeSpec extends FlatSpec with Matchers {
   }
 
   it should "allow to define complex types" in {
-    val t1 = MapType(Types.DoubleType, "m")
-    assert(t1.name == "m")
+    val t1 = MapType(Types.DoubleType)
     assert(t1.valueType == Types.typeForName("double"))
 
     val tt = TupleType(Array(Field("c", Types.IntType)))
-    val t2 = BagType(tt, "b")
-    assert(t2.name == "b")
+    val t2 = BagType(tt)
     assert(t2.valueType == tt)
 
     val t3 = TupleType(Array(Field("f1", Types.IntType),
                              Field("f2", Types.DoubleType),
-                             Field("f3", MapType(Types.CharArrayType, "m"))), "t")
-    assert(t3.name == "t")
+                             Field("f3", MapType(Types.CharArrayType))))
     assert(t3.fields(0).name == "f1")
     assert(t3.fields(1).name == "f2")
     assert(t3.fields(1).fType == Types.DoubleType)
     assert(t3.fields(2).name == "f3")
-    assert(t3.fields(2).fType.name == "m")
   }
 
   it should "check type compatibility" in {
@@ -75,23 +71,23 @@ class TypeSpec extends FlatSpec with Matchers {
     assert(Types.typeCompatibility(Types.IntType, Types.DoubleType))
     assert(Types.typeCompatibility(Types.FloatType, Types.DoubleType))
     assert(! Types.typeCompatibility(Types.IntType, Types.CharArrayType))
-    assert(! Types.typeCompatibility(Types.IntType, MapType(Types.CharArrayType, "m")))
+    assert(! Types.typeCompatibility(Types.IntType, MapType(Types.CharArrayType)))
   }
 
   it should "check type compatibility for bags" in {
     val t1 = BagType(TupleType(Array(Field("f1", Types.IntType),
                                               Field("f2", Types.DoubleType),
-                                              Field("f3", Types.CharArrayType))), "b")
+                                              Field("f3", Types.CharArrayType))))
     val t2 = BagType(TupleType(Array(Field("f1", Types.IntType),
                                               Field("f2", Types.DoubleType),
-                                              Field("f3", Types.CharArrayType))), "b")
+                                              Field("f3", Types.CharArrayType))))
     val t3 = BagType(TupleType(Array(Field("f11", Types.IntType),
                                               Field("f21", Types.IntType),
-                                              Field("f31", Types.CharArrayType))), "b")
+                                              Field("f31", Types.CharArrayType))))
     val t4 = BagType(TupleType(Array(Field("f11", Types.IntType),
                                               Field("f12", Types.DoubleType),
                                               Field("f13", Types.DoubleType),
-                                              Field("f14", Types.CharArrayType))), "b")
+                                              Field("f14", Types.CharArrayType))))
     assert(Types.typeCompatibility(t1, t2))
     assert(Types.typeCompatibility(t1, t3))
     assert(! Types.typeCompatibility(t1, t4))
@@ -123,5 +119,21 @@ class TypeSpec extends FlatSpec with Matchers {
     tup.typeOfComponent("f1") should be (Types.IntType)
     tup.typeOfComponent(0) should be (Types.IntType)
     tup.typeOfComponent("f2") should be (tup0)
+  }
+
+  it should "return the correct encoding" in {
+    Types.IntType.encode should be ("i")
+    Types.BooleanType.encode should be ("b")
+    Types.DoubleType.encode should be ("d")
+    Types.LongType.encode should be ("l")
+    Types.CharArrayType.encode should be ("c")
+    Types.ByteArrayType.encode should be ("a")
+    Types.FloatType.encode should be ("f")
+
+    val tup0 = TupleType(Array(Field("t1", Types.ByteArrayType),
+      Field("t2", Types.ByteArrayType)))
+    val tup = TupleType(Array(Field("f1", Types.IntType),
+      Field("f2", tup0)))
+    BagType(tup).encode should be ("{(f1:if2:(t1:at2:a))}")
   }
 }

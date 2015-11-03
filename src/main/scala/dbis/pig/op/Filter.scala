@@ -55,5 +55,11 @@ case class Filter(out: Pipe, in: Pipe, pred: Predicate, var windowMode: Boolean 
     }
   }
 
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"FILTER { out = ${outPipeName} , in = ${inPipeName} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "expr = " + pred)
+  }
 
 }

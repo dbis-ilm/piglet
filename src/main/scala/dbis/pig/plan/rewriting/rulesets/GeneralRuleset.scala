@@ -194,7 +194,7 @@ object GeneralRuleset extends Ruleset {
         case _ => None
       }
       case op@Generate(exprs) =>
-        val (genExprs, foundStar) = constructGeneratorList(exprs, op)
+        val (genExprs, foundStar) = constructGeneratorList(exprs, op.parentOp)
         if (foundStar) {
           val newOp = Generate(genExprs.toList)
           newOp.copyPipes(op)

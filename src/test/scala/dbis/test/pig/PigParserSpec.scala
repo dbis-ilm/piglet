@@ -58,19 +58,19 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   it should "parse a load statement with typed schema specification" in {
     val uri = new URI("file.csv")
-    val schema = BagType(TupleType(Array(Field("a", Types.IntType),
+    val schema = Array(Field("a", Types.IntType),
                                                 Field("b", Types.CharArrayType),
-                                                Field("c", Types.DoubleType))))
+                                                Field("c", Types.DoubleType))
     assert(parseScript("""a = load 'file.csv' as (a:int, b:chararray, c:double); """) ==
       List(Load(Pipe("a"), uri, Some(Schema(schema)))))
   }
 
   it should "parse a load statement with complex typed schema specification" in {
     val uri = new URI("file.csv")
-    val schema = BagType(TupleType(Array(Field("a", Types.IntType),
+    val schema = Array(Field("a", Types.IntType),
       Field("t", TupleType(Array(Field("f1", Types.IntType), Field("f2", Types.IntType)))),
-      Field("b", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType)), "t2"))))))
-    assert(parseScript("""a = load 'file.csv' as (a:int, t:tuple(f1: int, f2:int), b:{t2:tuple(f3:double, f4:double)}); """) ==
+      Field("b", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))
+    assert(parseScript("""a = load 'file.csv' as (a:int, t:tuple(f1: int, f2:int), b:{tuple(f3:double, f4:double)}); """) ==
       List(Load(Pipe("a"), uri, Some(Schema(schema)))))
   }
 
@@ -424,7 +424,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a register statement" in {
-    assert(parseScript("""register "/usr/local/share/myfile.jar";""") == List(RegisterCmd("\"/usr/local/share/myfile.jar\"")))
+    assert(parseScript("""register '/usr/local/share/myfile.jar';""") == List(RegisterCmd("/usr/local/share/myfile.jar")))
   }
 
   it should "parse a define (function alias) statement" in {
