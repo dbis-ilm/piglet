@@ -17,6 +17,7 @@
 package dbis.pig.schema
 
 import dbis.pig.op.NamedField
+import scala.collection.mutable.Map
 
 /**
  * An exception indicating failures in schema handling.
@@ -37,10 +38,21 @@ case class AmbiguousFieldnameException(private val msg: String) extends  Excepti
  * We assume that the element type is a bag of tuple types.
  *
  * @param element the type definition - in most cases a bag of tuples
+ * @param className a unique name for the schema which is used to generate classes
+ *                  representing tuples. The className is assigned later.
  *
  */
-case class Schema(var element: BagType) {
-  def setBagName(s: String) =  element.name = s
+case class Schema(var element: BagType, var className: String = "") {
+
+  def setBagName(s: String): Unit =  {} // element.name = s
+
+  /**
+   * Returns a compact representation of the schema which is used to compare two
+   * schemas for equality.
+   *
+   * @return a string representation
+   */
+  def schemaCode(): String = element.encode
 
   /**
    * Returns the index of the field in the schema.
@@ -65,7 +77,7 @@ case class Schema(var element: BagType) {
   def indexOfField(nf: NamedField): Int = {
     if (! element.valueType.isInstanceOf[TupleType])
       throw new SchemaException("schema type isn't a bag of tuples")
-    val tupleType = element.valueType.asInstanceOf[TupleType]
+    val tupleType = element.valueType
     tupleType.fields.count(_.name == nf.name) match {
       case 0 => -1
       case 1 =>
@@ -105,7 +117,7 @@ case class Schema(var element: BagType) {
   def field(pos: Int): Field = {
     if (! element.valueType.isInstanceOf[TupleType])
       throw SchemaException("schema type isn't a bag of tuples")
-    val tupleType = element.valueType.asInstanceOf[TupleType]
+    val tupleType = element.valueType
     tupleType.fields(pos)
   }
 
@@ -149,7 +161,7 @@ case class Schema(var element: BagType) {
   def fields: Array[Field] = {
     if (! element.valueType.isInstanceOf[TupleType])
       throw SchemaException("schema type isn't a bag of tuples")
-    val tupleType = element.valueType.asInstanceOf[TupleType]
+    val tupleType = element.valueType
     tupleType.fields
   }
 
@@ -158,5 +170,78 @@ case class Schema(var element: BagType) {
    *
    * @return the string representation
    */
-  override def toString = "Schema(" + element.toString + "," + element.name + ")"
+  override def toString = element.descriptionString
+
+  /**
+   * Check if the schema is valid, i.e. all fields have defined types (at least bytearray).
+   *
+   * @return true if valid
+   */
+  def isValid(): Boolean = {
+    fields.filter(_.fType.tc == TypeCode.AnyType).isEmpty
+  }
+}
+
+/**
+ * Companion object for class Schema. The main purpose is to provide a convenient
+ * constructor as well as a mechanism to assign unique names for the generated
+ * schema classes where different schema instances with the same structure have
+ * the same name. We achieve this by collecting all created schemas in a Map where
+ * the schema code acts as the key.
+ */
+object Schema {
+  private val schemaSet = Map[String, Schema]()
+  private var cnt = 0
+
+  /**
+   * Increments the counter used for creating unique class names
+   * and returns the current value.
+   *
+   * @return the next value of the counter
+   */
+  def nextCounter(): Int = { cnt += 1; cnt }
+
+  def apply(b: BagType) = {
+    val s = new Schema(b)
+    registerSchema(s)
+  }
+
+  def apply(fields: Array[Field]) = {
+    val s = new Schema(BagType(TupleType(fields)))
+    registerSchema(s)
+  }
+
+  /**
+   * Clears the map of all schemas and resets the counter.
+   */
+  def init(): Unit = {
+    schemaSet.clear()
+    cnt = 0
+  }
+
+  /**
+   * Registers a schema by inserting it into the Map and
+   * deriving a unique class name. If a schema with the
+   * same structure already exists then it is just returned
+   * without creating a new one.
+   *
+   * @param schema the schema to be registered
+   * @return either a new schema or an already existing schema with
+   *         the same structure
+   */
+  def registerSchema(schema: Schema): Schema = {
+    val code = schema.schemaCode
+    if (schemaSet.contains(code))
+      schemaSet(code)
+    else {
+      if (schema.isValid) {
+        // we do not register invalid schemas - they will be replaced later anyway
+        schema.className = s"t${nextCounter}"
+        schemaSet += code -> schema
+      }
+      schema
+    }
+  }
+
+  def schemaList(): List[Schema] = schemaSet.values.toList.sortWith(_.schemaCode() < _.schemaCode())
 }

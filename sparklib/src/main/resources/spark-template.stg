@@ -9,6 +9,14 @@ import dbis.pig.backends.spark._
 <\n>
 >>
 
+// ----------------- schema class -----------------
+schema_class(name, fields, string_rep) ::= <<
+case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+override def mkString(_c: String = ",") = <string_rep>
+}
+
+>>
+
 // ----------------- BEGIN of code building and initializing the query --------
 query_object(name, embedded_code) ::= <<
 object <name> {
@@ -25,13 +33,13 @@ begin_query(name) ::= <<
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,func,schema,params) ::=<<
-        val <out> = <func>().load(sc, "<file>"<params>)
+loader(out, file, class, func, extractor, params) ::= <<
+        val <out> = <func>[<class>]().load(sc, "<file>", <extractor><if (params)>, <params><endif>)
 >>
 
 // ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
-        <in>.collect.map(t => println(t.mkString(",")))
+        <in>.collect.map(t => println(t.mkString()))
 >>
 
 // ------------------ DISPLAY results in Zeppelin -----------------------------
@@ -41,14 +49,9 @@ display(in, tableHeader) ::=<<
 
 // ------------------ STORE Results on disk -----------------------------------
 
-store(in,file,schema,func) ::=<<
-	<if (schema)>
-    	val <in>_storehelper = <in>.map(t => <schema>).coalesce(1, true)
-	<else>
-		val <in>_storehelper = <in>
-	<endif>
-	
-    <func>().write("<file>", <in>_storehelper)
+store(in, file, class, func, params) ::= <<
+    val <in>_helper = <in>.coalesce(1, true)
+    <func>[<class>]().write("<file>", <in>_helper<if (params)>, <params><endif>)
 >>
 
 // ------------------ FILTER for a predicate ----------------------------------
@@ -57,43 +60,55 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element -----------
-foreach(out,in,expr,aggrs) ::=<<
+foreach(out, in, expr, class) ::=<<
+        val <out> = <in>.map(t => <class>(<expr>))
+>>
+
+// ------------------ Executes an expression FOREACH input element where the expression is a nested plan -----------
+foreachNested(out, in, expr) ::=<<
         val <out> = <in>.map(t => <expr>)
 >>
 
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
-foreachFlatMap(out,in,expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
+// Note, that the closing parenthesis is intentionally missing
+foreachFlatMap(out, in, expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
-groupBy(out,in,expr,keyExtr) ::=<<
+groupBy(out, in, expr, class, keyExtr) ::=<<
 <if (expr)>
-        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(<keyExtr>,v)}
+        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => <class>(<keyExtr>,v)}
 <else>
-        val <out> = <in>.coalesce(1).glom.map(t => List("all", t.toList))
+        val <out> = <in>.coalesce(1).glom.map(t => <class>("all", t))
 <endif>
 >>
 
 // ------------------ Outputs only distinct values ----------------------------
-distinct(out,in) ::=<<
+distinct(out, in) ::=<<
         val <out> = <in>.distinct
 >>
 
 // ------------------ Outputs only num records --------------------------------
-limit(out,in,num) ::=<<
+limit(out, in, num) ::=<<
         val <out> = sc.parallelize(<in>.take(<num>))
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
-join_key_map(rels,keys) ::=<<
+join_key_map(rels, keys) ::=<<
         <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
         }>
 >>
 
-join(out,rel1,key1,rel2,key2) ::=<<
-        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => (k, v ++ w)\}}>.map{case (k,v) => v}
+//        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => <class>(<fields>)\}}>
 
+join(out, class, rel1, rel2, fields) ::=<<
+        val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)\}
+>>
+
+
+m_join(out, class, rel1, rel2, pairs, fields) ::=<<
+        val <out> = <rel1>_kv<rel2: {rel | .join(<rel>_kv)}>.map{case (k,<pairs>) => <class>(<fields>)\}
 >>
 
 // ------------------ UNIONs multiple streams to one --------------------------
@@ -107,7 +122,7 @@ sample(out,in,expr) ::=<<
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------
-orderBy(out,in,key,asc) ::=<<
+orderBy(out, in, key, asc) ::=<<
         val <out> = <in>.keyBy(t => <key>).sortByKey(<asc>).map{case (k,v) => v}
 >>
 

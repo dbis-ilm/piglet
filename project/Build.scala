@@ -31,6 +31,7 @@ object PigBuild extends Build {
 
   lazy val sparklib = (project in file("sparklib")).
     settings(commonSettings: _*).
+    settings(libraryDependencies += Dependencies.h2Database).
     dependsOn(common)
 
   lazy val flinklib = (project in file("flinklib")).
@@ -53,7 +54,11 @@ object PigBuild extends Build {
   
   val itDeps = backend match {
     case "flink" | "flinks" => Seq(Dependencies.flinkDist % "test;it" from Dependencies.flinkAddress)
-    case "spark" | "sparks" => Seq(Dependencies.sparkCore % "test;it", Dependencies.sparkSql % "test;it")
+    case "spark" | "sparks" => Seq(
+      Dependencies.sparkCore % "test;it",
+      Dependencies.sparkSql % "test;it",
+      Dependencies.h2Database % "test;it"
+    )
     case "mapreduce" => Seq(Dependencies.pig % "test;it")
     case _ => println(s"Unsupported backend: $backend ! I don't know which dependencies to include!"); Seq.empty[ModuleID]
   }
@@ -93,6 +98,7 @@ object Dependencies {
   val pig = "org.apache.pig" % "pig" % "0.15.0"
   val commons = "org.apache.commons" % "commons-exec" % "1.3"
   val twitterUtil = "com.twitter" %% "util-eval" % "6.27.0"
+  val h2Database = "com.h2database" % "h2" % "1.4.190"
 
   val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10-SNAPSHOT.jar"
   
@@ -113,6 +119,7 @@ object Dependencies {
     commons,
     slf4j,
     hadoop % "provided",
-    twitterUtil
+    twitterUtil,
+    h2Database
   )
 }

@@ -18,12 +18,14 @@ package dbis.pig.udf
 
 import dbis.pig.schema._
 
+import scala.collection.mutable.ListBuffer
+
 case class UDF(name: String, scalaName: String, paramTypes: List[PigType], resultType: PigType, isAggregate: Boolean) {
   def numParams = paramTypes.size
 }
 
 object UDFTable {
-  lazy val funcTable: List[UDF] = List(
+  lazy val funcTable = ListBuffer[UDF](
     UDF("COUNT", "PigFuncs.count", List(Types.AnyType), Types.LongType, true),
     UDF("AVG", "PigFuncs.average", List(Types.IntType), Types.DoubleType, true),
     UDF("AVG", "PigFuncs.average", List(Types.LongType), Types.DoubleType, true),
@@ -46,6 +48,10 @@ object UDFTable {
     UDF("STARTSWITH","PigFuncs.startswith", List(Types.CharArrayType, Types.CharArrayType), Types.BooleanType, false),
     UDF("STRLEN", "PigFuncs.strlen", List(Types.CharArrayType), Types.IntType,false)
   )
+
+  def addUDF(func: UDF): Unit = {
+    funcTable += func
+  }
 
   /**
    * Checks whether two parameter types are the same.

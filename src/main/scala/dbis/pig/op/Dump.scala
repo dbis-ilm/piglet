@@ -33,4 +33,9 @@ case class Dump(in: Pipe) extends PigOperator {
   override def lineageString: String = {
     s"""DUMP%""" + super.lineageString
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"DUMP { in = ${inPipeName} }")
+  }
+
 }

@@ -14,15 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package dbis.pig.plan.rewriting.dsl.words
 
-package dbis.pig.op
+import dbis.pig.op.PigOperator
+import dbis.pig.plan.rewriting.dsl.builders.Builder
+import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, CheckWordT, EndWordT}
 
-
-/** Wraps code that is to be embedded in the compiled Scala application.
- *
- * @param code The embedded code.
- */
-case class EmbedCmd(code: String, ruleCode: Option[String]) extends PigOperator {
-  def this(code: String) = this(code, None)
+/** Provides several modification methods for a builder.
+  *
+  * @param b
+  * @tparam FROM
+  * @tparam TO
+  */
+class RewriteWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO])
+  extends CheckWordT[FROM, TO] {
 }
-

@@ -20,11 +20,14 @@ import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.op.{PigOperator, _}
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rules.registerAllRules
+import dbis.pig.plan.rewriting.dsl.RewriterDSL
 import dbis.pig.plan.rewriting.internals._
 import org.kiama.rewriting.Rewriter._
+import org.kiama.rewriting.Rewriter.{rewrite => kiamarewrite}
 import org.kiama.rewriting.Strategy
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 case class RewriterException(msg: String) extends Exception(msg)
 
@@ -65,6 +68,10 @@ case class RewriterException(msg: String) extends Exception(msg)
   *
   * - [[reorder]] for reordering two operators
   *
+  * ==DSL==
+  *
+  * A DSL for easily adding rewriting operations is provided as well, its documented in [[dbis.pig.plan.rewriting.dsl]].
+  *
   * ==DataflowPlan helper methods==
   *
   * Some operations provided by [[DataflowPlan]] objects are not implemented there, but on this object. These include
@@ -94,8 +101,14 @@ object Rewriter extends LazyLogging
                 with EmbedSupport
                 with MaterializationSupport
                 with Fixers
-                with FastStrategyAdder {
+                with FastStrategyAdder
+                with RewriterDSL {
   private var ourStrategy = fail
+
+  /** Resets [[ourStrategy]] to [[fail]].
+    *
+    */
+  private def resetStrategy = ourStrategy = fail
 
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
     *
@@ -125,7 +138,8 @@ object Rewriter extends LazyLogging
     * @param f
     */
   //noinspection ScalaDocMissingParameterDescription
-  def addOperatorReplacementStrategy(f: Any => Option[PigOperator]): Unit = {
+  def addOperatorReplacementStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+    (f: T => Option[T2]): Unit = {
     addStrategy(buildOperatorReplacementStrategy(f))
   }
 
@@ -147,7 +161,7 @@ object Rewriter extends LazyLogging
     */
   private def processPigOperator(sink: PigOperator, strategy: Strategy): Any = {
     val rewriter = downup(attempt(strategy))
-    rewrite(rewriter)(sink)
+    kiamarewrite(rewriter)(sink)
   }
 
   /** Apply all rewriting rules of this Rewriter to a [[dbis.pig.plan.DataflowPlan]].

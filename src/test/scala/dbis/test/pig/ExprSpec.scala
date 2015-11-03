@@ -79,4 +79,26 @@ class ExprSpec extends FlatSpec with Matchers {
     val e2 = CastExpr(tupleType, RefExpr(NamedField("f3")))
     e2.resultType(Some(schema)) should be (tupleType)
   }
+
+  it should "return the correct result type for a tuple constructor" in {
+    Schema.init()
+    val fields = Array(Field("s1", Types.IntType), Field("s2", Types.CharArrayType))
+    val schema = Schema(fields)
+    val e = ConstructTupleExpr(List(RefExpr(NamedField("s1")), RefExpr(NamedField("s2"))))
+    e.resultType(Some(schema)) should be (TupleType(Array(Field("", Types.IntType), Field("", Types.CharArrayType))))
+  }
+
+  it should "return the correct result type for a bag constructor" in {
+    Schema.init()
+    val fields = Array(Field("s1", Types.IntType), Field("s2", Types.IntType))
+    val schema = Schema(fields)
+    val e = ConstructBagExpr(List(RefExpr(NamedField("s1")), RefExpr(NamedField("s2"))))
+    e.resultType(Some(schema)) should be (BagType(TupleType(Array(Field("", fields(0).fType)))))
+
+  }
+
+  it should "return the correct result type for a map constructor" in {
+
+  }
+
 }

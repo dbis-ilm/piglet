@@ -20,6 +20,8 @@ import dbis.pig.op._
 import dbis.pig.schema._
 import dbis.pig.plan.DataflowPlan
 
+import scala.collection.mutable.ArrayBuffer
+
 
 class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
 
@@ -32,34 +34,52 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     *
     * @param schema
     * @param tuplePrefix
-    * @param requiresTypeCast
     * @return
     */
-  override def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
-                       requiresTypeCast: Boolean = true,
-                       aggregate: Boolean = false): String = ref match {
+  override def emitRef(schema: Option[Schema], ref: Ref,
+                       tuplePrefix: String = "t",
+                       aggregate: Boolean = false,
+                       namedRef: Boolean = false): String = ref match {
       case DerefTuple(r1, r2) => 
-        if (aggregate) s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]].map(e => e${emitRef(tupleSchema(schema, r1), r2, "", false)})"
-        else s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false, aggregate)}"
-      case _ => super.emitRef(schema, ref, tuplePrefix, requiresTypeCast, aggregate)
+        if (aggregate)
+          s"${emitRef(schema, r1, "t")}.map(e => e${emitRef(tupleSchema(schema, r1), r2, "")})"
+        else
+          s"${emitRef(schema, r1, "t")}${emitRef(tupleSchema(schema, r1), r2, "", aggregate, namedRef)}"
+      case _ => super.emitRef(schema, ref, tuplePrefix, aggregate, namedRef)
   }
 
   /**
     * Generates Scala code for a nested plan, i.e. statements within nested FOREACH.
     *
-    * @param schema the input schema of the FOREACH statement
+    * @param parent the parent FOREACH statement
     * @param plan the dataflow plan representing the nested statements
     * @return the generated code
     */
-  def emitNestedPlan(schema: Option[Schema], plan: DataflowPlan): String = {
+  def emitNestedPlan(parent: PigOperator, plan: DataflowPlan): String = {
+    val schema = parent.inputSchema
+
+    require(parent.schema.isDefined)
+    val className = schemaClassName(parent.schema.get.className)
+
     "{\n" + plan.operators.map {
-      case Generate(expr) => s"""( ${emitGenerator(schema, expr)} )"""
+      case Generate(expr) => s"""${className}(${emitGenerator(schema, expr, namedRef = true)})"""
       case n@ConstructBag(out, ref) => ref match {
         case DerefTuple(r1, r2) => {
-          val p1 = findFieldPosition(schema, r1)
-          val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
-          require(p1 >= 0 && p2 >= 0)
-          s"""val ${n.outPipeName} = t($p1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]]($p2))"""
+          // there are two options of ConstructBag
+          // 1. r1 refers to the input pipe of the outer operator (for automatically
+          //    inserted ConstructBag operators)
+          if (r1.toString == parent.inPipeName) {
+            val pos = findFieldPosition(schema, r2)
+            // println("pos = " + pos)
+            s"""val ${n.outPipeName} = t._$pos.toList"""
+          }
+          else {
+            // 2. r1 refers to a field in the schema
+            val p1 = findFieldPosition(schema, r1)
+            val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
+            // println("pos2 = " + p1 + ", " + p2)
+            s"""val ${n.outPipeName} = t._$p1.map(l => l._$p2).toList"""
+          }
         }
         case _ => "" // should not happen
       }
@@ -73,19 +93,18 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
 
   def emitForeachExpr(node: PigOperator, gen: ForeachGenerator): String = {
     // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
-    val requiresPlainFlatten =  node.asInstanceOf[Foreach].containsFlatten(onBag = false)
+    // val requiresPlainFlatten =  node.asInstanceOf[Foreach].containsFlatten(onBag = false)
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     gen match {
       case GeneratorList(expr) => {
-        if (requiresFlatMap) emitBagFlattenGenerator(node.inputSchema, expr)
-          else {
-          if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
-            else emitGenerator(node.inputSchema, expr)
-        }
+        if (requiresFlatMap)
+          emitBagFlattenGenerator(node, expr)
+        else
+          emitGenerator(node.inputSchema, expr)
       }
       case GeneratorPlan(plan) => {
         val subPlan = node.asInstanceOf[Foreach].subPlan.get
-        emitNestedPlan(node.inputSchema, subPlan)
+        emitNestedPlan(node, subPlan)
       }
     }
   }
@@ -98,90 +117,107 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     * Generates code for the CROSS operator.
     *
     * @param node the Cross Operator node
-    * @param out name of the output bag
-    * @param rels list of Pipes to cross
     * @return the Scala code implementing the CROSS operator
     */
-  def emitCross(node: PigOperator, out: String, rels: List[Pipe]): String = {
-    callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name)))
+
+   def emitCross(node: PigOperator): String = {
+    val rels = node.inputs
+    callST("cross", Map("out" -> node.outPipeName,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name)))
   }
 
   /**
     * Generates code for the DISTINCT Operator
     *
-    * @param out name of the output bag
-    * @param in name of the input bag
+    * @param node the DISTINCT operator
     * @return the Scala code implementing the DISTINCT operator
     */
-  def emitDistinct(out: String, in: String): String = {
-    callST("distinct", Map("out"->out,"in"->in))
+  def emitDistinct(node: PigOperator): String = {
+    callST("distinct", Map("out" -> node.outPipeName, "in" -> node.inPipeName))
   }
 
   /** 
     * Generates code for the FILTER Operator
     *
-    * @param schema the nodes schema
-    * @param out name of the output bag
-    * @param in name of the input bag
+    * @param node the FILTER operator
     * @param pred the filter predicate
     * @return the Scala code implementing the FILTER operator
     */
-  def emitFilter(schema: Option[Schema], out: String, in: String, pred: Predicate): String = { 
-    callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(schema, pred)))
+  def emitFilter(node: PigOperator, pred: Predicate): String = {
+    callST("filter", Map("out" -> node.outPipeName,"in" -> node.inPipeName,
+      "pred" -> emitPredicate(node.schema, pred)))
   }
 
   /** 
     * Generates code for the FOREACH Operator
     *
     * @param node the FOREACH Operator node
-    * @param out name of the output bag
-    * @param in name of the input bag
     * @param gen the generate expression
     * @return the Scala code implementing the FOREACH operator
     */
-  def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator): String = { 
-    // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
-
-    val expr = emitForeachExpr(node, gen)
-
-    val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
-    if (requiresFlatMap)
-      callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->expr))
-    else
-      callST("foreach", Map("out"->out,"in"->in,"expr"->expr))
+  def emitForeach(node: PigOperator, gen: ForeachGenerator): String = {
+    require(node.schema.isDefined)
+    val className = schemaClassName(node.schema.get.className)
+     val expr = emitForeachExpr(node, gen)
+    // in case of a nested FOREACH the tuples are creates as part of the GENERATE clause
+    // -> no need to give the schema class
+    if (gen.isInstanceOf[GeneratorPlan]) {
+      callST("foreachNested", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "expr" -> expr))
+    }
+    else {
+      // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
+      val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
+      if (requiresFlatMap)
+        callST("foreachFlatMap", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "expr" -> expr))
+      else
+        callST("foreach", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className, "expr" -> expr))
+    }
   }
 
   /**
     * Generates code for the GROUPING Operator
     *
-    * @param schema the nodes input schema
-    * @param out name of the output bag
-    * @param in name of the input bag
+    * @param node the GROUPING operator
     * @param groupExpr the grouping expression
     * @return the Scala code implementing the GROUPING operator
     */
-  def emitGrouping(schema: Option[Schema], out: String, in: String, groupExpr: GroupingExpression): String = {
-    if (groupExpr.keyList.isEmpty)
-      callST("groupBy", Map("out"->out,"in"->in))
-    else {
-      val keyExtr = if (groupExpr.keyList.size > 1)
-        "List(" + (for (i <- 1 to groupExpr.keyList.size) yield s"k._$i").mkString(", ") + ")"
-      else "k"
+  def emitGrouping(node: Grouping, groupExpr: GroupingExpression): String = {
+    require(node.schema.isDefined)
+    val className = schemaClassName(node.schema.get.className)
 
-      callST("groupBy", Map("out" -> out, "in" -> in, "expr" -> emitGroupExpr(schema, groupExpr), "keyExtr" -> keyExtr))
+    // GROUP ALL: no need to generate a key
+    if (groupExpr.keyList.isEmpty)
+      callST("groupBy", Map("out"->node.outPipeName, "in"->node.inPipeName, "class" -> className))
+    else {
+      val keyExtr = if (groupExpr.keyList.size > 1) {
+        // the grouping key consists of multiple fields, i.e. we have
+        // to construct a tuple where the type is the TupleType of the group field
+        val field = node.schema.get.field("group")
+        val className = field.fType match {
+          case TupleType(f, c) => schemaClassName(c)
+          case _ => throw TemplateException("unknown type for grouping key")
+        }
+
+        s"${className}(" + (for (i <- 1 to groupExpr.keyList.size) yield s"k._$i").mkString(", ") + ")"
+      }
+      else "k" // the simple case: the key is a single field
+
+      callST("groupBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className,
+        "expr" -> emitGroupExpr(node.inputSchema, groupExpr),
+        "keyExtr" -> keyExtr))
     }
   }
 
   /**
     * Generates code for the JOIN operator.
     *
-    * @param node the Join Operator node
-    * @param out name of the output bag
+    * @param node the JOIN operator node
     * @param rels list of Pipes to join
     * @param exprs list of join keys
     * @return the Scala code implementing the JOIN operator
     */
-  def emitJoin(node: PigOperator, out: String, rels: List[Pipe], exprs: List[List[Ref]]): String = {
+  def emitJoin(node: PigOperator, rels: List[Pipe], exprs: List[List[Ref]]): String = {
+    require(node.schema.isDefined)
+
     val res = node.inputs.zip(exprs)
     val keys = res.map{case (i,k) => emitJoinKey(i.producer.schema, k)}
 
@@ -200,11 +236,55 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
     val dkeys = keys.zipWithIndex.filter{k => duplicates(k._2) == 0}.map(_._1)
 
     /*
-     * And finally, create the join kv vars for them.
+     * And finally, create the join kv vars for them...
      */
-    var str = callST("join_key_map", Map("rels"->drels.map(_.name), "keys"->dkeys))
-    str += callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
+    var str = callST("join_key_map", Map("rels" -> drels.map(_.name), "keys" -> dkeys))
 
+    /*
+     * We construct a string v._0, v._1 ... w._0, w._1 ...
+     * The numbers of v's and w's are determined by the size of the input schemas.
+     */
+    val className = node.schema match {
+      case Some(s) => schemaClassName(s.className)
+      case None => schemaClassName(node.outPipeName)
+    }
+
+    /*
+      *  ...as well as the actual join.
+      */
+    if (rels.length == 2) {
+      val vsize = rels.head.inputSchema.get.fields.length
+      val fieldList = node.schema.get.fields.zipWithIndex
+        .map{case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}"}.mkString(", ")
+
+      str += callST("join",
+        Map("out" -> node.outPipeName,
+          "rel1" -> rels.head.name,
+          "class" -> className,
+          "rel2" -> rels.tail.map(_.name),
+          "fields" -> fieldList))
+    }
+    else {
+      var pairs = "(v1,v2)"
+      for (i <- 3 to rels.length) {
+        pairs = s"($pairs,v$i)"
+      }
+      val fieldList = ArrayBuffer[String]()
+      for (i <- 1 to node.inputs.length) {
+        node.inputs(i-1).producer.schema match {
+          case Some(s) => fieldList ++= s.fields.zipWithIndex.map{ case (f, k) => s"v$i._$k" }
+          case None => fieldList += s"v$i._0"
+        }
+      }
+
+      str += callST("m_join",
+      Map("out" -> node.outPipeName,
+        "rel1" -> rels.head.name,
+        "class" -> className,
+        "rel2" -> rels.tail.map(_.name),
+        "pairs" -> pairs,
+        "fields" -> fieldList.mkString(", ")))
+    }
     joinKeyVars += rels.head.name
     joinKeyVars ++= rels.tail.map(_.name)
     str
@@ -213,13 +293,12 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
   /**
     * Generates code for the LIMIT Operator
     *
-    * @param out name of the output bag
-    * @param in name of the input bag
+    * @param node the LIMIT operator
     * @param num amount of retruned records
     * @return the Scala code implementing the LIMIT operator
     */
-  def emitLimit(out: String, in: String, num: Int): String = {
-    callST("limit", Map("out"->out,"in"->in,"num"->num))
+  def emitLimit(node: PigOperator, num: Int): String = {
+    callST("limit", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "num" -> num))
   }
 
   /**
@@ -254,13 +333,13 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
        * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
        *       after changing the pipe name. Instead, use node.outPipeName
        */
-      case Cross(out, rels, _) => emitCross(node, node.outPipeName, node.inputs)
-      case Distinct(out, in, _) => emitDistinct(node.outPipeName, node.inPipeName)
-      case Filter(out, in, pred, _) => emitFilter(node.schema, node.outPipeName, node.inPipeName, pred)
-      case Foreach(out, in, gen, _) => emitForeach(node, node.outPipeName, node.inPipeName, gen)
-      case Grouping(out, in, groupExpr, _) => emitGrouping(node.inputSchema, node.outPipeName, node.inPipeName, groupExpr)
-      case Join(out, rels, exprs, _) => emitJoin(node, node.outPipeName, node.inputs, exprs)
-      case Limit(out, in, num) => emitLimit(node.outPipeName, node.inPipeName, num)
+      case Cross(out, rels, _) => emitCross(node)
+      case Distinct(out, in, _) => emitDistinct(node)
+      case Filter(out, in, pred, _) => emitFilter(node, pred)
+      case Foreach(out, in, gen, _) => emitForeach(node, gen)
+      case op@Grouping(out, in, groupExpr, _) => emitGrouping(op, groupExpr)
+      case Join(out, rels, exprs, _) => emitJoin(node, node.inputs, exprs)
+      case Limit(out, in, num) => emitLimit(node, num)
       case OrderBy(out, in, orderSpec, _) => emitOrderBy(node, node.outPipeName, node.inPipeName, orderSpec)
       case _ => super.emitNode(node)
     }

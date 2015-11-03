@@ -251,6 +251,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val fsKeyword = "fs".ignoreCase
   lazy val setKeyword = "set".ignoreCase
   lazy val returnsKeyword = "returns".ignoreCase
+  lazy val accumulateKeyword = "accumulate".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -275,7 +276,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
       /*
        * bag schema: bag{<tuple>} or {<tuple>}
        */
-    | ("bag"?) ~ "{" ~ ident ~ ":" ~ tupleTypeSpec ~ "}" ^^{ case _ ~ _ ~ id ~ _ ~ tup ~ _ => tup.name = id; BagType(tup) }
+    | ("bag"?) ~ "{" ~ tupleTypeSpec ~ "}" ^^{ case _ ~  _ ~ tup ~ _ => BagType(tup) }
       /*
        * map schema: map[<list of fields>] or [<list of fields>]
        */
@@ -391,6 +392,13 @@ class PigParser extends JavaTokenParsers with LazyLogging {
     }
 
   /*
+   * <A> = ACCUMULATE <B> GENERATE <Expr> [ AS <Schema> ]
+   */
+  def accumulateStmt: Parser[PigOperator] = bag ~ "=" ~ accumulateKeyword ~ bag ~ generateKeyword ~ generatorList ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ exList => new Accumulate(Pipe(out), Pipe(in), GeneratorList(exList))
+  }
+
+  /*
    * <A> = FILTER <B> BY <Predicate>
    */
   def filterStmt: Parser[PigOperator] = bag ~ "=" ~ filterKeyword ~ bag ~ byKeyword ~ logicalExpr ^^ {
@@ -451,7 +459,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * REGISTER <JarFile>
    */
-  def registerStmt: Parser[PigOperator] = registerKeyword ~ stringLiteral ^^{ case _ ~ uri => new RegisterCmd(uri) }
+  def registerStmt: Parser[PigOperator] = registerKeyword ~ fileName ^^{ case _ ~ uri => new RegisterCmd(uri) }
 
   /*
    * DEFINE <Alias> <FuncName>
@@ -576,7 +584,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
-  def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
+  def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt) ~ ";" ^^ {
     case op ~ _  => op }
@@ -766,6 +774,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /* ---------------------------------------------------------------------------------------------------------------- */
 
   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
+    Schema.init()
     parseScript(new CharSequenceReader(s), feature)
   }
 
