@@ -62,6 +62,15 @@ package dbis.pig.expr
  *    * Minus: expr1 - expr2
  *    * Mult: expr1 * expr2
  *    * Div: expr1 / expr2
+ *    * MSign: -expr
+ *    * PExpr: ( expr )
+ *    * FlattenExpr: flatten(expr)
+ *    * CastExpr: (type) expr
+ *    * FuncExpr: func(expr1, ..., exprN)
+ *    * ConstructBagExpr: { expr1, expr2, ..., exprN } -> bag
+ *    * ConstructMapExpr: [ key1#value1, key2#value2 ] -> map
+ *    * ConstructTupleExpr: ( expr1, expr2, ..., exprN ) -> tuple
+ *    * RefExpr:
  *
  */
 
