@@ -41,7 +41,7 @@ class SparkCompileSpec extends FlatSpec {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport
       + codeGenerator.emitHeader1("test")
-      + codeGenerator.emitHeader2("test")
+      + codeGenerator.emitHeader2("test",true)
       + codeGenerator.emitFooter)
 //        |import dbis.spark._
     val expectedCode = cleanString("""

@@ -523,7 +523,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String): String = callST("begin_query")
+  def emitHeader2(scriptName: String, enableProfiling: Boolean): String = callST("begin_query")
 
   /**
    * Generate code needed for finishing the script.

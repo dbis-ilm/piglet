@@ -66,7 +66,9 @@ object FileTools extends LazyLogging {
     }
   }
 
-  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, templateFile: String, backend: String): Option[Path] = {
+  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, 
+      templateFile: String, backend: String, profiling: Boolean): Option[Path] = {
+    
     // 4. compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)
     logger.debug(s"using generator class: $generatorClass")
@@ -79,7 +81,7 @@ object FileTools extends LazyLogging {
     logger.debug(s"successfully created code generator class $compiler")
 
     // 5. generate the Scala code
-    val code = compiler.compile(scriptName, plan)
+    val code = compiler.compile(scriptName, plan, profiling)
 
     logger.debug("successfully generated scala program")
 

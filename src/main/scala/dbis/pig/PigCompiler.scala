@@ -53,7 +53,8 @@ object PigCompiler extends PigParser with LazyLogging {
                             params: Map[String,String] = Map(),
                             backend: String = Conf.defaultBackend,
                             updateConfig: Boolean = false,
-                            backendArgs: Map[String, String] = Map()
+                            backendArgs: Map[String, String] = Map(),
+                            profiling: Boolean = false
                           )
 
   def main(args: Array[String]): Unit = {
@@ -65,20 +66,25 @@ object PigCompiler extends PigParser with LazyLogging {
     var backend: String = null
     var updateConfig = false
     var backendArgs: Map[String, String] = null
+    var profiling = false
 
     val parser = new OptionParser[CompilerConfig]("PigCompiler") {
       head("PigCompiler", "0.2")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text ("compile only (don't execute the script)")
+      opt[Boolean]("profiling") optional() action { (x,c) => c.copy(profiling = x) } text("Switch on profiling")
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
+      opt[Map[String,String]]("backend-args") valueName("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text("arguments to pass to backend")
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
       opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in program home (see config file)")
-      opt[Map[String,String]]("backend-args") valueName("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text("arguments to pass to backend")
+      
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
       arg[File]("<file>...") unbounded() required() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
     }
+    
+    
     // parser.parse returns Option[C]
     parser.parse(args, CompilerConfig()) match {
       case Some(config) => {
@@ -91,6 +97,7 @@ object PigCompiler extends PigParser with LazyLogging {
         backend = config.backend
         updateConfig = config.updateConfig
         backendArgs = config.backendArgs
+        profiling = config.profiling
       }
       case None =>
         // arguments are bad, error message will have been displayed
@@ -104,17 +111,20 @@ object PigCompiler extends PigParser with LazyLogging {
     	Conf.copyConfigFile()
     
     // start processing
-    run(inputFiles, outDir, compileOnly, master, backend, params, backendArgs)
+    run(inputFiles, outDir, compileOnly, master, backend, params, backendArgs, profiling)
   }
 
-  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendArgs: Map[String, String]): Unit = {
-    run(Seq(inputFile), outDir, compileOnly, master, backend, params, backendArgs)
+  def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], 
+      backendArgs: Map[String, String], profiling: Boolean): Unit = {
+    
+    run(Seq(inputFile), outDir, compileOnly, master, backend, params, backendArgs, profiling)
   }
   
   /**
    * Start compiling the Pig script into a the desired program
    */
-  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendArgs: Map[String, String]): Unit = {
+  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], 
+      backendArgs: Map[String, String], profiling: Boolean): Unit = {
 
 	  try {
 
@@ -129,11 +139,16 @@ object PigCompiler extends PigParser with LazyLogging {
 				  logger.error("Raw backends do not support compile-only mode! Aborting")
 				  return
 			  }
+			  
+			  if(profiling) {
+			    logger.error("Raw backends do not support profiling yet! Aborting")
+			    return
+			  }
 
 			  inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
 
 		  } else {
-			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf, backendArgs)
+			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, params, backendConf, backendArgs, profiling)
 		  }
 
 	  } catch {
@@ -152,7 +167,9 @@ object PigCompiler extends PigParser with LazyLogging {
     runner.executeRaw(file, master, backendArgs)
   }
   
-  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], backendConf: BackendConf, backendArgs: Map[String,String]) {
+  def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String, params: Map[String,String], 
+      backendConf: BackendConf, backendArgs: Map[String,String], profiling: Boolean) {
+    
     logger.debug("start parsing input files")
     
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
@@ -170,7 +187,8 @@ object PigCompiler extends PigParser with LazyLogging {
     //////////////////////////////////////
     // begin global analysis phase
     
-    analyzePlans(schedule)
+    if(profiling)
+    	analyzePlans(schedule)
     
     ///////////////////////////////////////////
     // end analysis and continue normal processing
@@ -188,45 +206,53 @@ object PigCompiler extends PigParser with LazyLogging {
     
       // 3. now, we should apply optimizations
       var newPlan = plan
-		  newPlan = processMaterializations(newPlan, mm)
-      if (backend=="flinks") newPlan = processWindows(newPlan)
+      
+      if(profiling)
+    	  newPlan = processMaterializations(newPlan, mm)
+		  
+		  
+      if (backend=="flinks") 
+        newPlan = processWindows(newPlan)
+        
       newPlan = processPlan(newPlan)   
       // find materialization points
       
-      val walker = new DepthFirstTopDownWalker
-      walker.walk(newPlan) { op => 
-      
-        logger.debug(s"""checking database for runtime information for operator "${op.lineageSignature}" """)
-        // check for the current operator, if we have some runtime/stage information 
-        val avg = DB readOnly { implicit session => 
-          sql"select avg(progduration) as pd, avg(stageduration) as sd from exectimes where lineage = ${op.lineageSignature} group by lineage"
-            .map { rs => (rs.long("pd"), rs.long("sd")) }.single().apply()
-        }
-      
-        // if we have information, create a (potential) materialization point
-        if(avg.isDefined) {
-          val (progduration, stageduration) = avg.get
-          
-          logger.debug(s"""found runtime information: program: $progduration  stage: $stageduration""")
-          
-          /* XXX: calculate benefit
-           * Here, we do not have the parent hash information.
-           * But is it still needed? Since we have the program runtime duration 
-           * from beginning until the end the stage, we don't need to calculate
-           * the cumulative benefit?
-           */
-          val mp = MaterializationPoint(op.lineageSignature,
-                                          None, // currently, we do not consider the parent
-                                          progduration, // set the processing time
-                                          0L, // TODO: calculate loading time at this point
-                                          0L, // TODO: calculate saving time at this point
-                                          0 // no count/size information so far
-                                        )
-                                        
-          profiler.addMaterializationPoint(mp)
-          
-        } else {
-          logger.debug(s" found no runtime information")
+      if(profiling) {
+        val walker = new DepthFirstTopDownWalker
+        walker.walk(newPlan) { op => 
+        
+          logger.debug(s"""checking database for runtime information for operator "${op.lineageSignature}" """)
+          // check for the current operator, if we have some runtime/stage information 
+          val avg = DB readOnly { implicit session => 
+            sql"select avg(progduration) as pd, avg(stageduration) as sd from exectimes where lineage = ${op.lineageSignature} group by lineage"
+              .map { rs => (rs.long("pd"), rs.long("sd")) }.single().apply()
+          }
+        
+          // if we have information, create a (potential) materialization point
+          if(avg.isDefined) {
+            val (progduration, stageduration) = avg.get
+            
+            logger.debug(s"""found runtime information: program: $progduration  stage: $stageduration""")
+            
+            /* XXX: calculate benefit
+             * Here, we do not have the parent hash information.
+             * But is it still needed? Since we have the program runtime duration 
+             * from beginning until the end the stage, we don't need to calculate
+             * the cumulative benefit?
+             */
+            val mp = MaterializationPoint(op.lineageSignature,
+                                            None, // currently, we do not consider the parent
+                                            progduration, // set the processing time
+                                            0L, // TODO: calculate loading time at this point
+                                            0L, // TODO: calculate saving time at this point
+                                            0 // no count/size information so far
+                                          )
+                                          
+            profiler.addMaterializationPoint(mp)
+            
+          } else {
+            logger.debug(s" found no runtime information")
+          }
         }
       }
       
@@ -237,7 +263,7 @@ object PigCompiler extends PigParser with LazyLogging {
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
       
-      FileTools.compilePlan(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, backend) match {
+      FileTools.compilePlan(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, backend, profiling) match {
         // the file was created --> execute it
         case Some(jarFile) =>  
           if (!compileOnly) {

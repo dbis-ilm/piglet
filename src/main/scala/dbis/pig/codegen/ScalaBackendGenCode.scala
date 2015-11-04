@@ -564,7 +564,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
+  def emitHeader2(scriptName: String, enableProfiling: Boolean = false): String = callST("begin_query", Map("name" -> scriptName, "profiling"->enableProfiling))
 
   /**
    * Generate code needed for finishing the script and starting the execution.

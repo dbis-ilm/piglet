@@ -17,13 +17,9 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name,profiling) ::= <<
         def main(args: Array[String]) {
         val env = ExecutionEnvironment.getExecutionEnvironment<\n>
-        
-    <if (hook)>
-		setupHook()
-	<endif>
 >>
 
 // ----------------- LOAD text file -------------------------------------------

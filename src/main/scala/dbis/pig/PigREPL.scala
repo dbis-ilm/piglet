@@ -54,9 +54,12 @@ object PigREPL extends PigParser with LazyLogging {
                         backend: String = Conf.defaultBackend,
                         backendArgs: Map[String,String] = Map())
 
-  val consoleReader = new ConsoleReader()
+                        
+  val profiling = false                         
   val defaultScriptName = "__my_script"
-
+  
+  private val consoleReader = new ConsoleReader()
+  
   def cleanupResult(dir: String): Unit = {
     import scalax.file.Path
 
@@ -281,7 +284,7 @@ object PigREPL extends PigParser with LazyLogging {
           val templateFile = backendConf.templateFile
           val jobJar = Conf.backendJar(backend)
 
-          FileTools.compilePlan(plan, defaultScriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
+          FileTools.compilePlan(plan, defaultScriptName, Paths.get("."), false, jobJar, templateFile, backend, profiling) match {
             case Some(jarFile) =>
               val runner = backendConf.runnerClass
               runner.execute(master, defaultScriptName, jarFile, backendArgs)

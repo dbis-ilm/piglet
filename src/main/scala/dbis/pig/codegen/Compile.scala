@@ -78,9 +78,10 @@ trait GenCodeBase {
    * the main class/object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
+   * @param enableProfiling add profiling code to the generated code
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String): String
+  def emitHeader2(scriptName: String, enableProfiling: Boolean): String
 
   /**
    * Generate code needed for finishing the script.
@@ -154,7 +155,7 @@ trait Compile {
    * @param plan the dataflow plan.
    * @return the string representation of the code
    */
-  def compile(scriptName: String, plan: DataflowPlan): String = {
+  def compile(scriptName: String, plan: DataflowPlan, profiling: Boolean): String = {
     require(codeGen != null, "code generator undefined")
 
     if (plan.udfAliases != null) {
@@ -174,22 +175,26 @@ trait Compile {
     }
 
     // generate the object definition representing the script
-    code = code + codeGen.emitHeader2(scriptName)
+    code = code + codeGen.emitHeader2(scriptName, profiling)
 
     for (n <- plan.operators) {
       val generatedCode = codeGen.emitNode(n)
       
-      /* count the generated lines
-       * this is needed for the PerfMonitor to identify stages by line number
-       * 
-       * +1 is for the additional line that is inserted for the register code
-       */
-      val lines = scala.io.Source.fromBytes((code + generatedCode).getBytes).getLines().size + 1
-      
-      // register an operation with its line number and lineage  
-      val registerIdCode = codeGen.emitStageIdentifier(lines, n.lineageSignature)
+      if(profiling) {
+        /* count the generated lines
+         * this is needed for the PerfMonitor to identify stages by line number
+         * 
+         * +1 is for the additional line that is inserted for the register code
+         */
+        val lines = scala.io.Source.fromBytes((code + generatedCode).getBytes).getLines().size + 1
+        
+        // register an operation with its line number and lineage  
+        val registerIdCode = codeGen.emitStageIdentifier(lines, n.lineageSignature)
 
-      code = code + registerIdCode + "\n" + generatedCode + "\n"
+        code = code + registerIdCode + "\n"
+        
+      }
+      code =  code + generatedCode + "\n"
     }
 
     // generate the cleanup code
