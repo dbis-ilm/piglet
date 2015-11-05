@@ -43,7 +43,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport
       + codeGenerator.emitHeader1("test")
-      + codeGenerator.emitHeader2("test")
+      + codeGenerator.emitHeader2("test",true)
       + codeGenerator.emitFooter)
 //        |import dbis.spark._
     val expectedCode = cleanString("""
@@ -57,7 +57,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
         |    def main(args: Array[String]) {
         |      val conf = new SparkConf().setAppName("test_App")
         |      val sc = new SparkContext(conf)
+        |      val perfMon = new PerfMonitor("test_App")
+        |      sc.addSparkListener(perfMon)
         |      sc.stop()
+        |      
         |    }
         |}
       """.stripMargin)

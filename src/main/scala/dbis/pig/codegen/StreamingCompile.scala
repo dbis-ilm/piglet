@@ -24,6 +24,7 @@ import dbis.pig.backends.BackendManager
 
 import scala.collection.mutable.ListBuffer
 
+import java.nio.file.Path
 
 
 class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
@@ -173,6 +174,8 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
       }
     }
   }
+  
+  def emitStageIdentifier(line: Int, lineage: String): String = ???
 
 
   /*------------------------------------------------------------------------------------------------- */

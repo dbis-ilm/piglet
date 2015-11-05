@@ -39,6 +39,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.tools.DBConnection
 
 import scopt.OptionParser
 
@@ -55,9 +56,12 @@ object PigREPL extends PigParser with LazyLogging {
                         interactive: Boolean = true,
                         backendArgs: Map[String,String] = Map())
 
-  val consoleReader = new ConsoleReader()
-
+                        
+  val profiling = false                         
   val defaultScriptName = "__my_script"
+  
+  private val consoleReader = new ConsoleReader()
+  
 
   /**
    * A counter to make script names unique - it will be
@@ -243,9 +247,14 @@ object PigREPL extends PigParser with LazyLogging {
     val backendConf = BackendManager.backend(backend)
     if(backendConf.raw)
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
+    
+    try {
 
     BackendManager.backend = backendConf
 
+		  // initialize database driver and connection pool
+		  DBConnection.init(Conf.databaseSetting)
+    
     console {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
@@ -276,6 +285,7 @@ object PigREPL extends PigParser with LazyLogging {
       }
       case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
         var plan = new DataflowPlan(buf.toList)
+        
         val mm = new MaterializationManager
         plan = processMaterializations(plan, mm)
 
@@ -336,7 +346,7 @@ object PigREPL extends PigParser with LazyLogging {
           val jobJar = Conf.backendJar(backend)
 
           nextScriptName()
-          FileTools.compilePlan(plan, scriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
+          FileTools.compilePlan(plan, scriptName, Paths.get("."), false, jobJar, templateFile, backend, profiling) match {
             case Some(jarFile) =>
               val runner = backendConf.runnerClass
               runner.execute(master, scriptName, jarFile, backendArgs)
@@ -365,6 +375,9 @@ object PigREPL extends PigParser with LazyLogging {
         case iae: IllegalArgumentException => println(iae.getMessage); false
       }
       case _ => false
+    }
+    } finally {
+      DBConnection.exit()
     }
   }
 }

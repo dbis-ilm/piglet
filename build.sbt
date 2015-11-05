@@ -30,4 +30,5 @@ testOptions in IntegrationTest := Seq(
 	Tests.Argument("-oDF")
 )
 
+sourcesInBase := false
 EclipseKeys.skipParents in ThisBuild := false  // to enable piglet (parent not only children) eclispe import
