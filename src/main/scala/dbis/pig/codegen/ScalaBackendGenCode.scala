@@ -98,7 +98,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "String")
+    Types.ByteArrayType -> "Any")
     
 //  val javaTypeMappingTable = Map[PigType, String](
 //    Types.IntType -> "java.lang.Integer",
@@ -278,14 +278,14 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       val pTypes = params.map(p => p.resultType(schema))
       UDFTable.findUDF(f, pTypes) match {
         case Some(udf) => {
-          println(s"udf: $f found: " + udf)
+          // println(s"udf: $f found: " + udf)
           if (udf.isAggregate) {
             s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
           }
           else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
         }
         case None => {
-          println(s"udf: $f not found")
+          // println(s"udf: $f not found")
           // check if we have have an alias in DataflowPlan
           if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
             val alias = udfAliases.get(f)
@@ -530,6 +530,30 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
   }
 
 
+  /**
+    * Generates the code for the STREAM THROUGH operator including
+    * the necessary conversion of input and output data.
+    *
+    * @param node the StreamOp operator
+    * @return the Scala code implementing the operator
+    */
+  def emitStreamThrough(node: StreamOp): String = {
+    // TODO: how to handle cases where no schema was given??
+    val className = schemaClassName(node.schema.get.className)
+
+    val inFields = node.inputSchema.get.fields.zipWithIndex.map{ case (f, i) => s"t._$i"}.mkString(", ")
+    val outFields = node.schema.get.fields.zipWithIndex.map{ case (f, i) => s"t($i)"}.mkString(", ")
+
+    callST("streamOp",
+      Map("out" -> node.outPipeName,
+          "op" -> node.opName,
+          "in" -> node.inPipeName,
+          "class" -> className,
+          "in_fields" -> inFields,
+          "out_fields" -> outFields,
+          "params" -> emitParamList(node.schema, node.params)))
+  }
+
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
@@ -594,7 +618,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))
       case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->node.inPipeName,"others"->node.inPipeNames.tail))
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
-      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inPipeName,"params"->emitParamList(node.schema, params)))
+      case sOp@StreamOp(out, in, op, params, schema) => emitStreamThrough(sOp)
       // case MacroOp(out, name, params) => callST("call_macro", Map("out"->node.outPipeName,"macro_name"->name,"params"->emitMacroParamList(node.schema, params)))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))

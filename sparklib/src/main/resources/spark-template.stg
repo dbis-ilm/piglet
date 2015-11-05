@@ -128,8 +128,9 @@ orderHelper(params) ::=<<
 >>
 
 // ------------------ STREAM operators ----------------------------------------
-streamOp(out,in,op,params) ::=<<
-        val <out> = <op>(sc, <in><params>)
+streamOp(out, in, op, params, class, in_fields, out_fields) ::=<<
+        val <in>_helper = <in>.map(t => List(<in_fields>))
+        val <out> = <op>(sc, <in>_helper<params>).map(t => <class>(<out_fields>))
 >>
 
 // ----------------------- FS commands ----------------------------------------

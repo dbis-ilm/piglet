@@ -44,5 +44,13 @@ case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref
     // TODO
     schema
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"STREAM_THROUGH { out = ${outPipeName} , in = ${inPipeName} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "function = " + opName)
+  }
+
 }
 
