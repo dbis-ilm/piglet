@@ -20,18 +20,20 @@ package dbis.pig.op
 import dbis.pig.schema.Schema
 
 /**
- *
+ * A class representing the STREAM THROUGH operator for invoking a user-defined operator implemented
+  * by an external Scala function.
+  *
  * @param out the output pipe (relation).
  * @param in the input pipe
- * @param opName
- * @param params
- * @param loadSchema
+ * @param opName the name of the scala function
+ * @param params an optional list of parameter values passed to the UDF
+ * @param resSchema the optional result schema
  */
 case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref]] = None,
-                    var loadSchema: Option[Schema] = None) extends PigOperator {
+                    var resSchema: Option[Schema] = None) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
-  schema = loadSchema
+  schema = resSchema
 
   override def lineageString: String = s"""STREAM%${opName}%""" + super.lineageString
 
@@ -41,7 +43,11 @@ case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref
   }
 
   override def constructSchema: Option[Schema] = {
-    // TODO
+    // if a result schema was defined we use it,
+    // otherwise we assume that the UDF produces result with
+    // the same schema
+    if (schema.isEmpty)
+      schema = inputSchema
     schema
   }
 

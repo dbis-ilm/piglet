@@ -413,7 +413,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return the generated code
    */
   def emitParamList(schema: Option[Schema], params: Option[List[Ref]]): String = params match {
-    case Some(refList) => s",${refList.map(r => emitRef(schema, r)).mkString(",")}"
+    case Some(refList) => if (refList.nonEmpty) s",${refList.map(r => emitRef(schema, r)).mkString(",")}" else ""
     case None => ""
   }
 

@@ -586,22 +586,34 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   }
 
   it should "contain code for the stream through statement without parameters" in {
-    // aa = STREAM bb THROUGH myOp
-    val op = StreamOp(Pipe("aa"), Pipe("bb"), "myOp")
+    val ops = parseScript(
+      """data = load 'data.csv' as (f1: int, f2: int);
+        |res = STREAM data THROUGH myOp();""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("res").get
+
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""
-        |val aa = myOp(sc, bb)""".stripMargin)
+    val expectedCode = cleanString(
+      """val data_helper = data.map(t => List(t._0, t._1))
+        |val res = myOp(sc, data_helper).map(t => _t1_Tuple(t(0), t(1)))
+        |""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for the stream through statement with parameters" in {
-    // a = STREAM b THROUGH package.myOp(1, 42.0)
-    val op = StreamOp(Pipe("a"), Pipe("b"), "package.myOp", Some(List(Value(1), Value(42.0))))
+    val ops = parseScript(
+      """data = load 'data.csv' as (f1: int, f2: int);
+        |res = STREAM data THROUGH package.myOp(1, 42.0);""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("res").get
+
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""
-        |val a = package.myOp(sc, b,1,42.0)""".stripMargin)
+    val expectedCode = cleanString(
+      """val data_helper = data.map(t => List(t._0, t._1))
+        |val res = package.myOp(sc, data_helper,1,42.0).map(t => _t1_Tuple(t(0), t(1)))
+        |""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
