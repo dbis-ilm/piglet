@@ -258,7 +258,6 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     assert(generatedCode == expectedCode)
 
     val schemaCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
-    println("schemaCode = " + schemaCode)
     val expectedSchemaCode =
       cleanString("""
          |case class _t2_Tuple (_0 : String, _1 : Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
@@ -296,7 +295,6 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.groupBy(t => {(t._0,t._1)}).map{case (k,v) => _t3_Tuple(_t2_Tuple(k._1, k._2),v)}")
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
-    println("schema class: " + schemaClassCode)
     assert(generatedCode == expectedCode)
   }
 
@@ -369,7 +367,6 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs = List(input1,input2,input3)
     op.constructSchema
-    println("multiway join result = " + op.schema)
     val codeGenerator = new BatchGenCode(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
@@ -395,13 +392,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode2 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j2").get))
     val generatedCode3 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j").get))
 
-    println("j1 schema: " + plan.findOperatorForAlias("j1").get.schema)
-    println("j2 schema: " + plan.findOperatorForAlias("j2").get.schema)
     val finalJoinOp = plan.findOperatorForAlias("j").get
-    println("join schema: " + finalJoinOp.schema)
     // TODO: Schema classes!!!!
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(finalJoinOp.schema.get))
-    println("schema class = " + schemaClassCode)
 
     val expectedCode1 = cleanString(
       """val a_kv = a.map(t => (t._0,t))
@@ -531,7 +524,6 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
 
     assert(generatedCode == expectedCode)
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(foreachOp.schema.get))
-    println("schema class = " + schemaClassCode)
   }
 
   it should "contain code for a foreach statement with constructors for tuple, bag, and map" in {
@@ -846,7 +838,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   it should "contain code for nested schema classes" in {
     val ops = parseScript(
       """
-        |daily = load 'file' using PigStorage(',') as (exchange, symbol);
+        |daily = load 'file' using PigStorage(',') as (exchange: chararray, symbol: chararray);
         |grpd  = group daily by exchange;
         |DUMP grpd;
       """.stripMargin
