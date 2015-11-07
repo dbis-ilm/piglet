@@ -6,6 +6,14 @@ import dbis.pig.backends.flink._
 <\n>
 >>
 
+// ----------------- schema class -----------------
+schema_class(name, fields, string_rep) ::= <<
+case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+override def mkString(_c: String = ",") = <string_rep>
+}
+
+>>
+
 // ----------------- BEGIN of code building and initializing the query --------
 query_object(name, embedded_code) ::= <<
 object <name> {
@@ -19,12 +27,8 @@ begin_query(name) ::= <<
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,func,params) ::=<<
-<if (func)>
-        val <out> = <func>().load(env, "<file>"<params>)
-<else>
-        val <out> = PigStorage().load(env, "<file>", '\t')
-<endif>
+loader(out, file, class, func, extractor, params) ::=<<
+        val <out> = <func>[<class>]().load(env, "<file>", <extractor><if (params)>, <params><endif>)
 >>
 
 // ------------------ DUMP Results --------------------------------------------
@@ -33,9 +37,8 @@ dump(in) ::=<<
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
-store(in,file,schema,func) ::=<<
-        <in>.map(t => <schema>).writeAsText("<file>")
-        
+store(in, file, class, func, params) ::=<<
+        <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)
         env.execute()
 >>
 

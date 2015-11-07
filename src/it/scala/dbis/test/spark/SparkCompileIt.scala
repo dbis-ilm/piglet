@@ -28,6 +28,8 @@ import org.apache.commons.exec.environment.EnvironmentUtils
 class SparkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
+    // ("load.pig", "result1.out", "truth/result1.data", true, "pig", "flink"),
+    // ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
     ("selfjoin.pig", "joined.out", "truth/joined.data", true, "pig", "spark"),
@@ -62,6 +64,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
 //    ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false),
 //    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false)
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
+
   )
 
   def cleanupResult(dir: String): Unit = {

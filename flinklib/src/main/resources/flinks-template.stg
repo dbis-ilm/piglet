@@ -24,7 +24,7 @@ begin_query(name) ::= <<<\n>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,func,params) ::=<<
+loader(out, file, class, func, extractor, params) ::=<<
     val <out> = <func>().load(env, "<file>"<params>)
 >>
 
@@ -34,7 +34,7 @@ dump(in) ::=<<
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
-store(in,file,func,schema) ::=<<
+store(in, file, class, func, schema) ::=<<
     <if (schema)>
         val <in>_storehelper = <in>.map(t => <schema>)
     <else>
