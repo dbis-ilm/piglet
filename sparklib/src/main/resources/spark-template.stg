@@ -95,8 +95,6 @@ join_key_map(rels, keys) ::=<<
         }>
 >>
 
-//        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => <class>(<fields>)\}}>
-
 join(out, class, rel1, rel2, fields) ::=<<
         val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)\}
 >>
