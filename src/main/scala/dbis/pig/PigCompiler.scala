@@ -54,7 +54,8 @@ object PigCompiler extends PigParser with LazyLogging {
                             backend: String = Conf.defaultBackend,
                             language: String = "pig",
                             updateConfig: Boolean = false,
-                            backendArgs: Map[String, String] = Map()
+                            backendArgs: Map[String, String] = Map(),
+                            profiling: Boolean = false
                           )
 
   def main(args: Array[String]): Unit = {
@@ -67,6 +68,7 @@ object PigCompiler extends PigParser with LazyLogging {
     var languageFeature = LanguageFeature.PlainPig
     var updateConfig = false
     var backendArgs: Map[String, String] = null
+    var profiling = false
 
     val parser = new OptionParser[CompilerConfig]("PigCompiler") {
       head("PigCompiler", "0.3")
@@ -181,7 +183,7 @@ def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: Strin
                             backendConf: BackendConf, backendArgs: Map[String,String], profiling: Boolean) {
     logger.debug("start parsing input files")
     
-    val schedule = ListBuffer.empty[(DataflowPlan,Path)]
+    var schedule = ListBuffer.empty[(DataflowPlan,Path)]
     
     for(file <- inputFiles) {
       createDataflowPlan(file, params, backend, langFeature) match {
@@ -192,7 +194,9 @@ def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: Strin
       }
     }
 
-    if(merge != NONE) {
+    // TODO: make cmdline arg
+    val merge = true
+    if(merge) {
       logger.debug("Start merging plans")
       
       val mergedPlan = mergePlans(schedule.map{case (plan, _) => plan })
@@ -274,7 +278,7 @@ def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: Strin
       
       logger.debug("finished optimizations")
       
-println("final plan = {")
+      println("final plan = {")
       newPlan.printPlan()
       println("}")
 

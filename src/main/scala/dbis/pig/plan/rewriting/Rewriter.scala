@@ -100,6 +100,7 @@ object Rewriter extends LazyLogging
                 with WindowSupport
                 with EmbedSupport
                 with MaterializationSupport
+                with MergeSupport
                 with Fixers
                 with FastStrategyAdder
                 with RewriterDSL {

@@ -102,27 +102,4 @@ trait MaterializationSupport extends LazyLogging {
 
     newPlan
   }
-
-  def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = {
-    
-    
-    val mergedPlan = schedule.head
-    
-    val walker = new DepthFirstTopDownWalker
-    
-    def visitor(op: PigOperator): Unit = {
-      
-//      if(!mergedPlan.containsOperator(op))
-//        mergedPlan.addAndConnect(op)
-      
-    }
-    
-    
-    schedule.drop(1) // skip first plan as we already copied it into mergedPlan
-            .foreach { plan => walker.walk(plan)(visitor) }  // for all remaining: visit each op and add to merged plan    
-    
-    mergedPlan
-    
-  }
-  
 }
