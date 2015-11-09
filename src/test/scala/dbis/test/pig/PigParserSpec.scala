@@ -577,16 +577,15 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       Field("subject", Types.CharArrayType),
       Field("predicate", Types.CharArrayType),
       Field("object", Types.CharArrayType))))))
-      
-    // XXX: workaround! sometimes it happens, that the classnames are different
-    expected.x.className = ungrouped.head.schema.get.className
+
+    /* the classname is set by a global variable, which might have
+     * different values for different test case orderings. 
+     * However, we don't care about the classname here and simply set it
+     * manually to ensure equality. 
+     */
+    expected.get.className = ungrouped.head.schema.get.className
     
     ungrouped.head.schema shouldBe expected
-    
-//    assert(ungrouped.head.schema == Some(Schema(BagType(TupleType(Array(
-//      Field("subject", Types.CharArrayType),
-//      Field("predicate", Types.CharArrayType),
-//      Field("object", Types.CharArrayType)))))))
   }
 
   it should "parse RDFLoad operators for triple groups" in {

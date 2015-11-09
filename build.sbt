@@ -17,8 +17,14 @@ mainClass in assembly := Some("dbis.pig.PigCompiler")
 
 test in assembly := {}
 
+parallelExecution in ThisBuild := false
+
 // needed for serialization/deserialization
 fork in Test := true
+
+// enable for debug support in eclipse
+//javaOptions in (Test) += "-Xdebug"
+//javaOptions in (Test) += "-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=8000"
 
 fork in IntegrationTest := false
 
