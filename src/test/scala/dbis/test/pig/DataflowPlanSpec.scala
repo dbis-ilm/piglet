@@ -609,4 +609,23 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     val op = plan.findOperatorForAlias("stmts")
     op shouldBe defined
   }
+
+  it should "reject a ACCUMULATE statement with incorrect expressions" in {
+    val plan = new DataflowPlan(parseScript("""
+                                              |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
+                                              |b = accumulate a generate f1, sum(f2) + 13;
+                                              |""".stripMargin))
+    //    plan.checkSchemaConformance should equal (false)
+    an [SchemaException] should be thrownBy plan.checkSchemaConformance
+  }
+
+  it should "reject a ACCUMULATE statement with another incorrect expressions" in {
+    val plan = new DataflowPlan(parseScript("""
+                                              |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
+                                              |b = accumulate a generate avg(f4);
+                                              |""".stripMargin))
+    //    plan.checkSchemaConformance should equal (false)
+    an [SchemaException] should be thrownBy plan.checkSchemaConformance
+  }
+
 }

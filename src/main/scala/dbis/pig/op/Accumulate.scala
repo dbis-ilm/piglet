@@ -40,12 +40,27 @@ case class Accumulate(out: Pipe, in: Pipe, generator: GeneratorList) extends Pig
     schema
   }
 
+  private def isValidParameter(params: List[ArithmeticExpr]): Boolean = {
+    if (params.length != 1) return false
+    val expr = params.head
+    inputSchema match {
+      case Some(s) => {
+        // if we know the schema we check all named fields
+        expr.traverseAnd(s, Expr.checkExpressionConformance)
+      }
+      case None => {
+        // if we don't have a schema all expressions should contain only positional fields
+        expr.traverseAnd(null, Expr.containsNoNamedFields)
+      }
+    }
+  }
+
   override def checkSchemaConformance: Boolean = {
     // first we check whether all generator expressions are plain aggregate functions
     val funcCheck = generator.exprs.map{ e => e.expr match {
-      case Func(f, _) => {
+      case Func(f, params) => {
         val fname = f.toUpperCase
-        fname == "AVG" || fname == "SUM" || fname == "COUNT" || fname == "MIN" || fname == "MAX"
+        (fname == "AVG" || fname == "SUM" || fname == "COUNT" || fname == "MIN" || fname == "MAX") && isValidParameter(params)
       }
       case _ => false
     }}
