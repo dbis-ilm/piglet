@@ -3,6 +3,10 @@ init_code(includes) ::= <<
 import org.apache.flink.api.scala._
 import dbis.pig.backends.flink._
 
+<if (includes)>
+<includes>
+<endif>
+
 <\n>
 >>
 
@@ -21,7 +25,7 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name,profiling) ::= <<
         def main(args: Array[String]) {
         val env = ExecutionEnvironment.getExecutionEnvironment<\n>
 >>
@@ -48,7 +52,7 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element ------------
-foreach(out,in,expr,aggrs) ::=<<
+foreach(out,in,expr) ::=<<
         val <out> = <in>.map(t => <expr>)
 >>
 
@@ -99,10 +103,13 @@ orderBy(out,in,key,asc) ::=<<
         val <out> = <in>.sortPartition(t => <key>, Order.ASCENDING)
 >>
 
+stageIdentifier(line,lineage) ::=<< >>
 
 // ----------------- END of the code implementing the query -------------------
-end_query(name) ::= <<
-        
+end_query(name, hook) ::= <<        
+    <if (hook)>
+		shutdownHook()
+	<endif>
     }
 }
 >>

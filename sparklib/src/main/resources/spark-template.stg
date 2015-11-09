@@ -25,11 +25,15 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name,profiling) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
-
+        <if (profiling)>
+    	val perfMon = new PerfMonitor("<name>_App")
+    	sc.addSparkListener(perfMon)
+    	<endif>
+        
 >>
 
 // ----------------- LOAD text file -------------------------------------------
@@ -142,6 +146,9 @@ fs(cmd,params) ::=<<
 rscript(out,in,script) ::=<<
         val <out> = RScriptOp.process(sc, <in>, <script>, "res")
 >>
+stageIdentifier(line, lineage) ::=<<
+	perfMon.register(<line>, "<lineage>")
+>>	
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<

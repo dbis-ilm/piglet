@@ -17,7 +17,7 @@
 
 package dbis.pig.tools
 
-import java.io.{ File, FileOutputStream, FileWriter, InputStream, OutputStream }
+import java.io.{ File, FileOutputStream, FileWriter, InputStream, OutputStream, FileInputStream }
 import java.util.jar.JarFile
 import dbis.pig._
 import dbis.pig.codegen._
@@ -28,6 +28,8 @@ import dbis.pig.backends.BackendConf
 import java.nio.file.Path
 import java.nio.file.Files
 import java.nio.file.Paths
+
+import scala.collection.mutable.ListBuffer
 
 object FileTools extends LazyLogging {
   def copyStream(istream: InputStream, ostream: OutputStream): Unit = {
@@ -64,15 +66,22 @@ object FileTools extends LazyLogging {
     }
   }
 
-  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, templateFile: String, backend: String): Option[Path] = {
+  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, 
+      templateFile: String, backend: String, profiling: Boolean): Option[Path] = {
+    
     // 4. compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)
+    logger.debug(s"using generator class: $generatorClass")
     val extension = Conf.backendExtension(backend)
+    logger.debug(s"file extension for generated code: $extension")
     val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
+    logger.debug(s"""arguments to generator class: "${args.mkString(",")}" """)
+    
     val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[Compile]
+    logger.debug(s"successfully created code generator class $compiler")
 
     // 5. generate the Scala code
-    val code = compiler.compile(scriptName, plan)
+    val code = compiler.compile(scriptName, plan, profiling)
 
     logger.debug("successfully generated scala program")
 
@@ -85,6 +94,7 @@ object FileTools extends LazyLogging {
     if (!Files.exists(outputDir)) {
       Files.createDirectories(outputDir)
     }
+    
 
     val outputDirectory = outputDir.resolve("out") //s"${outputDir.getCanonicalPath}${File.separator}out"
     logger.debug(s"outputDirectory: $outputDirectory")
@@ -107,11 +117,10 @@ object FileTools extends LazyLogging {
       val jobJar = backendJar.toAbsolutePath().toString()
       FileTools.extractJarToDir(jobJar, outputDirectory)
 
-      //    if (compileOnly) 
-      //      return false // sys.exit(0)
-
+      val sources = ListBuffer(outputFile)
+      
       // 9. compile the scala code
-      if (!ScalaCompiler.compile(outputDirectory, outputFile))
+      if (!ScalaCompiler.compile(outputDirectory, sources))
         return None
 
       // 10. build a jar file
