@@ -27,7 +27,7 @@ import scala.collection.mutable.ListBuffer
 import java.nio.file.Path
 
 
-class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
+class FlinkStreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
 
 
   /*------------------------------------------------------------------------------------------------- */
@@ -62,16 +62,16 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
                   udfs += s"""("${udf.name}", List(${emitRef(node.inputSchema, r1, "", false)}, ${emitRef(tupleSchema(node.inputSchema, r1), r2, "")}))"""
                   DerefTuple(r1, PositionalField(tupleSchema(node.inputSchema, r1).get.fields.size + posCounter))
                 }
-                case _ => ??? 
+                case _ => ???
               }
               posCounter=posCounter+1
               GeneratorExpr(RefExpr(newExpr), e.alias)
             }
             case _ => GeneratorExpr(e.expr, e.alias)
           }
-        }   
+        }
         case _ => GeneratorExpr(e.expr, e.alias)
-      })  
+      })
     val newGen = gen match {
       case GeneratorList(expr) => GeneratorList(exprs)
       case GeneratorPlan(plan) => {
@@ -79,8 +79,8 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
         newPlan = newPlan.updated(newPlan.size-1, Generate(exprs))
         node.asInstanceOf[Foreach].subPlan = Option(new DataflowPlan(newPlan))
         GeneratorPlan(newPlan)
-      }   
-    }   
+      }
+    }
     (node, newGen, udfs.toList)
   }
 
@@ -174,7 +174,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
       }
     }
   }
-  
+
   def emitStageIdentifier(line: Int, lineage: String): String = ???
 
 
@@ -311,7 +311,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
       callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
   }
 
-  /** 
+  /**
     * Generates code for the ORDERBY Operator
     *
     * @param node the OrderBy Operator node
@@ -321,7 +321,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     * @param windowMode true if operator is called within a window environment
     * @return the Scala code implementing the ORDERBY operator
     */
-  def emitOrderBy(node: PigOperator, out: String, in: String, spec: List[OrderBySpec], windowMode: Boolean): String = { 
+  def emitOrderBy(node: PigOperator, out: String, in: String, spec: List[OrderBySpec], windowMode: Boolean): String = {
     val key = emitSortKey(node.schema, spec, out, in)
     val asc = ascendingSortOrder(spec.head)
     callST("orderBy", Map("out"->out,"in"->in,"key"->key,"asc"->asc))
@@ -376,7 +376,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     if(window._2==""){
       if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1))
       else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1, "sUnit"->slide._2))
-    } 
+    }
     else {
       if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1))
       else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1, "sUnit"->slide._2))
@@ -417,6 +417,6 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
 
 }
 
-class StreamingCompile(templateFile: String) extends Compile {
-  override val codeGen = new StreamingGenCode(templateFile)
+class FlinkStreamingCompile(templateFile: String) extends Compile {
+  override val codeGen = new FlinkStreamingGenCode(templateFile)
 }
