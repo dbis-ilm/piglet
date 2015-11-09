@@ -198,7 +198,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
       else
         Map("out" -> node.outPipeName,
           "rel1" -> rels.head.name,
-          "rel2" -> rels.tail.map(_.name)))
+          "rel2" -> rels.tail.map(_.name))
     callST("cross", params)
   }
 

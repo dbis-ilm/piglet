@@ -23,7 +23,7 @@ import scala.collection.mutable.ListBuffer
 object PigFuncs {
   def average[T: Numeric](bag: Iterable[T]) : Double = sum(bag).toDouble / count(bag).toDouble
 
-  def count(bag: Iterable[Any]): Long = bag.size
+  def count(bag: Iterable[Any]): Int = bag.size
 
   def sum[T: Numeric](bag: Iterable[T]): T = bag.sum
 
@@ -31,10 +31,20 @@ object PigFuncs {
 
   def max[T: Ordering](bag: Iterable[T]): T = bag.max
 
-  // STRING functions
+  /*
+   * String functions
+   */
   def tokenize(s: String, delim: String = """[, "]""") = s.split(delim)
   
   def startswith(haystack: String, prefix: String) = haystack.startsWith(prefix)
   
   def strlen(s: String) = s.length()
+
+  /*
+   * Incremental versions of the aggregate functions - used for implementing ACCUMULATE.
+   */
+  def incrSUM(acc: Int, v: Int) = { println(s"SUM($acc, $v)"); acc + v }
+  def incrCOUNT(acc: Int, v: Int) = { println(s"COUNT($acc, $v)"); acc + 1 }
+  def incrMIN(acc: Int, v: Int) = math.min(acc, v)
+  def incrMAX(acc: Int, v: Int) = math.max(acc, v)
 }

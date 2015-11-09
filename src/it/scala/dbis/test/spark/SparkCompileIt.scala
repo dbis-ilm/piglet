@@ -30,6 +30,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
     // ("load.pig", "result1.out", "truth/result1.data", true, "pig", "flink"),
     // ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
+    // ("accumulate.pig", "accumulate.out", "truth/accumulate.data", false, "pig", "spark"),
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
     ("selfjoin.pig", "joined.out", "truth/joined.data", true, "pig", "spark"),
@@ -50,6 +51,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "spark"),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "spark"),
+    // ("accumulate.pig", "accumulate.out", "truth/accumulate.data", false, "pig", "spark"),
     ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "spark"),
     ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "spark"),
     /* Works, but requires a R installation

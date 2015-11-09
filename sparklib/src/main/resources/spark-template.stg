@@ -137,8 +137,20 @@ fs(cmd,params) ::=<<
 >>
 
 // ------------------ RSCRIPT operators ----------------------------------------
-rscript(out,in,script) ::=<<
+rscript(out, in, script) ::=<<
         val <out> = RScriptOp.process(sc, <in>, <script>, "res")
+>>
+
+// ------------------- ACCUMULATE operator ------------------------------------
+accumulate_aggr(out, helper_class, expr) ::=<<
+        def aggr_<out>(acc: <helper_class>, v: <helper_class>): <helper_class> =
+                <helper_class>(v._t, <expr>)
+>>
+
+accumulate(out, in, helper_class, class, init_expr, aggr_expr) ::=<<
+        val <out>_fold = <in>.map(t => <helper_class>(t, <init_expr>))
+                                        .fold(<helper_class>())(aggr_<out>)
+        val <out> = sc.parallelize(Array(<class>(<aggr_expr>)))
 >>
 
 // ----------------- END of the code implementing the query -------------------

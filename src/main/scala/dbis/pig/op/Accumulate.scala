@@ -16,6 +16,8 @@
  */
 package dbis.pig.op
 
+import dbis.pig.schema.{TupleType, BagType, Schema}
+
 /**
  * Accumulate represents the ACCUMULATE operator of Pig.
  *
@@ -31,4 +33,30 @@ case class Accumulate(out: Pipe, in: Pipe, generator: GeneratorList) extends Pig
     s"""ACCUMULATE%${generator.exprs.mkString("%")}%""" + super.lineageString
   }
 
+  override def constructSchema: Option[Schema] = {
+    val fields = generator.constructFieldList(inputSchema)
+
+    schema = Some(Schema(fields))
+    schema
+  }
+
+  override def checkSchemaConformance: Boolean = {
+    // first we check whether all generator expressions are plain aggregate functions
+    val funcCheck = generator.exprs.map{ e => e.expr match {
+      case Func(f, _) => {
+        val fname = f.toUpperCase
+        fname == "AVG" || fname == "SUM" || fname == "COUNT" || fname == "MIN" || fname == "MAX"
+      }
+      case _ => false
+    }}
+    ! funcCheck.contains(false)
+    // TODO: second we check if the function arguments refer to valid fields
+  }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"ACCUMULATE { out = ${outPipeName} , in = ${inPipeName} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "exprs = " + generator.exprs.mkString(","))
+  }
 }

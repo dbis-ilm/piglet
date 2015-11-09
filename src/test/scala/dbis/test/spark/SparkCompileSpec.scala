@@ -698,6 +698,36 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for a simple accumulate statement" in {
+    val ops = parseScript("b = load 'file'; a = ACCUMULATE b GENERATE COUNT($0), AVG($1), SUM($2);")
+    val schema = Schema(Array(Field("t1", Types.IntType),
+                              Field("t2", Types.IntType),
+                              Field("t3", Types.IntType)))
+    ops.head.schema = Some(schema)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("a").get
+    val codeGenerator = new BatchGenCode(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """
+        |def aggr_a(acc: _t2_HelperTuple, v: _t2_HelperTuple): _t2_HelperTuple =
+        |                _t2_HelperTuple(v._t, PigFuncs.incrCOUNT(acc._0, v._0), PigFuncs.incrSUM(acc._1sum, v._1sum),
+        |                             PigFuncs.incrCOUNT(acc._1cnt, v._1cnt), PigFuncs.incrSUM(acc._2, v._2))
+        |val a_fold = b.map(t => _t2_HelperTuple(t, t._0, t._1, t._1, t._2))
+        |               .fold(_t2_HelperTuple())(aggr_a)
+        |val a = sc.parallelize(Array(_t2_Tuple(a_fold._0, a_fold._1sum / a_fold._1cnt, a_fold._2)))
+        |""".stripMargin)
+
+    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
+    val expectedHelperClass = cleanString(
+    """case class _t2_HelperTuple (_t: _t1_Tuple = null, _0: Int = 0, _1sum: Int = 0, _1cnt: Int = 0, _2: Int = 0)
+      |extends java.io.Serializable with SchemaClass { override def mkString(_c: String = ",") = "" }
+      |""".stripMargin)
+    assert(generatedHelperClass == expectedHelperClass)
+    assert(generatedCode == expectedCode)
+
+  }
+
   it should "not contain code for EMPTY operators" in {
     val op = Empty(Pipe("_"))
     val codeGenerator = new BatchGenCode(templateFile)
