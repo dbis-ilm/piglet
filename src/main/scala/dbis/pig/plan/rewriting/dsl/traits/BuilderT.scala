@@ -16,9 +16,16 @@
  */
 package dbis.pig.plan.rewriting.dsl.traits
 
-import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.Rewriter
-
+/** A builder for rewriting operations.
+  *
+  * It wraps a function performing the rewriting in a conditional check and can automatically apply fixup operations
+  * to the operations return value.
+  *
+  * Specific behaviour must be implemented by classes implementing this class.
+  *
+  * @tparam FROM
+  * @tparam TO
+  */
 abstract class BuilderT[FROM, TO] {
   protected var _func: Option[FROM => Option[TO]] = None
 

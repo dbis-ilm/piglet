@@ -29,6 +29,10 @@ lodhub_data
 
 __my_script/
 
+#####
+# ignore database
+db
+
 # sbt specific
 .cache
 .cache-*

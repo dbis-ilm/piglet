@@ -42,6 +42,8 @@ case class Load(out: Pipe,
     /*
      * Either the schema was defined or it is None.
      */
+    if (schema.isDefined)
+      schema.get.setBagName(outPipeName)
     schema
   }
 
@@ -53,4 +55,14 @@ case class Load(out: Pipe,
   override def lineageString: String = {
     s"""LOAD%${file}%""" + super.lineageString
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"LOAD { out = ${outPipeName} }")
+    println(indent(tab + 2) + "file = " + file.toString)
+    if (loaderFunc.isDefined) {
+      println(indent(tab + 2) + "func = " + loaderFunc.get)
+    }
+    println(indent(tab + 2) + "outSchema = " + schema)
+  }
+
 }

@@ -16,8 +16,13 @@
  */
 package dbis.pig.plan.rewriting.dsl.traits
 
-import dbis.pig.plan.rewriting.dsl.words.WhenWord
+import dbis.pig.plan.rewriting.dsl.words.{ImmediateEndWord, WhenWord}
 
+/** A trait supplying methods for adding checks to a [[dbis.pig.plan.rewriting.dsl.traits.BuilderT]].
+  *
+  * @tparam FROM
+  * @tparam TO
+  */
 trait CheckWordT[FROM, TO] {
   val b: BuilderT[FROM, TO]
 
@@ -36,12 +41,6 @@ trait CheckWordT[FROM, TO] {
     */
   def when(check: (FROM => Boolean)): WhenWord[FROM, TO] = {
     new WhenWord(b, check)
-  }
-
-  /** Add a check before the application of the function contained in the builder that always calls the function.
-    */
-  def always: WhenWord[FROM, TO] = {
-    new WhenWord(b, _ => true)
   }
 
   /** Add a check in the form of a pattern match before the application of the function contained in the builder. If

@@ -18,7 +18,7 @@ package dbis.pig.plan.rewriting.rulesets
 
 import dbis.pig.op._
 import dbis.pig.plan.PipeNameGenerator._
-import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.plan.rewriting.{Functions, Rewriter}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.internals.Column.Column
 import dbis.pig.plan.rewriting.internals.{Column, RDF}
@@ -103,7 +103,7 @@ object RDFRuleset extends Ruleset {
       return None
     }
 
-    Some(Load(op.out, op.uri, op.schema, Some("BinStorage")))
+    Some(Load(op.out, op.uri, op.schema, Some("RDFFileStorage")))
   }
 
   /** Applies rewriting rule F1 of the paper [[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -583,6 +583,30 @@ object RDFRuleset extends Ruleset {
     }
 
     group_filter
+  }
+
+  /** Applies rewriting rule F9 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
+    *
+    */
+  def F9(op: BGPFilter): Option[BGPFilter] = {
+    val patterns = op.patterns
+    val in = op.inputs.head
+    val out = op.outputs.head
+
+    if (patterns.length < 2) {
+      return None
+    }
+
+    if (RDF.isPathJoin(patterns) || RDF.isStarJoin(patterns)) {
+      return None
+    }
+
+    val new_filters: Seq[BGPFilter] = patterns map { p: TriplePattern =>
+      BGPFilter(Pipe(generate()), Pipe(generate()), List(p))
+    }
+
+    Functions.newFlowIgnoringOld(new_filters:_*)
+    Some(fixReplacementwithMultipleOperators(op, new_filters.head, new_filters.last))
   }
 
   /** Applies rewriting rule J1 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].

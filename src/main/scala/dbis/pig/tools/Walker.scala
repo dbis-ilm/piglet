@@ -8,6 +8,11 @@ import scala.collection.mutable.Stack
 import dbis.pig.plan.DataflowPlan
 import scala.collection.mutable.Queue
 import scala.collection.mutable.Set
+import dbis.pig.op.PigOperator
+import dbis.pig.plan.DataflowPlan
+import dbis.pig.op.PigOperator
+import dbis.pig.op.PigOperator
+import dbis.pig.op.PigOperator
 
 /**
  * A general trait to be implemented by all walkers

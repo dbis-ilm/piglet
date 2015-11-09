@@ -16,23 +16,23 @@
  */
 package dbis.pig.plan.rewriting.dsl.traits
 
-/** The most general Word class. It only provides a parameterless ``apply`` method that calls the wrapped builder.
-  *
-  * @param b
-  * @tparam FROM
-  * @tparam TO
+/** A trait supplying methods to set the function in a [[dbis.pig.plan.rewriting.dsl.traits.BuilderT]] and call its
+  * apply method.
   */
 trait EndWordT[FROM, TO] {
   val b: BuilderT[FROM, TO]
 
+  /** Apply ``f`` (a total function) when rewriting.
+    *
+    * @param f
+    */
   def applyRule(f: (FROM => Option[TO])): Unit = {
     b.func = f
     b.apply()
   }
 
-  /** Unconditionally apply ``f`` when rewriting.
+  /** Apply ``f`` (a partial function) when rewriting.
     *
-    * @param f
     */
   def applyPattern(f: scala.PartialFunction[FROM, TO]): Unit = {
     val lifted = f.lift

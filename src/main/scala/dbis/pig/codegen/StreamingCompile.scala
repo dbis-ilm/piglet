@@ -24,6 +24,7 @@ import dbis.pig.backends.BackendManager
 
 import scala.collection.mutable.ListBuffer
 
+import java.nio.file.Path
 
 
 class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
@@ -58,7 +59,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
                   PositionalField(node.inputSchema.get.fields.size + posCounter)
                 }
                 case DerefTuple(r1, r2) => {
-                  udfs += s"""("${udf.name}", List(${emitRef(node.inputSchema, r1, "", false)}, ${emitRef(tupleSchema(node.inputSchema, r1), r2, "", false)}))"""
+                  udfs += s"""("${udf.name}", List(${emitRef(node.inputSchema, r1, "", false)}, ${emitRef(tupleSchema(node.inputSchema, r1), r2, "")}))"""
                   DerefTuple(r1, PositionalField(tupleSchema(node.inputSchema, r1).get.fields.size + posCounter))
                 }
                 case _ => ??? 
@@ -88,14 +89,13 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     * @param schema
     * @param ref
     * @param tuplePrefix
-    * @param requiresTypeCast
     * @return
     */
   override def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
-                       requiresTypeCast: Boolean = true,
-                       aggregate: Boolean = false): String = ref match {
-      case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]](0)${emitRef(tupleSchema(schema, r1), r2, "", false)}"
-      case _ => super.emitRef(schema, ref, tuplePrefix, requiresTypeCast, aggregate)
+                       aggregate: Boolean = false,
+                        namedRef: Boolean = false): String = ref match {
+      case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]](0)${emitRef(tupleSchema(schema, r1), r2, "")}"
+      case _ => super.emitRef(schema, ref, tuplePrefix, aggregate)
   }
 
   override def emitHelperClass(node: PigOperator): String = node match {
@@ -162,10 +162,10 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     gen match {
       case GeneratorList(expr) => {
-        if (requiresFlatMap) emitBagFlattenGenerator(node.inputSchema, expr)
+        if (requiresFlatMap) emitBagFlattenGenerator(node, expr)
           else {
-          if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
-            else emitGenerator(node.inputSchema, expr)
+          /*if (requiresPlainFlatten) emitFlattenGenerator(node.inputSchema, expr)
+            else*/ emitGenerator(node.inputSchema, expr)
         }
       }
       case GeneratorPlan(plan) => {
@@ -174,6 +174,8 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
       }
     }
   }
+  
+  def emitStageIdentifier(line: Int, lineage: String): String = ???
 
 
   /*------------------------------------------------------------------------------------------------- */

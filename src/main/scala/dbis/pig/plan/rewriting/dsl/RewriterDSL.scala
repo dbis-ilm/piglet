@@ -38,6 +38,21 @@ trait RewriterDSL {
     new ReplaceWord[FROM](b)
   }
 
+  /** Start describing a merging operation for objects of type ``cls1`` and ``cls2``.
+    *
+    * Example code for merging two [[dbis.pig.op.Filter]] operators:
+    *
+    * {{{
+    * Rewriter toMerge(classOf[Filter], classOf[Filter])  applyRule {
+    *    tup: (Filter, Filter) => Some(Filter(tup._2.outputs.head, tup._1.inputs.head, And(tup._1.pred, tup._2.pred)))
+    *  }
+    * }}}
+    * @param cls1
+    * @param cls2
+    * @tparam FROM1
+    * @tparam FROM2
+    * @return
+    */
   def toMerge[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : ClassTag]
     (cls1: Class[FROM1], cls2: Class[FROM2]): MergeWord[FROM1, FROM2] = {
     val b = new MergeBuilder[FROM1, FROM2]

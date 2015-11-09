@@ -14,15 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package dbis.pig.op
 
-
-/** Wraps code that is to be embedded in the compiled Scala application.
+/**
+ * Delay represents the DELAY operator of Pig.
  *
- * @param code The embedded code.
+ * @param out the output pipe (relation).
+ * @param in the input pipe.
+ * @param size the percentage of input tuples that is passed to the output pipe
+ * @param wtime the time for delaying the processing
+ *
  */
-case class EmbedCmd(code: String, ruleCode: Option[String]) extends PigOperator {
-  def this(code: String) = this(code, None)
-}
+case class Delay(out: Pipe, in: Pipe, size: Double, wtime: Int) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
 
+  override def lineageString: String = {
+    s"""DELAY%${size}%${wtime}%""" + super.lineageString
+  }
+
+}

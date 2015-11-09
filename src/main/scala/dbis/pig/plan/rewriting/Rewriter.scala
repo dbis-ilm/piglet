@@ -68,6 +68,10 @@ case class RewriterException(msg: String) extends Exception(msg)
   *
   * - [[reorder]] for reordering two operators
   *
+  * ==DSL==
+  *
+  * A DSL for easily adding rewriting operations is provided as well, its documented in [[dbis.pig.plan.rewriting.dsl]].
+  *
   * ==DataflowPlan helper methods==
   *
   * Some operations provided by [[DataflowPlan]] objects are not implemented there, but on this object. These include
@@ -84,8 +88,8 @@ case class RewriterException(msg: String) extends Exception(msg)
   *
   * After a rewriting operation, the `inputs` and `outputs` attribute of operators other than the rewritten ones
   * might be changed (for example to accommodate new or deleted operators). To help maintaining these relationships,
-  * the methods [[fixInputsAndOutputs]] and [[pullOpAcrossMultipleInputOp]] in several versions is provided. Their
-  * documentation include hints in which cases they apply.
+  * the methods [[fixMerge]], [[fixReordering]] and [[pullOpAcrossMultipleInputOp]] in several versions is provided.
+  * Their documentation include hints in which cases they apply.
   *
   * @todo Not all links in this documentation link to the correct methods, most notably links to overloaded ones.
   *
@@ -124,20 +128,6 @@ object Rewriter extends LazyLogging
     */
   //noinspection ScalaDocMissingParameterDescription
   def addStrategy(f: Any => Option[PigOperator]): Unit = addStrategy(strategyf(t => f(t)))
-
-  /** Adds a function `f` that replaces a single [[PigOperator]] with another one as a [[org.kiama.rewriting.Strategy]]
-    * to this object.
-    *
-    * If applying `f` to a term succeeded (Some(_)) was returned, the input term will be replaced by the new term in
-    * the input pipes of the new terms successors (the consumers of its output pipes).
-    *
-    * @param f
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  def addOperatorReplacementStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
-    (f: T => Option[T2]): Unit = {
-    addStrategy(buildOperatorReplacementStrategy(f))
-  }
 
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
     * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].

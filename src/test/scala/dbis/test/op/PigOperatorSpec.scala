@@ -17,9 +17,10 @@
 package dbis.test.op
 
 import dbis.pig.PigCompiler._
-import dbis.pig.op.Foreach
+import dbis.pig.op.{EmbedCmd, Foreach}
 import dbis.pig.plan._
 import dbis.pig.schema._
+import dbis.pig.udf.UDF
 import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
 import java.net.URI
@@ -89,5 +90,23 @@ class PigOperatorSpec extends FlatSpec with Matchers {
     plan.findOperatorForAlias("F").get.lineageString should not be equal (plan2.findOperatorForAlias("F").get.lineageString)
     plan.findOperatorForAlias("G").get.lineageString should not be equal (plan2.findOperatorForAlias("G").get.lineageString)
     plan.findOperatorForAlias("H").get.lineageString should not be equal (plan2.findOperatorForAlias("H").get.lineageString)
+  }
+
+  "EmbedCmd" should "extract UDF signatures" in {
+    val cmd = EmbedCmd(
+      s"""
+         |def func1(): Int = 3
+         |def func2(): String = "test"
+         |
+         |def func3(a: Int): Double = {}
+       """.stripMargin, None)
+    val udfs = cmd.extractUDFs()
+    udfs.length should be (3)
+    val udf1 = udfs(0)
+    udf1 should be (UDF("FUNC1", "func1", List(), Types.IntType, false))
+    val udf2 = udfs(1)
+    udf2 should be (UDF("FUNC2", "func2", List(), Types.CharArrayType, false))
+    val udf3 = udfs(2)
+    udf3 should be (UDF("FUNC3", "func3", List(Types.AnyType), Types.DoubleType, false))
   }
 }

@@ -31,4 +31,9 @@ case class Distinct(out: Pipe, in: Pipe, var windowMode: Boolean = false) extend
     s"""DISTINCT%""" + super.lineageString
   }
 
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"DISTINCT { out = ${outPipeName} , in = ${inPipeName} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+  }
 }

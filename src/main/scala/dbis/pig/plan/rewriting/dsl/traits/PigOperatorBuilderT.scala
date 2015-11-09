@@ -19,6 +19,11 @@ package dbis.pig.plan.rewriting.dsl.traits
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.Rewriter
 
+/** A builder for applying a rewriting operation to a [[dbis.pig.op.PigOperator]].
+  *
+  * @tparam FROM
+  * @tparam TO
+  */
 abstract class PigOperatorBuilderT[FROM <: PigOperator, TO] extends BuilderT[FROM, TO] {
   override def wrapInCheck(func: FROM => Option[TO]) = {
     def f(term: FROM): Option[TO] = {
@@ -42,7 +47,7 @@ abstract class PigOperatorBuilderT[FROM <: PigOperator, TO] extends BuilderT[FRO
         case ret @ (a : PigOperator, b:PigOperator) =>
           Rewriter.fixReplacementwithMultipleOperators(term, a, b)
           t
-        case op : TO if op.isInstanceOf[PigOperator] =>
+        case op if op.isInstanceOf[PigOperator] =>
           val o = op.asInstanceOf[PigOperator]
           o.inputs = term.inputs
           o.asInstanceOf[TO]

@@ -20,7 +20,9 @@ import dbis.pig.schema.Field
 
 sealed abstract class Ref
 
-case class NamedField(var name: String, lineage: List[String] = List.empty) extends Ref
+case class NamedField(var name: String, lineage: List[String] = List.empty) extends Ref {
+  override def toString = name + (if (lineage.nonEmpty) lineage.mkString("::") else "")
+}
 
 object NamedField {
   def fromString(s: String): NamedField = {

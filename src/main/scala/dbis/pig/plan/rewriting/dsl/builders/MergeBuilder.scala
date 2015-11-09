@@ -22,6 +22,10 @@ import dbis.pig.plan.rewriting.dsl.traits.BuilderT
 
 import scala.reflect.ClassTag
 
+/** A builder for applying a rewriting operation to two [[dbis.pig.op.PigOperator]]s. The rewriting operation must
+  * merge them by returning a single new operator.
+  *
+  */
 class MergeBuilder[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : ClassTag]
   extends BuilderT[(FROM1, FROM2), PigOperator] {
   override def addAsStrategy(func: ((FROM1, FROM2)) => Option[PigOperator]): Unit = {

@@ -8,6 +8,10 @@ import java.util.concurrent.TimeUnit
 import org.apache.flink.streaming.api.windowing.helper._
 import org.apache.flink.util.Collector
 
+<if (includes)>
+<includes>
+<endif>
+
 <\n>
 >>
 
@@ -18,13 +22,13 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<<\n>
+begin_query(name, profiling) ::= <<<\n>
   def main(args: Array[String]) {
     val env = StreamExecutionEnvironment.getExecutionEnvironment<\n>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,func,params) ::=<<
+loader(out, file, class, func, extractor, params) ::=<<
     val <out> = <func>().load(env, "<file>"<params>)
 >>
 
@@ -34,7 +38,7 @@ dump(in) ::=<<
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
-store(in,file,func,schema) ::=<<
+store(in, file, class, func, schema) ::=<<
     <if (schema)>
         val <in>_storehelper = <in>.map(t => <schema>)
     <else>
@@ -212,6 +216,10 @@ socketWrite(in,addr,mode,func) ::=<<
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
     env.execute("<name>")
+    
+<if (hook)>
+	shutdownHook()
+<endif>
   }
 }
 >>

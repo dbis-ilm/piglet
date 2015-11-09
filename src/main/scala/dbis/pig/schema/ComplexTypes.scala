@@ -37,10 +37,8 @@ object Field {
 /**
  * A base class for complex types, i.e. bag, tuple, and map.
  * Basically, it provides an interface to retrieve the types of individual components.
- *
- * @param s the type name
  */
-abstract class ComplexType(s: String) extends PigType(s) {
+abstract class ComplexType extends java.io.Serializable with PigType {
   /**
    * Returns the type of the component with the given field name.
    *
@@ -63,11 +61,15 @@ abstract class ComplexType(s: String) extends PigType(s) {
  * optional type name.
  *
  * @param fields the list of fields representing the tuple components.
- * @param s the type name
  */
-case class TupleType(var fields: Array[Field], s: String = "") extends ComplexType(s) {
+case class TupleType(var fields: Array[Field],var className: String = "") extends ComplexType {
+  override def tc = TypeCode.TupleType
+  override def name = "tuple"
+
+  override def encode: String = s"(${fields.map(f => f.name + ":" + f.fType.encode).mkString})"
+
   override def equals(that: Any): Boolean = that match {
-    case TupleType(fields, name) => this.name == name && this.fields.deep == fields.deep
+    case TupleType(f, _) => this.fields.deep == f.deep
     case _ => false
   }
 
@@ -76,7 +78,7 @@ case class TupleType(var fields: Array[Field], s: String = "") extends ComplexTy
    *
    * @return the string repesentation
    */
-  override def toString = "TupleType(" + name + "," + fields.mkString(",") + ")"
+  override def toString = s"${name}(" + fields.mkString(",") + ")"
 
   override def descriptionString = "(" + fields.mkString(", ") + ")"
 
@@ -86,14 +88,40 @@ case class TupleType(var fields: Array[Field], s: String = "") extends ComplexTy
   override def typeOfComponent(pos: Int): PigType = fields(pos).fType
 }
 
+object TupleType {
+  def apply(fields: Array[Field]) = {
+    val t = new TupleType(fields)
+    registerType(t)
+  }
+
+  def registerType(tt: TupleType): TupleType = {
+    val schema = Schema.registerSchema(Schema(BagType(tt)))
+    tt.className = schema.className
+    tt
+  }
+
+}
+
+
 /**
  * A type for representing Pig bags consisting of a value type (a tuple type) and an
  * optional type name.
  *
  * @param valueType the tuple type representing the element of the bag
- * @param s the type name
  */
-case class BagType(var valueType: TupleType, s: String = "") extends ComplexType(s) {
+case class BagType(var valueType: TupleType) extends ComplexType {
+  override def tc = TypeCode.BagType
+  override def name = "bag"
+
+  /**
+   * Returns a string representation of the type object.
+   *
+   * @return the string repesentation
+   */
+  override def toString = s"${name}{${valueType}}"
+
+  override def encode: String = s"{${valueType.encode}}"
+
   override def descriptionString = "{" + valueType.plainDescriptionString + "}"
   override def typeOfComponent(name: String): PigType = valueType.typeOfComponent(name)
   override def typeOfComponent(pos: Int): PigType = valueType.typeOfComponent(pos)
@@ -104,9 +132,13 @@ case class BagType(var valueType: TupleType, s: String = "") extends ComplexType
  * an optional type name.
  *
  * @param valueType the Pig type used for values of the map
- * @param s the type name
  */
-case class MapType(var valueType: PigType, s: String = "") extends ComplexType(s) {
+case class MapType(var valueType: PigType) extends ComplexType {
+  override def tc = TypeCode.MapType
+  override def name = "map"
+
+  override def encode: String = s"[${valueType.encode}]"
+
   override def descriptionString = "[" + valueType.descriptionString + "]"
   override def typeOfComponent(name: String): PigType = valueType
   override def typeOfComponent(pos: Int): PigType = valueType
