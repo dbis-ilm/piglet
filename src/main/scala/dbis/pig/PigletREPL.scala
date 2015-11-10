@@ -28,6 +28,7 @@ import dbis.pig.tools.{HDFSService, FileTools, Conf}
 import dbis.pig.backends.BackendManager
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.codegen.PigletCompiler
 
 import jline.console.ConsoleReader
 
@@ -346,7 +347,7 @@ object PigletREPL extends LazyLogging {
           val jobJar = Conf.backendJar(backend)
 
           nextScriptName()
-          FileTools.compilePlan(plan, scriptName, Paths.get("."), false, jobJar, templateFile, backend, profiling) match {
+          PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), false, jobJar, templateFile, backend, profiling) match {
             case Some(jarFile) =>
               val runner = backendConf.runnerClass
               runner.execute(master, scriptName, jarFile, backendArgs)

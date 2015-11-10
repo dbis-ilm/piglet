@@ -295,7 +295,7 @@ object Piglet extends LazyLogging {
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
       
-      FileTools.compilePlan(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, backend, profiling) match {
+      PigletCompiler.compilePlan(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, backend, profiling) match {
         // the file was created --> execute it
         case Some(jarFile) =>  
           if (!compileOnly) {

@@ -10,6 +10,14 @@ import scala.collection.mutable.ListBuffer
 import dbis.pig.parser.PigParser
 import dbis.pig.op.PigOperator
 import java.nio.file.Paths
+import java.nio.file.Files
+import java.io.FileWriter
+import dbis.pig.tools.FileTools
+import dbis.pig.tools.ScalaCompiler
+import dbis.pig.tools.JarBuilder
+import dbis.pig.tools.CppCompiler
+import dbis.pig.tools.CppCompilerConf
+import dbis.pig.tools.Conf
 
 object PigletCompiler extends LazyLogging {
   
@@ -75,6 +83,93 @@ object PigletCompiler extends LazyLogging {
     }
     buf.toIterator
   }
+  
+  /**
+   * Compile the given plan into a executable program.
+   * 
+   * @param plan The plan to compile
+   * @param scriptName The name of the script (used as program and file name)
+   * @param outDir The directory to write generated files to
+   * @param compileOnly If <code>true</code> the program will only be compiled, and not executed
+   * @param backendJar Path to the backend jar file
+   * @param templateFile The template file to use for code generation
+   * @param backend The name of the backend
+   * @param profiling Flag indicating whether profiling code should be inserted
+   */
+  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, 
+      templateFile: String, backend: String, profiling: Boolean): Option[Path] = {
+    
+    // 4. compile it into Scala code for Spark
+    val generatorClass = Conf.backendGenerator(backend)
+    logger.debug(s"using generator class: $generatorClass")
+    val extension = Conf.backendExtension(backend)
+    logger.debug(s"file extension for generated code: $extension")
+    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
+    logger.debug(s"""arguments to generator class: "${args.mkString(",")}" """)
+    
+    val codeGenerator = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
+    logger.debug(s"successfully created code generator class $codeGenerator")
+
+    // 5. generate the Scala code
+    val code = codeGenerator.compile(scriptName, plan, profiling)
+
+    logger.debug("successfully generated scala program")
+
+    // 6. write it to a file
+
+    val outputDir = outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
+
+    logger.debug(s"outputDir: $outputDir")
+
+    if (!Files.exists(outputDir)) {
+      Files.createDirectories(outputDir)
+    }
+    
+
+    val outputDirectory = outputDir.resolve("out") //s"${outputDir.getCanonicalPath}${File.separator}out"
+    logger.debug(s"outputDirectory: $outputDirectory")
+
+    // check whether output directory exists
+    if (!Files.exists(outputDirectory)) {
+      Files.createDirectory(outputDirectory)
+    }
+
+    val outputFile = outputDirectory.resolve(s"$scriptName.$extension")
+    logger.debug(s"outputFile: $outputFile")
+    val writer = new FileWriter(outputFile.toFile())
+    writer.append(code)
+    writer.close()
+    if (extension.equalsIgnoreCase("scala")) {
+      // 7. extract all additional jar files to output
+      plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
+
+      // 8. copy the sparklib library to output
+      val jobJar = backendJar.toAbsolutePath().toString()
+      FileTools.extractJarToDir(jobJar, outputDirectory)
+
+      val sources = ListBuffer(outputFile)
+      
+      // 9. compile the scala code
+      if (!ScalaCompiler.compile(outputDirectory, sources))
+        return None
+
+      // 10. build a jar file
+      logger.info(s"creating job's jar file ...")
+      val jarFile = Paths.get(outDir.toAbsolutePath().toString(), scriptName, s"$scriptName.jar") //s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
+
+      if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
+        logger.info(s"created job's jar file at $jarFile")
+        return Some(jarFile)
+      } else
+        return None
+    } else {
+      if (CppCompiler.compile(outputDirectory.toString(), outputFile.toString(), CppCompilerConf.cppConf(backend))) {
+        logger.info(s"created job's file at $outputFile")
+        return Some(outputFile)
+      } else
+        return None
+    }
+  } 
    
   private def loadScript(inputFile: Path): Iterator[String] = Source.fromFile(inputFile.toFile()).getLines()
   
