@@ -773,27 +773,30 @@ class PigParser extends JavaTokenParsers with LazyLogging {
     }
   def complexEventPigScript: Parser[List[PigOperator]] = rep(complexEventStmt)
   
-  /* ---------------------------------------------------------------------------------------------------------------- */
-
-  def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
-    Schema.init()
-    parseScript(new CharSequenceReader(s), feature)
-  }
-
   def parseScript(input: CharSequenceReader, feature: LanguageFeature): List[PigOperator] = {
-    parsePhrase(input, feature) match {
-      case Success(t, _) => t
-      case NoSuccess(msg, next) => 
-        throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
-    }
+	  parsePhrase(input, feature) match {
+  	  case Success(t, _) => t
+  	  case NoSuccess(msg, next) => 
+  	  throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
+	  }
   }
 
-  def parsePhrase(input: CharSequenceReader, feature: LanguageFeature): ParseResult[List[PigOperator]] =
+  def parsePhrase(input: CharSequenceReader, feature: LanguageFeature): ParseResult[List[PigOperator]] = {
     feature match {
       case PlainPig => phrase(plainPigScript)(input)
       case SparqlPig => phrase(sparqlPigScript)(input)
       case StreamingPig => phrase(streamingPigScript)(input)
       case ComplexEventPig => phrase(complexEventPigScript)(input)
     }
+  }
+}
 
+object PigParser {
+   
+   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
+    Schema.init()
+    val parser = new PigParser
+    parser.parseScript(new CharSequenceReader(s), feature)
+  }
+  
 }

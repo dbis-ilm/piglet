@@ -1,6 +1,6 @@
 package dbis.test.pig
 
-import dbis.pig.Piglet._
+import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._

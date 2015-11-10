@@ -18,7 +18,6 @@
 package dbis.pig
 
 
-import java.io.File
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.parser.LanguageFeature
@@ -26,25 +25,33 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.FileTools
-import scopt.OptionParser
-import scala.io.Source
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.tools.Conf
-import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.backends.BackendManager
-import java.nio.file.Path
-import java.nio.file.Paths
-import scala.collection.mutable.ListBuffer
 import dbis.pig.backends.BackendConf
-import scala.collection.mutable.{Map => MutableMap}
 import dbis.pig.tools.DBConnection
 import dbis.pig.tools.{DepthFirstTopDownWalker, BreadthFirstTopDownWalker}
 import dbis.pig.mm.{DataflowProfiler, MaterializationPoint}
+import dbis.pig.codegen.PigletCompiler
+
+import java.io.File
+
+import scopt.OptionParser
+import scala.io.Source
+
+import com.typesafe.scalalogging.LazyLogging
+
+import java.nio.file.Path
+import java.nio.file.Paths
+import scala.collection.mutable.ListBuffer
+
+import scala.collection.mutable.{Map => MutableMap}
+
 
 import scalikejdbc._
 
 
-object Piglet extends PigParser with LazyLogging {
+object Piglet extends LazyLogging {
 
   case class CompilerConfig(master: String = "local",
                             inputs: Seq[File] = Seq.empty,
@@ -186,7 +193,7 @@ object Piglet extends PigParser with LazyLogging {
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
     
     for(file <- inputFiles) {
-      createDataflowPlan(file, params, backend, langFeature) match {
+      PigletCompiler.createDataflowPlan(file, params, backend, langFeature) match {
         case Some(v) => schedule += ((v,file))
         case None => 
           logger.error(s"failed to create dataflow plan for $file - aborting")
@@ -306,90 +313,7 @@ object Piglet extends PigParser with LazyLogging {
     }
   }
 
-  /**
-   * Helper method to parse the given file into a dataflow plan
-   * 
-   * @param inputFile The file to parse
-   * @param params Key value pairs to replace placeholders in the script
-   * @param backend The name of the backend
-   */
-  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String, langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
-      // 1. we read the Pig file
-      val source = Source.fromFile(inputFile.toFile())
-      
-      logger.debug(s"""loaded pig script from "$inputFile" """)
   
-      // 2. then we parse it and construct a dataflow plan
-      val plan = new DataflowPlan(parseScriptFromSource(source, params, backend, langFeature))
-      
-
-      if (!plan.checkConnectivity) {
-        logger.error(s"dataflow plan not connected for $inputFile")
-        return None
-      }
-
-      logger.debug(s"successfully created dataflow plan for $inputFile")
-
-      return Some(plan)
-    
-  }
-
-  /**
-   * Replace placeholders in the script with values provided by the given map
-   * 
-   * @param line The line to process
-   * @param params The map of placeholder key and the value to use as replacement
-   */
-  def replaceParameters(line: String, params: Map[String,String]): String = {
-    var s = line
-    params.foreach{case (p, v) => s = s.replaceAll("\\$" + p, v)}
-    s
-  }
-
-  def loadScript(inputFile: Path): Iterator[String] = {
-    logger.debug(s"""try to load pig script from "$inputFile" """)
-    val source = Source.fromFile(inputFile.toFile())
-    source.getLines()
-  }
-
-  /**
-   * Handle IMPORT statements by simply replacing the line containing IMPORT with the content
-   * of the imported file.
-   *
-   * @param lines the original script
-   * @return the script where IMPORTs are replaced
-   */
-   def resolveImports(lines: Iterator[String]): Iterator[String] = {
-    val buf: ListBuffer[String] = ListBuffer()
-    for (l <- lines) {
-      if (l.matches("""[ \t]*[iI][mM][pP][oO][rR][tT][ \t]*'([^'\p{Cntrl}\\]|\\[\\"bfnrt]|\\u[a-fA-F0-9]{4})*'[ \t\n]*;""")) {
-        val s = l.split(" ")(1)
-        val name = s.substring(1, s.length - 2)
-        val path = Paths.get(name)
-        val resolvedLine = resolveImports(loadScript(path))
-        buf ++= resolvedLine
-      }
-      else
-        buf += l
-    }
-    buf.toIterator
-  }
-
-  private def parseScriptFromSource(source: Source, params: Map[String,String], backend: String, langFeature: LanguageFeature.LanguageFeature): List[PigOperator] = {
-     /*
-     * Handle IMPORT statements.
-     */
-    val sourceLines = resolveImports(source.getLines())
-      if (params.nonEmpty) {
-        /*
-         * Replace placeholders by parameters.
-         */
-        parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"), langFeature)
-      }
-      else {
-        parseScript(sourceLines.mkString("\n"), langFeature)
-      }
-  }
   
   private def analyzePlans(schedule: Seq[(DataflowPlan, Path)]) {
     

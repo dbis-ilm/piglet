@@ -16,7 +16,7 @@
  */
 package dbis.test.spark
 
-import dbis.pig.Piglet._
+import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.backends.BackendManager
 import dbis.pig.codegen.BatchCodeGen
 import dbis.pig.op._

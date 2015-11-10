@@ -48,7 +48,7 @@ case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
 case object EmptyLine extends JLineEvent
 case object EOF extends JLineEvent
 
-object PigletREPL extends PigParser with LazyLogging {
+object PigletREPL extends LazyLogging {
   case class REPLConfig(master: String = "local",
                         outDir: String = ".",
                         backend: String = Conf.defaultBackend,
@@ -334,7 +334,7 @@ object PigletREPL extends PigParser with LazyLogging {
             buf --= dumps
           }
 
-          buf ++= parseScript(s, languageFeature)
+          buf ++= PigParser.parseScript(s, languageFeature)
 
           var plan = new DataflowPlan(buf.toList)
 
@@ -369,7 +369,7 @@ object PigletREPL extends PigParser with LazyLogging {
         processFsCmd(s)
       }
       case Line(s, buf) => try {
-        buf ++= parseScript(s, languageFeature)
+        buf ++= PigParser.parseScript(s, languageFeature)
         false
       } catch {
         case iae: IllegalArgumentException => println(iae.getMessage); false
