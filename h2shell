@@ -1,0 +1,3 @@
+#!/bin/bash
+#java -cp ~/.m2/repository/com/h2database/h2/1.4.183/h2-1.4.183.jar org.h2.tools.Shell -url jdbc:h2:file:./db/default -driver org.h2.Driver -user sa
+java -cp ~/.m2/repository/com/h2database/h2/1.4.183/h2-1.4.183.jar org.h2.tools.Shell -url jdbc:h2:tcp://cloud01.prakinf.tu-ilmenau.de/data/stha1in/pigletdb -driver org.h2.Driver -user sa

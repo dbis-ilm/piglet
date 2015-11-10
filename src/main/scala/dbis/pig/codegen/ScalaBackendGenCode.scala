@@ -627,6 +627,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case ConstructBag(in, ref) => "" // used only inside macros
       case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again
+      case Delay(out, in, size, wtime) => callST("delay", Map("out" -> node.outPipeName, "in"->node.inPipeName, "size"->size, "wait"->wtime)) 
       case Empty(_) => ""
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
@@ -658,7 +659,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
+  def emitHeader2(scriptName: String, enableProfiling: Boolean = false): String = callST("begin_query", Map("name" -> scriptName, "profiling"->enableProfiling))
 
   /**
    * Generate code needed for finishing the script and starting the execution.

@@ -109,6 +109,8 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
       }
     }
   }
+  
+  def emitStageIdentifier(line: Int, lineage: String): String = callST("stageIdentifier", Map("line"->line, "lineage"->lineage))
 
   /*------------------------------------------------------------------------------------------------- */
   /*                                   Node code generators                                           */
