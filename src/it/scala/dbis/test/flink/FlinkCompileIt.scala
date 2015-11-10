@@ -16,7 +16,7 @@
  */
 package dbis.test.flink
 
-import dbis.pig.PigCompiler
+import dbis.pig.Piglet
 import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import scalax.file.Path
@@ -64,7 +64,7 @@ class FlinkCompileIt extends FlatSpec with Matchers with LazyLogging {
 //      logger.debug(s"result path: $resultPath")
     
       println("execute: " + script)
-      PigCompiler.main(Array("--backend", "flink", "--outdir", resultPath.parent.get.path, "--params", s"inbase=$resourcePath,outfile=${resultPath.path}" ,resourcePath + script))
+      Piglet.main(Array("--backend", "flink", "--outdir", resultPath.parent.get.path, "--params", s"inbase=$resourcePath,outfile=${resultPath.path}" ,resourcePath + script))
 
       // 3. load the output file[s] and the truth file
       var result = Iterator[String]()

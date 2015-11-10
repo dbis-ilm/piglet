@@ -18,7 +18,7 @@ package dbis.test.pig
 
 import java.net.URI
 
-import dbis.pig.PigCompiler._
+import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.op._
 import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}
@@ -1458,21 +1458,19 @@ class RewriterSpec extends FlatSpec
 
   "ForEachCallingFunctionE" should "extract the function name of a function called in the only GeneratorExpr of a" +
     " GeneratorList in a ForEach statement" in {
-    val p = new PigParser()
-    val op = p.parseScript("B = FOREACH A GENERATE myFunc(f1, f2);").head
+    val op = PigParser.parseScript("B = FOREACH A GENERATE myFunc(f1, f2);").head
     op should matchPattern {
       case ForEachCallingFunctionE(_, "myFunc") =>
     }
 
-    val op2 = p.parseScript("B = FOREACH A GENERATE notMyFunc(f1, f2);").head
+    val op2 = PigParser.parseScript("B = FOREACH A GENERATE notMyFunc(f1, f2);").head
     op2 should not matchPattern {
       case ForEachCallingFunctionE(_, "myFunc") =>
     }
   }
 
   "SuccE" should "extract the single successor of a PigOperator" in {
-    val p = new PigParser()
-    val ops = p.parseScript(
+    val ops = PigParser.parseScript(
       """
         | a = load 'foo' using PigStorage(':');
         | dump a;
@@ -1492,8 +1490,7 @@ class RewriterSpec extends FlatSpec
   }
 
   "AllSuccE" should "extract all successors of a PigOperator" in {
-    val p = new PigParser()
-    val ops = p.parseScript(
+    val ops = PigParser.parseScript(
       """
         | a = load 'foo' using PigStorage(':');
         | b = filter a by $0 == 'hallo';
@@ -1695,8 +1692,8 @@ class RewriterSpec extends FlatSpec
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
   // other test results :-)
   "Embedsupport" should "apply rules registered by embedded code" in {
-    val p = new PigParser()
-    val ops = p.parseScript(
+    
+    val ops = PigParser.parseScript(
       """
         |<! def myFunc(s: String): String = {
         |   s

@@ -16,7 +16,8 @@
  */
 package dbis.test.op
 
-import dbis.pig.PigCompiler._
+//import dbis.pig.Piglet._
+import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.op.{EmbedCmd, Foreach}
 import dbis.pig.plan._
 import dbis.pig.schema._

@@ -52,13 +52,14 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element ------------
-foreach(out,in,expr) ::=<<
-        val <out> = <in>.map(t => <expr>)
+foreach(out, in, expr, class) ::=<<
+        val <out> = <in>.map(t => <class>(<expr>))
 >>
 
 // ----- Executes an expression FOREACH input element requiring flatMap -------
-foreachFlatMap(out,in,expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
+// Note, that the closing parenthesis is intentionally missing
+foreachFlatMap(out, in, expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>
 >>
 
 
@@ -94,12 +95,12 @@ join(out,rel1,key1,rel2,key2) ::=<<
 >>
 
 // ------------------ UNIONs multiple streams to one --------------------------
-union(out,in,others) ::=<<
+union(out, in, others) ::=<<
         val <out> = <in><others:{ e | .union(<e>)}>
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------
-orderBy(out,in,key,asc) ::=<<
+orderBy(out, in, key, asc) ::=<<
         val <out> = <in>.sortPartition(t => <key>, Order.ASCENDING)
 >>
 

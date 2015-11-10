@@ -41,9 +41,9 @@ import scala.collection.mutable.Set
  *
  * @param template the name of the backend-specific template fle
  */
-abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging {
+abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with LazyLogging {
 
-   templateFile = template 
+  templateFile = template 
   /*------------------------------------------------------------------------------------------------- */
   /*                                           helper functions                                       */
   /*------------------------------------------------------------------------------------------------- */
@@ -98,7 +98,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "Any")
+    Types.ByteArrayType -> "String",
+    Types.AnyType -> "Any")
     
 //  val javaTypeMappingTable = Map[PigType, String](
 //    Types.IntType -> "java.lang.Integer",
@@ -475,7 +476,9 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    */
   def emitLoad(node: PigOperator, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
     def schemaExtractor(schema: Schema): String =
-      schema.fields.zipWithIndex.map{case (f, i) => s"data($i).to${scalaTypeMappingTable(f.fType)}"}.mkString(", ")
+      schema.fields.zipWithIndex.map{case (f, i) =>
+        s"data($i).to${scalaTypeMappingTable(f.fType)}"
+      }.mkString(", ")
 
     def jdbcSchemaExtractor(schema: Schema): String =
       schema.fields.zipWithIndex.map{case (f, i) => s"data.get${scalaTypeMappingTable(f.fType)}($i)"}.mkString(", ")
@@ -656,7 +659,14 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String, enableProfiling: Boolean = false): String = callST("begin_query", Map("name" -> scriptName, "profiling"->enableProfiling))
+  def emitHeader2(scriptName: String, enableProfiling: Boolean = false): String = {
+    var map = Map("name" -> scriptName)
+    
+    if(enableProfiling)
+      map += ("profiling" -> "profiling")
+    
+    callST("begin_query", map )
+  }
 
   /**
    * Generate code needed for finishing the script and starting the execution.

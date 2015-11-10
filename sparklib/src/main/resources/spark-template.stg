@@ -99,8 +99,6 @@ join_key_map(rels, keys) ::=<<
         }>
 >>
 
-//        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => <class>(<fields>)\}}>
-
 join(out, class, rel1, rel2, fields) ::=<<
         val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)\}
 >>
@@ -143,12 +141,26 @@ fs(cmd,params) ::=<<
 >>
 
 // ------------------ RSCRIPT operators ----------------------------------------
-rscript(out,in,script) ::=<<
+rscript(out, in, script) ::=<<
         val <out> = RScriptOp.process(sc, <in>, <script>, "res")
 >>
 stageIdentifier(line, lineage) ::=<<
 	perfMon.register(<line>, "<lineage>")
 >>	
+
+// ------------------- ACCUMULATE operator ------------------------------------
+accumulate_aggr(out, helper_class, seq_expr, comp_expr) ::=<<
+        def aggr_<out>_seq(acc: <helper_class>, v: <helper_class>): <helper_class> =
+                <helper_class>(v._t, <seq_expr>)
+        def aggr_<out>_comp(acc: <helper_class>, v: <helper_class>): <helper_class> =
+                <helper_class>(v._t, <comp_expr>)
+>>
+
+accumulate(out, in, helper_class, class, init_expr, aggr_expr) ::=<<
+        val <out>_fold = <in>.map(t => <helper_class>(t, <init_expr>))
+                                        .aggregate(<helper_class>())(aggr_<out>_seq, aggr_<out>_comp)
+        val <out> = sc.parallelize(Array(<class>(<aggr_expr>)))
+>>
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<

@@ -17,7 +17,7 @@
 
 package dbis.test.spark
 
-import dbis.pig.PigCompiler
+import dbis.pig.Piglet
 import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import scala.io.Source
@@ -50,6 +50,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "spark"),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "spark"),
+    ("accumulate.pig", "accumulate.out", "truth/accumulate.data", false, "pig", "spark"),
     ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "spark"),
     ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "spark"),
     /* Works, but requires a R installation

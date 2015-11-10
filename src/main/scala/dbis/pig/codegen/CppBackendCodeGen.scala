@@ -38,7 +38,7 @@ object LoadFuncs extends Enumeration {
 }
 import LoadFuncs._
 
-class CppBackendGenCode(template: String) extends GenCodeBase {
+class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
 
   templateFile = template
 
@@ -785,6 +785,6 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
   }
 }
 
-class CppBackendCompile(templateFile: String) extends Compile {
-  override val codeGen = new CppBackendGenCode(templateFile)
+class CppBackendGenerator(templateFile: String) extends CodeGenerator {
+  override val codeGen = new CppBackendCodeGen(templateFile)
 }

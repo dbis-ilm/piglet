@@ -26,7 +26,7 @@ case class UDF(name: String, scalaName: String, paramTypes: List[PigType], resul
 
 object UDFTable {
   lazy val funcTable = ListBuffer[UDF](
-    UDF("COUNT", "PigFuncs.count", List(Types.AnyType), Types.LongType, true),
+    UDF("COUNT", "PigFuncs.count", List(Types.AnyType), Types.IntType, true),
     UDF("AVG", "PigFuncs.average", List(Types.IntType), Types.DoubleType, true),
     UDF("AVG", "PigFuncs.average", List(Types.LongType), Types.DoubleType, true),
     UDF("AVG", "PigFuncs.average", List(Types.FloatType), Types.DoubleType, true),

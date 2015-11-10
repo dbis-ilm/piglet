@@ -23,9 +23,10 @@ import dbis.pig.plan.DataflowPlan
 import dbis.test.TestTools._
 
 import dbis.pig._
-import dbis.pig.PigCompiler._
+//import dbis.pig.Piglet._
 import dbis.pig.op._
 import dbis.pig.parser.LanguageFeature
+import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.schema._
 import org.scalatest.{Matchers, OptionValues, FlatSpec}
 
