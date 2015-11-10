@@ -201,7 +201,7 @@ CP=$BACKEND_DIR:$CP
 checkBackendJar
 
 if $interactive; then
-    java -Dscala.usejavacp=true -cp $CP dbis.pig.PigREPL $*
+    java -Dscala.usejavacp=true -cp $CP dbis.pig.PigletREPL $*
 else
     java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.Piglet $*
 fi

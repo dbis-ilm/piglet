@@ -48,7 +48,7 @@ case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
 case object EmptyLine extends JLineEvent
 case object EOF extends JLineEvent
 
-object PigREPL extends PigParser with LazyLogging {
+object PigletREPL extends PigParser with LazyLogging {
   case class REPLConfig(master: String = "local",
                         outDir: String = ".",
                         backend: String = Conf.defaultBackend,
