@@ -43,10 +43,18 @@ trait MergeSupport extends LazyLogging {
 	    logger.debug(s"processing op: $op")
 			if(!mergedPlan.containsOperator(op)) {
 			  logger.debug(s"$op not already part of merged plan")
-				op.inputs.map { pipe => pipe.producer }.foreach { producer =>
-					mergedPlan = mergedPlan.insertAfter(producer, op)
-					logger.debug(s"inserted $op after $producer")
+			  
+			  op.inputs.map { pipe => pipe.producer.lineageSignature }
+			    .flatMap { lineage => mergedPlan.findOperator { o => o.lineageSignature == lineage } }
+			    .foreach { producer =>
+  					mergedPlan = mergedPlan.insertAfter(producer, op)
+  					logger.debug(s"inserted $op after $producer")
 				}
+			  
+//				op.inputs.map { pipe => pipe.producer }.foreach { producer =>
+//					mergedPlan = mergedPlan.insertAfter(producer, op)
+//					logger.debug(s"inserted $op after $producer")
+//				}
 			} else {
 			  logger.debug(s"$op already present in plan")
 			}
