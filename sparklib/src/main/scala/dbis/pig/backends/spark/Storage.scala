@@ -20,6 +20,8 @@ package dbis.pig.backends.spark
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.dstream.DStream
 import java.io.FileInputStream
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
@@ -72,7 +74,12 @@ class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
   def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): RDD[T] =
     sc.textFile(path).map(line => extract(line.split(delim, -1)))
 
+  def loadStream(ssc: StreamingContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
+    ssc.receiverStream(new FileStreamReader(path)).map(line => extract(line.split(delim, -1)))
+    
   def write(path: String, rdd: RDD[T], delim: String = ",") = rdd.map(_.mkString(delim)).saveAsTextFile(path)
+  
+  def writeStream(path: String, dstream: DStream[T], delim: String = ",") = dstream.map(_.mkString(delim)).saveAsTextFiles(path)
 }
 
 object PigStorage extends java.io.Serializable {
