@@ -45,10 +45,10 @@ trait SchemaClass {
 /**
   * A record class for representing just a single line of text.
   *
-  * @param line the text line
+  * @param _0 the text line
   */
-case class TextLine(line: String) extends java.io.Serializable with SchemaClass {
-  override def toString = line
+case class TextLine(_0: String) extends java.io.Serializable with SchemaClass {
+  override def toString = _0
   override def mkString(delim: String) = toString
 }
 
