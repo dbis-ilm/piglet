@@ -124,6 +124,7 @@ object FileTools extends LazyLogging {
         return None
 
       // 10. build a jar file
+      logger.info(s"creating job's jar file ...")
       val jarFile = Paths.get(outDir.toAbsolutePath().toString(), scriptName, s"$scriptName.jar") //s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
 
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
