@@ -24,7 +24,7 @@ import dbis.pig.plan.DataflowPlan
 import scala.collection.mutable.ArrayBuffer
 
 
-class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
+class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
 
 
   /*------------------------------------------------------------------------------------------------- */
@@ -472,7 +472,7 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
 
 }
 
-class BatchCompile(templateFile: String) extends Compile {
-  override val codeGen = new BatchGenCode(templateFile)
+class BatchGenerator(templateFile: String) extends CodeGenerator {
+  override val codeGen = new BatchCodeGen(templateFile)
 }
 

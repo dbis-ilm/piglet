@@ -77,7 +77,7 @@ object FileTools extends LazyLogging {
     val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
     logger.debug(s"""arguments to generator class: "${args.mkString(",")}" """)
     
-    val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[Compile]
+    val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
     logger.debug(s"successfully created code generator class $compiler")
 
     // 5. generate the Scala code

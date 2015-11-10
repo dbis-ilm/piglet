@@ -44,7 +44,7 @@ import dbis.pig.mm.{DataflowProfiler, MaterializationPoint}
 import scalikejdbc._
 
 
-object PigCompiler extends PigParser with LazyLogging {
+object Piglet extends PigParser with LazyLogging {
 
   case class CompilerConfig(master: String = "local",
                             inputs: Seq[File] = Seq.empty,
@@ -134,7 +134,7 @@ object PigCompiler extends PigParser with LazyLogging {
   /**
    * Start compiling the Pig script into a the desired program
    */
-def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
+  def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String], profiling: Boolean): Unit = {
 
 	  try {
@@ -270,7 +270,7 @@ def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: Strin
       
       logger.debug("finished optimizations")
       
-println("final plan = {")
+      println("final plan = {")
       newPlan.printPlan()
       println("}")
 

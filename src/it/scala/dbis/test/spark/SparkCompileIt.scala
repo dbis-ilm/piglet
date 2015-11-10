@@ -17,7 +17,7 @@
 
 package dbis.test.spark
 
-import dbis.pig.PigCompiler
+import dbis.pig.Piglet
 import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import scala.io.Source

@@ -18,7 +18,7 @@ package dbis.test.pig
 
 import java.net.URI
 
-import dbis.pig.PigCompiler._
+import dbis.pig.Piglet._
 import dbis.pig.op._
 import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}

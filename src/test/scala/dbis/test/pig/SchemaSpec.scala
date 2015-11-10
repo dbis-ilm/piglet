@@ -21,7 +21,7 @@ import dbis.pig.op.NamedField
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.{Matchers, OptionValues, FlatSpec}
-import dbis.pig.PigCompiler._
+import dbis.pig.Piglet._
 
 class SchemaSpec extends FlatSpec with OptionValues with Matchers {
 

@@ -203,5 +203,5 @@ checkBackendJar
 if $interactive; then
     java -Dscala.usejavacp=true -cp $CP dbis.pig.PigREPL $*
 else
-    java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.PigCompiler $*
+    java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.Piglet $*
 fi

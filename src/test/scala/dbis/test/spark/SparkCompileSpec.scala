@@ -16,9 +16,9 @@
  */
 package dbis.test.spark
 
-import dbis.pig.PigCompiler._
+import dbis.pig.Piglet._
 import dbis.pig.backends.BackendManager
-import dbis.pig.codegen.BatchGenCode
+import dbis.pig.codegen.BatchCodeGen
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
@@ -40,7 +40,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   val templateFile = backendConf.templateFile
 
   "The compiler output" should "contain the Spark header & footer" in {
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test",true)
@@ -72,7 +72,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Load(Pipe("a"), file)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""
          |val a = PigStorage[TextLine]().load(sc, "${file}", (data: Array[String]) => TextLine(data(0)))""".stripMargin)
@@ -83,7 +83,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     val op = Load(Pipe("a"), file)
     op.outputs = List(Pipe("b"))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""
          |val b = PigStorage[TextLine]().load(sc, "${file}", (data: Array[String]) => TextLine(data(0)))""".stripMargin)
@@ -95,7 +95,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Load(Pipe("a"), file, None, Some("PigStorage"), List("""",""""))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""
          |val a = PigStorage[TextLine]().load(sc, "${file}", (data: Array[String]) => TextLine(data(0)), ",")""".stripMargin)
@@ -109,7 +109,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val op = plan.findOperatorForAlias("A").get
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(s"""
@@ -124,7 +124,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val file = new java.io.File(".").getCanonicalPath + "/file.n3"
     
     val op = Load(Pipe("a"), file, None, Some("RDFFileStorage"))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString( s"""
          |val a = RDFFileStorage[TextLine]().load(sc, "${file}", (data: Array[String]) => TextLine(data(0)))""".stripMargin)
@@ -133,7 +133,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
 
   it should "contain code for FILTER" in {
     val op = Filter(Pipe("aa"), Pipe("bb"), Lt(RefExpr(PositionalField(1)), RefExpr(Value(42))))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.filter(t => {t._1 < 42})")
     assert(generatedCode == expectedCode)
@@ -145,7 +145,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
         |c = FILTER b BY x > 0 AND (y < 0 OR (NOT z1 == z2));""".stripMargin)
     val plan = new DataflowPlan(ops)
     val op = ops(1)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val c = b.filter(t => {t._0 > 0 && (t._1 < 0 || (!(t._2 == t._3)))})")
     assert(generatedCode == expectedCode)
@@ -156,7 +156,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val op = Filter(Pipe("a"), Pipe("b"), Gt(
         Func("aFunc", List(RefExpr(PositionalField(0)), RefExpr(PositionalField(1)))),
         RefExpr(Value("0"))))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val a = b.filter(t => {aFunc(t._0,t._1) > 0})")
     assert(generatedCode == expectedCode)
@@ -169,7 +169,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
             Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),false)
     op.schema = Some(Schema(Array(Field("x", Types.IntType),
                                                         Field("y", Types.DoubleType))))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val a = b.filter(t => {aFunc(t._0,t._1) == true && cFunc(t._0,t._1) >= t._0})
@@ -179,7 +179,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   
   it should "contain code for DUMP" in {
     val op = Dump(Pipe("a"))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""a.collect.map(t => println(t.mkString()))""")
     assert(generatedCode == expectedCode)
@@ -190,7 +190,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Store(Pipe("A"), file)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       s"""
@@ -206,7 +206,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       Field("f1", Types.IntType),
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))))
 
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       s"""
@@ -222,7 +222,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       Field("f1", Types.IntType),
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))))
 
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       s"""
@@ -235,7 +235,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     
     val op = Store(Pipe("A"), file, Some("BinStorage"))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     
     val expectedCode = cleanString(
@@ -255,7 +255,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     )
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map(t => _t2_Tuple("all", t))""")
     assert(generatedCode == expectedCode)
@@ -279,7 +279,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     )
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.groupBy(t => {t._0}).map{case (k,v) => _t2_Tuple(k,v)}")
     assert(generatedCode == expectedCode)
@@ -294,7 +294,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     )
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.groupBy(t => {(t._0,t._1)}).map{case (k,v) => _t3_Tuple(_t2_Tuple(k._1, k._2),v)}")
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
@@ -303,7 +303,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
 
   it should "contain code for DISTINCT" in {
     val op = Distinct(Pipe("aa"), Pipe("bb"))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.distinct")
     assert(generatedCode == expectedCode)
@@ -311,7 +311,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
 
   it should "contain code for Limit" in {
     val op = Limit(Pipe("aa"), Pipe("bb"), 10)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = sc.parallelize(bb.take(10))")
     assert(generatedCode == expectedCode)
@@ -328,7 +328,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     op.inputs = List(input1,input2)
     op.constructSchema
 
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val bb_kv = bb.map(t => (t._0,t))
@@ -349,7 +349,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     op.inputs = List(input1,input2)
     op.constructSchema
 
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (Array(t._0,t._1).mkString,t))
@@ -370,7 +370,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs = List(input1,input2,input3)
     op.constructSchema
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (t._0,t))
@@ -390,7 +390,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
         |j = join j1 by $0, j2 by $0;
         |""".stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode1 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j1").get))
     val generatedCode2 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j2").get))
     val generatedCode3 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j").get))
@@ -429,7 +429,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
         RefExpr(PositionalField(1)))))
     )))
     op.constructSchema
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(PigFuncs.toMap(\"field1\",t._0,\"field2\",t._1)))")
     assert(generatedCode == expectedCode)
@@ -443,7 +443,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
         GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType)))
       )))
     op.constructSchema
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t._0, PigFuncs.count(t._1)))")
     assert(generatedCode == expectedCode)
@@ -454,7 +454,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val plan = parseScript("aa = FOREACH bb GENERATE $0, Distances.spatialDistance($1, $2, 1.0, 2.0) AS dist;")
     val op = plan.head
     op.constructSchema
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
     assert(generatedCode == expectedCode)
@@ -470,7 +470,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
     op.constructSchema
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     // this is just a hack for this test: normally, the udfAliases map is set in compile
     codeGenerator.udfAliases = Some(plan.udfAliases.toMap)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -484,7 +484,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
       GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\""))))))
     op.constructSchema
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val a = b.map(t => _t1_Tuple(t._0("k1"), t._1("k2")))""".stripMargin)
@@ -497,7 +497,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
       GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0)))))))
     op.constructSchema
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.map(t => _t1_Tuple(t._0._1, t._2._0))""".stripMargin)
@@ -516,7 +516,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val plan = new DataflowPlan(ops)
     val foreachOp = plan.findOperatorForAlias("uniqcnt").get
     println("schema = " + foreachOp.schema)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(foreachOp))
 
     val expectedCode = cleanString(
@@ -534,7 +534,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       """data = load 'file' as (f1: int, f2: int, name:chararray);
         |out = foreach data generate (f1, f2), {f1, f2}, [name, f1];""".stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val op = plan.findOperatorForAlias("out").get
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
 
@@ -551,7 +551,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   it should "contain code for a union operator on two relations" in {
     // a = UNION b, c;
     val op = Union(Pipe("aa"), List(Pipe("bb"), Pipe("cc")))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val aa = bb.union(cc)""".stripMargin)
@@ -561,7 +561,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   it should "contain code for a union operator on more than two relations" in {
     // a = UNION b, c, d;
     val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.union(c).union(d)""".stripMargin)
@@ -571,7 +571,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   it should "contain code for the sample operator with a literal value" in {
     // aa = SAMPLE bb 0.01;
     val op = Sample(Pipe("aa"), Pipe("bb"), RefExpr(Value(0.01)))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val aa = bb.sample(false, 0.01)""".stripMargin)
@@ -581,7 +581,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   it should "contain code for the sample operator with an expression" in {
     // a = SAMPLE b 100 / $3
     val op = Sample(Pipe("a"), Pipe("b"), Div(RefExpr(Value(100)), RefExpr(PositionalField(3))))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.sample(false, 100 / t._3)""".stripMargin)
@@ -595,7 +595,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("res").get
 
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
@@ -611,7 +611,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("res").get
 
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
@@ -623,7 +623,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   it should "contain code for simple ORDER BY" in {
     // aa = ORDER bb BY $0
     val op = OrderBy(Pipe("aa"), Pipe("bb"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val aa = bb.keyBy(t => t._0).sortByKey(true).map{case (k,v) => v}""".stripMargin)
@@ -640,7 +640,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
                                                               Field("f3", Types.IntType)))
 
     op.schema = Some(schema)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
         |val a = b.keyBy(t => custKey_a_b(t._0,t._2)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
@@ -667,7 +667,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
         Field("f4", Types.CharArrayType))))))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
         |val a = b.map(t => _t3_Tuple(t._0, t._1._0, t._1._1))""".stripMargin)
@@ -681,7 +681,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val schema = Schema(Array(Field("f1", Types.CharArrayType)))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
         |val a = b.flatMap(t => PigFuncs.tokenize(t._0)).map(t => _t2_Tuple(t))""".stripMargin)
@@ -694,7 +694,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       Field("f2", BagType(TupleType(Array(Field("ff1", Types.IntType)))))))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
         |val a = b.flatMap(t => t._1.map(s => _t3_Tuple(t._0, s))""".stripMargin)
@@ -709,7 +709,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("a").get
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
@@ -736,7 +736,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
 
   it should "not contain code for EMPTY operators" in {
     val op = Empty(Pipe("_"))
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
 
     assert(codeGenerator.emitNode(op) == "")
   }
@@ -751,7 +751,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
         |A = LOAD 'file.csv';
       """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     assert(cleanString(codeGenerator.emitHeader1("test", plan.code)) ==
       cleanString("""
         |object test {
@@ -777,7 +777,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode = cleanString(
       """
@@ -806,7 +806,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
@@ -836,7 +836,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
@@ -862,7 +862,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
@@ -893,7 +893,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchGenCode(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
 
     var code: String = ""
     for (schema <- Schema.schemaList) {

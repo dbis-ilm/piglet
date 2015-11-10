@@ -27,7 +27,7 @@ import scala.collection.mutable.ListBuffer
 import java.nio.file.Path
 
 
-class FlinkStreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
+class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(template) {
 
 
   /*------------------------------------------------------------------------------------------------- */
@@ -424,6 +424,6 @@ class FlinkStreamingGenCode(template: String) extends ScalaBackendGenCode(templa
 
 }
 
-class FlinkStreamingCompile(templateFile: String) extends Compile {
-  override val codeGen = new FlinkStreamingGenCode(templateFile)
+class FlinkStreamingGenerator(templateFile: String) extends CodeGenerator {
+  override val codeGen = new FlinkStreamingCodeGen(templateFile)
 }

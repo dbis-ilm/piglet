@@ -21,7 +21,7 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema.Schema
 import scala.collection.immutable.Map
 import scala.collection.mutable.Set
-import org.clapper.scalasti._
+import org.clapper.scalasti.STGroupFile
 
 /**
  * An exception representing an error in handling the templates for code generation.
@@ -31,7 +31,7 @@ import org.clapper.scalasti._
 case class TemplateException(msg: String) extends Exception(msg)
 
 
-trait GenCodeBase {
+trait CodeGeneratorBase {
 
   /**
    * The name of the template file used for code generation.
@@ -149,13 +149,13 @@ trait GenCodeBase {
  * has to override only the codeGen function which should return the
  * actual code generator object for the given target.
  */
-trait Compile {
+trait CodeGenerator {
   /**
    * Return the code generator object for the given target.
    *
    * @return an instance of the code generator.
    */
-  def codeGen: GenCodeBase
+  def codeGen: CodeGeneratorBase
 
   /**
    * Generates a string containing the code for the given dataflow plan.

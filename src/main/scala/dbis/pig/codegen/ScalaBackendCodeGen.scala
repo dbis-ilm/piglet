@@ -41,9 +41,9 @@ import scala.collection.mutable.Set
  *
  * @param template the name of the backend-specific template fle
  */
-abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging {
+abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with LazyLogging {
 
-   templateFile = template 
+  templateFile = template 
   /*------------------------------------------------------------------------------------------------- */
   /*                                           helper functions                                       */
   /*------------------------------------------------------------------------------------------------- */
