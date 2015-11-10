@@ -90,13 +90,12 @@ object PigletCompiler extends LazyLogging {
    * @param plan The plan to compile
    * @param scriptName The name of the script (used as program and file name)
    * @param outDir The directory to write generated files to
-   * @param compileOnly If <code>true</code> the program will only be compiled, and not executed
    * @param backendJar Path to the backend jar file
    * @param templateFile The template file to use for code generation
    * @param backend The name of the backend
    * @param profiling Flag indicating whether profiling code should be inserted
    */
-  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, 
+  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, backendJar: Path, 
       templateFile: String, backend: String, profiling: Boolean): Option[Path] = {
     
     // 4. compile it into Scala code for Spark

@@ -145,9 +145,9 @@ object Piglet extends LazyLogging {
           langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String], profiling: Boolean): Unit = {
 
 	  try {
-
 		  // initialize database driver and connection pool
-		  DBConnection.init(Conf.databaseSetting)
+	    if(profiling)
+	    	DBConnection.init(Conf.databaseSetting)
 
 		  val backendConf = BackendManager.backend(backend)
 		  BackendManager.backend = backendConf
@@ -175,7 +175,8 @@ object Piglet extends LazyLogging {
 	  } finally {
 
 		  // close connection pool
-		  DBConnection.exit()  
+	    if(profiling)
+		    DBConnection.exit()  
 	  }
   }
   
@@ -295,7 +296,7 @@ object Piglet extends LazyLogging {
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
       
-      PigletCompiler.compilePlan(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, backend, profiling) match {
+      PigletCompiler.compilePlan(newPlan, scriptName, outDir, jarFile, templateFile, backend, profiling) match {
         // the file was created --> execute it
         case Some(jarFile) =>  
           if (!compileOnly) {

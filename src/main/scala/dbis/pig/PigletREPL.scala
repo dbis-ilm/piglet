@@ -347,7 +347,7 @@ object PigletREPL extends LazyLogging {
           val jobJar = Conf.backendJar(backend)
 
           nextScriptName()
-          PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), false, jobJar, templateFile, backend, profiling) match {
+          PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), jobJar, templateFile, backend, profiling) match {
             case Some(jarFile) =>
               val runner = backendConf.runnerClass
               runner.execute(master, scriptName, jarFile, backendArgs)
