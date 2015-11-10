@@ -710,12 +710,15 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
-        |def aggr_a(acc: _t2_HelperTuple, v: _t2_HelperTuple): _t2_HelperTuple =
+        |def aggr_a_seq(acc: _t2_HelperTuple, v: _t2_HelperTuple): _t2_HelperTuple =
         |                _t2_HelperTuple(v._t, PigFuncs.incrCOUNT(acc._0, v._0), PigFuncs.incrSUM(acc._1sum, v._1sum),
         |                             PigFuncs.incrCOUNT(acc._1cnt, v._1cnt), PigFuncs.incrSUM(acc._2, v._2))
+        |def aggr_a_comp(acc: _t2_HelperTuple, v: _t2_HelperTuple): _t2_HelperTuple =
+        |                _t2_HelperTuple(v._t, PigFuncs.incrSUM(acc._0, v._0), PigFuncs.incrSUM(acc._1sum, v._1sum),
+        |                             PigFuncs.incrSUM(acc._1cnt, v._1cnt), PigFuncs.incrSUM(acc._2, v._2))
         |val a_fold = b.map(t => _t2_HelperTuple(t, t._0, t._1, t._1, t._2))
-        |               .fold(_t2_HelperTuple())(aggr_a)
-        |val a = sc.parallelize(Array(_t2_Tuple(a_fold._0, a_fold._1sum / a_fold._1cnt, a_fold._2)))
+        |               .aggregate(_t2_HelperTuple())(aggr_a_seq, aggr_a_comp)
+        |val a = sc.parallelize(Array(_t2_Tuple(a_fold._0, a_fold._1sum.toDouble / a_fold._1cnt.toDouble, a_fold._2)))
         |""".stripMargin)
 
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))

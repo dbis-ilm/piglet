@@ -343,6 +343,19 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
         s"PigFuncs.incr${funcName}(acc._$i, v._$i)"
       }
     }.mkString(", ")
+    // generate final combination expression
+    val compExpr = gen.exprs.zipWithIndex.map { case (e, i) =>
+      // AVG requires special handling
+      if (callsAverageFunc(node, e.expr))
+        s"PigFuncs.incrSUM(acc._${i}sum, v._${i}sum), PigFuncs.incrSUM(acc._${i}cnt, v._${i}cnt)"
+      else {
+        require(e.expr.isInstanceOf[Func])
+        val func = e.expr.asInstanceOf[Func]
+        var funcName = func.f.toUpperCase
+        if (funcName == "COUNT") funcName = "SUM"
+        s"PigFuncs.incr${funcName}(acc._$i, v._$i)"
+      }
+    }.mkString(", ")
 
     // generate init expression
     val initExpr = gen.exprs.map { e =>
@@ -366,14 +379,15 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
       // But because we assume that the expressions are only aggregate functions, we have to
       // distinguish only between avg and other functions.
       if (callsAverageFunc(node, e.expr))
-        s"${node.outPipeName}_fold._${i}sum / ${node.outPipeName}_fold._${i}cnt"
+       s"${node.outPipeName}_fold._${i}sum.toDouble / ${node.outPipeName}_fold._${i}cnt.toDouble"
       else
         s"${node.outPipeName}_fold._$i"
     }.mkString(", ")
 
     var res = callST("accumulate_aggr", Map("out" -> node.outPipeName,
       "helper_class" -> helperClassName,
-      "expr" -> updExpr))
+      "seq_expr" -> updExpr,
+      "comp_expr" -> compExpr))
     res += "\n"
     res += callST("accumulate", Map("out" -> node.outPipeName,
       "in" -> node.inPipeName,
@@ -414,6 +428,12 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
   }
 
 
+  /**
+    * Generate code for helper classes supporting the actual transformation/action.
+    *
+    * @param node the Pig operator requiring helper code
+    * @return a string representing the helper code
+    */
   override def emitHelperClass(node: PigOperator): String = {
     node match {
       case op@Accumulate(out, in, gen) => {
@@ -427,14 +447,21 @@ class BatchGenCode(template: String) extends ScalaBackendGenCode(template) {
           }
           else {
             val resType = e.expr.resultType(op.inputSchema)
-            val defaultValue = if (Types.isNumericType(resType)) "0" else "null"
+            require(e.expr.isInstanceOf[Func])
+            val funcName = e.expr.asInstanceOf[Func].f.toUpperCase
+            val defaultValue = if (Types.isNumericType(resType)) funcName match {
+                // for min and max we need special initial values
+                case "MIN" => "Int.MaxValue"
+                case "MAX" => "Int.MinValue"
+                case _ => 0
+              }
+              else "null"
             s"_$i: ${scalaTypeMappingTable(resType)} = ${defaultValue}"
           }
         }.mkString(", ")
-        val toStr = "\"\""
         callST("schema_class", Map("name" -> s"_${op.schema.get.className}_HelperTuple",
           "fields" -> fieldStr,
-          "string_rep" -> toStr))
+          "string_rep" -> "\"\""))
 
       }
       case _ => super.emitHelperClass(node)
