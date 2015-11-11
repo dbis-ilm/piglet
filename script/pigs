@@ -85,4 +85,4 @@ else
     CP=$SPARK_JAR:$CP
 fi
 
-java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.PigCompiler $*
+java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.Piglet $*

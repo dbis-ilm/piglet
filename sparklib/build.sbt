@@ -7,6 +7,7 @@ libraryDependencies ++= Seq(
     scalaTest % "test" withSources(),
     sparkCore % "provided",
     sparkSql % "provided",
+    sparkStreaming % "provided",
     typesafe,
     scalikejdbc,
     scalikejdbc_config,

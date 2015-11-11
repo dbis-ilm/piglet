@@ -32,6 +32,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     // ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
+    ("load3.pig", "result3.out", "truth/result3.data", true, "pig", "spark"),
     ("selfjoin.pig", "joined.out", "truth/joined.data", true, "pig", "spark"),
     ("selfjoin_ambiguous_fieldnames.pig", "joined_ambiguous_fieldnames.out", "truth/joined_ambiguous_fieldnames.data",
       // Pigs OrderBy is not a stable sort
@@ -46,7 +47,8 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("grouping.pig", "grouping.out", "truth/grouping.data", false, "pig", "spark"),
     ("groupall.pig", "groupall.out", "truth/groupall.data", false, "pig", "spark"),
     ("wordcount.pig", "marycounts.out", "truth/marycount.data", false, "pig", "spark"),
-    ("construct.pig", "result3.out", "truth/result3.data", true, "pig", "spark"),
+    ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "spark"),
+    ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "spark"),
     ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "spark"),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "spark"),
