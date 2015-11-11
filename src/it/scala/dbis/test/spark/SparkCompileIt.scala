@@ -133,8 +133,15 @@ class SparkCompileIt extends FlatSpec with Matchers {
   "The Pig compiler" should "compile and execute the script" in {
     forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean, lang: String, backend: String) =>
 
-    //TODO: Check which backend was set and only run tests on this - possible over BackendManager?
-    if(backend==(sys.props.getOrElse("backend", default="spark"))){
+      if (sys.env.get("SPARK_JAR").isEmpty) {
+        println("SPARK_JAR variable not set - exiting.")
+        System.exit(0)
+      }
+
+      if (sys.env.get("FLINK_JAR").isEmpty) {
+        println("FLINK_JAR variable not set - exiting.")
+        System.exit(0)
+      }
 
       // 1. make sure the output directory is empty
       cleanupResult(resultDir)
@@ -144,13 +151,6 @@ class SparkCompileIt extends FlatSpec with Matchers {
       val resourcePath = getClass.getResource("").getPath + "../../../"
 
       // 2. compile and execute Pig script
-      /*
-      PigCompiler.main(Array("--backend", "spark",
-        "--params", s"inbase=$resourcePath,outfile=${resultPath.path}",
-        "--master", "local[2]",
-        "--outdir", ".", resourcePath + script))
-      println("execute: " + script)
-      */
       runCompiler(script, resourcePath, resultPath, lang, backend) should be (true)
       
       // 3. load the output file(s) and the truth file
@@ -173,7 +173,6 @@ class SparkCompileIt extends FlatSpec with Matchers {
       // 5. delete the output directory
       cleanupResult(resultDir)
       cleanupResult(script.replace(".pig",""))
-    }
     }
   }
 }
