@@ -18,6 +18,7 @@
 package dbis.test.spark
 
 import dbis.pig.Piglet
+import dbis.pig.backends.BackendManager
 import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import scala.io.Source
@@ -28,8 +29,21 @@ import org.apache.commons.exec.environment.EnvironmentUtils
 class SparkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
-    // ("load.pig", "result1.out", "truth/result1.data", true, "pig", "flink"),
-    // ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
+
+    //FLINK
+    ("load.pig", "result1.out", "truth/result1.data", true, "pig", "flink"),
+    ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "flink"),
+    ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
+//    ("selfjoin.pig", "joined.out", "truth/joined.data", false, "pig", "flink"),
+//    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true, "pig", "flink"),
+//    ("sort.pig", "sorted.out", "sorted.data", true, "pig", "flink"),
+    ("foreach1.pig", "distances.out", "truth/distances.data", true, "pig", "flink"),
+//    ("nforeach.pig", "nested.out", "nested.data", true, "pig", "flink"),
+//    ("grouping.pig", "grouping.out", "grouping.data", false, "pig", "flink"),
+//    ("wordcount.pig", "marycounts.out", "marycount.data", false, "pig", "flink"),
+    ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "flink"),
+
+    //SPARK
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
     ("load3.pig", "result3.out", "truth/result3.data", true, "pig", "spark"),
@@ -118,6 +132,10 @@ class SparkCompileIt extends FlatSpec with Matchers {
 
   "The Pig compiler" should "compile and execute the script" in {
     forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean, lang: String, backend: String) =>
+
+    //TODO: Check which backend was set and only run tests on this - possible over BackendManager?
+    if(backend==(sys.props.getOrElse("backend", default="spark"))){
+
       // 1. make sure the output directory is empty
       cleanupResult(resultDir)
       cleanupResult(script.replace(".pig",""))
@@ -135,9 +153,17 @@ class SparkCompileIt extends FlatSpec with Matchers {
       */
       runCompiler(script, resourcePath, resultPath, lang, backend) should be (true)
       
-      // 3. load the output file and the truth file
-      val result = Source.fromFile(resultDir + "/part-00000").getLines()
+      // 3. load the output file(s) and the truth file
+      //val result = Source.fromFile(resultDir + "/part-00000").getLines()
+      var result = Iterator[String]()
+      val resultFile = new java.io.File(resultPath.path)
+      if(resultFile.isFile)
+        result ++= Source.fromFile(resultFile).getLines()
+      else
+        for (file <- resultFile.listFiles)
+        result++=Source.fromFile(file).getLines()
       val truth = Source.fromFile(resourcePath + truthFile).getLines()
+
       // 4. compare both files
       if (inOrder)
         result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
@@ -147,6 +173,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
       // 5. delete the output directory
       cleanupResult(resultDir)
       cleanupResult(script.replace(".pig",""))
+    }
     }
   }
 }

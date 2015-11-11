@@ -60,7 +60,7 @@ object PigBuild extends Build {
   }
   
   val itTests = backend match{
-    case "flink" => Seq("dbis.test.flink.FlinkCompileIt")
+    case "flink" => Seq("dbis.test.spark.SparkCompileIt")
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
     case "mapreduce" => Seq.empty[String] // TODO
