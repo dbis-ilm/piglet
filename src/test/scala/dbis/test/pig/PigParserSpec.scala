@@ -505,7 +505,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   it should "parse a socket read statement in standard mode with using clause" in {
     assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');", LanguageFeature.StreamingPig)
-      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("PigStream"),List("""','"""))))
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("PigStream"),List("""",""""))))
     assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();", LanguageFeature.StreamingPig)
       == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("RDFStream"))))
   }

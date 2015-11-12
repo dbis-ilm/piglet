@@ -53,15 +53,15 @@ class StreamingCodeGen(template: String) extends BatchCodeGen(template) {
     * @return the Scala code implementing the SOCKET_READ operator
     */
   def emitSocketRead(node: PigOperator, addr: SocketAddress, mode: String, streamFunc: Option[String], streamParams: List[String]): String ={
-    require(node.schema.isDefined)
-    val className = schemaClassName(node.schema.get.className)
+    var paramMap = super.emitExtractorFunc(node, streamFunc)
 
     val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
     val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
-    if(mode!="")
-      callST("socketRead", Map("out"->node.outPipeName,"addr"->addr,"mode"->mode,"func"->func,"params"->params))
-    else
-      callST("socketRead", Map("out"->node.outPipeName,"addr"->addr,"func"->func,"params"->params))
+    paramMap ++= Map("out" -> node.outPipeName, "addr" -> addr, "mode" -> mode,
+                      "func" -> func, "params" -> params)
+    if (mode != "")
+      paramMap += ("mode" -> mode)
+    callST("socketRead", paramMap)
   }
 
 

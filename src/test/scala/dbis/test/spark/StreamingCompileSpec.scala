@@ -76,7 +76,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain conde for receiving a stream" in {
+  it should "contain code for receiving a stream" in {
     val ops = parseScript(
       """
         |in = SOCKET_READ 'localhost:5555' USING PigStream(',') AS (s1: chararray, s2: int);
@@ -89,9 +89,11 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
     val generatedCode = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("in").get))
     val expectedCode = cleanString(
     """
-      |val in = PigStream[_t1_Tuple].receiveStream(ssc, "localhost", 5555, ???, ",")
+      |val in = PigStream[_t1_Tuple]().receiveStream(ssc, "localhost", 5555,
+      |(data: Array[String]) => _t1_Tuple(data(0).toString, data(1).toInt), ",")
     """.stripMargin
     )
     println("--> " + generatedCode)
+    assert(generatedCode == expectedCode)
   }
 }

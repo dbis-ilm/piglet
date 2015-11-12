@@ -139,8 +139,8 @@ orderHelper(params) ::=<<
 >>
 
 // ------------------ Reads from a SOCKET -------------------------------------
-socketRead(out, addr, class, func, extractor, params) ::=<<
-    val <out> = <func>[<class>]().receiveStream(ssc, "<addr.hostname>", <addr.port><extractor><if (params)>, <params><endif>)
+socketRead(out, addr, class, func, extractor, mode, params) ::=<<
+    val <out> = <func>[<class>]().receiveStream(ssc, "<addr.hostname>", <addr.port>, <extractor><if (params)><params><endif>)
 >>
 /*
 <if (mode)>
