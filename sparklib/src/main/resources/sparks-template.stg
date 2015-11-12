@@ -29,11 +29,13 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val ssc = new StreamingContext(conf, Seconds(1))
-
+        <if (profiling)>
+    	val perfMon = new PerfMonitor("<name>_App")
+    	<endif>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
@@ -135,6 +137,19 @@ orderHelper(params) ::=<<
         def compare(that: <params.cname>) = <params.cmpExpr>
     }
 >>
+
+// ------------------ Reads from a SOCKET -------------------------------------
+socketRead(out, addr, class, func, extractor, params) ::=<<
+    val <out> = <func>[<class>]().receiveStream(ssc, "<addr.hostname>", <addr.port><extractor><if (params)>, <params><endif>)
+>>
+/*
+<if (mode)>
+    val <out> = <func>().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
+<else>
+    val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
+<endif>
+*/
+
 
 // ------------------ STREAM operators ----------------------------------------
 streamOp(out,in,op,params) ::=<<
