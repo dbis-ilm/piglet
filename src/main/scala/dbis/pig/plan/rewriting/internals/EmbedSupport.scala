@@ -32,16 +32,8 @@ trait EmbedSupport {
                           |import dbis.pig.plan.rewriting.Rewriter._
                         """.stripMargin
 
-  def addStrategy(s: Strategy): Unit
-
   /** Evals each String in ``ruleCode``
     */
-  protected def evalExtraRuleCode(ruleCode: Seq[String]): Unit = {
-    def addImports(code: String) = imports ++ code
-    for (c <- ruleCode) {
-      val evaldStrategies = (new Eval).apply[Seq[Strategy]](addImports(c))
-      evaldStrategies.map(addStrategy)
-    }
-  }
-
+  protected def evalExtraRuleCode(ruleCode: Seq[String]): Unit =
+    ruleCode map { imports ++ _ } map { c => (new Eval).apply[scala.runtime.BoxedUnit](c) }
 }

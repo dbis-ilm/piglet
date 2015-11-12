@@ -1702,7 +1702,6 @@ class RewriterSpec extends FlatSpec
         |   s
         | }
         | rules:
-        | import dbis.pig.plan.rewriting.Rewriter
         | def rule(op: Any): Option[PigOperator] = {
         | op match {
         |   case ForEachCallingFunctionE(_, "myFunc") =>
@@ -1712,7 +1711,7 @@ class RewriterSpec extends FlatSpec
         |     None
         | }
         | }
-        | List(buildOperatorReplacementStrategy(rule))
+        | applyRule (rule _)
         |!>
         |a = LOAD 'file.csv';
         |b = FOREACH a GENERATE myFunc($0);
