@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.util.*;
 import org.apache.spark.repl.*;
-import dbis.pig.PigCompiler;
+import dbis.pig.codegen.PigletCompiler;
 import scala.tools.nsc.settings.*;
 import scala.tools.nsc.settings.MutableSettings.BooleanSetting;
 
@@ -64,10 +64,10 @@ public class PigletInterpreter extends Interpreter {
         if (line == null || line.trim().length() == 0) {
             return new InterpreterResult(Code.SUCCESS);
         }
-        String sparkCode = PigCompiler.createCodeFromInput(line, "spark");
+        String sparkCode = PigletCompiler.createCodeFromInput(line, "spark");
         sparkCode += "\nsc.stop()";
+        // sparkCode = "println(\"%table x\ty\\n1\t2\\n3\t4\\n\\n\")";
         logger.info("PigletInterpreter.interpret = " + sparkCode);
-
         String res = iLoop.run(sparkCode, settings);
         logger.info("result = " + res);
         InterpreterResult result = new InterpreterResult(Code.SUCCESS, extractResult(res));

@@ -142,10 +142,21 @@ object Expr {
    * @param ex the expression
    * @return true if the expression contains flatten({}).
    */
-  def containsFlattenOnBag(schema: Schema, ex: Expr): Boolean = {
-    ex match {
+  def containsFlattenOnBag(schema: Schema, ex: Expr): Boolean = ex match {
       case FlattenExpr(e) => e.resultType(Some(schema)).isInstanceOf[BagType]
       case _ => false
-    }
+  }
+
+  /**
+    * This function is a traverser function to check whether the expression contains
+    * a call to the AVERAGE aggregate function.
+    *
+    * @param schema the schema of the operator
+    * @param ex the expression
+    * @return true if the expression contains AVERAGE.
+    */
+  def containsAverageFunc(schema: Schema, ex: Expr): Boolean = ex match {
+    case Func(f, _) => f.toUpperCase == "AVG"
+    case _ => false
   }
 }

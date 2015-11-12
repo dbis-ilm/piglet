@@ -25,11 +25,15 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name,profiling) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
-
+        <if (profiling)>
+    	val perfMon = new PerfMonitor("<name>_App")
+    	sc.addSparkListener(perfMon)
+    	<endif>
+        
 >>
 
 // ----------------- LOAD text file -------------------------------------------
@@ -100,8 +104,6 @@ join_key_map(rels, keys) ::=<<
         }>
 >>
 
-//        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => <class>(<fields>)\}}>
-
 join(out, class, rel1, rel2, fields) ::=<<
         val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)\}
 >>
@@ -133,8 +135,9 @@ orderHelper(params) ::=<<
 >>
 
 // ------------------ STREAM operators ----------------------------------------
-streamOp(out,in,op,params) ::=<<
-        val <out> = <op>(sc, <in><params>)
+streamOp(out, in, op, params, class, in_fields, out_fields) ::=<<
+        val <in>_helper = <in>.map(t => List(<in_fields>))
+        val <out> = <op>(sc, <in>_helper<params>).map(t => <class>(<out_fields>))
 >>
 
 // ----------------------- FS commands ----------------------------------------
@@ -143,8 +146,25 @@ fs(cmd,params) ::=<<
 >>
 
 // ------------------ RSCRIPT operators ----------------------------------------
-rscript(out,in,script) ::=<<
+rscript(out, in, script) ::=<<
         val <out> = RScriptOp.process(sc, <in>, <script>, "res")
+>>
+stageIdentifier(line, lineage) ::=<<
+	perfMon.register(<line>, "<lineage>")
+>>	
+
+// ------------------- ACCUMULATE operator ------------------------------------
+accumulate_aggr(out, helper_class, seq_expr, comp_expr) ::=<<
+        def aggr_<out>_seq(acc: <helper_class>, v: <helper_class>): <helper_class> =
+                <helper_class>(v._t, <seq_expr>)
+        def aggr_<out>_comp(acc: <helper_class>, v: <helper_class>): <helper_class> =
+                <helper_class>(v._t, <comp_expr>)
+>>
+
+accumulate(out, in, helper_class, class, init_expr, aggr_expr) ::=<<
+        val <out>_fold = <in>.map(t => <helper_class>(t, <init_expr>))
+                                        .aggregate(<helper_class>())(aggr_<out>_seq, aggr_<out>_comp)
+        val <out> = sc.parallelize(Array(<class>(<aggr_expr>)))
 >>
 
 // ----------------- END of the code implementing the query -------------------

@@ -70,10 +70,24 @@ object Conf extends LazyLogging {
   
   def backendConf(backend: String) = appconf.getString(s"backends.$backend.conf")
   
+  // TODO: shouldn't we move this to the backend config? (not in Piglet itself)
   def backendGenerator(backend: String) = appconf.getString(s"backends.$backend.generator.class")
   def backendExtension(backend: String) = appconf.getString(s"backends.$backend.generator.extension")
   def backendCompileConf(backend: String) = appconf.getString(s"backends.$backend.compileconf")
   
   def hdfsCoreSiteFile = Paths.get(appconf.getString("hdfs.coresite"))
   def hdfsHdfsSiteFile = Paths.get(appconf.getString("hdfs.hdfssite"))
+  
+  def databaseSetting: ConnectionSetting = {
+    val driver = appconf.getString("db.driver")
+    val url = appconf.getString("db.url")
+    val user = appconf.getString("db.user")
+    val pw = appconf.getString("db.password")
+    
+    ConnectionSetting(driver, url, user, pw)
+    
+  }
+
+  def hookImport = appconf.getString("hooks.import")
+  
 }

@@ -252,6 +252,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val setKeyword = "set".ignoreCase
   lazy val returnsKeyword = "returns".ignoreCase
   lazy val accumulateKeyword = "accumulate".ignoreCase
+  lazy val delayKeyword = "delay".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -430,6 +431,13 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * <A> = LIMIT <B> <Num>
    */
   def limitStmt: Parser[PigOperator] = bag ~ "=" ~ limitKeyword ~ bag ~ num ^^ { case out ~ _ ~ _ ~ in ~ num => new Limit(Pipe(out), Pipe(in), num) }
+
+  /*
+   * <A> = DELAY <B> <Size> , <Wait>
+   */
+  def delayStmt: Parser[PigOperator] = bag ~ "=" ~ delayKeyword ~ bag ~ floatingPointNumber ~ "," ~ num ^^ {
+    case out ~ _ ~ _ ~ in ~ size ~ _ ~ wait => new Delay(Pipe(out), Pipe(in), size.toDouble, wait.toInt)
+  }
 
   /*
    * <A> = JOIN <B> BY <Ref>, <C> BY <Ref>, ...
@@ -626,7 +634,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
+    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt | delayStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
 
@@ -771,27 +779,30 @@ class PigParser extends JavaTokenParsers with LazyLogging {
     }
   def complexEventPigScript: Parser[List[PigOperator]] = rep(complexEventStmt)
   
-  /* ---------------------------------------------------------------------------------------------------------------- */
-
-  def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
-    Schema.init()
-    parseScript(new CharSequenceReader(s), feature)
-  }
-
   def parseScript(input: CharSequenceReader, feature: LanguageFeature): List[PigOperator] = {
-    parsePhrase(input, feature) match {
-      case Success(t, _) => t
-      case NoSuccess(msg, next) => 
-        throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
-    }
+	  parsePhrase(input, feature) match {
+  	  case Success(t, _) => t
+  	  case NoSuccess(msg, next) => 
+  	  throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
+	  }
   }
 
-  def parsePhrase(input: CharSequenceReader, feature: LanguageFeature): ParseResult[List[PigOperator]] =
+  def parsePhrase(input: CharSequenceReader, feature: LanguageFeature): ParseResult[List[PigOperator]] = {
     feature match {
       case PlainPig => phrase(plainPigScript)(input)
       case SparqlPig => phrase(sparqlPigScript)(input)
       case StreamingPig => phrase(streamingPigScript)(input)
       case ComplexEventPig => phrase(complexEventPigScript)(input)
     }
+  }
+}
 
+object PigParser {
+   
+   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
+    Schema.init()
+    val parser = new PigParser
+    parser.parseScript(new CharSequenceReader(s), feature)
+  }
+  
 }

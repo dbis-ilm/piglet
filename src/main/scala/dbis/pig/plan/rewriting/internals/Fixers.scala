@@ -54,7 +54,7 @@ trait Fixers {
     * @tparam T3 The type of the new operator.
     * @return
     */
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
+  def fixMerge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                   newParent: T3): T3 = {
     newParent.inputs = oldParent.inputs
     newParent.outputs = oldChild.outputs
@@ -76,7 +76,7 @@ trait Fixers {
     * @tparam T2 The type of the old child and new parent operators.
     * @return
     */
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
+  def fixReordering[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                newChild: T): T2 = {
     // If oldParent == newChild (for example when this is called from `swap`, we need to save oldParent.outPipename
     // because it depends on oldParent.outputs
@@ -111,6 +111,8 @@ trait Fixers {
     */
   def pullOpAcrossMultipleInputOp(toBePulled: PigOperator, multipleInputOp: PigOperator, indicator: PigOperator):
   PigOperator = {
+    require(multipleInputOp.inputs.map(_.producer) contains indicator, "indicator is not a predecessor of " +
+      "multipleInputOp")
     require(multipleInputOp.outputs.flatMap(_.consumer) contains toBePulled, "toBePulled is not a consumer of " +
       "multipleInputOp")
     // First, make the toBePulled a consumer of the correct input
@@ -219,6 +221,8 @@ trait Fixers {
     * @return ``new_``
     */
   def fixReplacement[T <: PigOperator](old: PigOperator) (new_ : T): T = {
+    new_.inputs = old.inputs
+    new_.outputs = old.outputs
     new_.outputs foreach { output =>
       output.consumer foreach { consumer =>
         consumer.inputs foreach { input =>

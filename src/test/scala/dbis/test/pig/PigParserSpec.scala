@@ -23,9 +23,10 @@ import dbis.pig.plan.DataflowPlan
 import dbis.test.TestTools._
 
 import dbis.pig._
-import dbis.pig.PigCompiler._
+//import dbis.pig.Piglet._
 import dbis.pig.op._
 import dbis.pig.parser.LanguageFeature
+import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.schema._
 import org.scalatest.{Matchers, OptionValues, FlatSpec}
 
@@ -572,10 +573,20 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     val uri = new URI("rdftest.rdf")
     val ungrouped = parseScript( """a = RDFLoad('rdftest.rdf');""", LanguageFeature.SparqlPig)
     assert(ungrouped == List(RDFLoad(Pipe("a"), uri, None)))
-    assert(ungrouped.head.schema == Some(Schema(BagType(TupleType(Array(
+    
+    val expected = Some(Schema(BagType(TupleType(Array(
       Field("subject", Types.CharArrayType),
       Field("predicate", Types.CharArrayType),
-      Field("object", Types.CharArrayType)))))))
+      Field("object", Types.CharArrayType))))))
+
+    /* the classname is set by a global variable, which might have
+     * different values for different test case orderings. 
+     * However, we don't care about the classname here and simply set it
+     * manually to ensure equality. 
+     */
+    expected.get.className = ungrouped.head.schema.get.className
+    
+    ungrouped.head.schema shouldBe expected
   }
 
   it should "parse RDFLoad operators for triple groups" in {

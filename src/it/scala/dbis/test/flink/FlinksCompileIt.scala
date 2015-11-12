@@ -16,7 +16,7 @@
  */
 package dbis.test.flink
 
-import dbis.pig.PigCompiler
+import dbis.pig.Piglet
 import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
 
@@ -30,7 +30,7 @@ class FlinksCompileIt extends FlatSpec with Matchers {
     ("load2.pig",         "result2.out",   "truth/result2.data",   false),
     ("foreach1.pig",      "distances.out", "truth/distances.data", false),
     ("filter.pig",        "filtered.out",  "truth/filtered.data",  false),
-    ("construct.pig",     "result3.out",   "truth/result3.data",   false),
+    ("construct.pig",     "result3.out", "truth/construct.data",   false),
     ("union.pig",         "united.out",    "truth/united.data",    false),
     ("aggregate.pig",     "aggregate.out", "truth/aggregate2.data",false),
     ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false),
@@ -68,7 +68,7 @@ class FlinksCompileIt extends FlatSpec with Matchers {
       val resourcePath = getClass.getResource("").getPath + "../../../"
       println("execute: " + script)
       //println("resultPath: " + resultPath.path)
-      PigCompiler.main(Array("--backend", "flinks", "--params", s"inbase=$resourcePath,outfile=${resultPath.path}", "--outdir", resultPath.parent.get.path, resourcePath + "streaming/"+ script))
+      Piglet.main(Array("--backend", "flinks", "--params", s"inbase=$resourcePath,outfile=${resultPath.path}", "--outdir", resultPath.parent.get.path, resourcePath + "streaming/"+ script))
 
       // 3. load the output file[s] and the truth file
       var result = Iterator[String]()

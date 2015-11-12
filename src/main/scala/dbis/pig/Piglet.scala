@@ -18,8 +18,6 @@
 package dbis.pig
 
 
-import java.io.File
-import dbis.pig.codegen.Compile
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.parser.LanguageFeature
@@ -27,19 +25,33 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.FileTools
-import scopt.OptionParser
-import scala.io.Source
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.tools.Conf
-import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.backends.BackendManager
+import dbis.pig.backends.BackendConf
+import dbis.pig.tools.DBConnection
+import dbis.pig.tools.{DepthFirstTopDownWalker, BreadthFirstTopDownWalker}
+import dbis.pig.mm.{DataflowProfiler, MaterializationPoint}
+import dbis.pig.codegen.PigletCompiler
+
+import java.io.File
+
+import scopt.OptionParser
+import scala.io.Source
+
+import com.typesafe.scalalogging.LazyLogging
+
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.collection.mutable.ListBuffer
-import dbis.pig.backends.BackendConf
+
+import scala.collection.mutable.{Map => MutableMap}
 
 
-object PigCompiler extends PigParser with LazyLogging {
+import scalikejdbc._
+
+
+object Piglet extends LazyLogging {
 
   case class CompilerConfig(master: String = "local",
                             inputs: Seq[File] = Seq.empty,
@@ -49,7 +61,8 @@ object PigCompiler extends PigParser with LazyLogging {
                             backend: String = Conf.defaultBackend,
                             language: String = "pig",
                             updateConfig: Boolean = false,
-                            backendArgs: Map[String, String] = Map()
+                            backendArgs: Map[String, String] = Map(),
+                            profiling: Boolean = false
                           )
 
   def main(args: Array[String]): Unit = {
@@ -62,11 +75,13 @@ object PigCompiler extends PigParser with LazyLogging {
     var languageFeature = LanguageFeature.PlainPig
     var updateConfig = false
     var backendArgs: Map[String, String] = null
+    var profiling = false
 
     val parser = new OptionParser[CompilerConfig]("PigCompiler") {
       head("PigCompiler", "0.3")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text ("compile only (don't execute the script)")
+      opt[Boolean]("profiling") optional() action { (x,c) => c.copy(profiling = x) } text("Switch on profiling")
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b', "backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
       opt[String]('l', "language") optional() action { (x,c) => c.copy(language = x)} text ("Accepted language (pig = default, sparql, streaming)")
@@ -77,6 +92,8 @@ object PigCompiler extends PigParser with LazyLogging {
       version("version") text ("prints this version info")
       arg[File]("<file>...") unbounded() required() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
     }
+    
+    
     // parser.parse returns Option[C]
     parser.parse(args, CompilerConfig()) match {
       case Some(config) => {
@@ -96,6 +113,7 @@ object PigCompiler extends PigParser with LazyLogging {
           case _ => LanguageFeature.PlainPig
         }
         // note: for some backends we could determine the language automatically
+        profiling = config.profiling
       }
       case None =>
         // arguments are bad, error message will have been displayed
@@ -112,36 +130,54 @@ object PigCompiler extends PigParser with LazyLogging {
     	Conf.copyConfigFile()
     
     // start processing
-    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendArgs)
+    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendArgs, profiling)
   }
 
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
-          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String]): Unit = {
-    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendArgs)
+          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String], profiling: Boolean): Unit = {
+    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendArgs, profiling)
   }
   
   /**
    * Start compiling the Pig script into a the desired program
    */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
-          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String]): Unit = {
-    
-    val backendConf = BackendManager.backend(backend)
-    
-    // XXX: Is this still needed?
-    BackendManager.backend = backendConf
-    
-    if(backendConf.raw) {
-      if(compileOnly) {
-        logger.error("Raw backends do not support compile-only mode! Aborting")
-        return
-      }
+          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String], profiling: Boolean): Unit = {
+
+	  try {
+		  // initialize database driver and connection pool
+	    if(profiling)
+	    	DBConnection.init(Conf.databaseSetting)
+
+		  val backendConf = BackendManager.backend(backend)
+		  BackendManager.backend = backendConf
+
+		  if(backendConf.raw) {
+			  if(compileOnly) {
+				  logger.error("Raw backends do not support compile-only mode! Aborting")
+				  return
+			  }
+			  
+			  if(profiling) {
+			    logger.error("Raw backends do not support profiling yet! Aborting")
+			    return
+			  }
+
+			  inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
+
+		  } else {
+			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeature, params, backendConf, backendArgs, profiling)
+		  }
+
+	  } catch {
+      case e: Exception => logger.error(s"An error occured: ${e.getMessage}",e)
       
-      inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
-      
-    } else {
-      runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeature, params, backendConf, backendArgs)
-    }
+	  } finally {
+
+		  // close connection pool
+	    if(profiling)
+		    DBConnection.exit()  
+	  }
   }
 
   /**
@@ -159,11 +195,13 @@ object PigCompiler extends PigParser with LazyLogging {
 
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
                             langFeature: LanguageFeature.LanguageFeature, params: Map[String,String],
-                            backendConf: BackendConf, backendArgs: Map[String,String]) {
+                            backendConf: BackendConf, backendArgs: Map[String,String], profiling: Boolean) {
     logger.debug("start parsing input files")
+    
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
+    
     for(file <- inputFiles) {
-      createDataflowPlan(file, params, backend, langFeature) match {
+      PigletCompiler.createDataflowPlan(file, params, backend, langFeature) match {
         case Some(v) => schedule += ((v,file))
         case None => 
           logger.error(s"failed to create dataflow plan for $file - aborting")
@@ -171,6 +209,16 @@ object PigCompiler extends PigParser with LazyLogging {
       }
     }
 
+    
+    //////////////////////////////////////
+    // begin global analysis phase
+    
+    if(profiling)
+    	analyzePlans(schedule)
+    
+    ///////////////////////////////////////////
+    // end analysis and continue normal processing
+    
     logger.debug("start processing created dataflow plans")
  
 
@@ -178,16 +226,65 @@ object PigCompiler extends PigParser with LazyLogging {
     val jarFile = Conf.backendJar(backend)
     val mm = new MaterializationManager
    
+    val profiler = new DataflowProfiler
     
-    for(plan <- schedule) {
+    for((plan,path) <- schedule) {
     
       // 3. now, we should apply optimizations
-      var newPlan = plan._1
-      newPlan = processMaterializations(newPlan, mm)
-      if (backend=="flinks") newPlan = processWindows(newPlan)
-      newPlan = processPlan(newPlan)
+      var newPlan = plan
+      
+      if(profiling)
+    	  newPlan = processMaterializations(newPlan, mm)
+		  
+		  
+      if (backend=="flinks") 
+        newPlan = processWindows(newPlan)
+        
+      newPlan = processPlan(newPlan)   
+      // find materialization points
+      
+      if(profiling) {
+        val walker = new DepthFirstTopDownWalker
+        walker.walk(newPlan) { op => 
+        
+          logger.debug(s"""checking database for runtime information for operator "${op.lineageSignature}" """)
+          // check for the current operator, if we have some runtime/stage information 
+          val avg = DB readOnly { implicit session => 
+            sql"select avg(progduration) as pd, avg(stageduration) as sd from exectimes where lineage = ${op.lineageSignature} group by lineage"
+              .map { rs => (rs.long("pd"), rs.long("sd")) }.single().apply()
+          }
+        
+          // if we have information, create a (potential) materialization point
+          if(avg.isDefined) {
+            val (progduration, stageduration) = avg.get
+            
+            logger.debug(s"""found runtime information: program: $progduration  stage: $stageduration""")
+            
+            /* XXX: calculate benefit
+             * Here, we do not have the parent hash information.
+             * But is it still needed? Since we have the program runtime duration 
+             * from beginning until the end the stage, we don't need to calculate
+             * the cumulative benefit?
+             */
+            val mp = MaterializationPoint(op.lineageSignature,
+                                            None, // currently, we do not consider the parent
+                                            progduration, // set the processing time
+                                            0L, // TODO: calculate loading time at this point
+                                            0L, // TODO: calculate saving time at this point
+                                            0 // no count/size information so far
+                                          )
+                                          
+            profiler.addMaterializationPoint(mp)
+            
+          } else {
+            logger.debug(s" found no runtime information")
+          }
+        }
+      }
+      
       
       logger.debug("finished optimizations")
+      
       println("final plan = {")
       newPlan.printPlan()
       println("}")
@@ -202,11 +299,11 @@ object PigCompiler extends PigParser with LazyLogging {
           return
         }
       }
-
-      val scriptName = plan._2.getFileName.toString().replace(".pig", "")
+  
+      val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
-
-      FileTools.compilePlan(newPlan, scriptName, outDir, compileOnly, jarFile, templateFile, backend) match {
+      
+      PigletCompiler.compilePlan(newPlan, scriptName, outDir, jarFile, templateFile, backend, profiling) match {
         // the file was created --> execute it
         case Some(jarFile) =>  
           if (!compileOnly) {
@@ -219,136 +316,56 @@ object PigCompiler extends PigParser with LazyLogging {
         } else
           logger.info("successfully compiled program - exiting.")
           
-        case None => logger.error(s"creating jar file failed for ${plan._2}") 
+        case None => logger.error(s"creating jar file failed for ${path}") 
       } 
     }
   }
 
-  /**
-   * Create Scala code for the given backend from the source string.
-   * This method is provided mainly for Zeppelin.
-   *
-   * @param source
-   * @param backend
-   * @return
-   */
-  def createCodeFromInput(source: String, backend: String): String = {
-    val plan = new DataflowPlan(parseScript(source))
-
-    try {
-      // if this does _not_ throw an exception, the schema is ok
-      plan.checkSchemaConformance
-    } catch {
-      case e:SchemaException => {
-        logger.error(s"schema conformance error in ${e.getMessage}")
-        return ""
-      }
-    }
-
-    if (!plan.checkConnectivity) {
-      logger.error(s"dataflow plan not connected")
-      return ""
-    }
-
-    logger.debug(s"successfully created dataflow plan")
-
-    // compile it into Scala code for Spark
-    val backendConf = BackendManager.backend(backend)
-    BackendManager.backend = backendConf
-    val generatorClass = Conf.backendGenerator(backend)
-    val extension = Conf.backendExtension(backend)
-    val templateFile = backendConf.templateFile
-    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
-    val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[Compile]
-
-    // 5. generate the Scala code
-    val code = compiler.compile("blubs", plan, true)
-    logger.debug("successfully generated scala program")
-    code
-  }
-
-  /**
-   * Helper method to parse the given file into a dataflow plan
-   * 
-   * @param inputFile The file to parse
-   * @param params Key value pairs to replace placeholders in the script
-   * @param backend The name of the backend
-   */
-  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String, langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
-      // 1. we read the Pig file
-      val source = Source.fromFile(inputFile.toFile())
-      
-      logger.debug(s"""loaded pig script from "$inputFile" """)
-  
-      // 2. then we parse it and construct a dataflow plan
-      val plan = new DataflowPlan(parseScriptFromSource(source, params, backend, langFeature))
-      
-
-      if (!plan.checkConnectivity) {
-        logger.error(s"dataflow plan not connected for $inputFile")
-        return None
-      }
-
-      logger.debug(s"successfully created dataflow plan for $inputFile")
-
-      return Some(plan)
+  private def analyzePlans(schedule: Seq[(DataflowPlan, Path)]) {
     
-  }
+    logger.debug("start creating lineage counter map")
+    
+    val walker = new BreadthFirstTopDownWalker
 
-  /**
-   * Replace placeholders in the script with values provided by the given map
-   * 
-   * @param line The line to process
-   * @param params The map of placeholder key and the value to use as replacement
-   */
-  def replaceParameters(line: String, params: Map[String,String]): String = {
-    var s = line
-    params.foreach{case (p, v) => s = s.replaceAll("\\$" + p, v)}
-    s
-  }
-
-  def loadScript(inputFile: Path): Iterator[String] = {
-    logger.debug(s"""try to load pig script from "$inputFile" """)
-    val source = Source.fromFile(inputFile.toFile())
-    source.getLines()
-  }
-
-  /**
-   * Handle IMPORT statements by simply replacing the line containing IMPORT with the content
-   * of the imported file.
-   *
-   * @param lines the original script
-   * @return the script where IMPORTs are replaced
-   */
-   def resolveImports(lines: Iterator[String]): Iterator[String] = {
-    val buf: ListBuffer[String] = ListBuffer()
-    for (l <- lines) {
-      if (l.matches("""[ \t]*[iI][mM][pP][oO][rR][tT][ \t]*'([^'\p{Cntrl}\\]|\\[\\"bfnrt]|\\u[a-fA-F0-9]{4})*'[ \t\n]*;""")) {
-        val s = l.split(" ")(1)
-        val name = s.substring(1, s.length - 2)
-        val path = Paths.get(name)
-        val resolvedLine = resolveImports(loadScript(path))
-        buf ++= resolvedLine
-      }
-      else
-        buf += l
+    val lineageMap = MutableMap.empty[String, Int]
+    
+    def visitor(op: PigOperator): Unit = {
+      val lineage = op.lineageSignature
+//      logger.debug(s"visiting: $lineage")
+      var old = 0
+      if(lineageMap.contains(lineage))
+        old = lineageMap(lineage)
+        
+      lineageMap(lineage) = old + 1
     }
-    buf.toIterator
-  }
-
-  private def parseScriptFromSource(source: Source, params: Map[String,String], backend: String, langFeature: LanguageFeature.LanguageFeature): List[PigOperator] = {
-     /*
-     * Handle IMPORT statements.
-     */
-    val sourceLines = resolveImports(source.getLines())
-      if (params.nonEmpty) {
-        /*
-         * Replace placeholders by parameters.
-         */
-        parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"), langFeature)
-      }
-      else {
-        parseScript(sourceLines.mkString("\n"), langFeature)
-      }
+    
+    schedule.foreach{ plan => walker.walk(plan._1)(visitor) }
+    
+    val entrySet = lineageMap.map { case (k,v) => Seq('id -> k, 'cnt -> v) }.toSeq
+    
+    
+    DB autoCommit { implicit session => 
+      sql"create table if not exists opcount(id varchar(200) primary key, cnt int default 0)"
+        .execute
+        .apply()
+    }
+    
+    DB localTx { implicit session =>
+      
+      sql"merge into opcount(id,cnt) select {id}, case when exists(select 1 from opcount where id={id}) then (select cnt from opcount where id={id})+{cnt} else 1 end"
+        .batchByName(entrySet:_ *)
+        .apply()
+      
+    }
+    
+//    val entries = DB readOnly { implicit session => 
+//      sql"select * from opcount"
+//        .map{ rs => s"${rs.string("id")}  -->  ${rs.int("cnt")}" }
+//        .list
+//        .apply()
+//      
+//    }
+//    entries.foreach { println }
+    
   }
 }

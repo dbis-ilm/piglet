@@ -17,19 +17,63 @@
 
 package dbis.pig.backends.flink
 
+import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala._
 
-class PigStorage extends java.io.Serializable {
-  def load(env: ExecutionEnvironment, path: String, delim: Char = ' '): DataSet[List[String]] = {
-    env.readTextFile(path).map(line => line.split(delim).toList)
+import scala.reflect.ClassTag
+
+/**
+  * The trait for all case classes implementing record types in Piglet.
+  */
+trait SchemaClass {
+  /**
+    * Produces a string representation of the object using the given delimiter.
+    *
+    * @param delim the delimiter string
+    * @return a string representation
+    */
+  def mkString(delim: String = ","): String
+
+  /**
+    * Overrides the default toString method.
+    *
+    * @return a string representation
+    */
+  override def toString() = "(" + mkString() + ")"
+}
+
+/**
+  * A record class for representing just a single line of text.
+  *
+  * @param _0 the text line
+  */
+case class TextLine(_0: String) extends java.io.Serializable with SchemaClass {
+  override def toString = _0
+  override def mkString(delim: String) = toString
+}
+
+/**
+  * A record class for an array of string values.
+  *
+  * @param fields the array of values
+  */
+case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
+  override def mkString(delim: String) = fields.mkString(delim)
+}
+
+//-----------------------------------------------------------------------------------------------------
+
+class PigStorage[T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Serializable {
+  def load(env: ExecutionEnvironment, path: String,  extract: (Array[String]) => T, delim: String = " "): DataSet[T] = {
+    env.readTextFile(path).map(line => extract(line.split(delim, -1)))
   }
 
-  def write(path: String, result: DataSet[String]) = result.writeAsText(path)
+  def write(path: String, result: DataSet[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path)
 }
 
 object PigStorage {
-  def apply(): PigStorage = {
-    new PigStorage
+  def apply[T <: SchemaClass :ClassTag: TypeInformation](): PigStorage[T] = {
+    new PigStorage[T]
   }
 }
 

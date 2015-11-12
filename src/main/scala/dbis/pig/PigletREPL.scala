@@ -28,6 +28,7 @@ import dbis.pig.tools.{HDFSService, FileTools, Conf}
 import dbis.pig.backends.BackendManager
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.codegen.PigletCompiler
 
 import jline.console.ConsoleReader
 
@@ -39,6 +40,7 @@ import com.typesafe.scalalogging.LazyLogging
 
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.tools.DBConnection
 
 import scopt.OptionParser
 
@@ -47,17 +49,21 @@ case class Line(value: String, plan: ListBuffer[PigOperator]) extends JLineEvent
 case object EmptyLine extends JLineEvent
 case object EOF extends JLineEvent
 
-object PigREPL extends PigParser with LazyLogging {
+object PigletREPL extends LazyLogging {
   case class REPLConfig(master: String = "local",
                         outDir: String = ".",
                         backend: String = Conf.defaultBackend,
                         language: String = "pig",
                         interactive: Boolean = true,
+                        profiling: Boolean = false,
                         backendArgs: Map[String,String] = Map())
 
-  val consoleReader = new ConsoleReader()
-
+                        
+  val profiling = false                         
   val defaultScriptName = "__my_script"
+  
+  private val consoleReader = new ConsoleReader()
+  
 
   /**
    * A counter to make script names unique - it will be
@@ -208,12 +214,14 @@ object PigREPL extends PigParser with LazyLogging {
     var languageFeature = LanguageFeature.PlainPig
     var backendArgs: Map[String, String] = null
     var interactive: Boolean = true
+    var profiling = false
     val parser = new OptionParser[REPLConfig]("PigShell") {
       head("PigShell", "0.3")
       opt[Unit]('i', "interactive") hidden() action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
+      opt[Boolean]("profiling") optional() action { (x,c) => c.copy(profiling = x) } text("Switch on profiling")
       opt[String]('l', "language") optional() action { (x,c) => c.copy(language = x)} text ("Accepted language (pig = default, sparql, streaming)")
       opt[Map[String,String]]("<backend-arguments>...") optional() action { (x, c) => c.copy(backendArgs = x) } text ("Pig script files to execute")
       help("help") text ("prints this usage text")
@@ -224,6 +232,7 @@ object PigREPL extends PigParser with LazyLogging {
         // do stuff
         master = config.master
         outDir = Paths.get(config.outDir)
+        profiling = config.profiling
         backend = config.backend
         languageFeature = config.language match {
           case "sparql" => LanguageFeature.SparqlPig
@@ -243,8 +252,15 @@ object PigREPL extends PigParser with LazyLogging {
     val backendConf = BackendManager.backend(backend)
     if(backendConf.raw)
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
+    
+    try {
 
     BackendManager.backend = backendConf
+
+    if (profiling) {
+      // initialize database driver and connection pool
+      DBConnection.init(Conf.databaseSetting)
+    }
 
     console {
       case EOF => println("Ctrl-d"); true
@@ -276,6 +292,7 @@ object PigREPL extends PigParser with LazyLogging {
       }
       case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => {
         var plan = new DataflowPlan(buf.toList)
+        
         val mm = new MaterializationManager
         plan = processMaterializations(plan, mm)
 
@@ -324,7 +341,7 @@ object PigREPL extends PigParser with LazyLogging {
             buf --= dumps
           }
 
-          buf ++= parseScript(s, languageFeature)
+          buf ++= PigParser.parseScript(s, languageFeature)
 
           var plan = new DataflowPlan(buf.toList)
 
@@ -336,7 +353,7 @@ object PigREPL extends PigParser with LazyLogging {
           val jobJar = Conf.backendJar(backend)
 
           nextScriptName()
-          FileTools.compilePlan(plan, scriptName, Paths.get("."), false, jobJar, templateFile, backend) match {
+          PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), jobJar, templateFile, backend, profiling) match {
             case Some(jarFile) =>
               val runner = backendConf.runnerClass
               runner.execute(master, scriptName, jarFile, backendArgs)
@@ -359,12 +376,16 @@ object PigREPL extends PigParser with LazyLogging {
         processFsCmd(s)
       }
       case Line(s, buf) => try {
-        buf ++= parseScript(s, languageFeature)
+        buf ++= PigParser.parseScript(s, languageFeature)
         false
       } catch {
         case iae: IllegalArgumentException => println(iae.getMessage); false
       }
       case _ => false
+    }
+    } finally {
+      if (profiling)
+        DBConnection.exit()
     }
   }
 }

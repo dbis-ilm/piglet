@@ -16,6 +16,7 @@
  */
 package dbis.pig.op
 
+import dbis.pig.expr.{NamedFieldExtractor, RefExprExtractor}
 import dbis.pig.plan.{PipeNameGenerator, DataflowPlan}
 import dbis.pig.schema._
 

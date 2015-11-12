@@ -41,9 +41,9 @@ import scala.collection.mutable.Set
  *
  * @param template the name of the backend-specific template fle
  */
-abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with LazyLogging {
+abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with LazyLogging {
 
-   templateFile = template 
+  templateFile = template 
   /*------------------------------------------------------------------------------------------------- */
   /*                                           helper functions                                       */
   /*------------------------------------------------------------------------------------------------- */
@@ -98,7 +98,8 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "String")
+    Types.ByteArrayType -> "String",
+    Types.AnyType -> "Any")
     
 //  val javaTypeMappingTable = Map[PigType, String](
 //    Types.IntType -> "java.lang.Integer",
@@ -278,14 +279,22 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       val pTypes = params.map(p => p.resultType(schema))
       UDFTable.findUDF(f, pTypes) match {
         case Some(udf) => {
-          println(s"udf: $f found: " + udf)
+          // println(s"udf: $f found: " + udf)
           if (udf.isAggregate) {
             s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
           }
-          else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+          else {
+            val mapStr = if (udf.resultType.isInstanceOf[ComplexType]) {
+              udf.resultType match {
+                case BagType(v) => s".map(${schemaClassName(v.className)}(_))"
+                case _ => "" // TODO: handle TupleType and MapType
+              }
+            } else ""
+            s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})${mapStr}"
+          }
         }
         case None => {
-          println(s"udf: $f not found")
+          // println(s"udf: $f not found")
           // check if we have have an alias in DataflowPlan
           if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
             val alias = udfAliases.get(f)
@@ -399,7 +408,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       else {
         // there is no other expression: we just construct an expression for flatMap:
         // (<expr>).map(t => <class>(t))
-        s"${emitExpr(node.inputSchema, ex.a)}).map(t => ${className}(t))"
+        s"${emitExpr(node.inputSchema, ex.a)}).map(t => ${className}(t._0))"
       }
     }
     else
@@ -413,7 +422,7 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @return the generated code
    */
   def emitParamList(schema: Option[Schema], params: Option[List[Ref]]): String = params match {
-    case Some(refList) => s",${refList.map(r => emitRef(schema, r)).mkString(",")}"
+    case Some(refList) => if (refList.nonEmpty) s",${refList.map(r => emitRef(schema, r)).mkString(",")}" else ""
     case None => ""
   }
 
@@ -475,7 +484,9 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    */
   def emitLoad(node: PigOperator, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
     def schemaExtractor(schema: Schema): String =
-      schema.fields.zipWithIndex.map{case (f, i) => s"data($i).to${scalaTypeMappingTable(f.fType)}"}.mkString(", ")
+      schema.fields.zipWithIndex.map{case (f, i) =>
+        s"data($i).to${scalaTypeMappingTable(f.fType)}"
+      }.mkString(", ")
 
     def jdbcSchemaExtractor(schema: Schema): String =
       schema.fields.zipWithIndex.map{case (f, i) => s"data.get${scalaTypeMappingTable(f.fType)}($i)"}.mkString(", ")
@@ -533,6 +544,31 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
     case Some(s) => s.fields.map(f => f.name).mkString("\t")
     case None => ""
   }
+
+  /**
+    * Generates the code for the STREAM THROUGH operator including
+    * the necessary conversion of input and output data.
+    *
+    * @param node the StreamOp operator
+    * @return the Scala code implementing the operator
+    */
+  def emitStreamThrough(node: StreamOp): String = {
+    // TODO: how to handle cases where no schema was given??
+    val className = schemaClassName(node.schema.get.className)
+
+    val inFields = node.inputSchema.get.fields.zipWithIndex.map{ case (f, i) => s"t._$i"}.mkString(", ")
+    val outFields = node.schema.get.fields.zipWithIndex.map{ case (f, i) => s"t($i)"}.mkString(", ")
+
+    callST("streamOp",
+      Map("out" -> node.outPipeName,
+          "op" -> node.opName,
+          "in" -> node.inPipeName,
+          "class" -> className,
+          "in_fields" -> inFields,
+          "out_fields" -> outFields,
+          "params" -> emitParamList(node.schema, node.params)))
+  }
+
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
@@ -598,12 +634,13 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
       case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))
       case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->node.inPipeName,"others"->node.inPipeNames.tail))
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
-      case StreamOp(out, in, op, params, schema) => callST("streamOp", Map("out"->node.outPipeName,"op"->op,"in"->node.inPipeName,"params"->emitParamList(node.schema, params)))
+      case sOp@StreamOp(out, in, op, params, schema) => emitStreamThrough(sOp)
       // case MacroOp(out, name, params) => callST("call_macro", Map("out"->node.outPipeName,"macro_name"->name,"params"->emitMacroParamList(node.schema, params)))
       case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case ConstructBag(in, ref) => "" // used only inside macros
       case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again
+      case Delay(out, in, size, wtime) => callST("delay", Map("out" -> node.outPipeName, "in"->node.inPipeName, "size"->size, "wait"->wtime)) 
       case Empty(_) => ""
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
@@ -635,7 +672,14 @@ abstract class ScalaBackendGenCode(template: String) extends GenCodeBase with La
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String): String = callST("begin_query", Map("name" -> scriptName))
+  def emitHeader2(scriptName: String, enableProfiling: Boolean = false): String = {
+    var map = Map("name" -> scriptName)
+    
+    if(enableProfiling)
+      map += ("profiling" -> "profiling")
+    
+    callST("begin_query", map )
+  }
 
   /**
    * Generate code needed for finishing the script and starting the execution.
