@@ -16,7 +16,7 @@
  */
 package dbis.pig.schema
 
-import dbis.pig.op.NamedField
+import dbis.pig.expr.NamedField
 import scala.collection.mutable.Map
 
 /**

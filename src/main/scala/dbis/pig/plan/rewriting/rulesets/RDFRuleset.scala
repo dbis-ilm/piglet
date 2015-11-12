@@ -17,6 +17,7 @@
 package dbis.pig.plan.rewriting.rulesets
 
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.plan.PipeNameGenerator._
 import dbis.pig.plan.rewriting.{Functions, Rewriter}
 import dbis.pig.plan.rewriting.Rewriter._

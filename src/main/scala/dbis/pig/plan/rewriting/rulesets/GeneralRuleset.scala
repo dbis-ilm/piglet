@@ -23,8 +23,10 @@ import dbis.pig.plan.rewriting.{Rewriter, RewriterException}
 import dbis.pig.plan.rewriting.internals.FilterUtils._
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
-
 import scala.collection.mutable.ListBuffer
+import dbis.pig.expr.NamedField
+import dbis.pig.expr.And
+import dbis.pig.expr.RefExpr
 
 object GeneralRuleset extends Ruleset {
   /** Put Filters before multipleInputOp if we can figure out which input of multipleInputOp contains the fields used in the Filters predicate

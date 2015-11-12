@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package dbis.pig.op
+package dbis.pig.op.cmd
 
 import dbis.pig.schema.{Types, PigType}
 import dbis.pig.udf.{UDFTable, UDF}
-
 import scala.collection.mutable.ListBuffer
+import dbis.pig.op.PigOperator
 
 
 /** Wraps code that is to be embedded in the compiled Scala application.

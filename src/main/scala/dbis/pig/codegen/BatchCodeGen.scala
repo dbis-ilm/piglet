@@ -20,8 +20,14 @@ import dbis.pig.expr.RefExprExtractor
 import dbis.pig.op._
 import dbis.pig.schema._
 import dbis.pig.plan.DataflowPlan
-
 import scala.collection.mutable.ArrayBuffer
+import dbis.pig.expr.DerefTuple
+import dbis.pig.expr.Ref
+import dbis.pig.expr.Predicate
+import dbis.pig.expr.Expr
+import dbis.pig.expr.Func
+import dbis.pig.expr.NamedField
+import dbis.pig.expr.PositionalField
 
 
 class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {

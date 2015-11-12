@@ -18,6 +18,9 @@
 package dbis.pig.op
 
 import dbis.pig.schema._
+import dbis.pig.expr.Ref
+import dbis.pig.expr.RefExpr
+import dbis.pig.expr.NamedField
 
 
 /**

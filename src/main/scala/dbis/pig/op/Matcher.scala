@@ -16,6 +16,7 @@
  */
 package dbis.pig.op
 import dbis.pig.schema._
+import dbis.pig.expr.Predicate
 /**
  * @brief Matcher represents the complex event processing operator of Pig.
  */
