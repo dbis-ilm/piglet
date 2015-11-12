@@ -14,25 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.op
 
-import dbis.pig.expr.Predicate
+package dbis.pig.backends.spark
 
-case class SplitBranch(val output: Pipe, val expr: Predicate)
-
-/**
- * SplitInto represents the SPLIT INTO operator of Pig.
- *
- * @param initialInPipeName the names of the input pipe.
- * @param splits a list of split branches (output pipe + condition)
- */
-case class SplitInto(in: Pipe, splits: List[SplitBranch]) extends PigOperator {
-  _outputs = splits.map(s => s.output)
-  _inputs = List(in)
-
-  // override def initialOutPipeNames: List[String] = splits.map{ branch => branch.output.name }
-
-   override def lineageString: String = {
-    s"""SPLIT%${splits}%""" + super.lineageString
-  }
+class SparkSRun extends SparkRun {
+  override def templateFile = appconf.getString("backends.sparks.template")
 }

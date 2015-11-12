@@ -16,7 +16,6 @@
  */
 package dbis.pig.op
 
-import dbis.pig.backends.BackendManager
 import java.net.URI
 
 /**

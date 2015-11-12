@@ -19,9 +19,11 @@ package dbis.pig.op
 
 import dbis.pig.plan.InvalidPlanException
 import dbis.pig.schema.Schema
-
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Map
+import dbis.pig.expr.Ref
+import dbis.pig.op.cmd.DefineMacroCmd
+import dbis.pig.expr.NamedField
 
 /**
  *

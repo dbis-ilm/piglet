@@ -20,6 +20,7 @@ import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.backends.BackendManager
 import dbis.pig.codegen.BatchCodeGen
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules
@@ -684,7 +685,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.flatMap(t => PigFuncs.tokenize(t._0)).map(t => _t2_Tuple(t))""".stripMargin)
+        |val a = b.flatMap(t => PigFuncs.tokenize(t._0).map(_t1_Tuple(_))).map(t => _t2_Tuple(t._0))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 

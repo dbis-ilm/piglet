@@ -22,6 +22,7 @@ import dbis.pig.schema.Schema
 import scala.collection.immutable.Map
 import scala.collection.mutable.Set
 import org.clapper.scalasti.STGroupFile
+import dbis.pig.expr.Value
 
 /**
  * An exception representing an error in handling the templates for code generation.
@@ -41,7 +42,7 @@ trait CodeGeneratorBase {
   /**
    * A map of alias names for user-defined functions.
    */
-  var udfAliases: Option[Map[String, (String, List[dbis.pig.op.Value])]] = None
+  var udfAliases: Option[Map[String, (String, List[Value])]] = None
 
   /**
    * The set of _KV variables refering to RDDs which are created for joins.

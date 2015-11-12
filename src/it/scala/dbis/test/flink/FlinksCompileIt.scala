@@ -30,7 +30,7 @@ class FlinksCompileIt extends FlatSpec with Matchers {
     ("load2.pig",         "result2.out",   "truth/result2.data",   false),
     ("foreach1.pig",      "distances.out", "truth/distances.data", false),
     ("filter.pig",        "filtered.out",  "truth/filtered.data",  false),
-    ("construct.pig",     "result3.out",   "truth/result3.data",   false),
+    ("construct.pig",     "result3.out", "truth/construct.data",   false),
     ("union.pig",         "united.out",    "truth/united.data",    false),
     ("aggregate.pig",     "aggregate.out", "truth/aggregate2.data",false),
     ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false),

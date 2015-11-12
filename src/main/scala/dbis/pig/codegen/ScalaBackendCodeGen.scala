@@ -19,6 +19,8 @@ package dbis.pig.codegen
 import com.typesafe.scalalogging.LazyLogging
 
 import dbis.pig.op._
+import dbis.pig.op.cmd._
+import dbis.pig.expr._
 import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
@@ -283,7 +285,15 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           if (udf.isAggregate) {
             s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
           }
-          else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+          else {
+            val mapStr = if (udf.resultType.isInstanceOf[ComplexType]) {
+              udf.resultType match {
+                case BagType(v) => s".map(${schemaClassName(v.className)}(_))"
+                case _ => "" // TODO: handle TupleType and MapType
+              }
+            } else ""
+            s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})${mapStr}"
+          }
         }
         case None => {
           // println(s"udf: $f not found")
@@ -400,7 +410,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       else {
         // there is no other expression: we just construct an expression for flatMap:
         // (<expr>).map(t => <class>(t))
-        s"${emitExpr(node.inputSchema, ex.a)}).map(t => ${className}(t))"
+        s"${emitExpr(node.inputSchema, ex.a)}).map(t => ${className}(t._0))"
       }
     }
     else

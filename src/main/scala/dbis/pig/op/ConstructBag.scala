@@ -18,6 +18,10 @@ package dbis.pig.op
 
 import dbis.pig.plan.InvalidPlanException
 import dbis.pig.schema._
+import dbis.pig.expr.DerefTuple
+import dbis.pig.expr.NamedField
+import dbis.pig.expr.PositionalField
+import dbis.pig.expr.Ref
 
 /**
  * This operator is a pseudo operator used inside a nested FOREACH to construct a new bag from an expression.

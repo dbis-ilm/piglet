@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.op
+package dbis.pig.expr
 
 import dbis.pig.schema._
 

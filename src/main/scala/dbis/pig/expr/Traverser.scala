@@ -1,6 +1,6 @@
 package dbis.pig.expr
 
-import dbis.pig.op.{Func, RefExpr, Expr, NamedField}
+//import dbis.pig.op.{Func, RefExpr, Expr, NamedField}
 import dbis.pig.schema.Schema
 
 import scala.collection.mutable.ListBuffer

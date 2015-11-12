@@ -55,6 +55,7 @@ object PigletREPL extends LazyLogging {
                         backend: String = Conf.defaultBackend,
                         language: String = "pig",
                         interactive: Boolean = true,
+                        profiling: Boolean = false,
                         backendArgs: Map[String,String] = Map())
 
                         
@@ -213,12 +214,14 @@ object PigletREPL extends LazyLogging {
     var languageFeature = LanguageFeature.PlainPig
     var backendArgs: Map[String, String] = null
     var interactive: Boolean = true
+    var profiling = false
     val parser = new OptionParser[REPLConfig]("PigShell") {
       head("PigShell", "0.3")
       opt[Unit]('i', "interactive") hidden() action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
+      opt[Boolean]("profiling") optional() action { (x,c) => c.copy(profiling = x) } text("Switch on profiling")
       opt[String]('l', "language") optional() action { (x,c) => c.copy(language = x)} text ("Accepted language (pig = default, sparql, streaming)")
       opt[Map[String,String]]("<backend-arguments>...") optional() action { (x, c) => c.copy(backendArgs = x) } text ("Pig script files to execute")
       help("help") text ("prints this usage text")
@@ -229,6 +232,7 @@ object PigletREPL extends LazyLogging {
         // do stuff
         master = config.master
         outDir = Paths.get(config.outDir)
+        profiling = config.profiling
         backend = config.backend
         languageFeature = config.language match {
           case "sparql" => LanguageFeature.SparqlPig
@@ -253,9 +257,11 @@ object PigletREPL extends LazyLogging {
 
     BackendManager.backend = backendConf
 
-		  // initialize database driver and connection pool
-		  DBConnection.init(Conf.databaseSetting)
-    
+    if (profiling) {
+      // initialize database driver and connection pool
+      DBConnection.init(Conf.databaseSetting)
+    }
+
     console {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
@@ -378,7 +384,8 @@ object PigletREPL extends LazyLogging {
       case _ => false
     }
     } finally {
-      DBConnection.exit()
+      if (profiling)
+        DBConnection.exit()
     }
   }
 }

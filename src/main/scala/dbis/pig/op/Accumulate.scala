@@ -17,6 +17,8 @@
 package dbis.pig.op
 
 import dbis.pig.schema.{TupleType, BagType, Schema}
+import dbis.pig.expr.ArithmeticExpr
+import dbis.pig.expr.{Expr,Func}
 
 /**
  * Accumulate represents the ACCUMULATE operator of Pig.
