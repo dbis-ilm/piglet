@@ -18,7 +18,9 @@ package dbis.pig.op
 
 import dbis.pig.expr.Predicate
 
-case class SplitBranch(val output: Pipe, val expr: Predicate)
+case class SplitBranch(val output: Pipe, val expr: Predicate) {
+  protected[op] def lineageSignature = s"""SPLITBRANCH($expr)"""  
+}
 
 /**
  * SplitInto represents the SPLIT INTO operator of Pig.
@@ -33,6 +35,6 @@ case class SplitInto(in: Pipe, splits: List[SplitBranch]) extends PigOperator {
   // override def initialOutPipeNames: List[String] = splits.map{ branch => branch.output.name }
 
    override def lineageString: String = {
-    s"""SPLIT%${splits}%""" + super.lineageString
+    s"""SPLIT%${splits.map(_.lineageSignature).mkString("%")}%""" + super.lineageString
   }
 }
