@@ -40,7 +40,9 @@ object NamedField {
   }
 }
 
-case class PositionalField(pos: Int) extends Ref
+case class PositionalField(pos: Int) extends Ref {
+  override def toString = "$" + pos
+}
 
 case class Value(var v: Any) extends Ref
 
