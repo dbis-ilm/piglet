@@ -15,17 +15,18 @@
  * limitations under the License.
  */
 
-package dbis.pig.op
+package dbis.pig.op.cmd
+
+import dbis.pig.expr.Value
+import dbis.pig.op.PigOperator
 
 
 /**
- * DefineCmd represents a pseudo operator for the DEFINE statement. This "operator" will
- * be eliminated during building the dataflow plan.
+ * SetCmd represents a pseudo operator for the SET statement.
  *
- * @param alias the alias name of the UDF
- * @param scalaName the full classified Scala name of the function
- * @param paramList a list of values uses as the first standard parameters in the function call
+ * @param param the parameter name
+ * @param value the value of the parameter set by this statement
  */
-case class DefineCmd(alias: String, scalaName: String, paramList: List[Value]) extends PigOperator
+case class SetCmd(param: String, value: Value) extends PigOperator
 
 

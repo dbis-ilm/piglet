@@ -18,6 +18,7 @@
 package dbis.pig.op
 
 import dbis.pig.schema.Schema
+import dbis.pig.expr.Ref
 
 /**
  * A class representing the STREAM THROUGH operator for invoking a user-defined operator implemented

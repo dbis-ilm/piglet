@@ -16,6 +16,9 @@
  */
 package dbis.pig.op
 
+import dbis.pig.expr.ArithmeticExpr
+import dbis.pig.expr.Expr
+
 /**
  *
  * @param out the output pipe (relation).

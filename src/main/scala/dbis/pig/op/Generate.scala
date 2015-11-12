@@ -19,8 +19,13 @@ package dbis.pig.op
 import dbis.pig.expr.{NamedFieldExtractor, RefExprExtractor}
 import dbis.pig.plan.{PipeNameGenerator, DataflowPlan}
 import dbis.pig.schema._
-
 import scala.collection.mutable.ListBuffer
+import dbis.pig.expr.NamedField
+import dbis.pig.expr.PositionalField
+import dbis.pig.expr.Value
+import dbis.pig.expr.DerefStreamingTuple
+import dbis.pig.expr.DerefTuple
+import dbis.pig.expr.DerefMap
 
 /**
  * GENERATE represents the final generate statement inside a nested FOREACH.

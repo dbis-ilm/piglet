@@ -186,8 +186,8 @@ fi
 
 
 if [ -z "$BACKEND_DIR" ]; then # if BACKEND_DIR does not exist, use our default one
-    BACKEND_DIR=`dirname $0`/../sparklib/target/scala-2.11/*
-    echo "No backend direcory (BACKEND_DIR) specified, using the default directory."
+    BACKEND_DIR=`dirname $0`/../${backend}lib/target/scala-2.11/*
+    echo "No backend direcory (BACKEND_DIR) specified, using the default directory '$BACKEND_DIR'."
 else
     if [[ "$BACKEND_DIR" == */ ]]; then # if it ends with / it's a directory - include all files using the wildcard *
         BACKEND_DIR=$BACKEND_DIR*
