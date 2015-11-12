@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.pig.op
+package dbis.pig.expr
 
 import dbis.pig.schema._
 import dbis.pig.udf.{UDFTable, UDF}

@@ -19,6 +19,7 @@ package dbis.test.flink
 import dbis.pig.Piglet._
 import dbis.pig.codegen.FlinkStreamingCodeGen
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.FlatSpec

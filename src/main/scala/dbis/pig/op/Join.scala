@@ -17,10 +17,9 @@
 package dbis.pig.op
 
 import dbis.pig.schema._
-
 import scala.collection.mutable.ArrayBuffer
-
 import java.util.concurrent.TimeUnit
+import dbis.pig.expr.Ref
 
 
 /**

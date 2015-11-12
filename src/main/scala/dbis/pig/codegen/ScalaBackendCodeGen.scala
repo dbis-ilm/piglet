@@ -19,6 +19,8 @@ package dbis.pig.codegen
 import com.typesafe.scalalogging.LazyLogging
 
 import dbis.pig.op._
+import dbis.pig.op.cmd._
+import dbis.pig.expr._
 import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._

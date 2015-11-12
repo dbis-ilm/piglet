@@ -17,9 +17,8 @@
 package dbis.pig.plan.rewriting.internals
 
 import dbis.pig.op._
-import dbis.pig.op.Value
-
 import scala.collection.mutable.Map
+import dbis.pig.expr._
 
 /** An enumeration of the three columns in RDF data - subject, predicate and object.
   *

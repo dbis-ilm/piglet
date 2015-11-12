@@ -16,8 +16,9 @@
  */
 package dbis.pig.parser
 
-import dbis.pig._
 import dbis.pig.op._
+import dbis.pig.op.cmd._
+import dbis.pig.expr._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 
@@ -467,7 +468,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * DEFINE <Alias> <FuncName>
    */
   def defineStmt: Parser[PigOperator] = defineKeyword ~ ident ~ className ~ "(" ~ repsep(literalField, ",") ~ ")" ^^{
-    case _ ~ alias ~ funcName ~ _ ~ params ~ _ => DefineCmd(alias, funcName, params.map(r => r.asInstanceOf[dbis.pig.op.Value]))
+    case _ ~ alias ~ funcName ~ _ ~ params ~ _ => DefineCmd(alias, funcName, params.map(r => r.asInstanceOf[dbis.pig.expr.Value]))
   }
 
   /*
@@ -492,7 +493,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * SET <Param> <Value>
    */
   def setStmt: Parser[PigOperator] = setKeyword ~ ident ~ literalField ^^ {
-    case _ ~ k ~ v => SetCmd(k, v.asInstanceOf[dbis.pig.op.Value]) }
+    case _ ~ k ~ v => SetCmd(k, v.asInstanceOf[dbis.pig.expr.Value]) }
 
   /*
    * <A> = STREAM <B> TROUGH <Operator> [(ParamList)] [AS (<Schema>) ]

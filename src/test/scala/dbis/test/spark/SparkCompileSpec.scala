@@ -21,6 +21,7 @@ import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.backends.BackendManager
 import dbis.pig.codegen.{StreamingCodeGen, BatchCodeGen}
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules
