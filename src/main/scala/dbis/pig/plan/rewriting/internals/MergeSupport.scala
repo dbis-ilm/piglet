@@ -24,6 +24,9 @@ trait MergeSupport extends LazyLogging {
 
 		val walker = new BreadthFirstTopDownWalker
 
+		val deferrPlanConstruction = false
+		var needPlanConstruction = false
+		
 		/* the visitor to process all operators and add them to the merged
 		 * plan if necessary
 		 */
@@ -40,8 +43,9 @@ trait MergeSupport extends LazyLogging {
 			  op match {
 			    
 			    case Load(_,_,_,_,_) => 
-			      mergedPlan.addOperator(List(op), true)
-			    case _ => {//Join(_,_,_,_) | Cross(_,_,_) => {
+			      mergedPlan.addOperator(List(op), deferrPlanConstruction)
+			      needPlanConstruction = true
+			    case Join(_,_,_,_) | Cross(_,_,_) => {
 			      
 			      op.inputs.foreach { pipe =>
 			        val prod = mergedPlan.findOperator { o => o.lineageSignature == pipe.producer.lineageSignature }.headOption
@@ -51,23 +55,20 @@ trait MergeSupport extends LazyLogging {
 			          logger.warn("No producer found for $op -- this shouldn't happen?!")
 			      }
 			      
-			      mergedPlan.addOperator(List(op), true)
-			      
-			      
+			      mergedPlan.addOperator(List(op), deferrPlanConstruction)
+			      needPlanConstruction = true
 			    } 
-//			    case _ =>
-//			      
-//			      val producer = op.inputs // since join and cross are handled separately, inputs is 0 (LOAD) or 1
-//    			    .flatMap { pipe => mergedPlan.findOperator { o => o.lineageSignature == pipe.producer.lineageSignature } } // get the producer 
-//  			      .foreach { producer => // process the single producer
-//    			      
-//    			      logger.debug(s"PRODUCER: $producer")
-//    			      
-//    			      op.inputs.head.name = producer.outPipeName
-//    			      
-//      					mergedPlan = mergedPlan.insertAfter(producer, op)
-//      					logger.debug(s"inserted $op after $producer")
-//    				}
+			    case _ =>
+			      
+			      op.inputs // since join and cross are handled separately, inputs is 0 (LOAD) or 1
+    			    .flatMap { pipe => mergedPlan.findOperator { o => o.lineageSignature == pipe.producer.lineageSignature } } // get the producer 
+  			      .foreach { producer => // process the single producer
+    			      
+    			      op.inputs.head.name = producer.outPipeName
+    			      
+      					mergedPlan = mergedPlan.insertAfter(producer, op)
+      					logger.debug(s"inserted $op after $producer")
+    				}
 			  }
 			} else {
 			  logger.debug(s"$op already present in plan")
@@ -77,7 +78,8 @@ trait MergeSupport extends LazyLogging {
 		schedule.drop(1) // skip first plan as we already copied it into mergedPlan
 		  .foreach { plan => walker.walk(plan)(visitor) }  // for all remaining: visit each op and add to merged plan    
 
-		mergedPlan.constructPlan(mergedPlan.operators)
+		if(needPlanConstruction && deferrPlanConstruction) 
+			mergedPlan.constructPlan(mergedPlan.operators)
 		
 		println("merged plan:")
 		mergedPlan.printPlan(2)
