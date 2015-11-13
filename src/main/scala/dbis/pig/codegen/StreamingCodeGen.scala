@@ -57,10 +57,12 @@ class StreamingCodeGen(template: String) extends BatchCodeGen(template) {
 
     val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
     val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
-    paramMap ++= Map("out" -> node.outPipeName, "addr" -> addr, "mode" -> mode,
+    paramMap ++= Map("out" -> node.outPipeName, "addr_hostname" -> addr.hostname,
+                      "addr_port" -> addr.port,
                       "func" -> func, "params" -> params)
     if (mode != "")
       paramMap += ("mode" -> mode)
+    println("paramMap = " + paramMap)
     callST("socketRead", paramMap)
   }
 

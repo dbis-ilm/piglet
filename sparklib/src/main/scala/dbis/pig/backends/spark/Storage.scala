@@ -86,8 +86,8 @@ object PigStorage extends java.io.Serializable {
 //-----------------------------------------------------------------------------------------------------
 
 class PigStream[T <: SchemaClass :ClassTag] extends java.io.Serializable {
-  def receiveStream(ssc: StreamingContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
-    ssc.socketTextStream("localhost", 9999).map(line => extract(line.split(delim, -1)))
+  def receiveStream(ssc: StreamingContext, hostname: String, port: Int, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
+    ssc.socketTextStream(hostname, port).map(line => extract(line.split(delim, -1)))
 
   def loadStream(ssc: StreamingContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
     ssc.receiverStream(new FileStreamReader(path)).map(line => extract(line.split(delim, -1)))
