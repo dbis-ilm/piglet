@@ -682,13 +682,14 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def socketReadStmt: Parser[PigOperator] =
     bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
       case out ~ _ ~ _ ~ addr ~ u ~ schema => u match {
-        case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2)
-        case None =>  SocketRead(Pipe(out), addr, "", schema)
+        case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+              case None =>  SocketRead(Pipe(out), addr, "", schema)
       }
+
     } |
       bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
         case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema => u match {
-          case Some(p) => SocketRead(Pipe(out), addr, mode, schema, Some(p._1), if (p._2.isEmpty) null else p._2)
+          case Some(p) => SocketRead(Pipe(out), addr, mode, schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
           case None => SocketRead(Pipe(out), addr, mode, schema)
         }
       }

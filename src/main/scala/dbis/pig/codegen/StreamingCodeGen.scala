@@ -16,11 +16,12 @@
  */
 package dbis.pig.codegen
 
+import dbis.pig.backends.BackendManager
 import dbis.pig.op._
 
 
 
-class StreamingGenCode(template: String) extends BatchCodeGen(template) {
+class StreamingCodeGen(template: String) extends BatchCodeGen(template) {
   /**
     * Generates code for the WINDOW Operator
     *
@@ -41,6 +42,30 @@ class StreamingGenCode(template: String) extends BatchCodeGen(template) {
     }
   }
 
+  /**
+    * Generates code for the SOCKET_READ Operator
+    *
+    * @param node the PigOperator instance
+    * @param addr the socket address to connect to
+    * @param mode the connection mode, e.g. zmq or empty for standard sockets
+    * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
+    * @param streamParams an optional list of parameters to a stream function (e.g. separators)
+    * @return the Scala code implementing the SOCKET_READ operator
+    */
+  def emitSocketRead(node: PigOperator, addr: SocketAddress, mode: String, streamFunc: Option[String], streamParams: List[String]): String ={
+    var paramMap = super.emitExtractorFunc(node, streamFunc)
+
+    val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
+    val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
+    paramMap ++= Map("out" -> node.outPipeName, "addr_hostname" -> addr.hostname,
+                      "addr_port" -> addr.port,
+                      "func" -> func, "params" -> params)
+    if (mode != "")
+      paramMap += ("mode" -> mode)
+    println("paramMap = " + paramMap)
+    callST("socketRead", paramMap)
+  }
+
 
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
@@ -55,6 +80,7 @@ class StreamingGenCode(template: String) extends BatchCodeGen(template) {
   override def emitNode(node: PigOperator): String = {
     node match {
       case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inPipeName,window,slide)
+      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node, address, mode, func, params)
       case _ => super.emitNode(node)
     }
   }
@@ -62,5 +88,5 @@ class StreamingGenCode(template: String) extends BatchCodeGen(template) {
 }
 
 class StreamingGenerator(templateFile: String) extends CodeGenerator {
-  override val codeGen = new StreamingGenCode(templateFile)
+  override val codeGen = new StreamingCodeGen(templateFile)
 }

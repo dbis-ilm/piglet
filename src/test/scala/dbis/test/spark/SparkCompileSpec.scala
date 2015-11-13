@@ -16,9 +16,10 @@
  */
 package dbis.test.spark
 
+import dbis.pig.parser.LanguageFeature
 import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.backends.BackendManager
-import dbis.pig.codegen.BatchCodeGen
+import dbis.pig.codegen.{StreamingCodeGen, BatchCodeGen}
 import dbis.pig.op._
 import dbis.pig.expr._
 import dbis.pig.plan.DataflowPlan
@@ -46,7 +47,6 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test",true)
       + codeGenerator.emitFooter)
-//        |import dbis.spark._
     val expectedCode = cleanString("""
         |import org.apache.spark.SparkContext
         |import org.apache.spark.SparkContext._
