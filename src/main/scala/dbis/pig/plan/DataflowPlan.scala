@@ -19,7 +19,6 @@ package dbis.pig.plan
 import dbis.pig.op._
 import dbis.pig.op.cmd._
 import dbis.pig.expr._
-
 import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.schema.{Types, PigType, Schema, SchemaException}
 import dbis.pig.udf.{UDFTable, UDF}
@@ -59,6 +58,13 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
 
   constructPlan(operators)
 
+  def addOperator(ops: List[PigOperator], deferrConstruct: Boolean = false) {
+    operators ++= ops
+    
+    if(!deferrConstruct)
+    	constructPlan(operators)
+  }
+  
   /**
    * Constructs a plan from a list of Pig operators. This means, that based on
    * the initial input and output bag names (as specified in the script) the

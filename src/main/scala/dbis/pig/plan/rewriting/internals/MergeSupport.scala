@@ -3,11 +3,11 @@ package dbis.pig.plan.rewriting.internals
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.op.PigOperator
 import dbis.pig.tools.BreadthFirstTopDownWalker
-
 import org.kiama.rewriting.Rewriter._
-
-
 import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.op.Join
+import dbis.pig.op.Cross
+import dbis.pig.op.Load
 trait MergeSupport extends LazyLogging {
 
   
@@ -37,19 +37,38 @@ trait MergeSupport extends LazyLogging {
 			if(mergedOps.isEmpty) {
 			  logger.debug(s"$op not already part of merged plan")
 			  
-			  op.inputs.map { pipe => pipe.producer.lineageSignature }
-			    .flatMap { lineage => mergedPlan.findOperator { o => o.lineageSignature == lineage } }
-			    .foreach { producer =>
+			  op match {
+			    
+			    case Load(_,_,_,_,_) => 
+			      mergedPlan.addOperator(List(op), true)
+			    case _ => {//Join(_,_,_,_) | Cross(_,_,_) => {
 			      
-			      logger.debug(s"PRODUCER: $producer")
+			      op.inputs.foreach { pipe =>
+			        val prod = mergedPlan.findOperator { o => o.lineageSignature == pipe.producer.lineageSignature }.headOption
+			        if(prod.isDefined)
+			          pipe.name = prod.get.outPipeName
+			        else
+			          logger.warn("No producer found for $op -- this shouldn't happen?!")
+			      }
 			      
-			      // FIXME: for SPLIT and JOIN we have to find the correct pipe
-			      op.inputs.head.name = producer.outPipeName
+			      mergedPlan.addOperator(List(op), true)
 			      
-  					mergedPlan = mergedPlan.insertAfter(producer, op)
-  					logger.debug(s"inserted $op after $producer")
-				}
-			  
+			      
+			    } 
+//			    case _ =>
+//			      
+//			      val producer = op.inputs // since join and cross are handled separately, inputs is 0 (LOAD) or 1
+//    			    .flatMap { pipe => mergedPlan.findOperator { o => o.lineageSignature == pipe.producer.lineageSignature } } // get the producer 
+//  			      .foreach { producer => // process the single producer
+//    			      
+//    			      logger.debug(s"PRODUCER: $producer")
+//    			      
+//    			      op.inputs.head.name = producer.outPipeName
+//    			      
+//      					mergedPlan = mergedPlan.insertAfter(producer, op)
+//      					logger.debug(s"inserted $op after $producer")
+//    				}
+			  }
 			} else {
 			  logger.debug(s"$op already present in plan")
 			}
@@ -58,6 +77,7 @@ trait MergeSupport extends LazyLogging {
 		schedule.drop(1) // skip first plan as we already copied it into mergedPlan
 		  .foreach { plan => walker.walk(plan)(visitor) }  // for all remaining: visit each op and add to merged plan    
 
+		mergedPlan.constructPlan(mergedPlan.operators)
 		
 		println("merged plan:")
 		mergedPlan.printPlan(2)
