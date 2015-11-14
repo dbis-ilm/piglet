@@ -102,14 +102,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     Types.CharArrayType -> "String",
     Types.ByteArrayType -> "String",
     Types.AnyType -> "Any")
-    
-//  val javaTypeMappingTable = Map[PigType, String](
-//    Types.IntType -> "java.lang.Integer",
-//    Types.LongType -> "java.lang.Long",
-//    Types.FloatType -> "java.lang.Float",
-//    Types.DoubleType -> "java.lang.Double",
-//    Types.CharArrayType -> "java.lang.String",
-//    Types.ByteArrayType -> "java.lang.String")
 
   /**
    * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
@@ -193,12 +185,19 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           else
             f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
         }
-        case None => throw new TemplateException(s"invalid field name $f") // if we don't have a schema this is not allowed
+        case None =>
+          // if we don't have a schema this is not allowed
+          throw new TemplateException(s"invalid field name $f")
       }
     }
     else
         s"$tuplePrefix._${schema.get.indexOfField(nf)}" // s"$tuplePrefix.$f"
-    case PositionalField(pos) => s"$tuplePrefix._$pos"
+    case PositionalField(pos) => schema match {
+      case Some(s) => s"$tuplePrefix._$pos"
+      case None =>
+        // if we don't have a schema the Record class is used
+        s"$tuplePrefix.get($pos)"
+    }
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
@@ -490,17 +489,25 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     var paramMap = Map[String, Any]()
     node.schema match {
       case Some(s) => if (loaderFunc.nonEmpty && loaderFunc.get == "JdbcStorage")
-      // JdbcStorage provides already types results, therefore we need an extractor which calls
-      // only the appropriate get functions on sql.Row
-        paramMap += ("extractor" ->
-          s"""(data: org.apache.spark.sql.Row) => ${schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
-          "class" -> schemaClassName(s.className))
-      else
-        paramMap += ("extractor" ->
-          s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
-          "class" -> schemaClassName(s.className))
-      case None => paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))",
-        "class" -> "TextLine")
+        // JdbcStorage provides already types results, therefore we need an extractor which calls
+        // only the appropriate get functions on sql.Row
+          paramMap += ("extractor" ->
+            s"""(data: org.apache.spark.sql.Row) => ${schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
+            "class" -> schemaClassName(s.className))
+        else
+          paramMap += ("extractor" ->
+            s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
+            "class" -> schemaClassName(s.className))
+      case None => {
+        paramMap += ("extractor" -> "(data: Array[String]) => Record(data)", "class" -> "Record")
+        /*
+        if(loaderFunc.nonEmpty && loaderFunc.get == "PigStorage")
+          // if we don't know the schema but the user wants to get records we use the Record class
+          paramMap += ("extractor" -> "(data: Array[String]) => Record(data)", "class" -> "Record")
+        else
+          paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))", "class" -> "TextLine")
+          */
+      }
     }
     paramMap
   }
@@ -547,7 +554,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       "func" -> storeFunc.getOrElse(BackendManager.backend.defaultConnector))
     node.schema match {
       case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
-      case None => paramMap += ("class" -> "TextLine")
+      case None => paramMap += ("class" -> "Record")
     }
 
     if (params != null && params.nonEmpty)

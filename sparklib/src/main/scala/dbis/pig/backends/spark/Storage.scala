@@ -54,10 +54,12 @@ trait SchemaClass {
  *
  * @param _0 the text line
  */
+/*
 case class TextLine(_0: String) extends java.io.Serializable with SchemaClass {
   override def toString = _0
   override def mkString(delim: String) = toString
 }
+*/
 
 /**
  * A record class for an array of string values.
@@ -66,6 +68,8 @@ case class TextLine(_0: String) extends java.io.Serializable with SchemaClass {
  */
 case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = fields.mkString(delim)
+
+  def get(idx: Int) = fields(idx)
 }
 
 //-----------------------------------------------------------------------------------------------------

@@ -79,12 +79,8 @@ foreachFlatMap(out,in,expr) ::=<<
 >>
 
 // ------------------ Passes Stream through a Window Operator -----------------
-window(out,in,window,wUnit,slider,sUnit) ::=<<
-  <if (sUnit)>
-    val <out> = <in>.window(<wUnit>(<window>), <sUnit>(<slider>))
-  <else>
-     val <out> = <in>.window(<wUnit>(<window>))
-  <endif>
+window(out, in, window, wUnit, slider, sUnit) ::=<<
+    val <out> = <in>.window(<wUnit>(<window>)<if (sUnit)>, <sUnit>(<slider>)<endif>)
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------

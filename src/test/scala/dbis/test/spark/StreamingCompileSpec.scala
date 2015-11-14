@@ -19,6 +19,7 @@ package dbis.test.spark
 import dbis.pig.backends.BackendManager
 import dbis.pig.codegen.BatchCodeGen
 import dbis.pig.codegen.StreamingCodeGen
+import dbis.pig.expr._
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.backends.BackendManager
@@ -93,7 +94,216 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
       |(data: Array[String]) => _t1_Tuple(data(0).toString, data(1).toInt), ",")
     """.stripMargin
     )
-    println("--> " + generatedCode)
     assert(generatedCode == expectedCode)
   }
+
+  it should "contain code for loading a stream" in {
+    val ops = parseScript(
+      """
+        |in = LOAD 'file.csv' USING PigStream(',') AS (f1: int, f2: int);
+        |DUMP in;
+      """.stripMargin, LanguageFeature.StreamingPig)
+
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("in").get))
+    val expectedCode = cleanString(
+      """
+        |val in = PigStream[_t1_Tuple]().loadStream(ssc, "file.csv",
+        |(data: Array[String]) => _t1_Tuple(data(0).toInt, data(1).toInt), ",")
+      """.stripMargin
+    )
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for simple ORDER BY" in {
+    val op = OrderBy(Pipe("B"), Pipe("A"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val B = A.transform(rdd => rdd.keyBy(t => t._0).sortByKey(true).map{case (k,v) => v})")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for complex ORDER BY" in {
+    val op = OrderBy(Pipe("B"), Pipe("A"), List(OrderBySpec(NamedField("f1"), OrderByDirection.AscendingOrder),
+      OrderBySpec(NamedField("f3"), OrderByDirection.AscendingOrder)))
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+      Field("f2", Types.DoubleType),
+      Field("f3", Types.IntType)))))
+    op.schema = Some(schema)
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val B = A.transform(rdd => rdd.keyBy(t => custKey_B_A(t._0,t._2)).sortByKey(true).map{case (k,v) => v})")
+    assert(generatedCode == expectedCode)
+
+    val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(op))
+    val expectedHelperCode = cleanString(
+      """case class custKey_B_A(c1: String, c2: Int) extends Ordered[custKey_B_A] {
+        |def compare(that: custKey_B_A) = {
+        |if (this.c1 == that.c1) { this.c2 compare that.c2 } else this.c1 compare that.c1 } }
+        |""".stripMargin)
+    assert(generatedHelperCode == expectedHelperCode)
+  }
+
+  it should "contain code for WINDOW with RANGE size and RANGE slider" in {
+    val op = Window(Pipe("b"), Pipe("a"), (5, "SECONDS"), (1, "SECONDS"))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val b = a.window(SECONDS(5), SECONDS(1))")
+    assert(generatedCode == expectedCode)
+  }
+
+  /*
+   * Not supported in Spark Streaming.
+   *
+  it should "contain code for WINDOW with RANGE size and ROWS slider" in {
+    val op = Window(Pipe("b"), Pipe("a"), (5, "SECONDS"), (10, ""))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val b = a.window(Time.of(5, TimeUnit.SECONDS)).every(Count.of(10))")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for WINDOW with ROWS size and RANGE slider" in {
+    val op = Window(Pipe("b"), Pipe("a"), (100, ""), (1, "SECONDS"))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val b = a.window(Count.of(100)).every(Time.of(1, TimeUnit.SECONDS))")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for WINDOW with ROWS size and ROWS slider" in {
+    val op = Window(Pipe("b"), Pipe("a"), (100, ""), (10, ""))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val b = a.window(Count.of(100)).every(Count.of(10))")
+    assert(generatedCode == expectedCode)
+  }
+  */
+
+  /*
+   * Not supported in Spark Streaming.
+   *
+  it should "contain code for a CROSS operator on two relations" in {
+    // a = Cross b, c;
+    val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c")),(10, "SECONDS"))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+                                     |val a = b.cross(c).onWindow(10, TimeUnit.SECONDS).map{
+                                     |t => t._1 ++ t._2
+                                     |}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a CROSS operator on more than two relations" in {
+    // a = Cross b, c, d;
+    val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")),(10, "SECONDS"))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+                                     |val a = b.cross(c).onWindow(10, TimeUnit.SECONDS).map{
+                                     |t => t._1 ++ t._2
+                                     |}.cross(d).onWindow(10, TimeUnit.SECONDS).map{
+                                     |t => t._1 ++ t._2
+                                     |}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+  */
+  it should "contain code for a binary JOIN statement with simple expression" in {
+    val file = new java.net.URI("input/file.csv")
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+      Field("f2", Types.DoubleType),
+      Field("f3", Types.IntType)))))
+    val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    op.inputs = List(input1, input2)
+    op.constructSchema
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+                                     |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
+                                     |t => t._1 ++ t._2
+                                     |}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a binary JOIN statement with expression lists" in {
+    val file = new java.net.URI("input/file.csv")
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
+      List(PositionalField(1), PositionalField(2))), (5, "SECONDS"))
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+      Field("f2", Types.DoubleType),
+      Field("f3", Types.IntType)))))
+    val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    op.inputs = List(input1, input2)
+    op.constructSchema
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+                                     |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => Array(t(0).asInstanceOf[String],t(1).asInstanceOf[Double]).mkString).equalTo(t => Array(t(1).asInstanceOf[Double],t(2).asInstanceOf[Int]).mkString).map{
+                                     |t => t._1 ++ t._2
+                                     |}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a multiway JOIN statement" in {
+    val file = new java.net.URI("input/file.csv")
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
+      List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+      Field("f2", Types.DoubleType),
+      Field("f3", Types.IntType)))))
+    val input1 = Pipe("b",Load(Pipe("b"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    val input3 = Pipe("d",Load(Pipe("d"), file, Some(schema), Some("PigStream"), List("\",\"")))
+    op.inputs = List(input1, input2, input3)
+    op.constructSchema
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+                                     |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
+                                     |t => t._1 ++ t._2
+                                     |}.join(d).onWindow(5, TimeUnit.SECONDS).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
+                                     |t => t._1 ++ t._2
+                                     |}""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a UNION operator on two relations" in {
+    // a = UNION b, c;
+    val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c")))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.union(c)")
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a UNION operator on more than two relations" in {
+    // a = UNION b, c, d;
+    val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.union(c).union(d)")
+    assert(generatedCode == expectedCode)
+  }
+
+  /*------------------------------------------------------------------------------------------------- */
+  /*                                 Testing of Hybrid Operators                                      */
+  /*------------------------------------------------------------------------------------------------- */
+
+  /*******************/
+  /* Test for FILTER */
+  /*******************/
+  it should "contain code for FILTER" in {
+    val op = Filter(Pipe("a"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
+    val codeGenerator = new StreamingCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("val a = b.filter(t => {t._1 < 42})")
+    assert(generatedCode == expectedCode)
+  }
+
 }
