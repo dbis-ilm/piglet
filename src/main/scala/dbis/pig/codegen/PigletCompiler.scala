@@ -143,9 +143,7 @@ object PigletCompiler extends LazyLogging {
       plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
 
       // 8. copy the sparklib library to output
-      // TODO: we have to find the real path!!!!!!
       val jobJar = backendJar.toAbsolutePath().toString()
-      logger.debug(s"jobJar: $jobJar (${backendJar.toString})")
       FileTools.extractJarToDir(jobJar, outputDirectory)
 
       val sources = ListBuffer(outputFile)
