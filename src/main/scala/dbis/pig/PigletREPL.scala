@@ -53,6 +53,7 @@ object PigletREPL extends LazyLogging {
   case class REPLConfig(master: String = "local",
                         outDir: String = ".",
                         backend: String = Conf.defaultBackend,
+                        backendPath: String = ".",
                         language: String = "pig",
                         interactive: Boolean = true,
                         profiling: Boolean = false,
@@ -211,6 +212,7 @@ object PigletREPL extends LazyLogging {
     var master: String = "local"
     var outDir: Path = null
     var backend: String = Conf.defaultBackend
+    var backendPath: String = "."
     var languageFeature = LanguageFeature.PlainPig
     var backendArgs: Map[String, String] = null
     var interactive: Boolean = true
@@ -221,6 +223,7 @@ object PigletREPL extends LazyLogging {
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[String]('o',"outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
       opt[String]('b',"backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
+      opt[String]("backend_dir") optional() action { (x,c) => c.copy(backendPath = x)} text ("Path to the diretory containing the backend plugins")
       opt[Boolean]("profiling") optional() action { (x,c) => c.copy(profiling = x) } text("Switch on profiling")
       opt[String]('l', "language") optional() action { (x,c) => c.copy(language = x)} text ("Accepted language (pig = default, sparql, streaming)")
       opt[Map[String,String]]("<backend-arguments>...") optional() action { (x, c) => c.copy(backendArgs = x) } text ("Pig script files to execute")
@@ -234,6 +237,7 @@ object PigletREPL extends LazyLogging {
         outDir = Paths.get(config.outDir)
         profiling = config.profiling
         backend = config.backend
+        backendPath = config.backendPath
         languageFeature = config.language match {
           case "sparql" => LanguageFeature.SparqlPig
           case "streaming" => LanguageFeature.StreamingPig
@@ -350,7 +354,7 @@ object PigletREPL extends LazyLogging {
           plan = processPlan(plan)
 
           val templateFile = backendConf.templateFile
-          val jobJar = Conf.backendJar(backend)
+          val jobJar = Paths.get(s"$backendPath/${Conf.backendJar(backend).toString}")
 
           nextScriptName()
           PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), jobJar, templateFile, backend, profiling) match {
