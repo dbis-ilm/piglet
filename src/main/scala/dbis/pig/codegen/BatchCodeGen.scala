@@ -323,9 +323,11 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     callST("orderBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "key" -> key, "asc" -> asc))
   }
 
-
   private def callsAverageFunc(node: PigOperator, e: Expr): Boolean =
     e.traverseOr(node.inputSchema.getOrElse(null), Expr.containsAverageFunc)
+
+  private def callsCountFunc(node: PigOperator, e: Expr): Boolean =
+    e.traverseOr(node.inputSchema.getOrElse(null), Expr.containsCountFunc)
 
   /**
     * Generates code for the ACCUMULATE operator
@@ -335,6 +337,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     * @return the Scala code implementing the operator
     */
   def emitAccumulate(node: PigOperator, gen: GeneratorList): String = {
+    val inputSchemaDefined = node.inputSchema.isDefined
     require(node.schema.isDefined)
     val outClassName = schemaClassName(node.schema.get.className)
     val helperClassName = s"_${node.schema.get.className}_HelperTuple"
@@ -372,13 +375,18 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
       val traverse = new RefExprExtractor
       e.expr.traverseAnd(null, traverse.collectRefExprs)
       val refExpr = traverse.exprs.head
-      val str = refExpr.r match {
-        case nf@NamedField(n, _) => s"t._${node.inputSchema.get.indexOfField(nf)}"
-        case PositionalField(p) => s"t._$p"
-        case _ => ""
+      // in case of COUNT we simply pass 0 instead of the field
+      if (callsCountFunc(node, e.expr))
+        "0"
+      else {
+        val str = refExpr.r match {
+          case nf@NamedField(n, _) => s"t._${node.inputSchema.get.indexOfField(nf)}"
+          case PositionalField(p) => if (inputSchemaDefined) s"t._$p" else s"t.get(0)"
+          case _ => ""
+        }
+        // in case of AVERAGE we need fields for SUM and COUNT
+        if (callsAverageFunc(node, e.expr)) s"${str}, ${str}" else str
       }
-      // in case of AVERAGE we need fields for SUM and COUNT
-      if (callsAverageFunc(node, e.expr)) s"${str}, ${str}" else str
     }.mkString(", ")
 
     // generate final aggregation expression
@@ -445,8 +453,11 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
   override def emitHelperClass(node: PigOperator): String = {
     node match {
       case op@Accumulate(out, in, gen) => {
-        // for ACCUMULATE we need a special tuple class
-        val inSchemaClassName = schemaClassName(op.inputSchema.get.className)
+        // TODO: for ACCUMULATE we need a special tuple class
+        val inSchemaClassName = op.inputSchema match {
+          case Some(s) => schemaClassName(s.className)
+          case None => "Record"
+        }
         val fieldStr = s"_t: ${inSchemaClassName} = null, " + op.generator.exprs.zipWithIndex.map{ case (e, i) =>
           if (callsAverageFunc(node, e.expr)) {
             // TODO: determine type
