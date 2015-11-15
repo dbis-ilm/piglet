@@ -121,7 +121,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
     val op = OrderBy(Pipe("B"), Pipe("A"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))
     val codeGenerator = new StreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val B = A.transform(rdd => rdd.keyBy(t => t._0).sortByKey(true).map{case (k,v) => v})")
+    val expectedCode = cleanString("val B = A.transform(rdd => rdd.keyBy(t => t.get(0)).sortByKey(true).map{case (k,v) => v})")
     assert(generatedCode == expectedCode)
   }
 
@@ -212,8 +212,9 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
   }
   */
   it should "contain code for a binary JOIN statement with simple expression" in {
+    Schema.init()
     val file = new java.net.URI("input/file.csv")
-    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
       Field("f2", Types.DoubleType),
       Field("f3", Types.IntType)))))
@@ -221,19 +222,21 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
     val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), Some("PigStream"), List("\",\"")))
     op.inputs = List(input1, input2)
     op.constructSchema
-    val codeGenerator = new StreamingCodeGen(templateFile)
+
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-                                     |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
-                                     |t => t._1 ++ t._2
-                                     |}""".stripMargin)
+                                     |val b_kv = b.map(t => (t._0,t))
+                                     |val c_kv = c.map(t => (t._0,t))
+                                     |val a = b_kv.join(c_kv).map{case (k,(v,w)) => _t2_Tuple(v._0, v._1, v._2, w._0, w._1, w._2)}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for a binary JOIN statement with expression lists" in {
+    Schema.init()
     val file = new java.net.URI("input/file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
-      List(PositionalField(1), PositionalField(2))), (5, "SECONDS"))
+      List(PositionalField(1), PositionalField(2))))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
       Field("f2", Types.DoubleType),
       Field("f3", Types.IntType)))))
@@ -241,19 +244,20 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
     val input2 = Pipe("c",Load(Pipe("c"), file, Some(schema), Some("PigStream"), List("\",\"")))
     op.inputs = List(input1, input2)
     op.constructSchema
-    val codeGenerator = new StreamingCodeGen(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-                                     |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => Array(t(0).asInstanceOf[String],t(1).asInstanceOf[Double]).mkString).equalTo(t => Array(t(1).asInstanceOf[Double],t(2).asInstanceOf[Int]).mkString).map{
-                                     |t => t._1 ++ t._2
-                                     |}""".stripMargin)
+                                     |val b_kv = b.map(t => (Array(t._0,t._1).mkString,t))
+                                     |val c_kv = c.map(t => (Array(t._1,t._2).mkString,t))
+                                     |val a = b_kv.join(c_kv).map{case (k,(v,w)) => _t2_Tuple(v._0, v._1, v._2, w._0, w._1, w._2)}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for a multiway JOIN statement" in {
+    Schema.init()
     val file = new java.net.URI("input/file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
-      List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
+      List(PositionalField(0)), List(PositionalField(0))))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
       Field("f2", Types.DoubleType),
       Field("f3", Types.IntType)))))
@@ -262,14 +266,13 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
     val input3 = Pipe("d",Load(Pipe("d"), file, Some(schema), Some("PigStream"), List("\",\"")))
     op.inputs = List(input1, input2, input3)
     op.constructSchema
-    val codeGenerator = new StreamingCodeGen(templateFile)
+    val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-                                     |val a = b.join(c).onWindow(5, TimeUnit.SECONDS).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
-                                     |t => t._1 ++ t._2
-                                     |}.join(d).onWindow(5, TimeUnit.SECONDS).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
-                                     |t => t._1 ++ t._2
-                                     |}""".stripMargin)
+                                     |val b_kv = b.map(t => (t._0,t))
+                                     |val c_kv = c.map(t => (t._0,t))
+                                     |val d_kv = d.map(t => (t._0,t))
+                                     |val a = b_kv.join(c_kv).join(d_kv).map{case (k,((v1,v2),v3)) => _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2)}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -302,7 +305,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
     val op = Filter(Pipe("a"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val codeGenerator = new StreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b.filter(t => {t._1 < 42})")
+    val expectedCode = cleanString("val a = b.filter(t => {t.get(1) < 42})")
     assert(generatedCode == expectedCode)
   }
 

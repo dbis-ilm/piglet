@@ -103,6 +103,21 @@ limit(out,in,num) ::=<<
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
+join_key_map(rels, keys) ::=<<
+        <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
+        }>
+>>
+
+join(out, class, rel1, rel2, fields) ::=<<
+        val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)\}
+>>
+
+
+m_join(out, class, rel1, rel2, pairs, fields) ::=<<
+        val <out> = <rel1>_kv<rel2: {rel | .join(<rel>_kv)}>.map{case (k,<pairs>) => <class>(<fields>)\}
+>>
+
+/*
 join_key_map(rels,keys) ::=<<
         <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
         }>
@@ -112,7 +127,7 @@ join(out,rel1,key1,rel2,key2) ::=<<
         val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => (k, v ++ w)\}}>.map{case (k,v) => v}
 
 >>
-
+*/
 // ------------------ UNIONs multiple streams to one --------------------------
 union(out,in,others) ::=<<
         val <out> = <in><others:{ e | .union(<e>)}>
