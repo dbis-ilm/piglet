@@ -375,7 +375,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
       val traverse = new RefExprExtractor
       e.expr.traverseAnd(null, traverse.collectRefExprs)
       val refExpr = traverse.exprs.head
-      // in case of COUNT we simply pass 0 instead of the field
+      // in case of COUNT we simply pass 0 instead of the field: this allows COUNT on chararray
       if (callsCountFunc(node, e.expr))
         "0"
       else {
