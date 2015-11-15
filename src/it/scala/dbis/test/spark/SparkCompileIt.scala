@@ -31,6 +31,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
 
     //FLINK
+  /*
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "flink"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "flink"),
     ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
@@ -42,7 +43,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
 //    ("grouping.pig", "grouping.out", "grouping.data", false, "pig", "flink"),
 //    ("wordcount.pig", "marycounts.out", "marycount.data", false, "pig", "flink"),
     ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "flink"),
-
+*/
     //SPARK
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
@@ -159,9 +160,11 @@ class SparkCompileIt extends FlatSpec with Matchers {
       val resultFile = new java.io.File(resultPath.path)
       if(resultFile.isFile)
         result ++= Source.fromFile(resultFile).getLines()
-      else
-        for (file <- resultFile.listFiles)
-        result++=Source.fromFile(file).getLines()
+      else {
+        // for the test cases we assume only a single file part-00000
+        for (file <- resultFile.listFiles if file.getName == "part-00000")
+          result ++= Source.fromFile(file).getLines()
+      }
       val truth = Source.fromFile(resourcePath + truthFile).getLines()
 
       // 4. compare both files

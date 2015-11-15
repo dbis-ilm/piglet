@@ -29,11 +29,13 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val ssc = new StreamingContext(conf, Seconds(1))
-
+        <if (profiling)>
+    	val perfMon = new PerfMonitor("<name>_App")
+    	<endif>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
@@ -77,12 +79,8 @@ foreachFlatMap(out,in,expr) ::=<<
 >>
 
 // ------------------ Passes Stream through a Window Operator -----------------
-window(out,in,window,wUnit,slider,sUnit) ::=<<
-  <if (sUnit)>
-    val <out> = <in>.window(<wUnit>(<window>), <sUnit>(<slider>))
-  <else>
-     val <out> = <in>.window(<wUnit>(<window>))
-  <endif>
+window(out, in, window, wUnit, slider, sUnit) ::=<<
+    val <out> = <in>.window(<wUnit>(<window>)<if (sUnit)>, <sUnit>(<slider>)<endif>)
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
@@ -135,6 +133,19 @@ orderHelper(params) ::=<<
         def compare(that: <params.cname>) = <params.cmpExpr>
     }
 >>
+
+// ------------------ Reads from a SOCKET -------------------------------------
+socketRead(out, addr_hostname, addr_port, class, func, extractor, mode, params) ::=<<
+    val <out> = <func>[<class>]().receiveStream(ssc, "<addr_hostname>", <addr_port>, <extractor><if (params)><params><endif>)
+>>
+/*
+<if (mode)>
+    val <out> = <func>().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
+<else>
+    val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
+<endif>
+*/
+
 
 // ------------------ STREAM operators ----------------------------------------
 streamOp(out,in,op,params) ::=<<

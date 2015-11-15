@@ -54,10 +54,12 @@ trait SchemaClass {
  *
  * @param _0 the text line
  */
+/*
 case class TextLine(_0: String) extends java.io.Serializable with SchemaClass {
   override def toString = _0
   override def mkString(delim: String) = toString
 }
+*/
 
 /**
  * A record class for an array of string values.
@@ -66,6 +68,8 @@ case class TextLine(_0: String) extends java.io.Serializable with SchemaClass {
  */
 case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = fields.mkString(delim)
+
+  def get(idx: Int) = fields(idx)
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -74,17 +78,31 @@ class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
   def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): RDD[T] =
     sc.textFile(path).map(line => extract(line.split(delim, -1)))
 
-  def loadStream(ssc: StreamingContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
-    ssc.receiverStream(new FileStreamReader(path)).map(line => extract(line.split(delim, -1)))
-    
   def write(path: String, rdd: RDD[T], delim: String = ",") = rdd.map(_.mkString(delim)).saveAsTextFile(path)
-  
-  def writeStream(path: String, dstream: DStream[T], delim: String = ",") = dstream.map(_.mkString(delim)).saveAsTextFiles(path)
 }
 
 object PigStorage extends java.io.Serializable {
   def apply[T <: SchemaClass :ClassTag](): PigStorage[T] = {
     new PigStorage[T]
+  }
+}
+
+//-----------------------------------------------------------------------------------------------------
+
+class PigStream[T <: SchemaClass :ClassTag] extends java.io.Serializable {
+  def receiveStream(ssc: StreamingContext, hostname: String, port: Int, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
+    ssc.socketTextStream(hostname, port).map(line => extract(line.split(delim, -1)))
+
+  def loadStream(ssc: StreamingContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
+    ssc.receiverStream(new FileStreamReader(path)).map(line => extract(line.split(delim, -1)))
+
+  def writeStream(path: String, dstream: DStream[T], delim: String = ",") = dstream.map(_.mkString(delim)).saveAsTextFiles(path)
+
+}
+
+object PigStream extends java.io.Serializable {
+  def apply[T <: SchemaClass :ClassTag](): PigStream[T] = {
+    new PigStream[T]
   }
 }
 

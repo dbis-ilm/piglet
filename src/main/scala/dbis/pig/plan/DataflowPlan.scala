@@ -52,7 +52,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
   /**
    * A map for UDF aliases + constructor arguments.
    */
-  val udfAliases = Map[String,(String,  List[Value])]()
+  val udfAliases = Map[String,(String, List[Any])]()
 
   var code: String = ""
   var extraRuleCode: Seq[String] = List.empty

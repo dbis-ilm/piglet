@@ -172,6 +172,13 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         RefExpr(Value(0))))))
   }
 
+  it should "parse a filter with an expression on a string literal" in {
+    assert(parseScript("a = FILTER b BY x == 'aString';") ==
+      List(Filter(Pipe("a"), Pipe("b"), Eq(
+        RefExpr(NamedField("x")),
+        RefExpr(Value("aString"))))))
+  }
+
   it should "parse a filter with a boolean function expression" in {
     assert(parseScript("a = FILTER b BY STARTSWITH($0,\"test\");") ==
       List(Filter(Pipe("a"), Pipe("b"),
@@ -498,7 +505,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   it should "parse a socket read statement in standard mode with using clause" in {
     assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');", LanguageFeature.StreamingPig)
-      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("PigStream"),List("""','"""))))
+      == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("PigStream"),List("""",""""))))
     assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();", LanguageFeature.StreamingPig)
       == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("RDFStream"))))
   }

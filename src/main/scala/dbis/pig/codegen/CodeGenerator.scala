@@ -42,7 +42,7 @@ trait CodeGeneratorBase {
   /**
    * A map of alias names for user-defined functions.
    */
-  var udfAliases: Option[Map[String, (String, List[Value])]] = None
+  var udfAliases: Option[Map[String, (String, List[Any])]] = None
 
   /**
    * The set of _KV variables refering to RDDs which are created for joins.
