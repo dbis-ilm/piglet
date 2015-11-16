@@ -48,7 +48,7 @@ abstract class BuilderT[FROM, TO] {
   /** Add the data wrapped by this object as a strategy.
     *
     */
-  def apply(): Unit = {
+  def build(): Unit = {
     val wrapped = wrapInFixer(wrapInCheck(func.get))
     addAsStrategy(wrapped)
   }

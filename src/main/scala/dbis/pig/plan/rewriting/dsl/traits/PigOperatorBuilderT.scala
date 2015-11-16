@@ -64,7 +64,7 @@ abstract class PigOperatorBuilderT[FROM <: PigOperator, TO] extends BuilderT[FRO
   /** Add the data wrapped by this object as a strategy.
     *
     */
-  override def apply(): Unit = {
+  override def build(): Unit = {
     val wrapped = wrapInFixer(wrapInCheck(func.get))
     addAsStrategy(wrapped)
   }
