@@ -90,8 +90,7 @@ trait RewriterDSL {
     */
   def unless[FROM <: PigOperator : ClassTag, TO : ClassTag](check: (FROM => Boolean)): WhenWord[FROM, TO] = {
     val b = new Builder[FROM, TO]
-    def newcheck(term: FROM): Boolean = !check(term)
-    new WhenWord[FROM, TO](b, newcheck)
+    new CheckWord[FROM, TO](b).unless(check)
   }
 
   /** Start describing a rewriting process by supplying a check that needs to succeed to make the rewriting happen.
@@ -103,7 +102,7 @@ trait RewriterDSL {
     */
   def when[FROM <: PigOperator : ClassTag, TO : ClassTag](check: (FROM => Boolean)): WhenWord[FROM, TO] = {
     val b = new Builder[FROM, TO]
-    new WhenWord[FROM, TO](b, check)
+    new CheckWord[FROM, TO](b).when(check)
   }
 
   /** Start describing a rewriting process by supplying a check in the form of a pattern match that needs to succeed to
@@ -117,9 +116,7 @@ trait RewriterDSL {
     */
   def whenMatches[FROM <: PigOperator : ClassTag, TO : ClassTag](check: scala.PartialFunction[FROM, _]) = {
     val b = new Builder[FROM, TO]
-    def f(term: FROM): Boolean = check.isDefinedAt(term)
-
-    new WhenWord(b, f)
+    new CheckWord[FROM, TO](b).whenMatches(check)
   }
 
   /** Start describing a rewriting process by supplying a check in the form of a pattern match that needs to fail to
@@ -133,8 +130,6 @@ trait RewriterDSL {
     */
   def unlessMatches[FROM <: PigOperator : ClassTag, TO : ClassTag](check: scala.PartialFunction[FROM, _]) = {
     val b = new Builder[FROM, TO]
-    def f(term: FROM): Boolean = !check.isDefinedAt(term)
-
-    new WhenWord(b, f)
+    new CheckWord[FROM, TO](b).unlessMatches(check)
   }
 }
