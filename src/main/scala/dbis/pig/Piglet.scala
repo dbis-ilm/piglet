@@ -243,7 +243,7 @@ object Piglet extends LazyLogging {
     	  newPlan = processMaterializations(newPlan, mm)
 		  
 		  
-      if (langFeature == LanguageFeature.StreamingPig)
+      if (langFeature == LanguageFeature.StreamingPig && backend == "flinks")
         newPlan = processWindows(newPlan)
         
       newPlan = processPlan(newPlan)   
