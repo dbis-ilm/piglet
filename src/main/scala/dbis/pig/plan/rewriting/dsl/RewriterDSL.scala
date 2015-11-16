@@ -17,7 +17,7 @@
 package dbis.pig.plan.rewriting.dsl
 
 import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.dsl.builders.{MergeBuilder, ReplacementBuilder, Builder}
+import dbis.pig.plan.rewriting.dsl.builders.{MergeBuilder, ReplacementBuilder, PigOperatorBuilder}
 import dbis.pig.plan.rewriting.dsl.traits.{CheckWordT, EndWordT}
 import dbis.pig.plan.rewriting.dsl.words._
 
@@ -66,7 +66,7 @@ trait RewriterDSL {
     * @tparam TO
     */
   def applyRule[FROM <: PigOperator : ClassTag, TO: ClassTag](f: (FROM => Option[TO])): Unit = {
-    val b = new Builder[FROM, TO]
+    val b = new PigOperatorBuilder[FROM, TO]
     new ImmediateEndWord(b).applyRule(f)
   }
 
@@ -76,7 +76,7 @@ trait RewriterDSL {
     * @tparam TO
     */
   def applyPattern[TO: ClassTag](f: scala.PartialFunction[PigOperator, TO]): Unit = {
-    val b = new Builder[PigOperator, TO]
+    val b = new PigOperatorBuilder[PigOperator, TO]
     new ImmediateEndWord(b).applyPattern(f)
   }
 
@@ -89,7 +89,7 @@ trait RewriterDSL {
     * @return
     */
   def unless[FROM <: PigOperator : ClassTag, TO : ClassTag](check: (FROM => Boolean)): WhenWord[FROM, TO] = {
-    val b = new Builder[FROM, TO]
+    val b = new PigOperatorBuilder[FROM, TO]
     new CheckWord[FROM, TO](b).unless(check)
   }
 
@@ -101,7 +101,7 @@ trait RewriterDSL {
     * @return
     */
   def when[FROM <: PigOperator : ClassTag, TO : ClassTag](check: (FROM => Boolean)): WhenWord[FROM, TO] = {
-    val b = new Builder[FROM, TO]
+    val b = new PigOperatorBuilder[FROM, TO]
     new CheckWord[FROM, TO](b).when(check)
   }
 
@@ -115,7 +115,7 @@ trait RewriterDSL {
     * }}}
     */
   def whenMatches[FROM <: PigOperator : ClassTag, TO : ClassTag](check: scala.PartialFunction[FROM, _]) = {
-    val b = new Builder[FROM, TO]
+    val b = new PigOperatorBuilder[FROM, TO]
     new CheckWord[FROM, TO](b).whenMatches(check)
   }
 
@@ -129,7 +129,7 @@ trait RewriterDSL {
     * }}}
     */
   def unlessMatches[FROM <: PigOperator : ClassTag, TO : ClassTag](check: scala.PartialFunction[FROM, _]) = {
-    val b = new Builder[FROM, TO]
+    val b = new PigOperatorBuilder[FROM, TO]
     new CheckWord[FROM, TO](b).unlessMatches(check)
   }
 }

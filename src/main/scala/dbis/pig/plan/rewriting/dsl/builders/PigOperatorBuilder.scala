@@ -28,7 +28,7 @@ import scala.reflect.ClassTag
   * @tparam FROM
   * @tparam TO
   */
-class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends BuilderT[FROM, TO] {
+class PigOperatorBuilder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends BuilderT[FROM, TO] {
   override def wrapInCheck(func: FROM => Option[TO]) = {
     def f(term: FROM): Option[TO] = {
       if (check.isEmpty) {
@@ -64,8 +64,7 @@ class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends BuilderT[FRO
   }
 
   def addAsStrategy(func: (FROM => Option[TO])) = {
-    val typeWrapped = Rewriter.buildTypedCaseWrapper(func)
-    Rewriter.addStrategy(strategyf(t => typeWrapped(t)))
+    Rewriter.addTypedStrategy(func)
   }
 
   /** Add the data wrapped by this object as a strategy.

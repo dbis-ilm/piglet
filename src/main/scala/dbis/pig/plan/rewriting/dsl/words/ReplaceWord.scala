@@ -17,7 +17,7 @@
 package dbis.pig.plan.rewriting.dsl.words
 
 import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.dsl.builders.Builder
+import dbis.pig.plan.rewriting.dsl.builders.PigOperatorBuilder
 import dbis.pig.plan.rewriting.dsl.traits.{CheckWordT, BuilderT, EndWordT}
 
 class ReplaceWord[FROM <: PigOperator](override val b: BuilderT[FROM, PigOperator])

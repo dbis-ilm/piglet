@@ -28,7 +28,7 @@ import scala.reflect.ClassTag
  * @tparam TO
  */
 class ReplacementBuilder[FROM <: PigOperator : ClassTag, TO <: PigOperator : ClassTag] extends
-  Builder[FROM, TO] {
+  PigOperatorBuilder[FROM, TO] {
   override def wrapInFixer(func: (FROM => Option[TO])): (FROM => Option[TO]) = func
 
   override def addAsStrategy(func: (FROM => Option[TO])) = {
