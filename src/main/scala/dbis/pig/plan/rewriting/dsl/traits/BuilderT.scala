@@ -27,7 +27,7 @@ package dbis.pig.plan.rewriting.dsl.traits
   * @tparam TO
   */
 abstract class BuilderT[FROM, TO] {
-  protected var _func: Option[FROM => Option[TO]] = None
+  private var _func: Option[FROM => Option[TO]] = None
 
   def func_=(f: FROM => Option[TO]) = _func = Some(f)
 
@@ -49,6 +49,9 @@ abstract class BuilderT[FROM, TO] {
     *
     */
   def build(): Unit = {
+    if(func.isEmpty) {
+      throw new IllegalStateException("BuilderT.build called, but the function is not defined")
+    }
     val wrapped = wrapInFixer(wrapInCheck(func.get))
     addAsStrategy(wrapped)
   }
