@@ -31,7 +31,7 @@ import scala.collection.mutable.ListBuffer
 class SparkRun extends PigletBackend with BackendConf {
 
   // loads the default configuration file in resources/sparkbackend.conf
-  private val appconf = ConfigFactory.load() 
+  protected val appconf = ConfigFactory.load() 
   
   override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]) {
 
@@ -49,7 +49,7 @@ class SparkRun extends PigletBackend with BackendConf {
    * 
    * @return Returns the name of this backend
    */
-  override def name: String = appconf.getString("backends.spark.name")
+  override def name: String = appconf.getString("backends.name")
   
   /**
    * Get the path to the runner class that implements the PigletBackend interface
@@ -60,7 +60,7 @@ class SparkRun extends PigletBackend with BackendConf {
   
   override def templateFile = appconf.getString("backends.spark.template")
 
-  override def defaultConnector = appconf.getString("backends.spark.connector")
+  override def defaultConnector = appconf.getString("backends.connector")
   
   override def raw = false
 }

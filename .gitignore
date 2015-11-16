@@ -29,11 +29,16 @@ lodhub_data
 
 __my_script/
 
+#####
+# ignore database
+db
+
 # sbt specific
 .cache
 .cache-*
 .history
 .lib/
+.scalastyle
 dist/*
 target/
 lib_managed/

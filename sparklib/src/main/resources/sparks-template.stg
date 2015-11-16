@@ -1,0 +1,196 @@
+// ----------------- header declaration ----------------- 
+init_code(includes) ::= <<
+import org.apache.spark._
+import org.apache.spark.streaming._
+import dbis.pig.backends.{SchemaClass, Record}
+import dbis.pig.backends.spark._
+
+object SECONDS {
+  def apply(p: Long) = Seconds(p)
+}
+object MINUTES {
+  def apply(p: Long) = Minutes(p)
+}
+<\n>
+>>
+
+// ----------------- schema class -----------------
+schema_class(name, fields, string_rep) ::= <<
+case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+override def mkString(_c: String = ",") = <string_rep>
+}
+
+>>
+
+// ----------------- BEGIN of code building and initializing the query --------
+query_object(name, embedded_code) ::= <<
+object <name> {
+    <embedded_code>
+
+>>
+
+// ----------------- BEGIN of code building and initializing the query --------
+begin_query(name, profiling) ::= <<
+    def main(args: Array[String]) {
+        val conf = new SparkConf().setAppName("<name>_App")
+        val ssc = new StreamingContext(conf, Seconds(1))
+        <if (profiling)>
+        val perfMon = new PerfMonitor("<name>_App")
+        sc.sparkContext.addSparkListener(perfMon)
+        <endif>
+>>
+
+// ----------------- LOAD text file -------------------------------------------
+loader(out, file, class, func, extractor, params) ::=<<
+        val <out> = <func>[<class>]().loadStream(ssc, "<file>", <extractor><if (params)>, <params><endif>)
+>>
+// ------------------ DUMP results --------------------------------------------
+dump(in) ::=<<
+        <in>.foreachRDD(rdd => rdd.foreach(elem => println(elem.mkString())))
+        //<in>.print
+>>
+
+// ------------------ STORE Results on disk -----------------------------------
+
+store(in, file, class, func, params) ::= <<
+    <func>[<class>]().writeStream("<file>", <in> <if (params)>, <params><endif>)
+>>
+
+/*
+store(in,file,schema,func) ::=<<
+    <if (schema)>
+        <in>.foreachRDD(rdd => <func>().write("<file>",  rdd.map(t => <schema>)))
+    <else>
+        <in>.foreachRDD(rdd => <func>().write("<file>",  rdd))
+    <endif>
+    */
+
+
+// ------------------ FILTER for a predicate ----------------------------------
+filter(out,in,pred) ::=<<
+        val <out> = <in>.filter(t => {<pred>}) 
+>>
+
+// ------------------ Executes an expression FOREACH input element -----------
+foreach(out,in,expr,aggrs, class) ::=<<
+        val <out> = <in>.map(t => <class>(<expr>))
+>>
+
+// ------------------ Executes an expression FOREACH input element where the expression is a nested plan -----------
+foreachNested(out, in, expr) ::=<<
+        val <out> = <in>.map(t => <expr>)
+>>
+
+// ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
+// Note, that the closing parenthesis is intentionally missing
+foreachFlatMap(out, in, expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>
+>>
+
+// ------------------ Passes Stream through a Window Operator -----------------
+window(out, in, window, wUnit, slider, sUnit) ::=<<
+    val <out> = <in>.window(<wUnit>(<window>)<if (sUnit)>, <sUnit>(<slider>)<endif>)
+>>
+
+// ------------------ GROUPs elements on an expression ------------------------
+groupBy(out, in, expr, class, keyExtr) ::=<<
+<if (expr)>
+        val <out> = <in>.transform(rdd => rdd.groupBy(t => {<expr>}).map{case (k,v) => <class>(<keyExtr>,v)})
+<else>
+        val <out> = <in>.transform(rdd => rdd.coalesce(1).glom.map(t => <class>("all", t)))
+<endif>
+>>
+
+
+// ------------------ Outputs only distinct values ----------------------------
+distinct(out,in) ::=<<
+        val <out> = <in>.transform(rdd => rdd.distinct)
+>>
+
+// ------------------ Outputs only num records --------------------------------
+limit(out,in,num) ::=<<
+        val <out> = <in>.transform(rdd => ssc.sparkContext.parallelize(rdd.take(<num>)))
+>>
+
+// ------------------ Joins two streams on the specified keys -----------------
+join_key_map(rels, keys) ::=<<
+        <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
+        }>
+>>
+
+join(out, class, rel1, rel2, fields) ::=<<
+        val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)\}
+>>
+
+
+m_join(out, class, rel1, rel2, pairs, fields) ::=<<
+        val <out> = <rel1>_kv<rel2: {rel | .join(<rel>_kv)}>.map{case (k,<pairs>) => <class>(<fields>)\}
+>>
+
+/*
+join_key_map(rels,keys) ::=<<
+        <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
+        }>
+>>
+
+join(out,rel1,key1,rel2,key2) ::=<<
+        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => (k, v ++ w)\}}>.map{case (k,v) => v}
+
+>>
+*/
+// ------------------ UNIONs multiple streams to one --------------------------
+union(out,in,others) ::=<<
+        val <out> = <in><others:{ e | .union(<e>)}>
+>>
+
+// ------------------ Returns a SAMPLE of the data ----------------------------
+sample(out,in,expr) ::=<<
+        val <out> = <in>.transform(rdd => rdd.sample(false, <expr>))
+>>
+
+// ------------------ ORDERs the input BY a key -------------------------------
+orderBy(out,in,key,asc) ::=<<
+        val <out> = <in>.transform(rdd => rdd.keyBy(t => <key>).sortByKey(<asc>).map{case (k,v) => v})
+>>
+
+orderHelper(params) ::=<<
+    case class <params.cname>(<params.fields>) extends Ordered[<params.cname>] {
+        def compare(that: <params.cname>) = <params.cmpExpr>
+    }
+>>
+
+// ------------------ Reads from a SOCKET -------------------------------------
+socketRead(out, addr_hostname, addr_port, class, func, extractor, mode, params) ::=<<
+    val <out> = <func>[<class>]().receiveStream(ssc, "<addr_hostname>", <addr_port>, <extractor><if (params)><params><endif>)
+>>
+/*
+<if (mode)>
+    val <out> = <func>().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
+<else>
+    val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
+<endif>
+*/
+
+
+// ------------------ STREAM operators ----------------------------------------
+streamOp(out,in,op,params) ::=<<
+        val <out> = <op>(ssc, <in><params>)
+>>
+
+// ----------------------- FS commands ----------------------------------------
+fs(cmd,params) ::=<<
+    HDFSService.process(<cmd>, <params>)
+>>
+
+// ------------------ RSCRIPT operators ----------------------------------------
+rscript(out,in,script) ::=<<
+        val <out> = RScriptOp.process(ssc, <in>, <script>, "res")
+>>
+
+// ----------------- END of the code implementing the query -------------------
+end_query(name) ::= <<
+        ssc.start()             
+        ssc.awaitTermination() 
+    }
+}
+>>

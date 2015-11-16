@@ -14,16 +14,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package dbis.pig.op
 
-
 /**
- * SetCmd represents a pseudo operator for the SET statement.
+ * Delay represents the DELAY operator of Pig.
  *
- * @param param the parameter name
- * @param value the value of the parameter set by this statement
+ * @param out the output pipe (relation).
+ * @param in the input pipe.
+ * @param size the percentage of input tuples that is passed to the output pipe
+ * @param wtime the time for delaying the processing
+ *
  */
-case class SetCmd(param: String, value: dbis.pig.op.Value) extends PigOperator
+case class Delay(out: Pipe, in: Pipe, size: Double, wtime: Int) extends PigOperator {
+  _outputs = List(out)
+  _inputs = List(in)
 
+  override def lineageString: String = {
+    s"""DELAY%${size}%${wtime}%""" + super.lineageString
+  }
 
+}

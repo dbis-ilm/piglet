@@ -18,8 +18,10 @@ package dbis.pig.op
 
 import dbis.pig.plan.{InvalidPlanException, DataflowPlan}
 import dbis.pig.schema._
-
 import scala.collection.mutable.{ListBuffer, Map}
+import dbis.pig.expr.ArithmeticExpr
+import dbis.pig.expr.Ref
+import dbis.pig.expr.Expr
 
 
 /**
@@ -43,7 +45,31 @@ case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None) {
  *
  * @param exprs
  */
-case class GeneratorList(var exprs: List[GeneratorExpr]) extends ForeachGenerator
+case class GeneratorList(var exprs: List[GeneratorExpr]) extends ForeachGenerator {
+  def constructFieldList(inputSchema: Option[Schema]): Array[Field] =
+    exprs.map(e => {
+      e.alias match {
+        // if we have an explicit schema (i.e. a field) then we use it
+        case Some(f) => {
+          if (f.fType == Types.ByteArrayType) {
+            // if the type was only bytearray, we should check the expression if we have a more
+            // specific type
+            val res = e.expr.resultType(inputSchema)
+            Field(f.name, res)
+          }
+          else
+            f
+        }
+        // otherwise we take the field name from the expression and
+        // the input schema
+        case None => {
+          val res = e.expr.resultType(inputSchema)
+          Field(e.expr.exprName, res)
+        }
+      }
+    }).toArray
+
+}
 
 /**
  * GeneratorPlan implements the ForeachGenerator trait and is used to represent
@@ -153,36 +179,14 @@ case class Foreach(out: Pipe,
     }
   }
 
-  def constructFieldList(exprs: List[GeneratorExpr]): Array[Field] =
-    exprs.map(e => {
-      e.alias match {
-        // if we have an explicit schema (i.e. a field) then we use it
-        case Some(f) => {
-          if (f.fType == Types.ByteArrayType) {
-            // if the type was only bytearray, we should check the expression if we have a more
-            // specific type
-            val res = e.expr.resultType(inputSchema)
-            Field(f.name, res)
-          }
-          else
-            f
-        }
-        // otherwise we take the field name from the expression and
-        // the input schema
-        case None => {
-          val res = e.expr.resultType(inputSchema)
-          Field(e.expr.exprName, res)
-        }
-      }
-    }).toArray
 
   override def constructSchema: Option[Schema] = {
     if (inputSchema.isDefined)
       inputSchema.get.setBagName(inPipeName)
 
     generator match {
-      case GeneratorList(expr) => {
-        val fields = constructFieldList(expr)
+      case gen@GeneratorList(expr) => {
+        val fields = gen.constructFieldList(inputSchema)
 
         schema = Some(Schema(BagType(TupleType(fields))))
       }
@@ -271,36 +275,6 @@ case class Foreach(out: Pipe,
       case GeneratorList(exprs) => println(indent(tab + 2) + "exprs = " + exprs.mkString(","))
       case GeneratorPlan(_) => subPlan.get.printPlan(tab + 5)
     }
-  }
-}
-
-class NamedFieldExtractor {
-  val fields = ListBuffer[NamedField]()
-
-  def collectNamedFields(schema: Schema, ex: Expr): Boolean = ex match {
-    case RefExpr(r) => r match {
-      case NamedField(n, _) => fields += r.asInstanceOf[NamedField]; true
-      case _ => true
-    }
-    case _ => true
-  }
-}
-
-class RefExprExtractor {
-  val exprs = ListBuffer[RefExpr]()
-
-  def collectRefExprs(schema: Schema, ex: Expr): Boolean = ex match {
-    case RefExpr(r) => exprs += ex.asInstanceOf[RefExpr]; true
-    case _ => true
-  }
-}
-
-class FuncExtractor {
-  val funcs = ListBuffer[Func]()
-
-  def collectFuncExprs(schema: Schema, ex: Expr): Boolean = ex match {
-    case Func(f, params) => funcs += ex.asInstanceOf[Func]; true
-    case _ => true
   }
 }
 

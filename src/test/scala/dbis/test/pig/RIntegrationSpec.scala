@@ -16,7 +16,7 @@
  */
 package dbis.test.pig
 
-import dbis.pig.PigCompiler._
+import dbis.pig.parser.PigParser.parseScript
 import dbis.pig._
 import dbis.pig.op._
 import dbis.pig.schema._

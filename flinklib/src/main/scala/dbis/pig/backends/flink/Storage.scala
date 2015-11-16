@@ -17,21 +17,30 @@
 
 package dbis.pig.backends.flink
 
+import dbis.pig.backends._
+import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala._
 
-class PigStorage extends java.io.Serializable {
-  def load(env: ExecutionEnvironment, path: String, delim: Char = ' '): DataSet[List[String]] = {
-    env.readTextFile(path).map(line => line.split(delim).toList)
+import scala.reflect.ClassTag
+
+
+//-----------------------------------------------------------------------------------------------------
+
+class PigStorage[T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Serializable {
+  def load(env: ExecutionEnvironment, path: String,  extract: (Array[String]) => T, delim: String = " "): DataSet[T] = {
+    env.readTextFile(path).map(line => extract(line.split(delim, -1)))
   }
 
-  def write(path: String, result: DataSet[String]) = result.writeAsText(path)
+  def write(path: String, result: DataSet[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path)
 }
 
 object PigStorage {
-  def apply(): PigStorage = {
-    new PigStorage
+  def apply[T <: SchemaClass :ClassTag: TypeInformation](): PigStorage[T] = {
+    new PigStorage[T]
   }
 }
+
+//-----------------------------------------------------------------------------------------------------
 
 class RDFFileStorage extends java.io.Serializable {
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r

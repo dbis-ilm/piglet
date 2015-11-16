@@ -15,25 +15,18 @@
  * limitations under the License.
  */
 
-package dbis.pig.op
+package dbis.pig.op.cmd
+
+import dbis.pig.expr.Value
+import dbis.pig.op.PigOperator
 
 
 /**
- * HdfsCmd represents a pseudo operator for HDFS commands.
+ * SetCmd represents a pseudo operator for the SET statement.
+ *
+ * @param param the parameter name
+ * @param value the value of the parameter set by this statement
  */
-case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator {
+case class SetCmd(param: String, value: Value) extends PigOperator
 
-  if (!isValid)
-    throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
-
-  def isValid: Boolean = cmd match {
-    case "copyFromLocal" => true
-    case "copyToRemote" => true
-    case "rm" => true
-    case "rmdir" => true
-    case "ls" => true
-    case "mkdir" => true
-    case _ => false
-  }
-}
 

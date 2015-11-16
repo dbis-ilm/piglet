@@ -17,12 +17,13 @@
 package dbis.pig.op
 
 import java.security.MessageDigest
-
 import dbis.pig.plan.InvalidPlanException
 import dbis.pig.schema._
 import org.kiama.rewriting.Rewritable
 import scala.collection.immutable.Seq
 import scala.collection.mutable.Map
+import dbis.pig.expr.NamedField
+import dbis.pig.expr.Ref
 
 /**
  * PigOperator is the base trait for all Pig operators. An operator contains

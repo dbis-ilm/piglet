@@ -17,9 +17,12 @@
 
 package dbis.pig.backends.spark
 
+import dbis.pig.backends._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.streaming.dstream.DStream
 import java.io.FileInputStream
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
@@ -27,44 +30,7 @@ import java.io.FileOutputStream
 
 import scala.reflect.ClassTag
 
-/**
- * The trait for all case classes implementing record types in Piglet.
- */
-trait SchemaClass {
-  /**
-   * Produces a string representation of the object using the given delimiter.
-   *
-   * @param delim the delimiter string
-   * @return a string representation
-   */
-  def mkString(delim: String = ","): String
 
-  /**
-   * Overrides the default toString method.
-   *
-   * @return a string representation
-   */
-  override def toString() = "(" + mkString() + ")"
-}
-
-/**
- * A record class for representing just a single line of text.
- *
- * @param line the text line
- */
-case class TextLine(line: String) extends java.io.Serializable with SchemaClass {
-  override def toString = line
-  override def mkString(delim: String) = toString
-}
-
-/**
- * A record class for an array of string values.
- *
- * @param fields the array of values
- */
-case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = fields.mkString(delim)
-}
 
 //-----------------------------------------------------------------------------------------------------
 
@@ -78,6 +44,25 @@ class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
 object PigStorage extends java.io.Serializable {
   def apply[T <: SchemaClass :ClassTag](): PigStorage[T] = {
     new PigStorage[T]
+  }
+}
+
+//-----------------------------------------------------------------------------------------------------
+
+class PigStream[T <: SchemaClass :ClassTag] extends java.io.Serializable {
+  def receiveStream(ssc: StreamingContext, hostname: String, port: Int, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
+    ssc.socketTextStream(hostname, port).map(line => extract(line.split(delim, -1)))
+
+  def loadStream(ssc: StreamingContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
+    ssc.receiverStream(new FileStreamReader(path)).map(line => extract(line.split(delim, -1)))
+
+  def writeStream(path: String, dstream: DStream[T], delim: String = ",") = dstream.map(_.mkString(delim)).saveAsTextFiles(path)
+
+}
+
+object PigStream extends java.io.Serializable {
+  def apply[T <: SchemaClass :ClassTag](): PigStream[T] = {
+    new PigStream[T]
   }
 }
 

@@ -16,7 +16,7 @@
  */
 package dbis.pig.schema
 
-import dbis.pig.op.NamedField
+import dbis.pig.expr.NamedField
 import scala.collection.mutable.Map
 
 /**
@@ -138,7 +138,7 @@ case class Schema(var element: BagType, var className: String = "") {
   }
 
   /**
-   * Returns the field corresponding to the given [[dbis.pig.op.NamedField]]
+   * Returns the field corresponding to the given [[dbis.pig.expr.NamedField]]
    * @param nf
    * @return
    */

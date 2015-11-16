@@ -8,6 +8,11 @@ import scala.collection.mutable.Stack
 import dbis.pig.plan.DataflowPlan
 import scala.collection.mutable.Queue
 import scala.collection.mutable.Set
+import dbis.pig.op.PigOperator
+import dbis.pig.plan.DataflowPlan
+import dbis.pig.op.PigOperator
+import dbis.pig.op.PigOperator
+import dbis.pig.op.PigOperator
 
 /**
  * A general trait to be implemented by all walkers
@@ -87,4 +92,33 @@ class BreadthFirstTopDownWalker extends Walker[PigOperator] {
       todo ++= op.outputs.flatMap(_.consumer).filter { op => !seen.contains(op.lineageSignature) }
     }
   } 
+}
+
+class DepthFirstTopDownWalker extends Walker[PigOperator] {
+  
+  @Override
+  override def walk(plan: DataflowPlan)(visit: (PigOperator => Unit)) = {
+    
+    val todo = Stack(plan.sourceNodes.toSeq: _*)
+    val seen = Set.empty[String]
+   
+    while(!todo.isEmpty) {
+      val op = todo.pop()
+      
+      val sig = op.lineageSignature 
+  
+      // if the signature of the current op has been seen before
+      if(!seen.contains(sig)) {
+        seen += sig  // mark as seen
+        visit(op)    // apply the visitor to the current op
+      }
+      
+      val children = op.outputs.flatMap(_.consumer).filter { o => !seen.contains(o.lineageSignature) } 
+      todo.pushAll(children)
+    }
+  }
+  
+  private def dfs(op: PigOperator, visit: (PigOperator => Unit)) = {
+    
+  }
 }

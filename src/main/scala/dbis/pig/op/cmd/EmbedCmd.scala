@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package dbis.pig.op
+package dbis.pig.op.cmd
 
 import dbis.pig.schema.{Types, PigType}
 import dbis.pig.udf.{UDFTable, UDF}
-
 import scala.collection.mutable.ListBuffer
+import dbis.pig.op.PigOperator
 
 
 /** Wraps code that is to be embedded in the compiled Scala application.
@@ -36,7 +36,7 @@ case class EmbedCmd(code: String, ruleCode: Option[String]) extends PigOperator 
    *
    * @return the list of identified UDFs
    */
-  def extractUDFs(): Unit = {
+  def extractUDFs(): List[UDF] = {
     def stringToPigType(s: String): PigType = s match {
       case "String" => Types.CharArrayType
       case "Int" => Types.IntType
@@ -48,10 +48,11 @@ case class EmbedCmd(code: String, ruleCode: Option[String]) extends PigOperator 
     }
 
     val udfs = ListBuffer[UDF]()
-    val pattern = "def\\s*\\w*\\s*\\(.*\\)\\s*:\\s*\\w*\\s*=".r
+    val pattern = "def\\s*\\w*\\s*\\(([^\\)]*)\\)\\s*:\\s*\\w*\\s*=".r
     val namePattern = "def\\s*\\w*\\s*".r
     val typePattern = "\\)\\s*:\\s*\\w*\\s*=$".r
     val paramPattern = "\\(.*\\)".r
+    val nonParamPattern = "\\(\\s*\\)".r
     val funcs = pattern.findAllIn(code.replaceAll("(\r\n)|\r|\n", ""))
     funcs.foreach(s => {
       val nameStr = namePattern.findFirstIn(s).get.split(" ")(1)
@@ -61,14 +62,17 @@ case class EmbedCmd(code: String, ruleCode: Option[String]) extends PigOperator 
       val typeStr = s2.substring(p1 + 1, p2 - p1).trim
       // TODO: handle more complex parameter types such as tuple, bag, and map
       val paramStr = paramPattern.findFirstIn(s).get
-      val numParams = paramStr.count(c => c == ',') + 1
-      println("name = '" + nameStr + "', typeStr = '" + typeStr + "', numParams = " + numParams)
+      val nonParamStr = nonParamPattern.findFirstIn(paramStr)
+      val numParams = if (nonParamStr.isDefined) 0 else paramStr.count(c => c == ',') + 1
+      // println("name = '" + nameStr + "', typeStr = '" + typeStr + "', numParams = " + numParams)
       val params = ListBuffer[PigType]()
       for (i <- 1 to numParams) params += Types.AnyType
       val udf = UDF(nameStr.toUpperCase, nameStr, params.toList, stringToPigType(typeStr), false)
-      println("add udf: " + udf)
+      // println("add udf: " + udf)
+      udfs += udf
       UDFTable.addUDF(udf)
     })
+    udfs.toList
   }
 
 

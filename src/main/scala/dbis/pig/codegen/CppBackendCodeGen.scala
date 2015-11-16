@@ -1,12 +1,15 @@
 package dbis.pig.codegen
 
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.schema._
 import dbis.pig.udf._
 import dbis.pig.backends.BackendManager
 import org.clapper.scalasti.STGroupFile
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
+
+import java.nio.file.Path
 /**
  * An exception indicating failures in C++ compiling.
  *
@@ -36,7 +39,7 @@ object LoadFuncs extends Enumeration {
 }
 import LoadFuncs._
 
-class CppBackendGenCode(template: String) extends GenCodeBase {
+class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
 
   templateFile = template
 
@@ -522,7 +525,7 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String): String = callST("begin_query")
+  def emitHeader2(scriptName: String, enableProfiling: Boolean): String = callST("begin_query")
 
   /**
    * Generate code needed for finishing the script.
@@ -576,6 +579,10 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
     }
     case _ => emitOpType(node)
   }
+  
+  
+  def emitStageIdentifier(line: Int, lineage: String): String = ???
+  
   /**
    * generate the code of the aggregation operator
    * @param node the node itself (operator)
@@ -779,6 +786,6 @@ class CppBackendGenCode(template: String) extends GenCodeBase {
   }
 }
 
-class CppBackendCompile(templateFile: String) extends Compile {
-  override val codeGen = new CppBackendGenCode(templateFile)
+class CppBackendGenerator(templateFile: String) extends CodeGenerator {
+  override val codeGen = new CppBackendCodeGen(templateFile)
 }

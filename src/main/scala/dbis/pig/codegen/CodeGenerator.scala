@@ -21,7 +21,8 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema.Schema
 import scala.collection.immutable.Map
 import scala.collection.mutable.Set
-import org.clapper.scalasti._
+import org.clapper.scalasti.STGroupFile
+import dbis.pig.expr.Value
 
 /**
  * An exception representing an error in handling the templates for code generation.
@@ -31,7 +32,7 @@ import org.clapper.scalasti._
 case class TemplateException(msg: String) extends Exception(msg)
 
 
-trait GenCodeBase {
+trait CodeGeneratorBase {
 
   /**
    * The name of the template file used for code generation.
@@ -41,7 +42,7 @@ trait GenCodeBase {
   /**
    * A map of alias names for user-defined functions.
    */
-  var udfAliases: Option[Map[String, (String, List[dbis.pig.op.Value])]] = None
+  var udfAliases: Option[Map[String, (String, List[Any])]] = None
 
   /**
    * The set of _KV variables refering to RDDs which are created for joins.
@@ -87,9 +88,10 @@ trait GenCodeBase {
    * the main class/object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
+   * @param enableProfiling add profiling code to the generated code
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String): String
+  def emitHeader2(scriptName: String, enableProfiling: Boolean): String
 
   /**
    * Generate code needed for finishing the script.
@@ -106,6 +108,7 @@ trait GenCodeBase {
    */
   def emitHelperClass(node: PigOperator): String
   
+  def emitStageIdentifier(line: Int, lineage: String): String
   /*------------------------------------------------------------------------------------------------- */
   /*                               template handling code                                             */
   /*------------------------------------------------------------------------------------------------- */
@@ -147,22 +150,24 @@ trait GenCodeBase {
  * has to override only the codeGen function which should return the
  * actual code generator object for the given target.
  */
-trait Compile {
+trait CodeGenerator {
   /**
    * Return the code generator object for the given target.
    *
    * @return an instance of the code generator.
    */
-  def codeGen: GenCodeBase
+  def codeGen: CodeGeneratorBase
 
   /**
    * Generates a string containing the code for the given dataflow plan.
    *
    * @param scriptName the name of the Pig script.
    * @param plan the dataflow plan.
+   * @param forREPL generate code for the Scala/Spark interactive REPL, i.e. without
+   *                Header2 and Footer
    * @return the string representation of the code
    */
-  def compile(scriptName: String, plan: DataflowPlan): String = {
+  def compile(scriptName: String, plan: DataflowPlan, profiling: Boolean, forREPL: Boolean = false): String = {
     require(codeGen != null, "code generator undefined")
 
     if (plan.udfAliases != null) {
@@ -177,7 +182,8 @@ trait Compile {
       code = code + codeGen.emitSchemaClass(schema)
     }
 
-    code = code + codeGen.emitHeader1(scriptName, plan.code)
+    if (!forREPL)
+      code = code + codeGen.emitHeader1(scriptName, plan.code)
 
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
@@ -186,14 +192,31 @@ trait Compile {
       code = code + genCode  + (if(genCode.nonEmpty) "\n" else "")
     }
 
-    // generate the object definition representing the script
-    code = code + codeGen.emitHeader2(scriptName)
+    if (!forREPL)
+      // generate the object definition representing the script
+      code = code + codeGen.emitHeader2(scriptName, profiling)
 
     for (n <- plan.operators) {
-      code = code + codeGen.emitNode(n) + "\n"
+      val generatedCode = codeGen.emitNode(n)
+      
+      if(profiling) {
+        /* count the generated lines
+         * this is needed for the PerfMonitor to identify stages by line number
+         * 
+         * +1 is for the additional line that is inserted for the register code
+         */
+        val lines = scala.io.Source.fromBytes((code + generatedCode).getBytes).getLines().size + 1
+        
+        // register an operation with its line number and lineage  
+        val registerIdCode = codeGen.emitStageIdentifier(lines, n.lineageSignature)
+
+        code = code + registerIdCode + "\n"
+        
+      }
+      code =  code + generatedCode + "\n"
     }
 
     // generate the cleanup code
-    code + codeGen.emitFooter
+    if (forREPL) code else code + codeGen.emitFooter
   }
 }

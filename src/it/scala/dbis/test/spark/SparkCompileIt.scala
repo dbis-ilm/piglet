@@ -17,7 +17,8 @@
 
 package dbis.test.spark
 
-import dbis.pig.PigCompiler
+import dbis.pig.Piglet
+import dbis.pig.backends.BackendManager
 import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import scala.io.Source
@@ -28,8 +29,25 @@ import org.apache.commons.exec.environment.EnvironmentUtils
 class SparkCompileIt extends FlatSpec with Matchers {
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
+
+    //FLINK
+  /*
+    ("load.pig", "result1.out", "truth/result1.data", true, "pig", "flink"),
+    ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "flink"),
+    ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
+//    ("selfjoin.pig", "joined.out", "truth/joined.data", false, "pig", "flink"),
+//    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true, "pig", "flink"),
+//    ("sort.pig", "sorted.out", "sorted.data", true, "pig", "flink"),
+    ("foreach1.pig", "distances.out", "truth/distances.data", true, "pig", "flink"),
+//    ("nforeach.pig", "nested.out", "nested.data", true, "pig", "flink"),
+//    ("grouping.pig", "grouping.out", "grouping.data", false, "pig", "flink"),
+//    ("wordcount.pig", "marycounts.out", "marycount.data", false, "pig", "flink"),
+    ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "flink"),
+*/
+    //SPARK
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
+    ("load3.pig", "result3.out", "truth/result3.data", true, "pig", "spark"),
     ("selfjoin.pig", "joined.out", "truth/joined.data", true, "pig", "spark"),
     ("selfjoin_ambiguous_fieldnames.pig", "joined_ambiguous_fieldnames.out", "truth/joined_ambiguous_fieldnames.data",
       // Pigs OrderBy is not a stable sort
@@ -44,10 +62,12 @@ class SparkCompileIt extends FlatSpec with Matchers {
     ("grouping.pig", "grouping.out", "truth/grouping.data", false, "pig", "spark"),
     ("groupall.pig", "groupall.out", "truth/groupall.data", false, "pig", "spark"),
     ("wordcount.pig", "marycounts.out", "truth/marycount.data", false, "pig", "spark"),
-    ("construct.pig", "result3.out", "truth/result3.data", true, "pig", "spark"),
+    ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "spark"),
+    ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "spark"),
     ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "spark"),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "spark"),
+    ("accumulate.pig", "accumulate.out", "truth/accumulate.data", false, "pig", "spark"),
     ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "spark"),
     ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "spark"),
     /* Works, but requires a R installation
@@ -62,6 +82,7 @@ class SparkCompileIt extends FlatSpec with Matchers {
 //    ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false),
 //    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false)
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
+
   )
 
   def cleanupResult(dir: String): Unit = {
@@ -112,6 +133,17 @@ class SparkCompileIt extends FlatSpec with Matchers {
 
   "The Pig compiler" should "compile and execute the script" in {
     forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean, lang: String, backend: String) =>
+
+      if (sys.env.get("SPARK_JAR").isEmpty) {
+        println("SPARK_JAR variable not set - exiting.")
+        System.exit(0)
+      }
+
+      if (sys.env.get("FLINK_JAR").isEmpty) {
+        println("FLINK_JAR variable not set - exiting.")
+        System.exit(0)
+      }
+
       // 1. make sure the output directory is empty
       cleanupResult(resultDir)
       cleanupResult(script.replace(".pig",""))
@@ -120,18 +152,21 @@ class SparkCompileIt extends FlatSpec with Matchers {
       val resourcePath = getClass.getResource("").getPath + "../../../"
 
       // 2. compile and execute Pig script
-      /*
-      PigCompiler.main(Array("--backend", "spark",
-        "--params", s"inbase=$resourcePath,outfile=${resultPath.path}",
-        "--master", "local[2]",
-        "--outdir", ".", resourcePath + script))
-      println("execute: " + script)
-      */
       runCompiler(script, resourcePath, resultPath, lang, backend) should be (true)
       
-      // 3. load the output file and the truth file
-      val result = Source.fromFile(resultDir + "/part-00000").getLines()
+      // 3. load the output file(s) and the truth file
+      //val result = Source.fromFile(resultDir + "/part-00000").getLines()
+      var result = Iterator[String]()
+      val resultFile = new java.io.File(resultPath.path)
+      if(resultFile.isFile)
+        result ++= Source.fromFile(resultFile).getLines()
+      else {
+        // for the test cases we assume only a single file part-00000
+        for (file <- resultFile.listFiles if file.getName == "part-00000")
+          result ++= Source.fromFile(file).getLines()
+      }
       val truth = Source.fromFile(resourcePath + truthFile).getLines()
+
       // 4. compare both files
       if (inOrder)
         result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)

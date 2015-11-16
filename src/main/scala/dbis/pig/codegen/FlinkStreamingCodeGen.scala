@@ -17,6 +17,7 @@
 package dbis.pig.codegen
 
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.udf._
 import dbis.pig.schema._
 import dbis.pig.plan.DataflowPlan
@@ -24,9 +25,10 @@ import dbis.pig.backends.BackendManager
 
 import scala.collection.mutable.ListBuffer
 
+import java.nio.file.Path
 
 
-class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
+class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(template) {
 
 
   /*------------------------------------------------------------------------------------------------- */
@@ -61,16 +63,16 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
                   udfs += s"""("${udf.name}", List(${emitRef(node.inputSchema, r1, "", false)}, ${emitRef(tupleSchema(node.inputSchema, r1), r2, "")}))"""
                   DerefTuple(r1, PositionalField(tupleSchema(node.inputSchema, r1).get.fields.size + posCounter))
                 }
-                case _ => ??? 
+                case _ => ???
               }
               posCounter=posCounter+1
               GeneratorExpr(RefExpr(newExpr), e.alias)
             }
             case _ => GeneratorExpr(e.expr, e.alias)
           }
-        }   
+        }
         case _ => GeneratorExpr(e.expr, e.alias)
-      })  
+      })
     val newGen = gen match {
       case GeneratorList(expr) => GeneratorList(exprs)
       case GeneratorPlan(plan) => {
@@ -78,8 +80,8 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
         newPlan = newPlan.updated(newPlan.size-1, Generate(exprs))
         node.asInstanceOf[Foreach].subPlan = Option(new DataflowPlan(newPlan))
         GeneratorPlan(newPlan)
-      }   
-    }   
+      }
+    }
     (node, newGen, udfs.toList)
   }
 
@@ -174,6 +176,8 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     }
   }
 
+  def emitStageIdentifier(line: Int, lineage: String): String = ???
+
 
   /*------------------------------------------------------------------------------------------------- */
   /*                                   Node code generators                                           */
@@ -182,46 +186,55 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
   /**
     * Generates code for the CROSS operator.
     *
-    * @param node the Cross Operator node
-    * @param out name of the output bag
-    * @param rels list of Pipes to cross
+    * @param node the CROSS operator node
     * @param window window information for Cross' on streams
     * @return the Scala code implementing the CROSS operator
     */
-  def emitCross(node: PigOperator, out: String, rels: List[Pipe], window: Tuple2[Int,String]): String = {
-    if(window!=null)
-      callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name),"window"->window._1,"wUnit"->window._2))
-    else
-      callST("cross", Map("out"->out,"rel1"->rels.head.name,"rel2"->rels.tail.map(_.name)))
+  def emitCross(node: PigOperator, window: Tuple2[Int,String]): String = {
+    val rels = node.inputs
+    val params =
+      if(window != null)
+        Map("out" -> node.outPipeName,
+          "rel1" -> rels.head.name,
+          "rel2" -> rels.tail.map(_.name),
+          "window" -> window._1,
+          "wUnit" -> window._2)
+      else
+        Map("out" -> node.outPipeName,
+          "rel1" -> rels.head.name,
+          "rel2" -> rels.tail.map(_.name))
+    callST("cross", params)
   }
 
   /**
     * Generates code for the DISTINCT Operator
     *
-    * @param out name of the output bag
-    * @param in name of the input bag
-    * @param windowMode true if operator is called within a window environment
+    * @param node the DISTINCT operator node
     * @return the Scala code implementing the DISTINCT operator
     */
-  def emitDistinct(out: String, in: String, windowMode: Boolean): String = {
-    callST("distinct", Map("out"->out,"in"->in))
+  def emitDistinct(node: PigOperator): String = {
+    callST("distinct", Map("out" -> node.outPipeName, "in" -> node.inPipeName))
   }
 
   /**
     * Generates code for the FILTER Operator
     *
-    * @param schema the nodes schema
-    * @param out name of the output bag
-    * @param in name of the input bag
     * @param pred the filter predicate
     * @param windowMode true if operator is called within a window environment
     * @return the Scala code implementing the FILTER operator
     */
-  def emitFilter(schema: Option[Schema], out: String, in: String, pred: Predicate, windowMode: Boolean): String = {
-    if (windowMode)
-      callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(schema, pred),"windowMode"->windowMode))
-    else
-      callST("filter", Map("out"->out,"in"->in,"pred"->emitPredicate(schema, pred)))
+  def emitFilter(node: PigOperator, pred: Predicate, windowMode: Boolean): String = {
+    val params =
+      if (windowMode)
+        Map("out" -> node.outPipeName,
+          "in" -> node.inPipeName,
+          "pred" -> emitPredicate(node.schema, pred),
+          "windowMode" -> windowMode)
+      else
+        Map("out" -> node.outPipeName,
+          "in" -> node.inPipeName,
+          "pred" -> emitPredicate(node.schema, pred))
+    callST("filter", params)
   }
 
   /**
@@ -308,20 +321,18 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
       callST("join", Map("out"->out,"rel1"->rels.head.name,"key1"->keys.head,"rel2"->rels.tail.map(_.name),"key2"->keys.tail))
   }
 
-  /** 
+  /**
     * Generates code for the ORDERBY Operator
     *
     * @param node the OrderBy Operator node
-    * @param out name of the output bag
-    * @param in name of the input bag
     * @param spec Order specification
     * @param windowMode true if operator is called within a window environment
     * @return the Scala code implementing the ORDERBY operator
     */
-  def emitOrderBy(node: PigOperator, out: String, in: String, spec: List[OrderBySpec], windowMode: Boolean): String = { 
-    val key = emitSortKey(node.schema, spec, out, in)
+  def emitOrderBy(node: PigOperator, spec: List[OrderBySpec], windowMode: Boolean): String = {
+    val key = emitSortKey(node.schema, spec, node.outPipeName, node.inPipeName)
     val asc = ascendingSortOrder(spec.head)
-    callST("orderBy", Map("out"->out,"in"->in,"key"->key,"asc"->asc))
+    callST("orderBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "key" -> key, "asc" -> asc))
   }
 
   /**
@@ -373,7 +384,7 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
     if(window._2==""){
       if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1))
       else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1, "sUnit"->slide._2))
-    } 
+    }
     else {
       if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1))
       else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1, "sUnit"->slide._2))
@@ -397,13 +408,13 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
        * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
        *       after changing the pipe name. Instead, use node.outPipeName
        */
-      case Cross(out, rels, window) => emitCross(node, node.outPipeName, node.inputs, window)
-      case Distinct(out, in, windowMode) => emitDistinct(node.outPipeName, node.inPipeName, windowMode)
-      case Filter(out, in, pred, windowMode) => emitFilter(node.schema, node.outPipeName, node.inPipeName, pred, windowMode)
+      case Cross(out, rels, window) => emitCross(node, window)
+      case Distinct(out, in, _) => emitDistinct(node)
+      case Filter(out, in, pred, windowMode) => emitFilter(node, pred, windowMode)
       case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outPipeName, node.inPipeName, gen, windowMode)
       case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outPipeName, node.inPipeName, groupExpr, windowMode)
       case Join(out, rels, exprs, window) => emitJoin(node, node.outPipeName, node.inputs, exprs, window)
-      case OrderBy(out, in, orderSpec, windowMode) => emitOrderBy(node, node.outPipeName, node.inPipeName, orderSpec, windowMode)
+      case OrderBy(out, in, orderSpec, windowMode) => emitOrderBy(node, orderSpec, windowMode)
       case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outPipeName, address, mode, func, params)
       case SocketWrite(in, address, mode, func) => emitSocketWrite(node.inPipeName, address, mode, func)
       case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inPipeName,window,slide)
@@ -414,6 +425,6 @@ class StreamingGenCode(template: String) extends ScalaBackendGenCode(template) {
 
 }
 
-class StreamingCompile(templateFile: String) extends Compile {
-  override val codeGen = new StreamingGenCode(templateFile)
+class FlinkStreamingGenerator(templateFile: String) extends CodeGenerator {
+  override val codeGen = new FlinkStreamingCodeGen(templateFile)
 }

@@ -16,8 +16,9 @@
  */
 package dbis.pig.parser
 
-import dbis.pig._
 import dbis.pig.op._
+import dbis.pig.op.cmd._
+import dbis.pig.expr._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 
@@ -203,6 +204,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   lazy val loadKeyword = "load".ignoreCase
   lazy val dumpKeyword = "dump".ignoreCase
+  lazy val displayKeyword = "display".ignoreCase
   lazy val storeKeyword = "store".ignoreCase
   lazy val intoKeyword = "into".ignoreCase
   lazy val filterKeyword = "filter".ignoreCase
@@ -251,6 +253,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val setKeyword = "set".ignoreCase
   lazy val returnsKeyword = "returns".ignoreCase
   lazy val accumulateKeyword = "accumulate".ignoreCase
+  lazy val delayKeyword = "delay".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -335,6 +338,11 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * DUMP <A>
    */
   def dumpStmt: Parser[PigOperator] = dumpKeyword ~ bag ^^ { case _ ~ b => new Dump(Pipe(b)) }
+
+  /*
+   * DISPLAY <A>
+   */
+  def displayStmt: Parser[PigOperator] = displayKeyword ~ bag ^^ { case _ ~ b => new Display(Pipe(b)) }
 
   /*
    * STORE <A> INTO "<FileName>"
@@ -426,6 +434,13 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def limitStmt: Parser[PigOperator] = bag ~ "=" ~ limitKeyword ~ bag ~ num ^^ { case out ~ _ ~ _ ~ in ~ num => new Limit(Pipe(out), Pipe(in), num) }
 
   /*
+   * <A> = DELAY <B> <Size> , <Wait>
+   */
+  def delayStmt: Parser[PigOperator] = bag ~ "=" ~ delayKeyword ~ bag ~ floatingPointNumber ~ "," ~ num ^^ {
+    case out ~ _ ~ _ ~ in ~ size ~ _ ~ wait => new Delay(Pipe(out), Pipe(in), size.toDouble, wait.toInt)
+  }
+
+  /*
    * <A> = JOIN <B> BY <Ref>, <C> BY <Ref>, ...
    * <A> = JOIN <B> BY ( <ListOfRefs> ), <C> BY ( <ListOfRefs>), ...
    */
@@ -459,7 +474,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * DEFINE <Alias> <FuncName>
    */
   def defineStmt: Parser[PigOperator] = defineKeyword ~ ident ~ className ~ "(" ~ repsep(literalField, ",") ~ ")" ^^{
-    case _ ~ alias ~ funcName ~ _ ~ params ~ _ => DefineCmd(alias, funcName, params.map(r => r.asInstanceOf[dbis.pig.op.Value]))
+    case _ ~ alias ~ funcName ~ _ ~ params ~ _ => DefineCmd(alias, funcName, params.map(r => r.asInstanceOf[dbis.pig.expr.Value]))
   }
 
   /*
@@ -484,7 +499,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * SET <Param> <Value>
    */
   def setStmt: Parser[PigOperator] = setKeyword ~ ident ~ literalField ^^ {
-    case _ ~ k ~ v => SetCmd(k, v.asInstanceOf[dbis.pig.op.Value]) }
+    case _ ~ k ~ v => SetCmd(k, v.asInstanceOf[dbis.pig.expr.Value]) }
 
   /*
    * <A> = STREAM <B> TROUGH <Operator> [(ParamList)] [AS (<Schema>) ]
@@ -580,7 +595,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
   def undelimStmt: Parser[PigOperator] = embedStmt
@@ -620,7 +635,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
+    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt | delayStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
 
@@ -673,13 +688,14 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def socketReadStmt: Parser[PigOperator] =
     bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
       case out ~ _ ~ _ ~ addr ~ u ~ schema => u match {
-        case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2)
-        case None =>  SocketRead(Pipe(out), addr, "", schema)
+        case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+              case None =>  SocketRead(Pipe(out), addr, "", schema)
       }
+
     } |
       bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
         case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema => u match {
-          case Some(p) => SocketRead(Pipe(out), addr, mode, schema, Some(p._1), if (p._2.isEmpty) null else p._2)
+          case Some(p) => SocketRead(Pipe(out), addr, mode, schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
           case None => SocketRead(Pipe(out), addr, mode, schema)
         }
       }
@@ -709,13 +725,13 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * ------------------------------------------------------------
    */
   lazy val skipNext = "skip_till_next_match"
-  lazy val matcherKeyword = "matcher".ignoreCase
+  lazy val matchEventKeyword = "match_event".ignoreCase
   lazy val patternKeyword = "pattern".ignoreCase
-  lazy val eventsKeyword = "events".ignoreCase
+  lazy val withKeyword = "with".ignoreCase
   lazy val withinKeyword = "within".ignoreCase
   lazy val negKeyword = "neg".ignoreCase
-  lazy val conjKeyword = "conj".ignoreCase
-  lazy val disjKeyword = "disj".ignoreCase
+  lazy val conjKeyword = "and".ignoreCase
+  lazy val disjKeyword = "or".ignoreCase
   lazy val seqKeyword = "seq".ignoreCase
   lazy val skipNextKeyword = skipNext.ignoreCase
   lazy val skipAnyKeyword = "skip_till_any_match".ignoreCase
@@ -724,7 +740,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val congnitiveMatchKeyword = "cognitive_match".ignoreCase
 
   def eventExpr: Parser[Predicate] = logicalExpr
-  def simpleEvent: Parser[SimpleEvent] = simplePattern ~ "=" ~ eventExpr ^^ { case s ~ _ ~ e => SimpleEvent(s, e) }
+  def simpleEvent: Parser[SimpleEvent] = simplePattern ~ ":" ~ eventExpr ^^ { case s ~ _ ~ e => SimpleEvent(s, e) }
   def eventParam: Parser[CompEvent] = "(" ~ simpleEvent ~ rep( "," ~> simpleEvent) ~ ")" ^^ { case _ ~ s ~ c ~ _ => CompEvent(s :: c) }
   
   def repeatPattern: Parser[List[Pattern]] = rep("," ~> patternParam)
@@ -745,7 +761,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def withinParam: Parser[Tuple2[Int, String]] = withinKeyword ~ num ~ timeUnit ^^ { case _ ~ n ~ u => (n, u) }
   def modes: Parser[String] = (skipNextKeyword | skipAnyKeyword | firstMatchKeyword | recentMatchKeyword | congnitiveMatchKeyword)
   def modeParam: Parser[String] = modeKeyword ~ modes ^^ { case _ ~ n => n }
-  def matcherStmt: Parser[PigOperator] = bag ~ "=" ~ matcherKeyword ~ bag ~ patternKeyword ~ patternParam ~ eventsKeyword ~ eventParam ~ (modeParam?) ~ (withinParam?) ^^ {
+  def matcherStmt: Parser[PigOperator] = bag ~ "=" ~ matchEventKeyword ~ bag ~ patternKeyword ~ patternParam ~ withKeyword ~ eventParam ~ (modeParam?) ~ (withinParam?) ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pattern ~ _ ~ e ~ mode ~ within => mode match {
       case Some(m) => within match {
         case Some(w) => Matcher(Pipe(out), Pipe(in), pattern, e, m, w)
@@ -765,27 +781,30 @@ class PigParser extends JavaTokenParsers with LazyLogging {
     }
   def complexEventPigScript: Parser[List[PigOperator]] = rep(complexEventStmt)
   
-  /* ---------------------------------------------------------------------------------------------------------------- */
-
-  def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
-    Schema.init()
-    parseScript(new CharSequenceReader(s), feature)
-  }
-
   def parseScript(input: CharSequenceReader, feature: LanguageFeature): List[PigOperator] = {
-    parsePhrase(input, feature) match {
-      case Success(t, _) => t
-      case NoSuccess(msg, next) => 
-        throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
-    }
+	  parsePhrase(input, feature) match {
+  	  case Success(t, _) => t
+  	  case NoSuccess(msg, next) => 
+  	  throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
+	  }
   }
 
-  def parsePhrase(input: CharSequenceReader, feature: LanguageFeature): ParseResult[List[PigOperator]] =
+  def parsePhrase(input: CharSequenceReader, feature: LanguageFeature): ParseResult[List[PigOperator]] = {
     feature match {
       case PlainPig => phrase(plainPigScript)(input)
       case SparqlPig => phrase(sparqlPigScript)(input)
       case StreamingPig => phrase(streamingPigScript)(input)
       case ComplexEventPig => phrase(complexEventPigScript)(input)
     }
+  }
+}
 
+object PigParser {
+   
+   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
+    Schema.init()
+    val parser = new PigParser
+    parser.parseScript(new CharSequenceReader(s), feature)
+  }
+  
 }
