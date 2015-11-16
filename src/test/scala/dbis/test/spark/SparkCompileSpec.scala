@@ -946,4 +946,24 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     """.stripMargin)
     assert (generatedCode == expectedCode)
   }
+
+  it should "contain correct code for a function call with bytearray parameters" in {
+    val ops = parseScript(
+    """
+      |in = load 'file' as (x, y);
+      |in2 = foreach in generate x, y;
+      |out = foreach in2 generate tokenize(x);
+      |dump out;
+    """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new BatchCodeGen(templateFile)
+    val op = rewrittenPlan.findOperatorForAlias("out").get
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """
+        |val out = in2.map(t => _t3_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t2_Tuple(_))))
+      """.stripMargin)
+    assert (generatedCode == expectedCode)
+  }
 }

@@ -100,7 +100,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "String",
+    Types.ByteArrayType -> "Any",
     Types.AnyType -> "Any")
 
   /**
@@ -164,10 +164,10 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    /**
     * Generate Scala code for a reference to a named field, a positional field or a tuple/map derefence.
     *
-    * @param schema the (optional) schema decribing the tuple structure
-    * @param ref
+    * @param schema the (optional) schema describing the tuple structure
+    * @param ref the reference object
     * @param tuplePrefix the variable name
-    * @param aggregate ??
+    * @param aggregate
     * @return the generated code
     */
   def emitRef(schema: Option[Schema],
@@ -255,6 +255,56 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   }
 
   /**
+    * Generate Scala code for a function call with parameters.
+    *
+    * @param f the function name
+    * @param params the list of parameters
+    * @param schema the schema
+    * @return the generated Scala code
+    */
+  def emitFuncCall(f: String, params: List[ArithmeticExpr], schema: Option[Schema], namedRef: Boolean): String = {
+    val pTypes = params.map(p => p.resultType(schema))
+    UDFTable.findUDF(f, pTypes) match {
+      case Some(udf) => {
+        // println(s"udf: $f found: " + udf)
+        if (udf.isAggregate) {
+          s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
+        }
+        else {
+          val mapStr = if (udf.resultType.isInstanceOf[ComplexType]) {
+            udf.resultType match {
+              case BagType(v) => s".map(${schemaClassName(v.className)}(_))"
+              case _ => "" // TODO: handle TupleType and MapType
+            }
+          } else ""
+          s"${udf.scalaName}(${params.zipWithIndex.map { case (e, i) =>
+            // if we know the expected parameter type and the expression type
+            // is a generic bytearray then we cast it to the expected type
+            val typeCast = if (e.resultType(schema) == Types.ByteArrayType &&
+              (udf.paramTypes(i) != Types.ByteArrayType && udf.paramTypes(i) != Types.AnyType)) {
+                s".asInstanceOf[${scalaTypeMappingTable(udf.paramTypes(i))}]"
+              } else ""
+            emitExpr(schema, e, namedRef = namedRef) + typeCast
+          }.mkString(",")})${mapStr}"
+        }
+      }
+      case None => {
+        // println(s"udf: $f not found")
+        // check if we have have an alias in DataflowPlan
+        if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
+          val alias = udfAliases.get(f)
+          val paramList = alias._2 ::: params.map(e => emitExpr(schema, e, namedRef = namedRef))
+          s"${alias._1}(${paramList.mkString(",")})"
+        }
+        else {
+          // we don't know the function yet, let's assume there is a corresponding Scala function
+          s"$f(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+        }
+      }
+    }
+  }
+
+  /**
    *
    * @param schema
    * @param expr
@@ -276,39 +326,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     case Mult(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} * ${emitExpr(schema, e2, namedRef = namedRef)}"
     case Div(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} / ${emitExpr(schema, e2, namedRef = namedRef)}"
     case RefExpr(e) => s"${emitRef(schema, e, "t", aggregate, namedRef = namedRef)}"
-    case Func(f, params) => {
-      val pTypes = params.map(p => p.resultType(schema))
-      UDFTable.findUDF(f, pTypes) match {
-        case Some(udf) => {
-          // println(s"udf: $f found: " + udf)
-          if (udf.isAggregate) {
-            s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
-          }
-          else {
-            val mapStr = if (udf.resultType.isInstanceOf[ComplexType]) {
-              udf.resultType match {
-                case BagType(v) => s".map(${schemaClassName(v.className)}(_))"
-                case _ => "" // TODO: handle TupleType and MapType
-              }
-            } else ""
-            s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})${mapStr}"
-          }
-        }
-        case None => {
-          // println(s"udf: $f not found")
-          // check if we have have an alias in DataflowPlan
-          if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
-            val alias = udfAliases.get(f)
-            val paramList = alias._2 ::: params.map(e => emitExpr(schema, e, namedRef = namedRef))
-            s"${alias._1}(${paramList.mkString(",")})"
-          }
-          else {
-            // we don't know the function yet, let's assume there is a corresponding Scala function
-            s"$f(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
-          }
-        }
-      }
-    }
+    case Func(f, params) => emitFuncCall(f, params, schema, namedRef)
     case FlattenExpr(e) => flattenExpr(schema, e)
     case ConstructTupleExpr(exprs) => {
       val exType = expr.resultType(schema).asInstanceOf[TupleType]
@@ -480,7 +498,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   def emitExtractorFunc(node: PigOperator, loaderFunc: Option[String]): Map[String, Any] = {
     def schemaExtractor(schema: Schema): String =
       schema.fields.zipWithIndex.map{case (f, i) =>
-        s"data($i).to${scalaTypeMappingTable(f.fType)}"
+        // we cannot perform a "toAny" - therefore, we treat bytearray as String here
+        val t = scalaTypeMappingTable(f.fType); s"data($i).to${if (t == "Any") "String" else t}"
       }.mkString(", ")
 
     def jdbcSchemaExtractor(schema: Schema): String =
@@ -500,13 +519,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
             "class" -> schemaClassName(s.className))
       case None => {
         paramMap += ("extractor" -> "(data: Array[String]) => Record(data)", "class" -> "Record")
-        /*
-        if(loaderFunc.nonEmpty && loaderFunc.get == "PigStorage")
-          // if we don't know the schema but the user wants to get records we use the Record class
-          paramMap += ("extractor" -> "(data: Array[String]) => Record(data)", "class" -> "Record")
-        else
-          paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))", "class" -> "TextLine")
-          */
       }
     }
     paramMap
