@@ -84,11 +84,11 @@ object Functions {
     * @param op
     * @return
     */
-  def remove(op: PigOperator): Any = {
+  def remove(op: PigOperator): List[PigOperator] = {
     if (op.inputs.isEmpty) {
       val consumers = op.outputs.flatMap(_.consumer)
       if (consumers.isEmpty) {
-        Empty(Pipe(""))
+        List(Empty(Pipe("")))
       }
       else {
         consumers foreach (_.inputs = List.empty)
