@@ -64,7 +64,8 @@ class PigOperatorBuilder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends B
   }
 
   def addAsStrategy(func: (FROM => Option[TO])) = {
-    Rewriter.addTypedStrategy(func)
+    val wrapped = Rewriter.buildTypedCaseWrapper(func)
+    Rewriter.addStrategy(strategyf(t => wrapped(t)))
   }
 
   /** Add the data wrapped by this object as a strategy.
