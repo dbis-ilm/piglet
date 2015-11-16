@@ -29,10 +29,14 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val ssc = new StreamingContext(conf, Seconds(1))
+        <if (profiling)>
+        val perfMon = new PerfMonitor("<name>_App")
+        sc.sparkContext.addSparkListener(perfMon)
+        <endif>
 
 >>
 
@@ -42,7 +46,8 @@ loader(out, file, class, func, extractor, params) ::=<<
 >>
 // ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
-        <in>.foreachRDD(rdd => rdd.foreach(elem => println(elem.mkString())))
+        //<in>.foreachRDD(rdd => rdd.foreach(elem => println(elem.mkString())))
+        <in>.print
 >>
 
 // ------------------ STORE Results on disk -----------------------------------
@@ -67,13 +72,19 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element -----------
-foreach(out,in,expr,aggrs) ::=<<
+foreach(out,in,expr,aggrs, class) ::=<<
+        val <out> = <in>.map(t => <class>(<expr>))
+>>
+
+// ------------------ Executes an expression FOREACH input element where the expression is a nested plan -----------
+foreachNested(out, in, expr) ::=<<
         val <out> = <in>.map(t => <expr>)
 >>
 
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
-foreachFlatMap(out,in,expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
+// Note, that the closing parenthesis is intentionally missing
+foreachFlatMap(out, in, expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>
 >>
 
 // ------------------ Passes Stream through a Window Operator -----------------
@@ -86,13 +97,14 @@ window(out,in,window,wUnit,slider,sUnit) ::=<<
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
-groupBy(out,in,expr,keyExtr) ::=<<
+groupBy(out, in, expr, class, keyExtr) ::=<<
 <if (expr)>
-        val <out> = <in>.transform(rdd => rdd.groupBy(t => {<expr>}).map{case (k,v) => List(k,v)}) // TODO: multiple keys
+        val <out> = <in>.transform(rdd => rdd.groupBy(t => {<expr>}).map{case (k,v) => <class>(<keyExtr>,v)})
 <else>
-        val <out> = <in>.transform(rdd => rdd.coalesce(1).glom.map(t => List("all", t.toList)))
+        val <out> = <in>.transform(rdd => rdd.coalesce(1).glom.map(t => <class>("all", t)))
 <endif>
 >>
+
 
 // ------------------ Outputs only distinct values ----------------------------
 distinct(out,in) ::=<<
