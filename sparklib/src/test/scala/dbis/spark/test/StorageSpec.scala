@@ -19,6 +19,7 @@ package dbis.pig.backends.spark.test
 
 import java.io.File
 
+import dbis.pig.backends.{SchemaClass, Record}
 import dbis.pig.backends.spark._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest._

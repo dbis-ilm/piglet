@@ -17,6 +17,7 @@
 
 package dbis.pig.backends.spark
 
+import dbis.pig.backends._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
@@ -29,48 +30,7 @@ import java.io.FileOutputStream
 
 import scala.reflect.ClassTag
 
-/**
- * The trait for all case classes implementing record types in Piglet.
- */
-trait SchemaClass {
-  /**
-   * Produces a string representation of the object using the given delimiter.
-   *
-   * @param delim the delimiter string
-   * @return a string representation
-   */
-  def mkString(delim: String = ","): String
 
-  /**
-   * Overrides the default toString method.
-   *
-   * @return a string representation
-   */
-  override def toString() = "(" + mkString() + ")"
-}
-
-/**
- * A record class for representing just a single line of text.
- *
- * @param _0 the text line
- */
-/*
-case class TextLine(_0: String) extends java.io.Serializable with SchemaClass {
-  override def toString = _0
-  override def mkString(delim: String) = toString
-}
-*/
-
-/**
- * A record class for an array of string values.
- *
- * @param fields the array of values
- */
-case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = fields.mkString(delim)
-
-  def get(idx: Int) = fields(idx)
-}
 
 //-----------------------------------------------------------------------------------------------------
 
