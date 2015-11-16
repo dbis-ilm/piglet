@@ -59,6 +59,7 @@ object Piglet extends LazyLogging {
                             outDir: String = ".",
                             params: Map[String,String] = Map(),
                             backend: String = Conf.defaultBackend,
+                            backendPath: String = ".",
                             language: String = "pig",
                             updateConfig: Boolean = false,
                             backendArgs: Map[String, String] = Map(),
@@ -72,6 +73,7 @@ object Piglet extends LazyLogging {
     var outDir: Path = null
     var params: Map[String,String] = null
     var backend: String = null
+    var backendPath: String = null
     var languageFeature = LanguageFeature.PlainPig
     var updateConfig = false
     var backendArgs: Map[String, String] = null
@@ -83,7 +85,8 @@ object Piglet extends LazyLogging {
       opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text ("compile only (don't execute the script)")
       opt[Boolean]("profiling") optional() action { (x,c) => c.copy(profiling = x) } text("Switch on profiling")
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x)} text ("output directory for generated code")
-      opt[String]('b', "backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, ...)")
+      opt[String]('b', "backend") optional() action { (x,c) => c.copy(backend = x)} text ("Target backend (spark, flink, sparks, ...)")
+      opt[String]("backend_dir") optional() action { (x,c) => c.copy(backendPath = x)} text ("Path to the diretory containing the backend plugins")
       opt[String]('l', "language") optional() action { (x,c) => c.copy(language = x)} text ("Accepted language (pig = default, sparql, streaming)")
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
       opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in program home (see config file)")
@@ -104,6 +107,7 @@ object Piglet extends LazyLogging {
         outDir = Paths.get(config.outDir)
         params = config.params
         backend = config.backend
+        backendPath = config.backendPath
         updateConfig = config.updateConfig
         backendArgs = config.backendArgs
         languageFeature = config.language match {
@@ -130,19 +134,21 @@ object Piglet extends LazyLogging {
     	Conf.copyConfigFile()
     
     // start processing
-    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendArgs, profiling)
+    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendPath, backendArgs, profiling)
   }
 
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
-          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String], profiling: Boolean): Unit = {
-    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendArgs, profiling)
+          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendPath: String,
+          backendArgs: Map[String,String], profiling: Boolean): Unit = {
+    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendPath, backendArgs, profiling)
   }
   
   /**
    * Start compiling the Pig script into a the desired program
    */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
-          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendArgs: Map[String,String], profiling: Boolean): Unit = {
+          langFeature: LanguageFeature.LanguageFeature, params: Map[String,String],
+          backendPath: String, backendArgs: Map[String,String], profiling: Boolean): Unit = {
 
 	  try {
 		  // initialize database driver and connection pool
@@ -166,7 +172,7 @@ object Piglet extends LazyLogging {
 			  inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
 
 		  } else {
-			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeature, params, backendConf, backendArgs, profiling)
+			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeature, params, backendPath, backendConf, backendArgs, profiling)
 		  }
 
 	  } catch {
@@ -179,16 +185,23 @@ object Piglet extends LazyLogging {
 		    DBConnection.exit()  
 	  }
   }
-  
+
+  /**
+   *
+   * @param file
+   * @param master
+   * @param backendConf
+   * @param backendArgs
+   */
   def runRaw(file: Path, master: String, backendConf: BackendConf, backendArgs: Map[String,String]) {
     logger.debug(s"executing in raw mode: $file with master $master for backend ${backendConf.name} with arguments ${backendArgs.mkString(" ")}")    
     val runner = backendConf.runnerClass
     runner.executeRaw(file, master, backendArgs)
   }
-  
+
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
                             langFeature: LanguageFeature.LanguageFeature, params: Map[String,String],
-                            backendConf: BackendConf, backendArgs: Map[String,String], profiling: Boolean) {
+                            backendPath: String, backendConf: BackendConf, backendArgs: Map[String,String], profiling: Boolean) {
     logger.debug("start parsing input files")
     
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
@@ -230,7 +243,7 @@ object Piglet extends LazyLogging {
     	  newPlan = processMaterializations(newPlan, mm)
 		  
 		  
-      if (backend=="flinks") 
+      if (langFeature == LanguageFeature.StreamingPig && backend == "flinks")
         newPlan = processWindows(newPlan)
         
       newPlan = processPlan(newPlan)   
@@ -296,7 +309,8 @@ object Piglet extends LazyLogging {
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")      
       
-      PigletCompiler.compilePlan(newPlan, scriptName, outDir, jarFile, templateFile, backend, profiling) match {
+      PigletCompiler.compilePlan(newPlan, scriptName, outDir, Paths.get(s"$backendPath/${jarFile.toString}"),
+        templateFile, backend, profiling) match {
         // the file was created --> execute it
         case Some(jarFile) =>  
           if (!compileOnly) {
@@ -314,8 +328,6 @@ object Piglet extends LazyLogging {
     }
   }
 
-  
-  
   private def analyzePlans(schedule: Seq[(DataflowPlan, Path)]) {
     
     logger.debug("start creating lineage counter map")

@@ -17,6 +17,7 @@
 package dbis.pig.plan.rewriting
 
 import dbis.pig.op._
+import dbis.pig.expr.Func
 
 import scala.reflect.ClassTag
 

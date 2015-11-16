@@ -20,6 +20,7 @@ import java.net.URI
 
 import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}
 import dbis.pig.plan.rewriting.Rewriter._

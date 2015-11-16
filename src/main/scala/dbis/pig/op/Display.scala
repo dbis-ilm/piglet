@@ -16,20 +16,12 @@
  */
 package dbis.pig.op
 
-import java.net.URI
-
 /**
- * Store represents the STORE operator of Pig.
+ * Display represents the DISPLAY operator used to produce data for Zeppelin.
  *
  * @param in the input pipe
- * @param file the name of the output file
- * @param func the name of the storage function implemented in the backend library
- * @param params a list of parameter strings for the storage function
  */
-case class Store(in: Pipe,
-                 file: URI,
-                 func: Option[String] = None, //BackendManager.backend.defaultConnector,
-                 params: List[String] = null) extends PigOperator {
+case class Display(in: Pipe) extends PigOperator {
   _outputs = List()
   _inputs = List(in)
 
@@ -39,15 +31,6 @@ case class Store(in: Pipe,
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""STORE%${file}%""" + super.lineageString
+    s"""DISPLAY%""" + super.lineageString
   }
-
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"STORE { in = ${inPipeName} }")
-    println(indent(tab + 2) + "file = " + file.toString)
-    if (func.isDefined) {
-      println(indent(tab + 2) + "func = " + func.get)
-    }
-  }
-
 }

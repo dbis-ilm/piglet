@@ -20,6 +20,7 @@ import dbis.pig.backends.BackendManager
 import dbis.pig.schema.Schema
 
 case class SocketAddress(protocol: String, hostname: String, port: String)
+
 /**
  * Load represents the LOAD operator of Pig.
  *

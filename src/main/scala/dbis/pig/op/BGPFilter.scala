@@ -19,6 +19,7 @@ package dbis.pig.op
 
 import dbis.pig.plan.rewriting.internals.RDF
 import dbis.pig.schema._
+import dbis.pig.expr.Ref
 
 
 case class TriplePattern(subj: Ref, pred: Ref, obj: Ref)

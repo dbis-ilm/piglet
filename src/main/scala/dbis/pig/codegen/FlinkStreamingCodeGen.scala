@@ -17,6 +17,7 @@
 package dbis.pig.codegen
 
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.udf._
 import dbis.pig.schema._
 import dbis.pig.plan.DataflowPlan

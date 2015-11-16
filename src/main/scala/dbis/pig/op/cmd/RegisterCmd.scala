@@ -15,15 +15,16 @@
  * limitations under the License.
  */
 
-package dbis.pig.op
+package dbis.pig.op.cmd
+
+import dbis.pig.op.PigOperator
 
 
 /**
- * SetCmd represents a pseudo operator for the SET statement.
+ * Register represents a pseudo operator for the REGISTER statement. This "operator" will
+ * be eliminated during building the dataflow plan.
  *
- * @param param the parameter name
- * @param value the value of the parameter set by this statement
+ * @param jarFile the URI of the Jar file to be registered
  */
-case class SetCmd(param: String, value: dbis.pig.op.Value) extends PigOperator
-
+case class RegisterCmd(jarFile: String) extends PigOperator
 

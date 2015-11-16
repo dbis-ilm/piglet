@@ -19,6 +19,7 @@ package dbis.test.pig
 import java.net.URI
 
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.plan.DataflowPlan

@@ -18,8 +18,10 @@ package dbis.pig.op
 
 import dbis.pig.plan.{InvalidPlanException, DataflowPlan}
 import dbis.pig.schema._
-
 import scala.collection.mutable.{ListBuffer, Map}
+import dbis.pig.expr.ArithmeticExpr
+import dbis.pig.expr.Ref
+import dbis.pig.expr.Expr
 
 
 /**

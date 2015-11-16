@@ -16,6 +16,8 @@
  */
 package dbis.pig.op
 
+import dbis.pig.expr.Ref
+
 /**
  *
  * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but

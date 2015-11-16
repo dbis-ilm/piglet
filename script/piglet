@@ -106,7 +106,7 @@ function getBackend {
 ##############################################################
 function checkBackendJar {
 
-    if [ "$backend" == "spark" ]; then
+    if [ "$backend" == "spark" ] || [ "$backend" == "sparks" ]; then
 	if [ -z "$SPARK_JAR" ]; then
 	    echo "Please set SPARK_JAR to your spark-assembly-hadoop jar file"
 	    exit 1
@@ -186,8 +186,9 @@ fi
 
 
 if [ -z "$BACKEND_DIR" ]; then # if BACKEND_DIR does not exist, use our default one
-    BACKEND_DIR=`dirname $0`/../sparklib/target/scala-2.11/*
-    echo "No backend direcory (BACKEND_DIR) specified, using the default directory."
+    # sparks and spark are supported by spark, flinks and flink by flink
+    BACKEND_DIR=`dirname $0`/../${backend%s}lib/target/scala-2.11/*
+    echo "No backend direcory (BACKEND_DIR) specified, using the default directory '$BACKEND_DIR'."
 else
     if [[ "$BACKEND_DIR" == */ ]]; then # if it ends with / it's a directory - include all files using the wildcard *
         BACKEND_DIR=$BACKEND_DIR*
@@ -201,7 +202,7 @@ CP=$BACKEND_DIR:$CP
 checkBackendJar
 
 if $interactive; then
-    java -Dscala.usejavacp=true -cp $CP dbis.pig.PigletREPL $*
+    java -Dscala.usejavacp=true -cp $CP dbis.pig.PigletREPL --backend_dir `dirname $0`/.. $*
 else
-    java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.Piglet $*
+    java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.Piglet --backend_dir `dirname $0`/.. $*
 fi

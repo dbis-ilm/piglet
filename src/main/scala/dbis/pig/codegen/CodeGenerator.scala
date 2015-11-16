@@ -22,6 +22,7 @@ import dbis.pig.schema.Schema
 import scala.collection.immutable.Map
 import scala.collection.mutable.Set
 import org.clapper.scalasti.STGroupFile
+import dbis.pig.expr.Value
 
 /**
  * An exception representing an error in handling the templates for code generation.
@@ -41,7 +42,7 @@ trait CodeGeneratorBase {
   /**
    * A map of alias names for user-defined functions.
    */
-  var udfAliases: Option[Map[String, (String, List[dbis.pig.op.Value])]] = None
+  var udfAliases: Option[Map[String, (String, List[Any])]] = None
 
   /**
    * The set of _KV variables refering to RDDs which are created for joins.
@@ -162,9 +163,11 @@ trait CodeGenerator {
    *
    * @param scriptName the name of the Pig script.
    * @param plan the dataflow plan.
+   * @param forREPL generate code for the Scala/Spark interactive REPL, i.e. without
+   *                Header2 and Footer
    * @return the string representation of the code
    */
-  def compile(scriptName: String, plan: DataflowPlan, profiling: Boolean): String = {
+  def compile(scriptName: String, plan: DataflowPlan, profiling: Boolean, forREPL: Boolean = false): String = {
     require(codeGen != null, "code generator undefined")
 
     if (plan.udfAliases != null) {
@@ -179,7 +182,8 @@ trait CodeGenerator {
       code = code + codeGen.emitSchemaClass(schema)
     }
 
-    code = code + codeGen.emitHeader1(scriptName, plan.code)
+    if (!forREPL)
+      code = code + codeGen.emitHeader1(scriptName, plan.code)
 
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
@@ -188,8 +192,9 @@ trait CodeGenerator {
       code = code + genCode  + (if(genCode.nonEmpty) "\n" else "")
     }
 
-    // generate the object definition representing the script
-    code = code + codeGen.emitHeader2(scriptName, profiling)
+    if (!forREPL)
+      // generate the object definition representing the script
+      code = code + codeGen.emitHeader2(scriptName, profiling)
 
     for (n <- plan.operators) {
       val generatedCode = codeGen.emitNode(n)
@@ -212,6 +217,6 @@ trait CodeGenerator {
     }
 
     // generate the cleanup code
-    code + codeGen.emitFooter
+    if (forREPL) code else code + codeGen.emitFooter
   }
 }

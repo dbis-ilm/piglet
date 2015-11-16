@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.op
+package dbis.pig.expr
 
 import dbis.pig.schema._
 
@@ -157,6 +157,19 @@ object Expr {
     */
   def containsAverageFunc(schema: Schema, ex: Expr): Boolean = ex match {
     case Func(f, _) => f.toUpperCase == "AVG"
+    case _ => false
+  }
+
+  /**
+    * This function is a traverser function to check whether the expression contains
+    * a call to the COUNT aggregate function.
+    *
+    * @param schema the schema of the operator
+    * @param ex the expression
+    * @return true if the expression contains COUNT.
+    */
+  def containsCountFunc(schema: Schema, ex: Expr): Boolean = ex match {
+    case Func(f, _) => f.toUpperCase == "COUNT"
     case _ => false
   }
 }

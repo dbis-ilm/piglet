@@ -15,25 +15,20 @@
  * limitations under the License.
  */
 
-package dbis.pig.op
+package dbis.pig.op.cmd
+
+import dbis.pig.op.PigOperator
+import dbis.pig.expr.Value
 
 
 /**
- * HdfsCmd represents a pseudo operator for HDFS commands.
+ * DefineCmd represents a pseudo operator for the DEFINE statement. This "operator" will
+ * be eliminated during building the dataflow plan.
+ *
+ * @param alias the alias name of the UDF
+ * @param scalaName the full classified Scala name of the function
+ * @param paramList a list of values uses as the first standard parameters in the function call
  */
-case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator {
+case class DefineCmd(alias: String, scalaName: String, paramList: List[Value]) extends PigOperator
 
-  if (!isValid)
-    throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
-
-  def isValid: Boolean = cmd match {
-    case "copyFromLocal" => true
-    case "copyToRemote" => true
-    case "rm" => true
-    case "rmdir" => true
-    case "ls" => true
-    case "mkdir" => true
-    case _ => false
-  }
-}
 

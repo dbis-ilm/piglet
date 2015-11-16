@@ -136,6 +136,12 @@ Furthermore, Piglet adds two statements simplifying the processing of RDF data:
  
 Finally, for processing streaming data using streaming backends (Flink Streaming, Spark Streaming, Storm, PipeFabric) we have added the following statements:
  * WINDOW
- * MATCHER
+ * MATCH_EVENT - implements complex event processing. The statement supports the following clauses
+    * PATTERN - defines the sequence of events, e.g. SEQ for a sequence, OR for alternative occurence, AND for mandatory occurence of both events, and NEG
+      for the absence of an event 
+    * WITH - describes the diffent events, e.g. (A: x == 0) means that the current tuple is detected as event A if x == 0
+    * MODE
+    * WITHIN - specifies the time frame for considering the sequence as a single event sequence
+     
  * SOCKET_READ
  * SOCKET_WRITE

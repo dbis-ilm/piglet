@@ -35,7 +35,7 @@ class FlinkCompileIt extends FlatSpec with Matchers with LazyLogging {
 //    ("nforeach.pig", "nested.out", "nested.data", true),
 //    ("grouping.pig", "grouping.out", "grouping.data", false),
 //    ("wordcount.pig", "marycounts.out", "marycount.data", false),
-    ("construct.pig", "result3.out", "truth/result3.data", true)
+    ("construct.pig", "result3.out", "truth/construct.data", true)
   )
 
   def cleanupResult(dir: String): Unit = {

@@ -2,6 +2,7 @@
 init_code(includes) ::= <<
 import org.apache.spark._
 import org.apache.spark.streaming._
+import dbis.pig.backend.{SchemaClass, Record}
 import dbis.pig.backends.spark._
 
 object SECONDS {
@@ -37,7 +38,6 @@ begin_query(name, profiling) ::= <<
         val perfMon = new PerfMonitor("<name>_App")
         sc.sparkContext.addSparkListener(perfMon)
         <endif>
-
 >>
 
 // ----------------- LOAD text file -------------------------------------------
@@ -88,12 +88,8 @@ foreachFlatMap(out, in, expr) ::=<<
 >>
 
 // ------------------ Passes Stream through a Window Operator -----------------
-window(out,in,window,wUnit,slider,sUnit) ::=<<
-  <if (sUnit)>
-    val <out> = <in>.window(<wUnit>(<window>), <sUnit>(<slider>))
-  <else>
-     val <out> = <in>.window(<wUnit>(<window>))
-  <endif>
+window(out, in, window, wUnit, slider, sUnit) ::=<<
+    val <out> = <in>.window(<wUnit>(<window>)<if (sUnit)>, <sUnit>(<slider>)<endif>)
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
@@ -117,6 +113,21 @@ limit(out,in,num) ::=<<
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
+join_key_map(rels, keys) ::=<<
+        <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
+        }>
+>>
+
+join(out, class, rel1, rel2, fields) ::=<<
+        val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)\}
+>>
+
+
+m_join(out, class, rel1, rel2, pairs, fields) ::=<<
+        val <out> = <rel1>_kv<rel2: {rel | .join(<rel>_kv)}>.map{case (k,<pairs>) => <class>(<fields>)\}
+>>
+
+/*
 join_key_map(rels,keys) ::=<<
         <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
         }>
@@ -126,7 +137,7 @@ join(out,rel1,key1,rel2,key2) ::=<<
         val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => (k, v ++ w)\}}>.map{case (k,v) => v}
 
 >>
-
+*/
 // ------------------ UNIONs multiple streams to one --------------------------
 union(out,in,others) ::=<<
         val <out> = <in><others:{ e | .union(<e>)}>
@@ -147,6 +158,19 @@ orderHelper(params) ::=<<
         def compare(that: <params.cname>) = <params.cmpExpr>
     }
 >>
+
+// ------------------ Reads from a SOCKET -------------------------------------
+socketRead(out, addr_hostname, addr_port, class, func, extractor, mode, params) ::=<<
+    val <out> = <func>[<class>]().receiveStream(ssc, "<addr_hostname>", <addr_port>, <extractor><if (params)><params><endif>)
+>>
+/*
+<if (mode)>
+    val <out> = <func>().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
+<else>
+    val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
+<endif>
+*/
+
 
 // ------------------ STREAM operators ----------------------------------------
 streamOp(out,in,op,params) ::=<<

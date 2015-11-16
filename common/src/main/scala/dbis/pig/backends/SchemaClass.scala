@@ -14,25 +14,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.op
-
-import dbis.pig.expr.Predicate
-
-case class SplitBranch(val output: Pipe, val expr: Predicate)
+package dbis.pig.backends
 
 /**
- * SplitInto represents the SPLIT INTO operator of Pig.
- *
- * @param initialInPipeName the names of the input pipe.
- * @param splits a list of split branches (output pipe + condition)
- */
-case class SplitInto(in: Pipe, splits: List[SplitBranch]) extends PigOperator {
-  _outputs = splits.map(s => s.output)
-  _inputs = List(in)
+  * The trait for all case classes implementing record types in Piglet.
+  */
+trait SchemaClass {
+  /**
+    * Produces a string representation of the object using the given delimiter.
+    *
+    * @param delim the delimiter string
+    * @return a string representation
+    */
+  def mkString(delim: String = ","): String
 
-  // override def initialOutPipeNames: List[String] = splits.map{ branch => branch.output.name }
+  /**
+    * Overrides the default toString method.
+    *
+    * @return a string representation
+    */
+  override def toString() = "(" + mkString() + ")"
+}
 
-   override def lineageString: String = {
-    s"""SPLIT%${splits}%""" + super.lineageString
-  }
+/**
+  * A record class for an array of string values.
+  *
+  * @param fields the array of values
+  */
+case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
+  override def mkString(delim: String) = fields.mkString(delim)
+
+  def get(idx: Int) = fields(idx)
 }

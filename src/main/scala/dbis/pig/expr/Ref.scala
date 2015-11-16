@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.op
+package dbis.pig.expr
 
 import dbis.pig.schema.Field
 
@@ -40,7 +40,9 @@ object NamedField {
   }
 }
 
-case class PositionalField(pos: Int) extends Ref
+case class PositionalField(pos: Int) extends Ref {
+  override def toString = "$" + pos
+}
 
 case class Value(var v: Any) extends Ref
 

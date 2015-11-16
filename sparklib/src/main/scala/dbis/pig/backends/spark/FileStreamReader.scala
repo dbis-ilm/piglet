@@ -24,7 +24,7 @@ class FileStreamReader(file: String) extends Receiver[String](StorageLevel.MEMOR
     try {
       for (line <- Source.fromFile(file).getLines()) {
         store(line)
-        //Thread sleep 1000 // for testing
+        Thread sleep 1000 // for testing
       }
       //stop("The EOF has been reached ... stop Now! ....")
     } catch {

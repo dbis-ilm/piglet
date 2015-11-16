@@ -16,11 +16,14 @@
  */
 package dbis.pig.op
 
+import dbis.pig.expr.Ref
+import dbis.pig.expr.PositionalField
 
 object OrderByDirection extends Enumeration {
   type OrderByDirection = Value
   val AscendingOrder, DescendingOrder = Value
 }
+
 
 import dbis.pig.op.OrderByDirection._
 

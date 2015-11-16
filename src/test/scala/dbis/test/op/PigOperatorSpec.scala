@@ -18,7 +18,8 @@ package dbis.test.op
 
 //import dbis.pig.Piglet._
 import dbis.pig.parser.PigParser.parseScript
-import dbis.pig.op.{EmbedCmd, Foreach}
+import dbis.pig.op.cmd.EmbedCmd
+import dbis.pig.op.Foreach
 import dbis.pig.plan._
 import dbis.pig.schema._
 import dbis.pig.udf.UDF
@@ -83,14 +84,30 @@ class PigOperatorSpec extends FlatSpec with Matchers {
          |G = ORDER F BY counter;
          |H = LIMIT G 25;
          |""".stripMargin))
-    plan.findOperatorForAlias("A").get.lineageString should not be equal (plan2.findOperatorForAlias("A").get.lineageString)
-    plan.findOperatorForAlias("B").get.lineageString should not be equal (plan2.findOperatorForAlias("A").get.lineageString)
-    plan.findOperatorForAlias("C").get.lineageString should not be equal (plan2.findOperatorForAlias("CC").get.lineageString)
-    plan.findOperatorForAlias("D").get.lineageString should not be equal (plan2.findOperatorForAlias("DD").get.lineageString)
-    plan.findOperatorForAlias("E").get.lineageString should not be equal (plan2.findOperatorForAlias("EE").get.lineageString)
-    plan.findOperatorForAlias("F").get.lineageString should not be equal (plan2.findOperatorForAlias("F").get.lineageString)
-    plan.findOperatorForAlias("G").get.lineageString should not be equal (plan2.findOperatorForAlias("G").get.lineageString)
-    plan.findOperatorForAlias("H").get.lineageString should not be equal (plan2.findOperatorForAlias("H").get.lineageString)
+    plan.findOperatorForAlias("A").get.lineageString should not equal (plan2.findOperatorForAlias("A").get.lineageString)
+    plan.findOperatorForAlias("B").get.lineageString should not equal (plan2.findOperatorForAlias("A").get.lineageString)
+    plan.findOperatorForAlias("C").get.lineageString should not equal (plan2.findOperatorForAlias("CC").get.lineageString)
+    plan.findOperatorForAlias("D").get.lineageString should not equal (plan2.findOperatorForAlias("DD").get.lineageString)
+    plan.findOperatorForAlias("E").get.lineageString should not equal (plan2.findOperatorForAlias("EE").get.lineageString)
+    plan.findOperatorForAlias("F").get.lineageString should not equal (plan2.findOperatorForAlias("F").get.lineageString)
+    plan.findOperatorForAlias("G").get.lineageString should not equal (plan2.findOperatorForAlias("G").get.lineageString)
+    plan.findOperatorForAlias("H").get.lineageString should not equal (plan2.findOperatorForAlias("H").get.lineageString)
+  }
+  
+  "Lineage for Expressions" should "also depend on literal values" in {
+    
+    val plan = new DataflowPlan(parseScript("""
+      | a = load 'file' as (x,y,z);
+      | b = filter a by x == "hello"; 
+      """.stripMargin))
+    
+    val plan2 = new DataflowPlan(parseScript("""
+      | a = load 'file' as (x,y,z);
+      | b = filter a by x == "world"; 
+      """.stripMargin)) 
+    
+    plan.findOperatorForAlias("a").get.lineageString should equal (plan2.findOperatorForAlias("a").get.lineageString)
+    plan.findOperatorForAlias("b").get.lineageString should not equal (plan2.findOperatorForAlias("b").get.lineageString)
   }
 
   "EmbedCmd" should "extract UDF signatures" in {

@@ -18,6 +18,9 @@
 package dbis.pig.op
 
 import scala.collection.mutable.Map
+import dbis.pig.expr.Predicate
+import dbis.pig.expr.Ref
+import dbis.pig.expr.Expr
 
 /**
  * Filter represents the FILTER operator of Pig.

@@ -4,6 +4,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd._
+import dbis.pig.backend.{SchemaClass, Record}
 import dbis.pig.backends.spark._
 
 <\n>
@@ -25,7 +26,7 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name,profiling) ::= <<
+begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
@@ -44,6 +45,11 @@ loader(out, file, class, func, extractor, params) ::= <<
 // ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
         <in>.collect.map(t => println(t.mkString()))
+>>
+
+// ------------------ DISPLAY results in Zeppelin -----------------------------
+display(in, tableHeader) ::=<<
+        println("%table <tableHeader>\n" + <in>.collect.map(t => t.mkString("\t")).mkString("\n") + "\n\n")
 >>
 
 // ------------------ STORE Results on disk -----------------------------------

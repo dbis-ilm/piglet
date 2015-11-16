@@ -14,14 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.op
+package dbis.pig.op.cmd
 
 import java.io.{ObjectInputStream, ByteArrayInputStream, ObjectOutputStream, ByteArrayOutputStream}
-
-import dbis.pig.plan.{InvalidPlanException, DataflowPlan}
-import dbis.pig.schema.{Types, PigType}
-
+import dbis.pig.plan.DataflowPlan
 import scala.collection.mutable.ListBuffer
+import dbis.pig.op.{Pipe,PigOperator}
 
 
 case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[String]], stmts: List[PigOperator]) extends PigOperator {

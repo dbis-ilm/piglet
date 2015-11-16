@@ -42,6 +42,10 @@ object PigBuild extends Build {
     settings(commonSettings: _*).
     dependsOn(common)
         
+  lazy val zeppelin = (project in file("zeppelin")).
+    settings(commonSettings: _*).
+    dependsOn(common).
+    dependsOn(root)
 
   /*
    * define the backend for the compiler: currently we support spark and flink
@@ -60,7 +64,7 @@ object PigBuild extends Build {
   }
   
   val itTests = backend match{
-    case "flink" => Seq("dbis.test.flink.FlinkCompileIt")
+    case "flink" => Seq("dbis.test.spark.SparkCompileIt")
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
     case "mapreduce" => Seq.empty[String] // TODO

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package dbis.pig.op
+package dbis.pig.expr
 
 import dbis.pig.schema._
 import dbis.pig.udf.{UDFTable, UDF}
@@ -55,7 +55,7 @@ case class RefExpr(var r: Ref) extends ArithmeticExpr {
     case _  => ""
   }
 
-  override def toString = exprName()
+  // override def toString = exprName()
 
   def resolveReferences(mapping: Map[String, Ref]): Unit = r match {
     case nf@NamedField(n, _) => {

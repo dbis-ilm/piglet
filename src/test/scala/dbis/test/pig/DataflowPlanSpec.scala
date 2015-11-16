@@ -17,14 +17,14 @@
 package dbis.test.pig
 
 import dbis.test.TestTools._
-
-//import dbis.pig.Piglet._
 import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.op._
+import dbis.pig.expr._
 import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
 import dbis.pig.schema._
 import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
+import dbis.pig.op.cmd.RegisterCmd
 
 class DataflowPlanSpec extends FlatSpec with Matchers {
   /*

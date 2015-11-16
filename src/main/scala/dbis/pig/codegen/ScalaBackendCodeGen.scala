@@ -19,6 +19,8 @@ package dbis.pig.codegen
 import com.typesafe.scalalogging.LazyLogging
 
 import dbis.pig.op._
+import dbis.pig.op.cmd._
+import dbis.pig.expr._
 import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
@@ -100,14 +102,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     Types.CharArrayType -> "String",
     Types.ByteArrayType -> "String",
     Types.AnyType -> "Any")
-    
-//  val javaTypeMappingTable = Map[PigType, String](
-//    Types.IntType -> "java.lang.Integer",
-//    Types.LongType -> "java.lang.Long",
-//    Types.FloatType -> "java.lang.Float",
-//    Types.DoubleType -> "java.lang.Double",
-//    Types.CharArrayType -> "java.lang.String",
-//    Types.ByteArrayType -> "java.lang.String")
 
   /**
    * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
@@ -191,12 +185,19 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           else
             f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
         }
-        case None => throw new TemplateException(s"invalid field name $f") // if we don't have a schema this is not allowed
+        case None =>
+          // if we don't have a schema this is not allowed
+          throw new TemplateException(s"invalid field name $f")
       }
     }
     else
         s"$tuplePrefix._${schema.get.indexOfField(nf)}" // s"$tuplePrefix.$f"
-    case PositionalField(pos) => s"$tuplePrefix._$pos"
+    case PositionalField(pos) => schema match {
+      case Some(s) => s"$tuplePrefix._$pos"
+      case None =>
+        // if we don't have a schema the Record class is used
+        s"$tuplePrefix.get($pos)"
+    }
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
@@ -283,7 +284,15 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           if (udf.isAggregate) {
             s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
           }
-          else s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+          else {
+            val mapStr = if (udf.resultType.isInstanceOf[ComplexType]) {
+              udf.resultType match {
+                case BagType(v) => s".map(${schemaClassName(v.className)}(_))"
+                case _ => "" // TODO: handle TupleType and MapType
+              }
+            } else ""
+            s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})${mapStr}"
+          }
         }
         case None => {
           // println(s"udf: $f not found")
@@ -400,7 +409,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       else {
         // there is no other expression: we just construct an expression for flatMap:
         // (<expr>).map(t => <class>(t))
-        s"${emitExpr(node.inputSchema, ex.a)}).map(t => ${className}(t))"
+        s"${emitExpr(node.inputSchema, ex.a)}).map(t => ${className}(t._0))"
       }
     }
     else
@@ -461,6 +470,48 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   }
 
 
+  /**
+    * Construct the extract function for the LOAD operator.
+    *
+    * @param node the PigOperator for loading data
+    * @param loaderFunc the loader function
+    * @return a parameter map with class and extractor elements
+    */
+  def emitExtractorFunc(node: PigOperator, loaderFunc: Option[String]): Map[String, Any] = {
+    def schemaExtractor(schema: Schema): String =
+      schema.fields.zipWithIndex.map{case (f, i) =>
+        s"data($i).to${scalaTypeMappingTable(f.fType)}"
+      }.mkString(", ")
+
+    def jdbcSchemaExtractor(schema: Schema): String =
+      schema.fields.zipWithIndex.map{case (f, i) => s"data.get${scalaTypeMappingTable(f.fType)}($i)"}.mkString(", ")
+
+    var paramMap = Map[String, Any]()
+    node.schema match {
+      case Some(s) => if (loaderFunc.nonEmpty && loaderFunc.get == "JdbcStorage")
+        // JdbcStorage provides already types results, therefore we need an extractor which calls
+        // only the appropriate get functions on sql.Row
+          paramMap += ("extractor" ->
+            s"""(data: org.apache.spark.sql.Row) => ${schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
+            "class" -> schemaClassName(s.className))
+        else
+          paramMap += ("extractor" ->
+            s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
+            "class" -> schemaClassName(s.className))
+      case None => {
+        paramMap += ("extractor" -> "(data: Array[String]) => Record(data)", "class" -> "Record")
+        /*
+        if(loaderFunc.nonEmpty && loaderFunc.get == "PigStorage")
+          // if we don't know the schema but the user wants to get records we use the Record class
+          paramMap += ("extractor" -> "(data: Array[String]) => Record(data)", "class" -> "Record")
+        else
+          paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))", "class" -> "TextLine")
+          */
+      }
+    }
+    paramMap
+  }
+
   /*------------------------------------------------------------------------------------------------- */
   /*                                   Node code generators                                           */
   /*------------------------------------------------------------------------------------------------- */
@@ -475,35 +526,15 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * @return the Scala code implementing the LOAD operator
    */
   def emitLoad(node: PigOperator, file: URI, loaderFunc: Option[String], loaderParams: List[String]): String = {
-    def schemaExtractor(schema: Schema): String =
-      schema.fields.zipWithIndex.map{case (f, i) =>
-        s"data($i).to${scalaTypeMappingTable(f.fType)}"
-      }.mkString(", ")
-
-    def jdbcSchemaExtractor(schema: Schema): String =
-      schema.fields.zipWithIndex.map{case (f, i) => s"data.get${scalaTypeMappingTable(f.fType)}($i)"}.mkString(", ")
-
-    var paramMap = Map("out" -> node.outPipeName, "file" -> file.toString)
+    var paramMap = emitExtractorFunc(node, loaderFunc)
+    paramMap += ("out" -> node.outPipeName)
+    paramMap += ("file" -> file.toString)
     if (loaderFunc.isEmpty)
       paramMap += ("func" -> BackendManager.backend.defaultConnector)
     else {
       paramMap += ("func" -> loaderFunc.get)
       if (loaderParams != null && loaderParams.nonEmpty)
         paramMap += ("params" -> loaderParams.mkString(","))
-    }
-    node.schema match {
-      case Some(s) => if (loaderFunc.nonEmpty && loaderFunc.get == "JdbcStorage")
-        // JdbcStorage provides already types results, therefore we need an extractor which calls
-        // only the appropriate get functions on sql.Row
-        paramMap += ("extractor" ->
-          s"""(data: org.apache.spark.sql.Row) => ${schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
-          "class" -> schemaClassName(s.className))
-        else
-        paramMap += ("extractor" ->
-          s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
-        "class" -> schemaClassName(s.className))
-      case None => paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))",
-        "class" -> "TextLine")
     }
     callST("loader", paramMap)
   }
@@ -523,7 +554,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       "func" -> storeFunc.getOrElse(BackendManager.backend.defaultConnector))
     node.schema match {
       case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
-      case None => paramMap += ("class" -> "TextLine")
+      case None => paramMap += ("class" -> "Record")
     }
 
     if (params != null && params.nonEmpty)
@@ -532,6 +563,10 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     callST("store", paramMap)
   }
 
+  def tableHeader(schema: Option[Schema]): String = schema match {
+    case Some(s) => s.fields.map(f => f.name).mkString("\t")
+    case None => ""
+  }
 
   /**
     * Generates the code for the STREAM THROUGH operator including
@@ -616,6 +651,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
          */
       case Load(out, file, schema, func, params) => emitLoad(node, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inPipeName))
+      case Display(in) => callST("display", Map("in"->node.inPipeName, "tableHeader"->tableHeader(node.inputSchema)))
       case Store(in, file, func, params) => emitStore(node, file, func, params)
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))

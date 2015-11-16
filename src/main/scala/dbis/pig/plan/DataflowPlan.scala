@@ -17,11 +17,15 @@
 package dbis.pig.plan
 
 import dbis.pig.op._
+import dbis.pig.op.cmd._
+import dbis.pig.expr._
+
 import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.schema.{Types, PigType, Schema, SchemaException}
 import dbis.pig.udf.{UDFTable, UDF}
-
 import scala.collection.mutable.{ListBuffer, Map}
+
+
 
 /**
  * An exception indicating that the dataflow plan is invalid.
@@ -48,7 +52,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
   /**
    * A map for UDF aliases + constructor arguments.
    */
-  val udfAliases = Map[String,(String,  List[dbis.pig.op.Value])]()
+  val udfAliases = Map[String,(String, List[Any])]()
 
   var code: String = ""
   var extraRuleCode: Seq[String] = List.empty
