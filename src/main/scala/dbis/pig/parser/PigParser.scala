@@ -725,13 +725,13 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * ------------------------------------------------------------
    */
   lazy val skipNext = "skip_till_next_match"
-  lazy val matcherKeyword = "matcher".ignoreCase
+  lazy val matchEventKeyword = "match_event".ignoreCase
   lazy val patternKeyword = "pattern".ignoreCase
-  lazy val eventsKeyword = "events".ignoreCase
+  lazy val withKeyword = "with".ignoreCase
   lazy val withinKeyword = "within".ignoreCase
   lazy val negKeyword = "neg".ignoreCase
-  lazy val conjKeyword = "conj".ignoreCase
-  lazy val disjKeyword = "disj".ignoreCase
+  lazy val conjKeyword = "and".ignoreCase
+  lazy val disjKeyword = "or".ignoreCase
   lazy val seqKeyword = "seq".ignoreCase
   lazy val skipNextKeyword = skipNext.ignoreCase
   lazy val skipAnyKeyword = "skip_till_any_match".ignoreCase
@@ -740,7 +740,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val congnitiveMatchKeyword = "cognitive_match".ignoreCase
 
   def eventExpr: Parser[Predicate] = logicalExpr
-  def simpleEvent: Parser[SimpleEvent] = simplePattern ~ "=" ~ eventExpr ^^ { case s ~ _ ~ e => SimpleEvent(s, e) }
+  def simpleEvent: Parser[SimpleEvent] = simplePattern ~ ":" ~ eventExpr ^^ { case s ~ _ ~ e => SimpleEvent(s, e) }
   def eventParam: Parser[CompEvent] = "(" ~ simpleEvent ~ rep( "," ~> simpleEvent) ~ ")" ^^ { case _ ~ s ~ c ~ _ => CompEvent(s :: c) }
   
   def repeatPattern: Parser[List[Pattern]] = rep("," ~> patternParam)
@@ -761,7 +761,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def withinParam: Parser[Tuple2[Int, String]] = withinKeyword ~ num ~ timeUnit ^^ { case _ ~ n ~ u => (n, u) }
   def modes: Parser[String] = (skipNextKeyword | skipAnyKeyword | firstMatchKeyword | recentMatchKeyword | congnitiveMatchKeyword)
   def modeParam: Parser[String] = modeKeyword ~ modes ^^ { case _ ~ n => n }
-  def matcherStmt: Parser[PigOperator] = bag ~ "=" ~ matcherKeyword ~ bag ~ patternKeyword ~ patternParam ~ eventsKeyword ~ eventParam ~ (modeParam?) ~ (withinParam?) ^^ {
+  def matcherStmt: Parser[PigOperator] = bag ~ "=" ~ matchEventKeyword ~ bag ~ patternKeyword ~ patternParam ~ withKeyword ~ eventParam ~ (modeParam?) ~ (withinParam?) ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pattern ~ _ ~ e ~ mode ~ within => mode match {
       case Some(m) => within match {
         case Some(w) => Matcher(Pipe(out), Pipe(in), pattern, e, m, w)
