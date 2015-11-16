@@ -18,19 +18,61 @@ package dbis.pig.plan.rewriting.dsl.builders
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.plan.rewriting.dsl.traits.{PigOperatorBuilderT, BuilderT}
-
+import dbis.pig.plan.rewriting.dsl.traits.BuilderT
 import org.kiama.rewriting.Rewriter.strategyf
-import scala.reflect.{ClassTag, classTag}
+
+import scala.reflect.ClassTag
 
 /** Wraps strategy data, such as the rewriting function and pre-checks and adds strategies from them.
   *
   * @tparam FROM
   * @tparam TO
   */
-class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends PigOperatorBuilderT[FROM, TO] {
+class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends BuilderT[FROM, TO] {
+  override def wrapInCheck(func: FROM => Option[TO]) = {
+    def f(term: FROM): Option[TO] = {
+      if (check.isEmpty) {
+        func(term)
+      } else {
+        if (check.get(term)) {
+          func(term)
+        } else {
+          None
+        }
+      }
+    }
+
+    f _
+  }
+
+  override def wrapInFixer(func: FROM => Option[TO]): FROM => Option[TO] = {
+    def f(term: FROM): Option[TO] = {
+      func(term) map {t : TO => t match {
+        case ret @ (a : PigOperator, b:PigOperator) =>
+          Rewriter.fixReplacementwithMultipleOperators(term, a, b)
+          t
+        case op if op.isInstanceOf[PigOperator] =>
+          val o = op.asInstanceOf[PigOperator]
+          o.inputs = term.inputs
+          o.asInstanceOf[TO]
+        case _ =>
+          t
+      }}
+    }
+
+    f _
+  }
+
   def addAsStrategy(func: (FROM => Option[TO])) = {
     val typeWrapped = Rewriter.buildTypedCaseWrapper(func)
     Rewriter.addStrategy(strategyf(t => typeWrapped(t)))
+  }
+
+  /** Add the data wrapped by this object as a strategy.
+    *
+    */
+  override def build(): Unit = {
+    val wrapped = wrapInFixer(wrapInCheck(func.get))
+    addAsStrategy(wrapped)
   }
 }
