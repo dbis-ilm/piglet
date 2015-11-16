@@ -2,7 +2,7 @@
 init_code(includes) ::= <<
 import org.apache.spark._
 import org.apache.spark.streaming._
-import dbis.pig.backend.{SchemaClass, Record}
+import dbis.pig.backends.{SchemaClass, Record}
 import dbis.pig.backends.spark._
 
 object SECONDS {
@@ -46,8 +46,8 @@ loader(out, file, class, func, extractor, params) ::=<<
 >>
 // ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
-        //<in>.foreachRDD(rdd => rdd.foreach(elem => println(elem.mkString())))
-        <in>.print
+        <in>.foreachRDD(rdd => rdd.foreach(elem => println(elem.mkString())))
+        //<in>.print
 >>
 
 // ------------------ STORE Results on disk -----------------------------------
