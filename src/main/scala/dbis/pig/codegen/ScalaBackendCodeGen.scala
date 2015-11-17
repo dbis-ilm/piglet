@@ -277,15 +277,18 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
               case _ => "" // TODO: handle TupleType and MapType
             }
           } else ""
-          s"${udf.scalaName}(${params.zipWithIndex.map { case (e, i) =>
+          val paramExprList = params.zipWithIndex.map { case (e, i) =>
             // if we know the expected parameter type and the expression type
             // is a generic bytearray then we cast it to the expected type
-            val typeCast = if (e.resultType(schema) == Types.ByteArrayType &&
+            val typeCast = if (udf.paramTypes.length > i && // make sure the function has enough parameters
+              e.resultType(schema) == Types.ByteArrayType &&
               (udf.paramTypes(i) != Types.ByteArrayType && udf.paramTypes(i) != Types.AnyType)) {
-                s".asInstanceOf[${scalaTypeMappingTable(udf.paramTypes(i))}]"
-              } else ""
+              s".asInstanceOf[${scalaTypeMappingTable(udf.paramTypes(i))}]"
+            } else ""
             emitExpr(schema, e, namedRef = namedRef) + typeCast
-          }.mkString(",")})${mapStr}"
+          }
+
+          s"${udf.scalaName}(${paramExprList.mkString(",")})${mapStr}"
         }
       }
       case None => {

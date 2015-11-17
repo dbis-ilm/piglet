@@ -50,7 +50,9 @@ case class RefExpr(var r: Ref) extends ArithmeticExpr {
           case PositionalField(p) =>  s.field(p)
           case _ => throw new SchemaException(s"unknown bag in the schema")
         }
-        val tupleType = bagField.fType.asInstanceOf[BagType].valueType
+        val tupleType = if (bagField.fType.isInstanceOf[TupleType])
+          bagField.fType.asInstanceOf[TupleType]
+        else bagField.fType.asInstanceOf[BagType].valueType
         val fieldType: PigType = c match {
           case NamedField(n, _) => tupleType.fields.filter { p => p.name == n}.head.fType
           case PositionalField(p) => tupleType.fields(p).fType 
