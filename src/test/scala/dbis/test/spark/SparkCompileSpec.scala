@@ -962,7 +962,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
-        |val out = in2.map(t => _t3_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t2_Tuple(_))))
+        |val out = in2.map(t => _t2_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t1_Tuple(_))))
       """.stripMargin)
     assert (generatedCode == expectedCode)
   }
