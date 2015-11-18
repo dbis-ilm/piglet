@@ -48,8 +48,8 @@ class RewriterSpec extends FlatSpec
     Rewriter invokePrivate resetMethod()
   }
 
-  private def performConnectTest(op1: PigOperator, op2: PigOperator) = {
-    Rewriter.connect(op1, op2)
+  private def performConnectTest(op1: PigOperator, op2: PigOperator, overwrite: Boolean = false) = {
+    Rewriter.connect(op1, op2, overwrite)
     op1.outputs.flatMap(_.consumer) should contain only op2
     op2.inputs.map(_.producer) should contain only op1
     op1.outPipeName shouldBe op2.inPipeName
@@ -1742,6 +1742,22 @@ class RewriterSpec extends FlatSpec
     val op2 = OrderBy(Pipe("b"), Pipe("d"), List())
     val op3 = OrderBy(Pipe("d"), Pipe("b", op2), List())
     performFailingConnectTest(op1, op3)
+  }
+
+  it should "ignore all precautions if overwrite is set" in {
+    var op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    var op2 = OrderBy(Pipe("b"), Pipe("d"), List())
+    var op3 = OrderBy(Pipe("d"), Pipe("b", op2), List())
+    performConnectTest(op1, op3, true)
+
+    op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    op2 = OrderBy(Pipe("c"), Pipe("d"), List())
+    performConnectTest(op1, op2, true)
+
+    op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    op2 = OrderBy(Pipe("c"), Pipe("b"), List())
+    op1.outputs = List(Pipe("b"), Pipe("c"))
+    performConnectTest(op1, op2, true)
   }
 
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
