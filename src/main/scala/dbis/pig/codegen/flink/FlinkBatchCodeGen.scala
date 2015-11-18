@@ -118,6 +118,6 @@ class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
 }
 
 class FlinkBatchGenerator(templateFile: String) extends CodeGenerator {
-  override val codeGen = new BatchCodeGen(templateFile)
+  override val codeGen = new FlinkBatchCodeGen(templateFile)
 }
 
