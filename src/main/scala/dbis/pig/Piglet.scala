@@ -50,6 +50,8 @@ import scala.collection.mutable.{Map => MutableMap}
 
 import scalikejdbc._
 
+import com.typesafe.scalalogging.Logger
+
 
 object Piglet extends LazyLogging {
 
