@@ -27,10 +27,11 @@ import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules
 import dbis.pig.schema._
 import dbis.pig.udf.UDFTable
+import dbis.test.CodeMatchers
 import dbis.test.TestTools._
 import org.scalatest.{Matchers, BeforeAndAfterAll, FlatSpec}
 
-class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
+class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
   
   override def beforeAll()  {
     Rules.registerAllRules()
@@ -114,10 +115,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val op = plan.findOperatorForAlias("A").get
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""
-         |val A = PigStorage[_t1_Tuple]().load(sc, "file.csv",
-         |(data: Array[String]) => _t1_Tuple(data(0).toInt, data(1).toString, data(2).toDouble), ",")""".stripMargin)
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("""
+         |val A = PigStorage[_t$1_Tuple]().load(sc, "file.csv",
+         |(data: Array[String]) => _t$1_Tuple(data(0).toInt, data(1).toString, data(2).toDouble), ",")""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
+    //    assert(generatedCode == expectedCode)
   }
 
   it should "contain code for LOAD with RDFFileStorage" in {
@@ -211,10 +213,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
-      s"""
+      """
          |val A_helper = A.coalesce(1, true)
-         |PigStorage[_t2_Tuple]().write("input/file.csv", A_helper)""".stripMargin)
-    assert(generatedCode == expectedCode)
+         |PigStorage[_t$1_Tuple]().write("input/file.csv", A_helper)""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
   
   it should "contain code for STORE with delimiter" in {
@@ -227,10 +229,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
-      s"""
+      """
          |val A_helper = A.coalesce(1, true)
-         |PigStorage[_t2_Tuple]().write("input/file.csv", A_helper, "#")""".stripMargin)
-   assert(generatedCode == expectedCode)
+         |PigStorage[_t$1_Tuple]().write("input/file.csv", A_helper, "#")""".stripMargin)
+   generatedCode should matchSnippet(expectedCode)
   }
   
   it should "contain code for STORE with using clause" in {
@@ -265,11 +267,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val schemaCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
     val expectedSchemaCode =
       cleanString("""
-         |case class _t2_Tuple (_0 : String, _1 : Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
+         |case class _t$1_Tuple (_0 : String, _1 : Iterable[_t$2_Tuple]) extends java.io.Serializable with SchemaClass {
          |override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
          |}
        """.stripMargin)
-    assert(schemaCode == expectedSchemaCode)
+    schemaCode should matchSnippet(expectedSchemaCode)
   }
 
   it should "contain code for GROUP BY $0" in {
@@ -283,8 +285,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val op = plan.findOperatorForAlias("aa").get
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.groupBy(t => {t._0}).map{case (k,v) => _t2_Tuple(k,v)}")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val aa = bb.groupBy(t => {t._0}).map{case (k,v) => _t$1_Tuple(k,v)}")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for GROUP BY with multiple keys" in {
@@ -298,9 +300,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val op = plan.findOperatorForAlias("aa").get
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.groupBy(t => {(t._0,t._1)}).map{case (k,v) => _t3_Tuple(_t2_Tuple(k._1, k._2),v)}")
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString(
+      """val aa = bb.groupBy(t => {(t._0,t._1)}).map{case (k,v) => _t$1_Tuple(_t$2_Tuple(k._1, k._2),v)}""")
+    // val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for DISTINCT" in {
@@ -335,8 +338,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val expectedCode = cleanString("""
       |val bb_kv = bb.map(t => (t._0,t))
       |val cc_kv = cc.map(t => (t._0,t))
-      |val aa = bb_kv.join(cc_kv).map{case (k,(v,w)) => _t2_Tuple(v._0, v._1, v._2, w._0, w._1, w._2)}""".stripMargin)
-    assert(generatedCode == expectedCode)
+      |val aa = bb_kv.join(cc_kv).map{case (k,(v,w)) => _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2)}""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a binary join statement with expression lists" in {
@@ -356,8 +359,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (Array(t._0,t._1).mkString,t))
       |val c_kv = c.map(t => (Array(t._1,t._2).mkString,t))
-      |val a = b_kv.join(c_kv).map{case (k,(v,w)) => _t2_Tuple(v._0, v._1, v._2, w._0, w._1, w._2)}""".stripMargin)
-    assert(generatedCode == expectedCode)
+      |val a = b_kv.join(c_kv).map{case (k,(v,w)) => _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2)}""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a multiway join statement" in {
@@ -378,8 +381,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       |val b_kv = b.map(t => (t._0,t))
       |val c_kv = c.map(t => (t._0,t))
       |val d_kv = d.map(t => (t._0,t))
-      |val a = b_kv.join(c_kv).join(d_kv).map{case (k,((v1,v2),v3)) => _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2)}""".stripMargin)
-    assert(generatedCode == expectedCode)
+      |val a = b_kv.join(c_kv).join(d_kv).map{case (k,((v1,v2),v3)) => _t$1_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2)}""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for multiple joins" in {
@@ -404,19 +407,19 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val expectedCode1 = cleanString(
       """val a_kv = a.map(t => (t._0,t))
         |val b_kv = b.map(t => (t._0,t))
-        |val j1 = a_kv.join(b_kv).map{case (k,(v,w)) => _t2_Tuple(v._0, w._0)}""".stripMargin)
-    assert(generatedCode1 == expectedCode1)
+        |val j1 = a_kv.join(b_kv).map{case (k,(v,w)) => _t$1_Tuple(v._0, w._0)}""".stripMargin)
+    generatedCode1 should matchSnippet(expectedCode1)
 
     val expectedCode2 = cleanString(
       """val c_kv = c.map(t => (t._0,t))
-        |val j2 = a_kv.join(c_kv).map{case (k,(v,w)) => _t2_Tuple(v._0, w._0)}""".stripMargin)
-    assert(generatedCode2 == expectedCode2)
+        |val j2 = a_kv.join(c_kv).map{case (k,(v,w)) => _t$1_Tuple(v._0, w._0)}""".stripMargin)
+    generatedCode2 should matchSnippet(expectedCode2)
 
     val expectedCode3 = cleanString(
       """val j1_kv = j1.map(t => (t._0,t))
         |val j2_kv = j2.map(t => (t._0,t))
-        |val j = j1_kv.join(j2_kv).map{case (k,(v,w)) => _t3_Tuple(v._0, v._1, w._0, w._1)}""".stripMargin)
-    assert(generatedCode3 == expectedCode3)
+        |val j = j1_kv.join(j2_kv).map{case (k,(v,w)) => _t$1_Tuple(v._0, v._1, w._0, w._1)}""".stripMargin)
+    generatedCode3 should matchSnippet(expectedCode3)
 
   }
 
@@ -433,8 +436,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     op.constructSchema
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(PigFuncs.toMap(\"field1\",t.get(0),\"field2\",t.get(1))))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(PigFuncs.toMap(\"field1\",t.get(0),\"field2\",t.get(1))))")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a foreach statement with another function expression" in {
@@ -447,8 +450,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     op.constructSchema
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t.get(0), PigFuncs.count(t.get(1))))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t.get(0), PigFuncs.count(t.get(1))))")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a foreach statement with a UDF expression" in {
@@ -462,8 +465,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val op = plan.findOperatorForAlias("aa").get
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t2_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a foreach statement with a UDF alias expression" in {
@@ -480,8 +483,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     // this is just a hack for this test: normally, the udfAliases map is set in compile
     codeGenerator.udfAliases = Some(plan.udfAliases.toMap)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t2_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for deref operator on maps in foreach statement" in {
@@ -497,8 +500,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val a = b.map(t => _t3_Tuple(t._0("k1"), t._1("k2")))""".stripMargin)
-    assert(generatedCode == expectedCode)
+      |val a = b.map(t => _t$1_Tuple(t._0("k1"), t._1("k2")))""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for deref operator on tuple in foreach statement" in {
@@ -514,8 +517,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.map(t => _t4_Tuple(t._0._1, t._2._0))""".stripMargin)
-    assert(generatedCode == expectedCode)
+        |val a = b.map(t => _t$1_Tuple(t._0._1, t._2._0))""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a nested foreach statement" in {
@@ -537,9 +540,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       """val uniqcnt = grpd.map(t => {
         |val sym = t._1.map(l => l._1).toList
         |val uniq_sym = sym.distinct
-        |_t3_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
+        |_t$1_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(foreachOp.schema.get))
   }
 
@@ -556,10 +559,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     println("schema class = " + schemaClassCode)
 
     val expectedCode = cleanString(
-      """val out = data.map(t => _t4_Tuple(_t2_Tuple(t._0,t._1), List(_t3_Tuple(t._0),_t3_Tuple(t._1)),
+      """val out = data.map(t => _t$1_Tuple(_t$2_Tuple(t._0,t._1), List(_t$3_Tuple(t._0),_t$3_Tuple(t._1)),
         |Map[String,Int](t._2 -> t._0)))""".stripMargin)
 
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a union operator on two relations" in {
@@ -613,9 +616,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
-        |val res = myOp(sc, data_helper).map(t => _t1_Tuple(t(0), t(1)))
+        |val res = myOp(sc, data_helper).map(t => _t$1_Tuple(t(0), t(1)))
         |""".stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for the stream through statement with parameters" in {
@@ -629,9 +632,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
-        |val res = package.myOp(sc, data_helper,1,42.0).map(t => _t1_Tuple(t(0), t(1)))
+        |val res = package.myOp(sc, data_helper,1,42.0).map(t => _t$1_Tuple(t(0), t(1)))
         |""".stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for simple ORDER BY" in {
@@ -684,8 +687,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.map(t => _t3_Tuple(t._0, t._1._0, t._1._1))""".stripMargin)
-    assert(generatedCode == expectedCode)
+        |val a = b.map(t => _t$1_Tuple(t._0, t._1._0, t._1._1))""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for flattening a bag function in FOREACH" in {
@@ -698,8 +701,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.flatMap(t => PigFuncs.tokenize(t._0).map(_t1_Tuple(_))).map(t => _t2_Tuple(t._0))""".stripMargin)
-    assert(generatedCode == expectedCode)
+        |val a = b.flatMap(t => PigFuncs.tokenize(t._0).map(_t$1_Tuple(_))).map(t => _t$2_Tuple(t._0))""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for flattening a bag in FOREACH" in {
@@ -711,8 +714,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.flatMap(t => t._1.map(s => _t3_Tuple(t._0, s))""".stripMargin)
-    assert(generatedCode == expectedCode)
+        |val a = b.flatMap(t => t._1.map(s => _t$1_Tuple(t._0, s))""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a simple accumulate statement" in {
@@ -727,24 +730,24 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
-        |def aggr_a_seq(acc: _t2_HelperTuple, v: _t2_HelperTuple): _t2_HelperTuple =
-        |                _t2_HelperTuple(v._t, PigFuncs.incrCOUNT(acc._0, v._0), PigFuncs.incrSUM(acc._1sum, v._1sum),
+        |def aggr_a_seq(acc: _t$2_HelperTuple, v: _t$2_HelperTuple): _t$2_HelperTuple =
+        |                _t$2_HelperTuple(v._t, PigFuncs.incrCOUNT(acc._0, v._0), PigFuncs.incrSUM(acc._1sum, v._1sum),
         |                             PigFuncs.incrCOUNT(acc._1cnt, v._1cnt), PigFuncs.incrSUM(acc._2, v._2))
-        |def aggr_a_comp(acc: _t2_HelperTuple, v: _t2_HelperTuple): _t2_HelperTuple =
-        |                _t2_HelperTuple(v._t, PigFuncs.incrSUM(acc._0, v._0), PigFuncs.incrSUM(acc._1sum, v._1sum),
+        |def aggr_a_comp(acc: _t$2_HelperTuple, v: _t$2_HelperTuple): _t$2_HelperTuple =
+        |                _t$2_HelperTuple(v._t, PigFuncs.incrSUM(acc._0, v._0), PigFuncs.incrSUM(acc._1sum, v._1sum),
         |                             PigFuncs.incrSUM(acc._1cnt, v._1cnt), PigFuncs.incrSUM(acc._2, v._2))
-        |val a_fold = b.map(t => _t2_HelperTuple(t, 0, t._1, t._1, t._2))
-        |               .aggregate(_t2_HelperTuple())(aggr_a_seq, aggr_a_comp)
-        |val a = sc.parallelize(Array(_t2_Tuple(a_fold._0, a_fold._1sum.toDouble / a_fold._1cnt.toDouble, a_fold._2)))
+        |val a_fold = b.map(t => _t$2_HelperTuple(t, 0, t._1, t._1, t._2))
+        |               .aggregate(_t$2_HelperTuple())(aggr_a_seq, aggr_a_comp)
+        |val a = sc.parallelize(Array(_t$2_Tuple(a_fold._0, a_fold._1sum.toDouble / a_fold._1cnt.toDouble, a_fold._2)))
         |""".stripMargin)
 
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperClass = cleanString(
-    """case class _t2_HelperTuple (_t: _t1_Tuple = null, _0: Int = 0, _1sum: Int = 0, _1cnt: Int = 0, _2: Int = 0)
+    """case class _t$2_HelperTuple (_t: _t$1_Tuple = null, _0: Int = 0, _1sum: Int = 0, _1cnt: Int = 0, _2: Int = 0)
       |extends java.io.Serializable with SchemaClass { override def mkString(_c: String = ",") = "" }
       |""".stripMargin)
-    assert(generatedHelperClass == expectedHelperClass)
-    assert(generatedCode == expectedCode)
+    generatedHelperClass should matchSnippet(expectedHelperClass)
+    generatedCode should matchSnippet(expectedCode)
 
   }
 
@@ -795,9 +798,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode = cleanString(
       """
-        |val out = in.map(t => _t2_Tuple(t._0 + 42))
+        |val out = in.map(t => _t$1_Tuple(t._0 + 42))
         |""".stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for multiple macros" in {
@@ -824,15 +827,15 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
-        |val out = in.map(t => _t4_Tuple(t._0 + 42, t._1))
+        |val out = in.map(t => _t$1_Tuple(t._0 + 42, t._1))
         |""".stripMargin)
-    assert(generatedCode1 == expectedCode1)
+    generatedCode1 should matchSnippet(expectedCode1)
     val generatedCode2 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out2").get))
     val expectedCode2 = cleanString(
       """
-        |val out2 = out.map(t => _t4_Tuple(t._0, t._1 - 5))
+        |val out2 = out.map(t => _t$1_Tuple(t._0, t._1 - 5))
         |""".stripMargin)
-    assert(generatedCode2 == expectedCode2)
+    generatedCode2 should matchSnippet(expectedCode2)
   }
 
   it should "contain code for invoking a macro multiple times" in {
@@ -886,15 +889,15 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
     """
-      |case class _t2_Tuple (_0 : Int, _1 : String, _2 : Double, _3 : Int) extends java.io.Serializable with SchemaClass {
+      |case class _t$2_Tuple (_0 : Int, _1 : String, _2 : Double, _3 : Int) extends java.io.Serializable with SchemaClass {
       |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2 + _c + _3
       |}
-      |case class _t1_Tuple (_0 : Int, _1 : String, _2 : Double) extends java.io.Serializable with SchemaClass {
+      |case class _t$1_Tuple (_0 : Int, _1 : String, _2 : Double) extends java.io.Serializable with SchemaClass {
       |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2
       |}
       |""".stripMargin
     )
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for nested schema classes" in {
@@ -917,15 +920,15 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
       """
-        |case class _t1_Tuple (_0 : String, _1 : String) extends java.io.Serializable with SchemaClass {
+        |case class _t$1_Tuple (_0 : String, _1 : String) extends java.io.Serializable with SchemaClass {
         |override def mkString(_c: String = ",") = _0 + _c + _1
         |}
-        |case class _t2_Tuple (_0 : String, _1 : Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
+        |case class _t$2_Tuple (_0 : String, _1 : Iterable[_t$1_Tuple]) extends java.io.Serializable with SchemaClass {
         |override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
         |}
         |""".stripMargin
     )
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code to handle LOAD with PigStorage but without an explicit schema" in {
@@ -962,8 +965,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
-        |val out = in2.map(t => _t2_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t1_Tuple(_))))
+        |val out = in2.map(t => _t$2_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t$1_Tuple(_))))
       """.stripMargin)
-    assert (generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 }
