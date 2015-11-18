@@ -48,6 +48,19 @@ class RewriterSpec extends FlatSpec
     Rewriter invokePrivate resetMethod()
   }
 
+  private def performConnectTest(op1: PigOperator, op2: PigOperator, overwrite: Boolean = false) = {
+    Rewriter.connect(op1, op2, overwrite)
+    op1.outputs.flatMap(_.consumer) should contain only op2
+    op2.inputs.map(_.producer) should contain only op1
+    op1.outPipeName shouldBe op2.inPipeName
+  }
+
+  private def performFailingConnectTest(op1: PigOperator, op2: PigOperator) = {
+    intercept[IllegalArgumentException] {
+      Rewriter.connect(op1, op2)
+    }
+  }
+
   private def performReorderingTest() = {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -1690,6 +1703,63 @@ class RewriterSpec extends FlatSpec
     performReorderingTest()
   }
 
+  "Fixers.connect" should "connect two Operators if their pipe names match" in {
+    val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op2 = OrderBy(Pipe("c"), Pipe("b"), List())
+    performConnectTest(op1, op2)
+  }
+
+  it should "connect two operators if the successor doesn't have an input pipe" in {
+    val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op2 = OrderBy(Pipe("c"), Pipe("b"), List())
+    op2.inputs = List.empty
+    performConnectTest(op1, op2)
+  }
+
+  it should "connect two operators if neither operator a proper pipe" in {
+    val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op2 = OrderBy(Pipe("c"), Pipe("b"), List())
+    op1.outputs = List.empty
+    op2.inputs = List.empty
+    performConnectTest(op1, op2)
+  }
+
+  it should "not connect two operators if the successor has multiple output pipes" in {
+    val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op2 = OrderBy(Pipe("c"), Pipe("b"), List())
+    op1.outputs = List(Pipe("b"), Pipe("c"))
+    performFailingConnectTest(op1, op2)
+  }
+
+  it should "not connect two operators if their pipe names don't match " in {
+    val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op2 = OrderBy(Pipe("c"), Pipe("d"), List())
+    performFailingConnectTest(op1, op2)
+  }
+
+  it should "not connect two operators if the successor already reads from a different operator " in {
+    val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op2 = OrderBy(Pipe("b"), Pipe("d"), List())
+    val op3 = OrderBy(Pipe("d"), Pipe("b", op2), List())
+    performFailingConnectTest(op1, op3)
+  }
+
+  it should "ignore all precautions if overwrite is set" in {
+    var op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    var op2 = OrderBy(Pipe("b"), Pipe("d"), List())
+    var op3 = OrderBy(Pipe("d"), Pipe("b", op2), List())
+    performConnectTest(op1, op3, true)
+
+    op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    op2 = OrderBy(Pipe("c"), Pipe("d"), List())
+    performConnectTest(op1, op2, true)
+
+    op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    op2 = OrderBy(Pipe("c"), Pipe("b"), List())
+    op1.outputs = List(Pipe("b"), Pipe("c"))
+    performConnectTest(op1, op2, true)
+  }
+
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
   // other test results :-)
   "Embedsupport" should "apply rules registered by embedded code" in {
@@ -1700,7 +1770,6 @@ class RewriterSpec extends FlatSpec
         |   s
         | }
         | rules:
-        | import dbis.pig.plan.rewriting.Rewriter
         | def rule(op: Any): Option[PigOperator] = {
         | op match {
         |   case ForEachCallingFunctionE(_, "myFunc") =>
@@ -1710,7 +1779,7 @@ class RewriterSpec extends FlatSpec
         |     None
         | }
         | }
-        | List(buildOperatorReplacementStrategy(rule))
+        | applyRule (rule _)
         |!>
         |a = LOAD 'file.csv';
         |b = FOREACH a GENERATE myFunc($0);
