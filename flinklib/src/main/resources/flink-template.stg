@@ -69,7 +69,7 @@ foreachFlatMap(out, in, expr) ::=<<
 
 // ------------------ GROUPS elements on an expression ------------------------
 groupBy(out,in,expr,keyExtr, class) ::=<<
-val <out> = A.groupBy(t => <expr>).reduceGroup{ (in, out: Collector[<class>]) => val itr = in.toIterable; out.collect(<class>(itr.head._0, itr)) }
+val <out> = A.groupBy(t => <expr>).reduceGroup{ (in, out: Collector[<class>]) => val itr = in.toIterable; out.collect(<class>(<keyExtr>, itr)) }
 >>
 
 // ------------------ Outputs only distinct values ----------------------------

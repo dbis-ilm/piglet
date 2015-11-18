@@ -479,7 +479,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
         params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
 
-        //Flink
+        //Flink??
         params += "out"->node.outPipeName
         params += "key"->orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse"->true

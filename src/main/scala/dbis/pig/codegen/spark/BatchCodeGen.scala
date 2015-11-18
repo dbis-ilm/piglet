@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.codegen
+package dbis.pig.codegen.spark
 
 import dbis.pig.expr.RefExprExtractor
 import dbis.pig.op._
@@ -28,6 +28,9 @@ import dbis.pig.expr.Expr
 import dbis.pig.expr.Func
 import dbis.pig.expr.NamedField
 import dbis.pig.expr.PositionalField
+import dbis.pig.codegen.CodeGenerator
+import dbis.pig.codegen.ScalaBackendCodeGen
+import dbis.pig.codegen.TemplateException
 
 
 class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
