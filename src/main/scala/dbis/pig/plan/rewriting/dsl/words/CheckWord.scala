@@ -14,23 +14,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting.dsl.builders
+package dbis.pig.plan.rewriting.dsl.words
 
 import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.plan.rewriting.dsl.traits.{PigOperatorBuilderT, BuilderT}
+import dbis.pig.plan.rewriting.dsl.traits.{BuilderT, CheckWordT}
 
-import org.kiama.rewriting.Rewriter.strategyf
-import scala.reflect.{ClassTag, classTag}
+class CheckWord[FROM <: PigOperator, TO](override val b: BuilderT[FROM, TO]) extends CheckWordT[FROM, TO] {
 
-/** Wraps strategy data, such as the rewriting function and pre-checks and adds strategies from them.
-  *
-  * @tparam FROM
-  * @tparam TO
-  */
-class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends PigOperatorBuilderT[FROM, TO] {
-  def addAsStrategy(func: (FROM => Option[TO])) = {
-    val typeWrapped = Rewriter.buildTypedCaseWrapper(func)
-    Rewriter.addStrategy(strategyf(t => typeWrapped(t)))
-  }
 }
