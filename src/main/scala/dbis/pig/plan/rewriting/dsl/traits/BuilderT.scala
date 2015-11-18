@@ -26,7 +26,7 @@ package dbis.pig.plan.rewriting.dsl.traits
   * @tparam FROM
   * @tparam TO
   */
-abstract class BuilderT[FROM, TO] {
+trait BuilderT[FROM, TO] {
   private var _func: Option[FROM => Option[TO]] = None
 
   def func_=(f: FROM => Option[TO]) = _func = Some(f)
