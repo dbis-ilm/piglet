@@ -2,6 +2,11 @@
 init_code(includes) ::= <<
 import org.apache.flink.api.scala._
 import dbis.pig.backends.flink._
+import dbis.pig.backends.{SchemaClass, Record}
+import org.apache.flink.util.Collector
+import org.apache.flink.api.common.operators.Order
+
+
 
 <if (includes)>
 <includes>
@@ -37,13 +42,12 @@ loader(out, file, class, func, extractor, params) ::=<<
 
 // ------------------ DUMP Results --------------------------------------------
 dump(in) ::=<<
-        <in>.map(_.mkString(",")).print
+        <in>.map(_.mkString()).print
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
 store(in, file, class, func, params) ::=<<
         <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)
-        env.execute()
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -64,17 +68,13 @@ foreachFlatMap(out, in, expr) ::=<<
 
 
 // ------------------ GROUPS elements on an expression ------------------------
-groupBy(out,in,expr,keyExtr) ::=<<
-<if (expr)>
-        val <out> = <in>.groupBy(t => <expr>)
-<else>
-        val <out> = <in>
-<endif>
+groupBy(out,in,expr,keyExtr, class) ::=<<
+val <out> = A.groupBy(t => <expr>).reduceGroup{ (in, out: Collector[<class>]) => val itr = in.toIterable; out.collect(<class>(itr.head._0, itr)) }
 >>
 
 // ------------------ Outputs only distinct values ----------------------------
 distinct(out,in) ::=<<
-        val <out> = <in>.distinct(t => t(0))
+        val <out> = <in>.distinct
 >>
 
 // ------------------ Outputs only num records --------------------------------
@@ -101,7 +101,10 @@ union(out, in, others) ::=<<
 
 // ------------------ ORDERs the input BY a key -------------------------------
 orderBy(out, in, key, asc) ::=<<
-        val <out> = <in>.sortPartition(t => <key>, Order.ASCENDING)
+        val <out> = <in>.setParallelism(1)<key,asc:{k, a|.sortPartition(<k>, Order.<a>)}>
+>>
+
+orderHelper(params) ::=<<
 >>
 
 stageIdentifier(line,lineage) ::=<< >>

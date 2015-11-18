@@ -7,12 +7,21 @@ import dbis.pig.backends.flink.streaming.FlinkExtensions._
 import java.util.concurrent.TimeUnit
 import org.apache.flink.streaming.api.windowing.helper._
 import org.apache.flink.util.Collector
+import dbis.pig.backends.{SchemaClass, Record}
 
 <if (includes)>
 <includes>
 <endif>
 
 <\n>
+>>
+
+// ----------------- schema class -----------------
+schema_class(name, fields, string_rep) ::= <<
+case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+override def mkString(_c: String = ",") = <string_rep>
+}
+
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
@@ -29,23 +38,25 @@ begin_query(name, profiling) ::= <<<\n>
 
 // ----------------- LOAD text file -------------------------------------------
 loader(out, file, class, func, extractor, params) ::=<<
-    val <out> = <func>().load(env, "<file>"<params>)
+    val <out> = PigStream[<class>]().loadStream(env, "<file>", <extractor><if (params)>, <params><endif>)
 >>
 
 // ------------------ DUMP Results --------------------------------------------
 dump(in) ::=<<
-    <in>.map(_.mkString(",")).print
+    <in>.map(_.mkString()).print
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
-store(in, file, class, func, schema) ::=<<
+store(in, file, class, func, schema, params) ::=<<
+    /*
     <if (schema)>
         val <in>_storehelper = <in>.map(t => <schema>)
     <else>
         val <in>_storehelper = <in>
     <endif>
-
-    <func>().write("<file>", <in>_storehelper)
+    */
+    //val <in>_helper = <in>.setParallelism(1)
+    <func>[<class>]().writeStream("<file>", <in><if (params)>, <params><endif>)
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -72,14 +83,14 @@ splitInto(in,out,pred) ::=<<
 
 
 // ------------------ Executes an expression FOREACH input element ------------
-foreach(out,in,expr,aggrs,windowMode) ::=<<
+foreach(out,in,expr,aggrs,windowMode, class) ::=<<
 <if(windowMode)>
     val <out> = <in>.mapWindow(custom<out>Map _)
 <else>
     <if (aggrs)>
     val <out> = <in>.mapWithState(PigFuncs.streamFunc(<aggrs>)).map(t => <expr>)
     <else>
-    val <out> = <in>.map(t => <expr>)
+    val <out> = <in>.map(t => <class>(<expr>))
     <endif>
 <endif>
 >>

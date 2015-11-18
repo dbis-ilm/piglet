@@ -31,7 +31,7 @@ class PigStorage[T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Se
     env.readTextFile(path).map(line => extract(line.split(delim, -1)))
   }
 
-  def write(path: String, result: DataSet[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path)
+  def write(path: String, result: DataSet[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path).setParallelism(1)
 }
 
 object PigStorage {
@@ -40,9 +40,8 @@ object PigStorage {
   }
 }
 
-//-----------------------------------------------------------------------------------------------------
 
-class RDFFileStorage extends java.io.Serializable {
+class RDFFileStorage[T:ClassTag: TypeInformation] extends java.io.Serializable {
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
   def rdfize(line: String): Array[String] = {
@@ -50,13 +49,12 @@ class RDFFileStorage extends java.io.Serializable {
     fields.toArray.slice(0, 3)
   }
 
-  def load(env: ExecutionEnvironment, path: String): DataSet[Array[String]] = {
-    env.readTextFile(path).map(line => rdfize(line))
-  }
+  def load(env: ExecutionEnvironment, path: String, extract: (Array[String]) => T): DataSet[T] =
+    env.readTextFile(path).map(line => extract(rdfize(line)))
 }
 
 object RDFFileStorage {
-  def apply(): RDFFileStorage = {
-    new RDFFileStorage
+  def apply[T:ClassTag: TypeInformation](): RDFFileStorage[T] = {
+    new RDFFileStorage[T]
   }
 }
