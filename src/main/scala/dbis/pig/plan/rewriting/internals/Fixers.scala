@@ -44,6 +44,7 @@ trait Fixers {
 
     // If there is an input pipe matching `pred`s output name, use it, otherwise build a new one
     val inPipe = succ.inputs.find {_.name == pred.outputs.head.name}.orElse(Some(Pipe(pred.outputs.head.name, pred))).get
+    inPipe.producer = pred
     inPipe.consumer = List(succ)
     succ.inputs = List(inPipe)
 
