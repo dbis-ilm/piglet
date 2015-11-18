@@ -16,17 +16,19 @@
  */
 package dbis.test.pig
 
-import dbis.test.TestTools._
-import dbis.pig.parser.PigParser.parseScript
-import dbis.pig.op._
 import dbis.pig.expr._
-import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
-import dbis.pig.schema._
-import org.scalatest.OptionValues._
-import org.scalatest.{FlatSpec, Matchers}
+import dbis.pig.op._
 import dbis.pig.op.cmd.RegisterCmd
+import dbis.pig.parser.PigParser.parseScript
+import dbis.pig.plan.{DataflowPlan, InvalidPlanException, PipeNameGenerator}
+import dbis.pig.schema._
+import dbis.test.TestTools._
+import org.scalatest.OptionValues._
+import org.scalatest.{FlatSpec, Matchers, PrivateMethodTester}
 
-class DataflowPlanSpec extends FlatSpec with Matchers {
+import scala.collection.mutable.{Set => MutableSet}
+
+class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
   /*
   "The plan" should "contain all pipes" in {
     val op1 = Load("a", "file.csv")
@@ -629,4 +631,17 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
+  "Setting operators" should "add all their relation names to the PipeNameGenerator as known names" in {
+    PipeNameGenerator.clearGenerated
+    val op0 = Load(Pipe("a"), "input/file.csv")
+    val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op2 = OrderBy(Pipe("c"), Pipe("b"), List())
+    val op3 = OrderBy(Pipe("d"), Pipe("b"), List())
+    val plan = new DataflowPlan(List(op0, op1, op2, op3))
+
+    val generatedMethod = PrivateMethod[MutableSet[String]]('generated)
+    val generatedSet = PipeNameGenerator invokePrivate generatedMethod()
+
+    generatedSet should contain only ("a", "b", "c", "d")
+  }
 }
