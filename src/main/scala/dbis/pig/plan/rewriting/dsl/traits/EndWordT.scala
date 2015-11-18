@@ -28,7 +28,7 @@ trait EndWordT[FROM, TO] {
     */
   def applyRule(f: (FROM => Option[TO])): Unit = {
     b.func = f
-    b.apply()
+    b.build()
   }
 
   /** Apply ``f`` (a partial function) when rewriting.
@@ -38,6 +38,6 @@ trait EndWordT[FROM, TO] {
     val lifted = f.lift
 
     b.func = lifted
-    b()
+    b.build()
   }
 }

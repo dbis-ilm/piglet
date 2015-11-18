@@ -16,6 +16,8 @@
  */
 package dbis.pig.plan.rewriting.internals
 
+import java.lang.IllegalArgumentException
+
 import dbis.pig.op._
 import scala.collection.mutable.Map
 import dbis.pig.expr._
@@ -221,6 +223,7 @@ object RDF {
       case NamedField(n, _) => s"?$n"
       case PositionalField(p) => s"$$$p"
       case Value(v) => s"""$v"""
+      case _ => throw new IllegalArgumentException("Can't handle " + column)
     }
     "{ " + patterns.map { p: TriplePattern =>
       columnToString(p.subj) + " " + columnToString(p.pred) + " " + columnToString(p.obj)

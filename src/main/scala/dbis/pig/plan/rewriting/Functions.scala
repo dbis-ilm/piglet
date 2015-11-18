@@ -84,12 +84,11 @@ object Functions {
     * @param op
     * @return
     */
-  def remove(op: PigOperator): Any = {
-    val pigOp = op.asInstanceOf[PigOperator]
-    if (pigOp.inputs.isEmpty) {
-      val consumers = pigOp.outputs.flatMap(_.consumer)
+  def remove(op: PigOperator): List[PigOperator] = {
+    if (op.inputs.isEmpty) {
+      val consumers = op.outputs.flatMap(_.consumer)
       if (consumers.isEmpty) {
-        Empty(Pipe(""))
+        List(Empty(Pipe("")))
       }
       else {
         consumers foreach (_.inputs = List.empty)
@@ -97,13 +96,13 @@ object Functions {
       }
     }
     else {
-      val newOps = pigOp.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
+      val newOps = op.outputs.flatMap(_.consumer).map((inOp: PigOperator) => {
         // Remove input pipes to `op` and replace them with `ops` input pipes
-        inOp.inputs = inOp.inputs.filterNot(_.producer == pigOp) ++ pigOp.inputs
+        inOp.inputs = inOp.inputs.filterNot(_.producer == op) ++ op.inputs
         inOp
       })
       // Replace `op` in its inputs output pipes with `ops` children
-      pigOp.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
+      op.inputs.map(_.producer).foreach(_.outputs.foreach((out: Pipe) => {
         if (out.consumer contains op) {
           out.consumer = out.consumer.filterNot(_ == op) ++ newOps
         }

@@ -17,6 +17,7 @@
 package dbis.pig.plan.rewriting.internals
 
 import dbis.pig.op.{PigOperator, Pipe}
+import dbis.pig.plan.PipeNameGenerator
 
 /** Provides helper methods for fixing inputs and outputs after rewriting operations.
   *
@@ -24,20 +25,33 @@ import dbis.pig.op.{PigOperator, Pipe}
 trait Fixers {
   /** Makes ``succ`` a successor of ``pred``.
     *
+    * @param overwrite If true, disables all safety mechanisms (no IllegalArgumentExceptions will be raised) and
+    *                  clear inputs and outputs before connecting the two operators.
     */
-  @throws[IllegalArgumentException]("If pred does not have exactly one output pipe")
+  @throws[IllegalArgumentException]("If pred has more than one output pipe")
   @throws[IllegalArgumentException]("If succ has more than one input pipe")
   @throws[IllegalArgumentException]("If succ already has an input pipe with a producer that's not pred")
-  def connect(pred: PigOperator, succ: PigOperator): Unit = {
-    require(pred.outputs.length == 1, "The new predecessor does not have exactly one output pipe")
-    require(succ.inputs.length < 2, "The new successor has more than one input pipe")
-    require(succ.inputs.length == 0 || succ.inputs.head.producer == null || succ.inputs.head.producer == pred,
-      "The new successors input pipe already has a producer that is not the same as pred")
-    require(succ.inputs.length == 0 || pred.outputs.find(_.name == succ.inPipeName).isDefined,
-      pred + " writes " + pred.outPipeName + ", but " + succ + " reads " + succ.inPipeName)
+  def connect(pred: PigOperator, succ: PigOperator, overwrite: Boolean = false): Unit = {
+    if (!overwrite) {
+      require(pred.outputs.length <= 1, "The new predecessor more than one output pipe")
+      require(succ.inputs.length < 2 || succ.inputs.exists(_.name == pred.outPipeName),
+        "The new successor has more then one input pipe and none matches the new predecessors output name")
+      require(succ.inputs.isEmpty || succ.inputs.head.producer == null || succ.inputs.head.producer == pred,
+        "The new successors input pipe already has a producer that is not the same as pred")
+      require(succ.inputs.isEmpty || pred.outputs.find(_.name == succ.inPipeName).isDefined,
+        pred + " writes " + pred.outPipeName + ", but " + succ + " reads " + succ.inPipeName)
+    } else {
+      pred.outputs = List.empty
+      pred.inputs = List.empty
+    }
+
+    if (pred.outputs.isEmpty) {
+      pred.outputs = List(Pipe(PipeNameGenerator.generate()))
+    }
 
     // If there is an input pipe matching `pred`s output name, use it, otherwise build a new one
     val inPipe = succ.inputs.find {_.name == pred.outputs.head.name}.orElse(Some(Pipe(pred.outputs.head.name, pred))).get
+    inPipe.producer = pred
     inPipe.consumer = List(succ)
     succ.inputs = List(inPipe)
 
