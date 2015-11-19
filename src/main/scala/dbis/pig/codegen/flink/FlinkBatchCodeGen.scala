@@ -31,6 +31,7 @@ import dbis.pig.expr.PositionalField
 import dbis.pig.codegen.CodeGenerator
 import dbis.pig.codegen.spark.BatchCodeGen
 import dbis.pig.codegen.TemplateException
+import scala.collection.mutable.ListBuffer
 
 class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
 
@@ -84,6 +85,43 @@ class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
     callST("orderBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "key" -> key, "asc" -> orders))
   }
 
+  /**
+   * Generates code for the ACCUMULATE operator
+   *
+   * @param node the ACCUMULATE operator
+   * @param gen the generator expressions containing the aggregates
+   * @return the Scala code implementing the operator
+   */
+  override def emitAccumulate(node: PigOperator, gen: GeneratorList): String = {
+    val inputSchemaDefined = node.inputSchema.isDefined
+    require(node.schema.isDefined)
+    val outClassName = schemaClassName(node.schema.get.className)
+    var initAggrFun: String = ""
+    var moreAggrFuns: ListBuffer[String] = new ListBuffer()
+    val updExpr = gen.exprs.zipWithIndex.map {
+      case (e, i) =>
+        require(e.expr.isInstanceOf[Func])
+        val funcName = e.expr.asInstanceOf[Func].f.toUpperCase
+
+        val traverse = new RefExprExtractor
+        e.expr.traverseAnd(null, traverse.collectRefExprs)
+        val refExpr = traverse.exprs.head
+
+        val str: String = refExpr.r match {
+          case nf @ NamedField(n, _) => s"$node.inputSchema.get.indexOfField(nf)"
+          case PositionalField(p)    => if (inputSchemaDefined) s"$p" else "0"
+          case _                     => ""
+        }
+        if (i == 0) initAggrFun = (funcName +","+ str) else moreAggrFuns += (funcName +","+ str)
+    }
+
+    callST("accumulate", Map("out" -> node.outPipeName,
+      "in" -> node.inPipeName,
+      "class" -> outClassName,
+      "init_aggr__expr" -> initAggrFun,
+      "more_aggr_expr" -> moreAggrFuns))
+  }
+
   def getOrderIndex(schema: Option[Schema],
                     ref: Ref): Int = schema match {
 
@@ -111,6 +149,7 @@ class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
     node match {
       case op @ Grouping(out, in, groupExpr, _) => emitGrouping(op, groupExpr)
       case OrderBy(out, in, orderSpec, _)       => emitOrderBy(node, orderSpec)
+      case Accumulate(out, in, gen)             => emitAccumulate(node, gen)
       case _                                    => super.emitNode(node)
     }
   }

@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.codegen
+package dbis.pig.codegen.flink
 
 import dbis.pig.op._
 import dbis.pig.expr._
@@ -26,7 +26,8 @@ import dbis.pig.backends.BackendManager
 import scala.collection.mutable.ListBuffer
 
 import java.nio.file.Path
-
+import dbis.pig.codegen.ScalaBackendCodeGen
+import dbis.pig.codegen.CodeGenerator
 
 class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(template) {
 
@@ -99,7 +100,10 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
       case _ => super.emitRef(schema, ref, tuplePrefix, aggregate)
   }
 
-  override def emitHelperClass(node: PigOperator): String = node match {
+  override def emitHelperClass(node: PigOperator): String = {
+     require(node.schema.isDefined)
+    val className = schemaClassName(node.schema.get.className)
+     node match {
     case Distinct(out, in, windowMode) => {
       if (windowMode) callST("distinctHelper", Map("params"->Map[String,Any]())) else ""
     }
@@ -108,6 +112,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
         var params = Map[String,Any]()
         params += "out"->node.outPipeName
         params += "expr"->emitGroupExpr(node.inputSchema,groupExpr)
+        params += "class" ->className
         callST("groupByHelper", Map("params"->params))
       } else ""
     }
@@ -117,6 +122,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
         params += "out"->node.outPipeName
         params += "expr"->emitForeachExpr(node, gen)
         params += "windowMode"->true
+        params += "class" ->className
         callST("foreachHelper", Map("params"->params))
       } else ""
     }
@@ -125,10 +131,12 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
         var params = Map[String,Any]()
         params += "out"->node.outPipeName
         params += "pred"->emitPredicate(node.schema, pred)
+        params += "class" ->className
         callST("filterHelper", Map("params"->params))
       } else ""
     }
     case _ => super.emitHelperClass(node)
+     }
   }
 
   /**
@@ -224,15 +232,19 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
     * @return the Scala code implementing the FILTER operator
     */
   def emitFilter(node: PigOperator, pred: Predicate, windowMode: Boolean): String = {
+    require(node.schema.isDefined)
+    val className = schemaClassName(node.schema.get.className)
     val params =
       if (windowMode)
         Map("out" -> node.outPipeName,
           "in" -> node.inPipeName,
           "pred" -> emitPredicate(node.schema, pred),
+          "class" ->className,
           "windowMode" -> windowMode)
       else
         Map("out" -> node.outPipeName,
           "in" -> node.inPipeName,
+          "class" ->className,
           "pred" -> emitPredicate(node.schema, pred))
     callST("filter", params)
   }
@@ -250,6 +262,9 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
   def emitForeach(node: PigOperator, out: String, in: String, gen: ForeachGenerator, windowMode: Boolean): String = {
     // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
 
+    require(node.schema.isDefined)
+    val className = schemaClassName(node.schema.get.className)
+    
     var generator = gen
     var foreachNode = node
     var aggrs: String = ""
@@ -266,17 +281,17 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
     val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
     if (requiresFlatMap)
       if (windowMode)
-        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->expr,"windowMode"->windowMode))
+        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->expr,"windowMode"->windowMode, "class" ->className))
       else
-        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->expr))
+        callST("foreachFlatMap", Map("out"->out,"in"->in,"expr"->expr, "class" ->className))
     else
       if (windowMode)
-        callST("foreach", Map("out"->out,"in"->in,"expr"->expr,"windowMode"->windowMode))
+        callST("foreach", Map("out"->out,"in"->in,"expr"->expr,"windowMode"->windowMode, "class" ->className))
       else
         if (aggrs == "")
-          callST("foreach", Map("out"->out,"in"->in,"expr"->expr))
+          callST("foreach", Map("out"->out,"in"->in,"expr"->expr , "class" ->className))
         else
-          callST("foreach", Map("out"->out,"in"->in,"expr"->expr,"aggrs"->aggrs))
+          callST("foreach", Map("out"->out,"in"->in,"expr"->expr,"aggrs"->aggrs, "class" ->className))
   }
 
   /**
@@ -289,17 +304,22 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
     * @param windowMode true if operator is called within a window environment
     * @return the Scala code implementing the GROUPING operator
     */
-  def emitGrouping(schema: Option[Schema], out: String, in: String, groupExpr: GroupingExpression, windowMode: Boolean): String = {
+  def emitGrouping(node: PigOperator, groupExpr: GroupingExpression, windowMode: Boolean): String = {
+   val nodeSchema = node.schema
+    require(nodeSchema.isDefined)
+    val className = schemaClassName(nodeSchema.get.className)
+    val out = node.outPipeName
+    val in = node.inPipeName
     if (groupExpr.keyList.isEmpty)
       if (windowMode)
-        callST("groupBy", Map("out"->out,"in"->in,"windowMode"->windowMode))
+        callST("groupBy", Map("out"->out,"in"->in,"windowMode"->windowMode, "class" ->className))
       else
-        callST("groupBy", Map("out"->out,"in"->in))
+        callST("groupBy", Map("out"->out,"in"->in, "class" ->className))
     else
       if (windowMode)
-        callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGroupExpr(schema, groupExpr),"windowMode"->windowMode))
+        callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGroupExpr(nodeSchema, groupExpr),"windowMode"->windowMode, "class" ->className))
       else
-        callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGroupExpr(schema, groupExpr)))
+        callST("groupBy", Map("out"->out,"in"->in,"expr"->emitGroupExpr(nodeSchema, groupExpr), "class" ->className))
   }
 
   /**
@@ -412,7 +432,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
       case Distinct(out, in, _) => emitDistinct(node)
       case Filter(out, in, pred, windowMode) => emitFilter(node, pred, windowMode)
       case Foreach(out, in, gen, windowMode) => emitForeach(node, node.outPipeName, node.inPipeName, gen, windowMode)
-      case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node.inputSchema, node.outPipeName, node.inPipeName, groupExpr, windowMode)
+      case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node, groupExpr, windowMode)
       case Join(out, rels, exprs, window) => emitJoin(node, node.outPipeName, node.inputs, exprs, window)
       case OrderBy(out, in, orderSpec, windowMode) => emitOrderBy(node, orderSpec, windowMode)
       case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outPipeName, address, mode, func, params)

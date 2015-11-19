@@ -60,7 +60,7 @@ store(in, file, class, func, schema, params) ::=<<
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
-filter(out,in,pred,windowMode) ::=<<
+filter(out,in,pred,windowMode, class) ::=<<
 <if (windowMode)>
     val <out> = <in>.mapWindow(custom<out>Filter _)
 <else>
@@ -69,7 +69,7 @@ filter(out,in,pred,windowMode) ::=<<
 >>
 
 filterHelper(params) ::=<<
-    def custom<params.out>Filter(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
+    def custom<params.out>Filter(ts: Iterable[<params.class>], out: Collector[<params.class>]) ={
       ts.filter(t => {<params.pred>}).foreach(x => out.collect(x))
     }
 >>
@@ -97,8 +97,8 @@ foreach(out,in,expr,aggrs,windowMode, class) ::=<<
 
 foreachHelper(params) ::=<<
 <if(params.windowMode)>
-    def custom<params.out>Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-      ts.foreach { t => out.collect(<params.expr>)}
+    def custom<params.out>Map(ts: Iterable[<params.class>], out: Collector[<params.class>]) = {
+      ts.foreach { t => out.collect(<params.class>(<params.expr>))}
     }
 <else>    
 <endif>
@@ -110,32 +110,32 @@ foreachFlatMap(out,in,expr,windowMode) ::=<<
 >>
 
 // ------------------ GROUPS elements on an expression ------------------------
-groupBy(out,in,expr,windowMode) ::=<<
+groupBy(out,in,expr,windowMode, class) ::=<<
 <if (expr)>
   <if(windowMode)>
-    val <out> = <in>.mapWindow(custom<out>Map _).groupBy(t => t(0))
+    val <out> = <in>.mapWindow(custom<out>Map _).groupBy(t => t._0)
   <else>
-    val <out> = <in>.map(t => List((<expr>),List(t))).groupBy(t => t(0))
+    val <out> = <in>.map(t => <class>((<expr>),List(t))).groupBy(t => t._0)
   <endif>
 <else>
-    val <out> = <in>.map(t => List("all", List(t))).groupBy(t => t(0))
+    val <out> = <in>.map(t => List("all", List(t))).groupBy(t => t._0)
 <endif>
 >>
 
 groupByHelper(params) ::=<<
-    def custom<params.out>Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+    def custom<params.out>Map(ts: Iterable[<params.class>], out: Collector[<params.class>]) = {
 <!      out.collect(ts.groupBy(t => <params.expr>).flatMap(x => List(x._1,x._2)).toList) !>
-      ts.groupBy(t => <params.expr>).foreach(t => out.collect(List(t._1,t._2)))
+      ts.groupBy(t => <params.expr>).foreach(t => out.collect(<params.class>(t._1,t._2)))
     }
 >>
 
 // ------------------ Outputs only distinct values ----------------------------
-distinct(out,in) ::=<<
+distinct(out,in, class) ::=<<
     val <out> = <in>.mapWindow(distinct _)
 >>
 
 distinctHelper(params) ::=<<
-    def distinct(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
+    def distinct(ts: Iterable[<params.class>], out: Collector[<params.class>]) ={
       ts.toList.distinct.foreach{ x => out.collect(x) }
     }
 >>
