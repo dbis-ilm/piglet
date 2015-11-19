@@ -421,6 +421,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   }
 
   it should "contain code for multiple joins" in {
+     Schema.init()
     val ops = parseScript(
       """a = load 'file' as (a: chararray);
         |b = load 'file' as (a: chararray);
@@ -446,7 +447,10 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val expectedCode2 = cleanString(
       """val j2 = a.join(c).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v2._0) }""".stripMargin)
     assert(generatedCode2 == expectedCode2)
-
+   
+    val expectedCode3 = cleanString(
+        """ val j = j1.join(j2).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t3_Tuple(v1._0, v1._1, v2._0, v2._1) }""".stripMargin)
+    assert(generatedCode3 == expectedCode3)
   }
 
   it should "contain code for a simple accumulate statement" in {
