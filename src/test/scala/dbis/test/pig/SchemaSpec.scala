@@ -105,4 +105,16 @@ class SchemaSpec extends FlatSpec with OptionValues with Matchers {
     val s = plan.findOperatorForAlias("Y").value.schema.value
     s.indexOfField(NamedField("b1", List("C"))) shouldBe -1
   }
+
+  it should "support equality based only on the element type" in {
+    val schema1 = Schema(Array(Field("f1", Types.IntType), Field("f2", Types.DoubleType)))
+    val schema2 = Schema(Array(Field("f1", Types.IntType), Field("f2", Types.DoubleType)))
+    schema2.className = "t9"
+    val schema3 = Schema(Array(Field("f1", Types.DoubleType), Field("f2", Types.CharArrayType)))
+    val schema4 = Schema(Array(Field("f3", Types.IntType), Field("f4", Types.DoubleType)))
+    schema1 should be (schema2)
+    schema1 == schema2 should be (true)
+    schema1 shouldNot equal (schema3)
+    schema1 shouldNot equal (schema4)
+  }
 }
