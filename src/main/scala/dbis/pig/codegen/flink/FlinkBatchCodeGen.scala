@@ -112,13 +112,13 @@ class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
           case PositionalField(p)    => if (inputSchemaDefined) s"$p" else "0"
           case _                     => ""
         }
-        if (i == 0) initAggrFun = (funcName +","+ str) else moreAggrFuns += (funcName +","+ str)
+        if (i == 0) initAggrFun = (funcName + "," + str) else moreAggrFuns += (funcName + "," + str)
     }
 
     callST("accumulate", Map("out" -> node.outPipeName,
       "in" -> node.inPipeName,
       "class" -> outClassName,
-      "init_aggr__expr" -> initAggrFun,
+      "init_aggr_expr" -> initAggrFun,
       "more_aggr_expr" -> moreAggrFuns))
   }
 
@@ -133,6 +133,60 @@ class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
     case None =>
       // if we don't have a schema this is not allowed
       throw new TemplateException(s"the flink orderby operator needs a schema, thus, invalid field ")
+  }
+
+  private def printQuote(values: List[String]) = """""""+ values.mkString("""","""") + """""""
+  /**
+   * Generates code for the JOIN operator.
+   *
+   * @param node the JOIN operator node
+   * @param rels list of Pipes to join
+   * @param exprs list of join keys
+   * @return the Scala code implementing the JOIN operator
+   */
+  override def emitJoin(node: PigOperator, rels: List[Pipe], exprs: List[List[Ref]]): String = {
+    require(node.schema.isDefined)
+
+    val res = node.inputs.zip(exprs)
+    val keys = res.map { case (i, k) => k.map { x => s"_${getOrderIndex(i.producer.schema, x)}" }}
+    var keysGroup: ListBuffer[(List[String], List[String])] = new ListBuffer
+    for (i <- 0 until keys.length -1) {
+      val v = (keys(i), keys(i+1))
+      keysGroup += v
+    }
+    val keysGroup1 =  keysGroup.zipWithIndex.map {case (i,k) => 
+      if (k > 0) 
+        (printQuote(i._1.map { x => s"_$k.$x" }),  printQuote(i._2))
+      else
+        (printQuote(i._1), printQuote(i._2))
+    } 
+    val keys1 = keysGroup1.map( x =>x._1 ) 
+    val keys2 = keysGroup1.map( x =>x._2 )
+    
+    val className = node.schema match {
+      case Some(s) => schemaClassName(s.className)
+      case None    => schemaClassName(node.outPipeName)
+    }
+    var pairs = "(v1,v2)"
+    for (i <- 3 to rels.length) {
+      pairs = s"($pairs,v$i)"
+    }
+    val fieldList = ArrayBuffer[String]()
+    for (i <- 1 to node.inputs.length) {
+      node.inputs(i - 1).producer.schema match {
+        case Some(s) => fieldList ++= s.fields.zipWithIndex.map { case (f, k) => s"v$i._$k" }
+        case None    => fieldList += s"v$i._0"
+      }
+    }
+    callST("join",
+      Map("out" -> node.outPipeName,
+        "rel1" -> rels.head.name,
+        "class" -> className,
+        "rels" -> rels.tail.map(_.name),
+        "pairs" -> pairs,
+        "rel1_keys" ->keys1,
+        "rel2_keys" ->keys2,
+        "fields" -> fieldList.mkString(", ")))
   }
 
   /*------------------------------------------------------------------------------------------------- */
@@ -150,6 +204,7 @@ class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
       case op @ Grouping(out, in, groupExpr, _) => emitGrouping(op, groupExpr)
       case OrderBy(out, in, orderSpec, _)       => emitOrderBy(node, orderSpec)
       case Accumulate(out, in, gen)             => emitAccumulate(node, gen)
+      case Join(out, rels, exprs, _)            => emitJoin(node, node.inputs, exprs)
       case _                                    => super.emitNode(node)
     }
   }

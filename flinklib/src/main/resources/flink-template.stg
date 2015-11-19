@@ -86,11 +86,12 @@ limit(out,in,num) ::=<<
 join_key_map(rels,keys) ::=<<
 >>
 
-join(out,rel1,key1,rel2,key2) ::=<<
-        val <out> = <rel1><rel2,key2:{ r,k |<\\>
-        .join(<r>).where(t => <key1>).equalTo(t => <k>)<\\>
-        .map{ t => t._1 ++ t._2 \}<\\>
-        }>
+join(out,rel1, rels, rel1_keys, rel2_keys, pairs, fields, class) ::=<<
+        val <out> = <rel1><rels, rel1_keys, rel2_keys:{ r,k1, k2 | .join(<r>).where(<k1>).equalTo(<k2>)}>.map{ 
+         t => 
+         val <pairs> = t
+         <class>(<fields>)
+        }
 
 >>
 
@@ -108,6 +109,10 @@ orderHelper(params) ::=<<
 >>
 
 stageIdentifier(line,lineage) ::=<< >>
+
+accumulate(out, in,  class, init_aggr_expr, more_aggr_expr) ::=<<
+        val <out> = <in>.aggregate(Aggregations.<init_aggr_expr>)<more_aggr_expr:{exp|.and(Aggregations.<exp>)}>
+>>
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name, hook) ::= <<        

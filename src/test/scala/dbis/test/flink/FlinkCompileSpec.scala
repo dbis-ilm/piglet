@@ -287,61 +287,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     assert(generatedCode == expectedCode)
   }
   /*
-  it should "contain code for a binary JOIN statement with simple expression" in {
-    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))))
-    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
-                                                              Field("f2", Types.DoubleType),
-                                                              Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
-    op.inputs=List(input1,input2)
-    val codeGenerator = new FlinkBatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""
-        |val a = b.join(c).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
-        |t => t._1 ++ t._2
-        |}""".stripMargin)
-    assert(generatedCode == expectedCode)
-  }
-
-  it should "contain code for a binary JOIN statement with expression lists" in {
-    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
-      List(PositionalField(1), PositionalField(2))))
-    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
-                                                              Field("f2", Types.DoubleType),
-                                                              Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
-    op.inputs=List(input1,input2)
-    val codeGenerator = new FlinkBatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""
-        |val a = b.join(c).where(t => Array(t(0).asInstanceOf[String],t(1).asInstanceOf[Double]).mkString).equalTo(t => Array(t(1).asInstanceOf[Double],t(2).asInstanceOf[Int]).mkString).map{
-        |t => t._1 ++ t._2
-        |}""".stripMargin)
-    assert(generatedCode == expectedCode)
-  }
-
-  it should "contain code for a multiway JOIN statement" in {
-    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
-      List(PositionalField(0)), List(PositionalField(0))))
-    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
-                                                              Field("f2", Types.DoubleType),
-                                                              Field("f3", Types.IntType)))))
-    val input1 = Pipe("b",Load(Pipe("b"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
-    val input2 = Pipe("c",Load(Pipe("c"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
-    val input3 = Pipe("d",Load(Pipe("d"), "file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
-    op.inputs=List(input1,input2,input3)
-    val codeGenerator = new FlinkBatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""
-      |val a = b.join(c).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{ 
-        |t => t._1 ++ t._2
-        |}.join(d).where(t => t(0).asInstanceOf[String]).equalTo(t => t(0).asInstanceOf[String]).map{
-        |t => t._1 ++ t._2
-        |}""".stripMargin)
-    assert(generatedCode == expectedCode)
-  }
 
   it should "contain code for GROUP BY ALL" in {
     val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List()))
@@ -390,7 +335,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   it should "contain code for simple ORDER BY" in {
     // aa = ORDER bb BY $0
     val op = OrderBy(Pipe("aa"), Pipe("bb"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))
-     val schema = Schema(Array(Field("f1", Types.IntType),
+    val schema = Schema(Array(Field("f1", Types.IntType),
       Field("f2", Types.DoubleType),
       Field("f3", Types.IntType)))
 
@@ -417,5 +362,107 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val expectedCode = cleanString("""
         |val a = b.setParallelism(1).sortPartition(0, Order.DESCENDING).sortPartition(2, Order.ASCENDING)""".stripMargin)
     assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a binary join statement with simple expression" in {
+    Schema.init()
+    val op = Join(Pipe("aa"), List(Pipe("bb"), Pipe("cc")), List(List(PositionalField(0)), List(PositionalField(0))))
+    val schema = Schema(Array(Field("f1", Types.CharArrayType),
+      Field("f2", Types.DoubleType),
+      Field("f3", Types.IntType)))
+    val input1 = Pipe("bb", Load(Pipe("bb"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("cc", Load(Pipe("cc"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    op.inputs = List(input1, input2)
+    op.constructSchema
+
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val aa = bb.join(cc).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2) }""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a binary join statement with expression lists" in {
+    Schema.init()
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
+      List(PositionalField(1), PositionalField(2))))
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+      Field("f2", Types.DoubleType),
+      Field("f3", Types.IntType)))))
+    val input1 = Pipe("b", Load(Pipe("b"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c", Load(Pipe("c"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    op.inputs = List(input1, input2)
+    op.constructSchema
+
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+     |val a = b.join(c).where("_0","_1").equalTo("_1","_2").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2) }""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for a multiway join statement" in {
+    Schema.init()
+    val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
+      List(PositionalField(0)), List(PositionalField(0))))
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+      Field("f2", Types.DoubleType),
+      Field("f3", Types.IntType)))))
+    val input1 = Pipe("b", Load(Pipe("b"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c", Load(Pipe("c"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input3 = Pipe("d", Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    op.inputs = List(input1, input2, input3)
+    op.constructSchema
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+      |val a = b.join(c).where("_0").equalTo("_0").join(d).where("_1._0").equalTo("_0").map{ t => val ((v1,v2),v3) = t _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2) }""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for multiple joins" in {
+    val ops = parseScript(
+      """a = load 'file' as (a: chararray);
+        |b = load 'file' as (a: chararray);
+        |c = load 'file' as (a: chararray);
+        |j1 = join a by $0, b by $0;
+        |j2 = join a by $0, c by $0;
+        |j = join j1 by $0, j2 by $0;
+        |""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode1 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j1").get))
+    val generatedCode2 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j2").get))
+    val generatedCode3 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j").get))
+
+    val finalJoinOp = plan.findOperatorForAlias("j").get
+    // TODO: Schema classes!!!!
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(finalJoinOp.schema.get))
+
+    val expectedCode1 = cleanString(
+      """val j1 = a.join(b).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v2._0) }""".stripMargin)
+    assert(generatedCode1 == expectedCode1)
+
+    val expectedCode2 = cleanString(
+      """val j2 = a.join(c).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v2._0) }""".stripMargin)
+    assert(generatedCode2 == expectedCode2)
+
+  }
+
+  it should "contain code for a simple accumulate statement" in {
+    val ops = parseScript("b = load 'file'; a = ACCUMULATE b GENERATE COUNT($0), AVG($1), SUM($2);")
+    val schema = Schema(Array(Field("t1", Types.IntType),
+      Field("t2", Types.IntType),
+      Field("t3", Types.IntType)))
+    ops.head.schema = Some(schema)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("a").get
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+       |val a = b.aggregate(Aggregations.COUNT,0).and(Aggregations.AVG,1).and(Aggregations.SUM,2)""".stripMargin)
+
+    assert(generatedCode == expectedCode)
+
   }
 }
