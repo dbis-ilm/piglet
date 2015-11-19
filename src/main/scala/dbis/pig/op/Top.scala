@@ -14,27 +14,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting
+package dbis.pig.op
 
-import com.typesafe.scalalogging.LazyLogging
-import dbis.pig.plan.rewriting.rulesets.{SparkRuleset, GeneralRuleset, RDFRuleset}
-
-
-
-/** This object contains all the rewriting rules that are currently implemented
+/** An operator for top-k queries.
   *
+  * It can also be used for bottom-k by changing the orderSpec
+  *
+  * @param out
+  * @param in
+  * @param orderSpec
+  * @param num
   */
-//noinspection ScalaDocMissingParameterDescription
-object Rules extends LazyLogging {
-  val rulesets = List(GeneralRuleset, RDFRuleset)
-  def registerAllRules() = {
-    // IMPORTANT: If you change one of the rule registration calls in here, please also change the call in the
-    // corresponding test methods!
-    rulesets foreach { _.registerRules() }
-  }
+case class Top(out: Pipe, in: Pipe, orderSpec: List[OrderBySpec], num: Int) extends PigOperator{
+  outputs = List(out)
+  inputs = List(in)
 
-  def registerBackendRules(backend: String) = backend match {
-    case "spark" => SparkRuleset.registerRules()
-    case _ => logger.debug("No rules known for " + backend)
-  }
+  override def lineageString: String = s"""TOP${num}""" + super.lineageString
 }
