@@ -12,12 +12,12 @@ trait CodeMatchers {
 
   /**
     * A matcher for code snippets which allows to compare generated code with a template string
-    * where certain parameters denoted by $1 ... $9 can be matched to arbitrary numbers (actually digits).
+    * where certain parameters denoted by $1 ... $9 can be matched to arbitrary numbers.
     * Note that the same template parameter matches to the same value, but different parameters
     * expect different values. Examples:
     *
     * "abc $1 def $1" matches "abc 1 def 1" but not "abc 7 def 8"
-    * "abc $1 def $2" matches "abc 8 def 9"
+    * "abc $1 def $2" matches "abc 84 def 92"
     *
     * @param expectedStringTemplate the code template containing parameters $1 ... $9
     */
@@ -48,8 +48,19 @@ object SnippetMatcher {
       .zipWithIndex
       .map{ case (p, offset) => p - offset}.toList
     val keys = pattern.findAllMatchIn(template).map(p => p.toString).toList
+
+    val pattern2 = "[0-9]+".r
+    var offs = 0
     for (i <- 0 until keys.length) {
-      replacements += (keys(i) -> snippet(positions(i)).toString)
+      // now we look for the number that we use to replace the $i string
+      pattern2.findFirstIn(snippet.substring(positions(i) + offs)) match {
+        case Some(s) => {
+          replacements += (keys(i) -> s)
+          // if it was longer than one digit we have to correct the position
+          offs += s.length - 1
+        }
+        case None => {}
+      }
     }
     var s = template
     replacements.foreach{case (k, v) => s = s.replace(k, v)}
