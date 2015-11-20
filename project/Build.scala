@@ -122,7 +122,7 @@ object Dependencies {
     scalikejdbc,
     scalikejdbc_config,
     commons,
-    slf4j,
+    slf4j % "provided",
     hadoop % "provided",
     twitterUtil,
     h2Database
