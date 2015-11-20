@@ -2,7 +2,6 @@ import Dependencies._
 
 name := "piglet-interpreter"
 
-unmanagedJars in Compile += file("zeppelin/lib_unmanaged/zeppelin-spark-0.6.0-incubating-SNAPSHOT.jar")
 
 libraryDependencies ++= Seq(
     sparkCore % "provided",
