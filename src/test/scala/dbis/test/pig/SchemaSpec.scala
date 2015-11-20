@@ -111,9 +111,7 @@ class SchemaSpec extends FlatSpec with OptionValues with Matchers {
     val schema2 = Schema(Array(Field("f1", Types.IntType), Field("f2", Types.DoubleType)))
     schema2.className = "t1434233"
     
-    schema1 shouldNot be theSameInstanceAs schema2
-    
-    assert(schema1.className != schema2.className)
+    schema1 should be theSameInstanceAs schema2
     
     val schema3 = Schema(Array(Field("f1", Types.DoubleType), Field("f2", Types.CharArrayType)))
     val schema4 = Schema(Array(Field("f3", Types.IntType), Field("f4", Types.DoubleType)))
