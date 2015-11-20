@@ -781,6 +781,18 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     )))
   }
 
+  it should "parse a DEFINE macro statement without parameters" in {
+    val ops = parseScript(
+      """DEFINE my_macro() RETURNS out_alias {
+        |$out_alias = LOAD 'file' USING PigStorage(':');
+        |};
+      """.stripMargin
+    )
+    assert(ops == List(DefineMacroCmd(Pipe("out_alias"), "my_macro", Some(List()),
+      List(Load(Pipe("$out_alias"), new URI("file"), None, Some("PigStorage"), List("""":"""")))
+    )))
+  }
+
   it should "parse a statement invoking a macro" in {
     assert(parseScript("a = my_macro(in, 42);") == List(MacroOp(Pipe("a"), "my_macro", Some(List(NamedField("in"), Value(42))))))
 
