@@ -109,7 +109,9 @@ class SchemaSpec extends FlatSpec with OptionValues with Matchers {
   it should "support equality based only on the element type" in {
     val schema1 = Schema(Array(Field("f1", Types.IntType), Field("f2", Types.DoubleType)))
     val schema2 = Schema(Array(Field("f1", Types.IntType), Field("f2", Types.DoubleType)))
-    schema2.className = "t9"
+    schema2.className = "t1434233"
+    
+    schema1 shouldNot be theSameInstanceAs schema2
     
     assert(schema1.className != schema2.className)
     
