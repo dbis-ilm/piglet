@@ -285,8 +285,21 @@ trait PigOperator extends Rewritable with Serializable {
     this
   }
 
+  /**
+    * Returns a string of whitespaces for indenting a line by the given number.
+    *
+    * @param tab number of tabs to indent
+    * @return a string with whitespaces
+    */
   def indent(tab: Int): String = new String((for (i <-1 to tab) yield ' ').toArray)
 
+  /**
+    * Prints a description of the operator to standard output but indent it by the given
+    * number of characters.
+    * Note this method is used to pretty print a execution plan.
+    *
+    * @param tab the number of characters for indenting the output
+    */
   def printOperator(tab: Int): Unit = {
     println(indent(tab) + this.toString + s" { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
   }
