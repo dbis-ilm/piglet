@@ -605,7 +605,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * defineMacroStmt contains other statements but not other macro definitions
    */
-  def plainStmt: Parser[PigOperator] = stmt | defineMacroStmt
+  def plainStmt: Parser[PigOperator] = defineMacroStmt | stmt
   /*
    * A plain Pig script is a list of statements.
    */
