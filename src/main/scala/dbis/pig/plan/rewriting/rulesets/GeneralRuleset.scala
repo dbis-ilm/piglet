@@ -65,7 +65,11 @@ object GeneralRuleset extends Ruleset {
     *         Filters, None otherwise.
     */
   def mergeFilters(parent: Filter, child: Filter): Option[Filter] = {
-    Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
+    if (parent.pred != child.pred) {
+      Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
+    } else {
+      None
+    }
   }
 
   /** Removes a [[dbis.pig.op.Filter]] object that's a successor of a Filter with the same Predicate
