@@ -200,7 +200,6 @@ fi
 CP=$BACKEND_DIR:$CP
 checkBackendJar
 
-echo $CP
 if $interactive; then
     java -Dscala.usejavacp=true -cp $CP dbis.pig.PigletREPL --backend_dir `dirname $0`/.. $*
 else
