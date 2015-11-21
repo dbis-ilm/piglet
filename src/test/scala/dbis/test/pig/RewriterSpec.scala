@@ -124,8 +124,67 @@ class RewriterSpec extends FlatSpec
     pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op3
     op4.inputs.map(_.producer) should contain only op3
   }
+
+  // THESIS
   "The rewriter" should "merge two Filter operations" in {
     merge[Filter, Filter](mergeFilters)
+    performMergeTest()
+  }
+
+  // THESIS
+  it should "merge two filter operations manually" in {
+    def strategy(op: Any): Option[Filter] = op match {
+      case filter1 : Filter =>
+        val successors = filter1.outputs.flatMap(_.consumer)
+
+        //Ensure that the Filter operator is the only successor
+        if (successors.length != 1 || !successors.head.isInstanceOf[Filter]) {
+          return None
+        }
+
+        val filter2 = successors.head.asInstanceOf[Filter]
+        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+        Some(fixMerge(filter1, filter2, merged))
+      case _ => None
+    }
+
+    addStrategy(strategy _)
+
+    performMergeTest()
+  }
+
+  // THESIS
+  it should "merge Filter operations manually with Extractors" in {
+    def strategy(op: Any): Option[Filter] = op match {
+      case SuccE(filter1: Filter, filter2: Filter) =>
+        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+        Some(fixMerge(filter1, filter2, merged))
+      case _ => None
+    }
+
+    addStrategy(strategy _)
+
+    performMergeTest()
+  }
+
+  // THESIS
+  it should "merge Filter operations via binary strategies" in {
+    def strategy(filter1: Filter, filter2: Filter): Option[Filter] = {
+      val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+      Some(fixMerge(filter1, filter2, merged))
+    }
+
+    addBinaryPigOperatorStrategy(strategy)
+
+    performMergeTest()
+  }
+
+  // THESIS
+  it should "merge Filter operations via binary strategies and anonymous functions" in {
+    addBinaryPigOperatorStrategy({ (filter1: Filter, filter2: Filter) =>
+                                   val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+                                   Some(fixMerge(filter1, filter2, merged)) })
+
     performMergeTest()
   }
 
