@@ -148,8 +148,60 @@ class RewriterSpec extends FlatSpec
     op4.inputs.map(_.producer) should contain only op2
   }
 
+  // THESIS
   it should "order Filter operations before Order By ones" in {
     reorder[OrderBy, Filter]
+    performReorderingTest()
+  }
+
+  // THESIS
+  it should "order Filter operations before Order By ones manually" in {
+    def strategy(op: Any): Option[Filter] = op match {
+      case order : OrderBy =>
+        val successors = order.outputs.flatMap(_.consumer)
+
+        //Ensure that the Filter operator is the only successor
+        if (successors.length != 1 || !successors.head.isInstanceOf[Filter]) {
+          return None
+        }
+
+        val filter = successors.head.asInstanceOf[Filter]
+        Some(fixReordering(order, filter, filter, order))
+      case _ => None
+    }
+
+    addStrategy(strategy _)
+
+    performReorderingTest()
+  }
+
+  // THESIS
+  it should "order Filter operations before Order By ones manually with Extractors" in {
+    def strategy(op: Any): Option[Filter] = op match {
+      case SuccE(o: OrderBy, f: Filter) => Some(fixReordering(o, f, f, o))
+      case _ => None
+    }
+
+    addStrategy(strategy _)
+
+    performReorderingTest()
+  }
+
+  // THESIS
+  it should "order Filter operations before Order By ones via binary strategies" in {
+    def strategy(order: OrderBy, filter: Filter): Option[Filter] =
+      Some(fixReordering(order, filter, filter, order))
+
+    addBinaryPigOperatorStrategy(strategy)
+
+    performReorderingTest()
+  }
+
+  // THESIS
+  it should "order Filter operations before Order By ones via binary strategies and anonymous functions" in {
+    addBinaryPigOperatorStrategy({ (order: OrderBy, filter: Filter) =>
+                                   Some(fixReordering(order, filter, filter, order)) })
+
     performReorderingTest()
   }
 
@@ -1585,11 +1637,13 @@ class RewriterSpec extends FlatSpec
     dOp.inputs.map(_.producer) should have length 2
   }
 
+  // THESIS
   "The Rewriter DSL" should "apply patterns via applyPattern without conditions" in {
     Rewriter applyPattern { case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ) }
     performReorderingTest()
   }
 
+  // THESIS
   it should "apply patterns via applyPattern with a condition added by when" in {
     Rewriter when { t: OrderBy => t.outputs.length > 0 } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
@@ -1597,6 +1651,7 @@ class RewriterSpec extends FlatSpec
     performReorderingTest()
   }
 
+  // THESIS
   it should "apply patterns via applyPattern with a condition added by unless" in {
     Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
@@ -1696,6 +1751,7 @@ class RewriterSpec extends FlatSpec
     performRemovalTest()
   }
 
+  // THESIS
   it should "allow swapping operators" in {
     Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
