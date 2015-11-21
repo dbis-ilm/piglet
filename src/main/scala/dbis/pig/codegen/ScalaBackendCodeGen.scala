@@ -99,9 +99,9 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     Types.LongType -> "Long",
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
-    Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "Any",
-    Types.AnyType -> "Any")
+    Types.CharArrayType -> "String",  
+    Types.ByteArrayType -> "String", //TODO: check this
+    Types.AnyType -> "String") //TODO: check this
 
   /**
    * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume

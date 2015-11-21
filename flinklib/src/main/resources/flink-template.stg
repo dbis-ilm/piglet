@@ -48,6 +48,7 @@ dump(in) ::=<<
 // ------------------ STORE Results on Disk -----------------------------------
 store(in, file, class, func, params) ::=<<
         <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)
+        env.execute("Starting Query")
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -60,16 +61,22 @@ foreach(out, in, expr, class) ::=<<
         val <out> = <in>.map(t => <class>(<expr>))
 >>
 
-// ----- Executes an expression FOREACH input element requiring flatMap -------
+// ------------------ Executes an expression FOREACH input element where the expression is a nested plan -----------
+foreachNested(out, in, expr) ::=<<
+        val <out> = <in>.map(t => <expr>)
+>>
+
+// ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
 // Note, that the closing parenthesis is intentionally missing
 foreachFlatMap(out, in, expr) ::=<<
         val <out> = <in>.flatMap(t => <expr>
 >>
 
 
+
 // ------------------ GROUPS elements on an expression ------------------------
 groupBy(out,in,expr,keyExtr, class) ::=<<
-val <out> = A.groupBy(t => <expr>).reduceGroup{ (in, out: Collector[<class>]) => val itr = in.toIterable; out.collect(<class>(<keyExtr>, itr)) }
+       val <out> = <in>.groupBy(t => <expr>).reduceGroup{ (in, out: Collector[<class>]) => val itr = in.toIterable; out.collect(<class>(<keyExtr>, itr)) }
 >>
 
 // ------------------ Outputs only distinct values ----------------------------

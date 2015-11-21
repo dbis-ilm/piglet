@@ -30,7 +30,7 @@ import org.scalatest.{ Matchers, BeforeAndAfterAll, FlatSpec }
 import dbis.pig.plan.rewriting.Rules
 
 class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
-
+  
   override def beforeAll() {
     Rules.registerAllRules()
   }
@@ -118,7 +118,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val op = Store(Pipe("A"), file)
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(s"""PigStorage[Record]().write("$file", A)""".stripMargin)
+    val expectedCode = cleanString(
+        s"""PigStorage[Record]().write("$file", A) env.execute("Starting Query")""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -313,7 +314,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val aa = A.groupBy(t => t._0).reduceGroup{ (in, out: Collector[_t2_Tuple]) => val itr = in.toIterable; out.collect(_t2_Tuple(itr.head._0, itr)) }""".stripMargin)
+      |val aa = bb.groupBy(t => t._0).reduceGroup{ (in, out: Collector[_t2_Tuple]) => val itr = in.toIterable; out.collect(_t2_Tuple(itr.head._0, itr)) }""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -328,7 +329,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val aa = A.groupBy(t => (t._0,t._1)).reduceGroup{ (in, out: Collector[_t3_Tuple]) => val itr = in.toIterable; out.collect(_t3_Tuple(_t2_Tuple(itr.head._0,itr.head._1), itr)) }""".stripMargin)
+      |val aa = bb.groupBy(t => (t._0,t._1)).reduceGroup{ (in, out: Collector[_t3_Tuple]) => val itr = in.toIterable; out.collect(_t3_Tuple(_t2_Tuple(itr.head._0,itr.head._1), itr)) }""".stripMargin)
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
     assert(generatedCode == expectedCode)
   }

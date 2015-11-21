@@ -673,6 +673,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
   }
 
   it should "contain code for flattening a tuple in FOREACH" in {
+    Schema.init()
     val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
     val schema = Schema(Array(
       Field("f1", Types.CharArrayType),
@@ -698,7 +699,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
-        |val a = b.flatMap(t => PigFuncs.tokenize(t._0).map(_t1_Tuple(_))).map(t => _t2_Tuple(t._0))""".stripMargin)
+        |val a = b.flatMap(t => PigFuncs.tokenize(t._0).map(_t3_Tuple(_))).map(t => _t2_Tuple(t._0))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -740,7 +741,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
 
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperClass = cleanString(
-    """case class _t2_HelperTuple (_t: _t1_Tuple = null, _0: Int = 0, _1sum: Int = 0, _1cnt: Int = 0, _2: Int = 0)
+    """case class _t2_HelperTuple (_t: _t1_Tuple = null, _0: Long = 0, _1sum: Int = 0, _1cnt: Int = 0, _2: Int = 0)
       |extends java.io.Serializable with SchemaClass { override def mkString(_c: String = ",") = "" }
       |""".stripMargin)
     assert(generatedHelperClass == expectedHelperClass)
@@ -962,7 +963,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
-        |val out = in2.map(t => _t2_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t1_Tuple(_))))
+        |val out = in2.map(t => _t2_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t3_Tuple(_))))
       """.stripMargin)
     assert (generatedCode == expectedCode)
   }
