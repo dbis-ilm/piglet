@@ -18,6 +18,8 @@
 package dbis.pig
 
 
+import java.nio.file.Path
+
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.parser.LanguageFeature
@@ -52,7 +54,6 @@ import scalikejdbc._
 
 import com.typesafe.scalalogging.Logger
 
-
 object Piglet extends LazyLogging {
 
   case class CompilerConfig(master: String = "local",
@@ -69,15 +70,16 @@ object Piglet extends LazyLogging {
                             profiling: Boolean = false
                           )
 
+  var master: String = "local"
+  var backend: String = null
+  var backendPath: String = null
+  var languageFeature = LanguageFeature.PlainPig
+
   def main(args: Array[String]): Unit = {
-    var master: String = "local"
     var inputFiles: Seq[Path] = null
     var compileOnly: Boolean = false
     var outDir: Path = null
     var params: Map[String,String] = null
-    var backend: String = null
-    var backendPath: String = null
-    var languageFeature = LanguageFeature.PlainPig
     var updateConfig = false
     var showPlan = false
     var backendArgs: Map[String, String] = null
@@ -374,15 +376,77 @@ object Piglet extends LazyLogging {
         .apply()
       
     }
-    
-//    val entries = DB readOnly { implicit session => 
-//      sql"select * from opcount"
-//        .map{ rs => s"${rs.string("id")}  -->  ${rs.int("cnt")}" }
-//        .list
-//        .apply()
-//      
-//    }
-//    entries.foreach { println }
-    
+  }
+
+  /**
+    * Sets the various configuration parameters to the given string values.
+    *
+    * @param master the master for Spark/Flink
+    * @param backend the backend used for execution (spark, flink, sparks, flinks, ...)
+    * @param language the Piglet dialect used for processing the script
+    * @param backendDir the directory where the backend-specific jars are located
+    */
+  def setConfig(master: String = "local", backend: String = "spark", language: String = "pig",
+                backendDir: String = "."): Unit = {
+    Piglet.master = master
+    Piglet.backend = backend
+    Piglet.backendPath = backendDir
+    Piglet.languageFeature = language match {
+      case "sparql" => LanguageFeature.SparqlPig
+      case "streaming" => LanguageFeature.StreamingPig
+      case "pig" => LanguageFeature.PlainPig
+      case _ => LanguageFeature.PlainPig
+    }
+    val backendConf = BackendManager.backend(backend)
+    BackendManager.backend = backendConf
+  }
+
+  /**
+    * Compiles and executes the given Piglet script represented as string.
+    *
+    * @param source a string containing the Piglet code
+    */
+  def compile(source: String): List[Any] = {
+    def cleanup(s: String): Unit = {
+      import scalax.file.Path
+
+      val path: Path = Path(s)
+      try {
+        path.deleteRecursively(continueOnFailure = false)
+      }
+      catch {
+        case e: java.io.IOException => // some file could not be deleted
+      }
+
+    }
+
+    PigletCompiler.createDataflowPlan(source, Map[String, String](), backend, languageFeature) match {
+      case Some(p) => {
+        val plan = processPlan(p)
+        plan.checkSchemaConformance
+
+        val backendConf = BackendManager.backend
+        val outDir = Paths.get(".")
+        val scriptName = "__r_piglet"
+        val templateFile = backendConf.templateFile
+        val jarFile = Conf.backendJar(backend)
+        val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(s"$backendPath/${jarFile.toString}"),
+          templateFile, backend, false) match {
+          case Some(jarFile) => {
+            val runner = backendConf.runnerClass
+            logger.debug(s"using runner class ${runner.getClass.toString()}")
+
+            logger.info( s"""starting job at "$jarFile" using backend "$backend" """)
+            val resStream = new java.io.ByteArrayOutputStream
+            Console.withOut(resStream)(runner.execute(master, scriptName, jarFile, Map[String,String]()))
+            resStream.toString
+          }
+          case None => ""
+        }
+        cleanup(scriptName)
+        res.split("\n").toList.map(_.split(","))
+      }
+      case None => List()
+    }
   }
 }
