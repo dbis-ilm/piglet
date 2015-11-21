@@ -44,7 +44,10 @@ object PigFuncs {
    * Incremental versions of the aggregate functions - used for implementing ACCUMULATE.
    */
   def incrSUM(acc: Int, v: Int) = acc + v
+  def incrSUM(acc: Double, v: Double) = acc + v
   def incrCOUNT(acc: Int, v: Int) = acc + 1
   def incrMIN(acc: Int, v: Int) = math.min(acc, v)
   def incrMAX(acc: Int, v: Int) = math.max(acc, v)
+  def incrMIN(acc: Double, v: Double) = math.min(acc, v)
+  def incrMAX(acc: Double, v: Double) = math.max(acc, v)
 }

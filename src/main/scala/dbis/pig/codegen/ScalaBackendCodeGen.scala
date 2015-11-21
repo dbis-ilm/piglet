@@ -190,8 +190,12 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           throw new TemplateException(s"invalid field name $f")
       }
     }
-    else
-        s"$tuplePrefix._${schema.get.indexOfField(nf)}" // s"$tuplePrefix.$f"
+    else {
+      val pos = schema.get.indexOfField(nf)
+      if (pos == -1)
+        throw new TemplateException(s"invalid field name $f")
+      s"$tuplePrefix._$pos" // s"$tuplePrefix.$f"
+    }
     case PositionalField(pos) => schema match {
       case Some(s) => s"$tuplePrefix._$pos"
       case None =>

@@ -7,13 +7,13 @@ libraryDependencies ++= Dependencies.rootDeps
 
 libraryDependencies ++= itDeps
 
-mainClass in (Compile, packageBin) := Some("dbis.pig.PigREPL")
+mainClass in (Compile, packageBin) := Some("dbis.pig.PigletREPL")
 
-mainClass in (Compile, run) := Some("dbis.pig.PigCompiler")
+mainClass in (Compile, run) := Some("dbis.pig.Piglet")
 
 assemblyJarName in assembly := "PigCompiler.jar"
 
-mainClass in assembly := Some("dbis.pig.PigCompiler")
+mainClass in assembly := Some("dbis.pig.Piglet")
 
 test in assembly := {}
 
