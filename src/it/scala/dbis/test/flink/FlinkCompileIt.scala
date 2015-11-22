@@ -61,7 +61,7 @@ class FlinkCompileIt extends CompileIt {
         println("FLINK_JAR variable not set - exiting.")
         System.exit(0)
       }
-      // Testing the jobmanager whether is working or not is done in piglet script
+      // checking the flink jobmanager, whether it is working or not, is done in the piglet script
       // 1. make sure the output directory is empty
       cleanupResult(resultDir)
       cleanupResult(script.replace(".pig", ""))

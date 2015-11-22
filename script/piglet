@@ -150,7 +150,8 @@ function checkInteractiveShell {
 
 
 ##############################################################
-# checkJobManager  - check if we flink JobManager is working or not
+# checkJobManager  - check if the flink JobManager is working or not.
+#                    if not the piglet will exit
 ##############################################################
 function checkJobManager {
     if [ "$backend" == "flink" ] || [ "$backend" == "flinks" ]; then
