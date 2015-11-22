@@ -148,6 +148,24 @@ function checkInteractiveShell {
     done
 }
 
+
+##############################################################
+# checkJobManager  - check if we flink JobManager is working or not
+##############################################################
+function checkJobManager {
+    if [ "$backend" == "flink" ] || [ "$backend" == "flinks" ]; then
+        jobmanager="org.apache.flink.runtime.jobmanager.JobManager"
+        pid=` ps aux | grep $jobmanager | grep -v "grep" | awk '{print $2}'`
+        if [[ ! -z $pid ]]
+        then
+            echo "The flink job manager is working with PID=$pid. Continuue ..."
+        else
+            echo "The flink job manager is not working. Please, run it from the flink bin folder (i.e., start-local). Piglet will exit now ..."
+            exit 1
+        fi
+    fi
+}
+
 ##############################################################
 
 ## search for the master option
@@ -200,6 +218,7 @@ fi
 CP=$BACKEND_DIR:$CP
 
 checkBackendJar
+checkJobManager
 
 if $interactive; then
     java -Dscala.usejavacp=true -cp $CP dbis.pig.PigletREPL --backend_dir `dirname $0`/.. $*

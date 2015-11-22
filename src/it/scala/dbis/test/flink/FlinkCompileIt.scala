@@ -61,13 +61,7 @@ class FlinkCompileIt extends CompileIt {
         println("FLINK_JAR variable not set - exiting.")
         System.exit(0)
       }
-
-      if (availablePort(6123) == false ) { // or by checking the process of  job manager
-        println("It seems that the job manager of" +
-          "flink is not running. Please, run the local job manager" +
-          "by executing ./start-local")
-        System.exit(0)
-      }
+      // Testing the jobmanager whether is working or not is done in piglet script
       // 1. make sure the output directory is empty
       cleanupResult(resultDir)
       cleanupResult(script.replace(".pig", ""))
@@ -93,37 +87,6 @@ class FlinkCompileIt extends CompileIt {
       cleanupResult(resultDir)
       cleanupResult(script.replace(".pig", ""))
     }
-  }
-
-  def availablePort(port: Int): Boolean = {
-    import java.net.ServerSocket
-    import java.net.DatagramSocket
-    import java.io.IOException
-    var ss: ServerSocket = null
-    var ds: DatagramSocket = null
-    try {
-      ss = new ServerSocket(port)
-      ss.setReuseAddress(true)
-      ds = new DatagramSocket(port)
-      ds.setReuseAddress(true)
-      return true
-    } catch {
-      case e: IOException =>
-    } finally {
-      if (ds != null) {
-        ds.close()
-      }
-
-      if (ss != null) {
-        try {
-          ss.close()
-        } catch {
-          case e: IOException =>
-        }
-      }
-    }
-
-    return false
   }
 }
 
