@@ -178,13 +178,11 @@ class RewriterSpec extends FlatSpec
   // THESIS
   it should "merge Filter operations manually with Extractors" in {
     def strategy(op: Any): Option[Filter] = op match {
-      case SuccE(filter1: Filter, filter2: Filter) =>
-        if (filter1.pred != filter2.pred) {
-          val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
-          Some(fixMerge(filter1, filter2, merged))
-        } else {
-          None
-        }
+      case SuccE(filter1 @ Filter(_, _, pred1, _),
+                 filter2 @ Filter(_, _, pred2, _))
+          if pred1 != pred2 =>
+        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(pred1, pred2))
+        Some(fixMerge(filter1, filter2, merged))
       case _ => None
     }
 
