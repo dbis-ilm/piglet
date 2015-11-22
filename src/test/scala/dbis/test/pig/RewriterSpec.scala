@@ -142,7 +142,7 @@ class RewriterSpec extends FlatSpec
 
   // THESIS
   "The rewriter" should "merge two Filter operations" in {
-    merge[Filter, Filter](mergeFilters)
+    merge(mergeFilters)
     performMergeTest()
     performNotMergeTest()
   }
@@ -422,7 +422,7 @@ class RewriterSpec extends FlatSpec
 
   it should "pull up Empty nodes" in {
     addStrategy(removeNonStorageSinks _)
-    merge[PigOperator, Empty](mergeWithEmpty)
+    merge(mergeWithEmpty)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
     val plan = new DataflowPlan(List(op1, op2))

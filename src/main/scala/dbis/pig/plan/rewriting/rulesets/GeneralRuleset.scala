@@ -253,8 +253,8 @@ object GeneralRuleset extends Ruleset {
     // corresponding test methods!
     addStrategy(replaceMacroOp _)
     addStrategy(removeDuplicateFilters)
-    merge[Filter, Filter](mergeFilters)
-    merge[PigOperator, Empty](mergeWithEmpty)
+    merge(mergeFilters)
+    merge(mergeWithEmpty)
     reorder[OrderBy, Filter]
     addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
     addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
