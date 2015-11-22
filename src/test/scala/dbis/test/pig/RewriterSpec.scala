@@ -176,6 +176,32 @@ class RewriterSpec extends FlatSpec
   }
 
   // THESIS
+  it should "merge two filter operations manually with a typed strategy" in {
+    def strategy(filter1: Filter): Option[Filter] = {
+      val successors = filter1.outputs.flatMap(_.consumer)
+
+      //Ensure that the Filter operator is the only successor
+      if (successors.length != 1 || !successors.head.isInstanceOf[Filter]) {
+        return None
+      }
+
+      val filter2 = successors.head.asInstanceOf[Filter]
+
+      if (filter1.pred != filter2.pred) {
+        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+        Some(fixMerge(filter1, filter2, merged))
+      } else {
+        None
+      }
+    }
+
+    addTypedStrategy(strategy _)
+
+    performMergeTest()
+    performNotMergeTest()
+  }
+
+  // THESIS
   it should "merge Filter operations manually with Extractors" in {
     def strategy(op: Any): Option[Filter] = op match {
       case SuccE(filter1 @ Filter(_, _, pred1, _),
