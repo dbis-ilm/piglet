@@ -52,6 +52,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       |import dbis.pig.backends.{SchemaClass, Record}
       |import org.apache.flink.util.Collector
       |import org.apache.flink.api.common.operators.Order
+      |import dbis.pig.backends.flink.Sampler._
       |
       |object test {
       |    def main(args: Array[String]) {
@@ -383,6 +384,16 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for the sample operator with a literal value" in {
+    // aa = SAMPLE bb 0.01;
+    val op = Sample(Pipe("aa"), Pipe("bb"), RefExpr(Value(0.01)))
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""
+        |val aa = bb.sample(false, 0.01)""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+  
   it should "contain code for a binary join statement with expression lists" in {
     Schema.init()
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),

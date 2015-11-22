@@ -19,6 +19,25 @@ package dbis.pig.backends.flink
 
 import scala.Numeric.Implicits._
 import scala.collection.mutable.ListBuffer
+import scala.reflect.ClassTag
+import java.util.Random
+import org.apache.flink.api.scala._
+import dbis.pig.backends._
+import org.apache.flink.api.java.functions._
+import org.apache.flink.api.common.typeinfo.TypeInformation
+
+class CustomSampler[T <: SchemaClass: ClassTag: TypeInformation](dataSet: DataSet[T]) {
+  def sample(withReplacement: Boolean,fraction: Double, seed: Long = new Random().nextLong() )  = {
+    dataSet.mapPartition(new SampleWithFraction[T](withReplacement, fraction, seed))
+  }
+
+}
+
+object Sampler {
+  implicit def addSampler[T <: SchemaClass: ClassTag: TypeInformation](dataSet: DataSet[T]) = {
+    new CustomSampler(dataSet)
+  }
+}
 
 object PigFuncs {
   def average[T: Numeric](bag: Iterable[T]) : Double = sum(bag).toDouble / count(bag).toDouble
@@ -33,7 +52,7 @@ object PigFuncs {
 
   def tokenize(s: String, delim: String = """[, "]""") = s.split(delim)
 
-   def startswith(haystack: String, prefix: String) = haystack.startsWith(prefix)
+  def startswith(haystack: String, prefix: String) = haystack.startsWith(prefix)
   
   def strlen(s: String) = s.length()
   

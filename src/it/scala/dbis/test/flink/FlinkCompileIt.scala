@@ -44,14 +44,14 @@ class FlinkCompileIt extends CompileIt {
     //("groupforeach.pig", "groupedrdf.out", "truth/groupedrdf.data", true, "sparql", "spark"), //  the order in flink including the groupBy operator is not preserved ?? but the result is similar to spark
     //("nforeach2.pig", "rdf.out", "truth/rdf.data", true, "sparql", "flink"),
     ("grouping.pig", "grouping.out", "truth/grouping.data", false, "pig", "flink"),
-    ("wordcount.pig", "marycounts.out", "truth/marycount.data", false, "pig", "spark"),
-    ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "spark"),
-    ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "spark"),
+    ("wordcount.pig", "marycounts.out", "truth/marycount.data", false, "pig", "flink"),
+    ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "flink"),
+    ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "flink"),
     ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
-    ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "spark"),
-    //("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "spark"),
-    ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "spark"),
-    ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "spark")
+    ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "flink"),
+    ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "flink"),
+    ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "flink"),
+    ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "flink")
   )
 
   "The Pig compiler" should "compile and execute the script" in {

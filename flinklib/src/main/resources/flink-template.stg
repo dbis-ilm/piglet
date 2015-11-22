@@ -5,7 +5,7 @@ import dbis.pig.backends.flink._
 import dbis.pig.backends.{SchemaClass, Record}
 import org.apache.flink.util.Collector
 import org.apache.flink.api.common.operators.Order
-
+import dbis.pig.backends.flink.Sampler._
 
 
 <if (includes)>
@@ -100,6 +100,11 @@ join(out,rel1, rels, rel1_keys, rel2_keys, pairs, fields, class) ::=<<
          <class>(<fields>)
         }
 
+>>
+
+// ------------------ Returns a SAMPLE of the data ----------------------------
+sample(out,in,expr) ::=<<
+        val <out> = <in>.sample(false, <expr>)
 >>
 
 // ------------------ UNIONs multiple streams to one --------------------------
