@@ -744,7 +744,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperClass = cleanString(
-    """case class _t$2_HelperTuple (_t: _t$1_Tuple = null, _0: Int = 0, _1sum: Int = 0, _1cnt: Int = 0, _2: Int = 0)
+    """case class _t$2_HelperTuple (_t: _t$1_Tuple = null, _0: Long = 0, _1sum: Long = 0, _1cnt: Long = 0, _2: Int = 0)
       |extends java.io.Serializable with SchemaClass { override def mkString(_c: String = ",") = "" }
       |""".stripMargin)
     generatedHelperClass should matchSnippet(expectedHelperClass)

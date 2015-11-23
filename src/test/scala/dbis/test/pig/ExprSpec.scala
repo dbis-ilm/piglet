@@ -118,7 +118,7 @@ class ExprSpec extends FlatSpec with Matchers {
     val res1 = UDFTable.findUDF(f1.f, params1)
     res1 shouldNot be (empty)
     res1.get.name should be ("COUNT")
-    res1.get.resultType should be (Types.IntType)
+    res1.get.resultType should be (Types.LongType)
     res1.get.isAggregate should be (true)
 
     val f2 = Func("sum", List(RefExpr(NamedField("x"))))

@@ -16,6 +16,7 @@
  */
 package dbis.test.flink
 
+import dbis.test.CodeMatchers
 import dbis.test.TestTools._
 import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.Piglet._
@@ -32,7 +33,7 @@ import dbis.pig.backends.BackendManager
 import org.scalatest.{ Matchers, BeforeAndAfterAll, FlatSpec }
 import dbis.pig.plan.rewriting.Rules
 
-class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
+class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
   
   override def beforeAll() {
     Rules.registerAllRules()
@@ -200,8 +201,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     op.constructSchema
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(PigFuncs.toMap(\"field1\",t.get(0),\"field2\",t.get(1))))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(PigFuncs.toMap(\"field1\",t.get(0),\"field2\",t.get(1))))")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a foreach statement with another function expression" in {
@@ -213,8 +214,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     op.constructSchema
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t1_Tuple(t.get(0), PigFuncs.count(t.get(1))))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t.get(0), PigFuncs.count(t.get(1))))")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a foreach statement with a UDF expression" in {
@@ -228,8 +229,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val op = plan.findOperatorForAlias("aa").get
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t2_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a foreach statement with a UDF alias expression" in {
@@ -246,8 +247,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     // this is just a hack for this test: normally, the udfAliases map is set in compile
     codeGenerator.udfAliases = Some(plan.udfAliases.toMap)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val aa = bb.map(t => _t2_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
+    generatedCode should matchSnippet(expectedCode)
   }
   
   it should "contain code for deref operator on maps in foreach statement" in {
@@ -263,8 +264,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val a = b.map(t => _t3_Tuple(t._0("k1"), t._1("k2")))""".stripMargin)
-    assert(generatedCode == expectedCode)
+      |val a = b.map(t => _t$1_Tuple(t._0("k1"), t._1("k2")))""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for deref operator on tuple in foreach statement" in {
@@ -280,8 +281,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.map(t => _t4_Tuple(t._0._1, t._2._0))""".stripMargin)
-    assert(generatedCode == expectedCode)
+        |val a = b.map(t => _t$1_Tuple(t._0._1, t._2._0))""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a nested foreach statement" in {
@@ -303,9 +304,9 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
       """val uniqcnt = grpd.map(t => {
         |val sym = t._1.map(l => l._1).toList
         |val uniq_sym = sym.distinct
-        |_t3_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
+        |_t$1_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(foreachOp.schema.get))
   }
 
@@ -322,10 +323,10 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     println("schema class = " + schemaClassCode)
 
     val expectedCode = cleanString(
-      """val out = data.map(t => _t4_Tuple(_t2_Tuple(t._0,t._1), List(_t3_Tuple(t._0),_t3_Tuple(t._1)),
+      """val out = data.map(t => _t$1_Tuple(_t$2_Tuple(t._0,t._1), List(_t$3_Tuple(t._0),_t$3_Tuple(t._1)),
         |Map[String,Int](t._2 -> t._0)))""".stripMargin)
 
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for the stream through statement without parameters" in {
@@ -339,9 +340,9 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
-        |val res = myOp(env, data_helper).map(t => _t1_Tuple(t(0), t(1)))
+        |val res = myOp(env, data_helper).map(t => _t$1_Tuple(t(0), t(1)))
         |""".stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for the stream through statement with parameters" in {
@@ -795,8 +796,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
-        |val out = in2.map(t => _t2_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t3_Tuple(_))))
+        |val out = in2.map(t => _t$1_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t$2_Tuple(_))))
       """.stripMargin)
-    assert (generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 }

@@ -464,8 +464,8 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
         val fieldStr = s"_t: ${inSchemaClassName} = null, " + op.generator.exprs.zipWithIndex.map{ case (e, i) =>
           if (callsAverageFunc(node, e.expr)) {
             // TODO: determine type
-            val inType = "Int"
-            s"_${i}sum: ${inType} = 0, _${i}cnt: Int = 0"
+            val inType = "Long"
+            s"_${i}sum: ${inType} = 0, _${i}cnt: Long = 0"
           }
           else {
             val resType = e.expr.resultType(op.inputSchema)

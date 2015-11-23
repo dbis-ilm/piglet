@@ -117,7 +117,7 @@ trait CompileIt extends Matchers {
     executor.setExitValue(0)
     val watchdog = new ExecuteWatchdog(120000)
     executor.setWatchdog(watchdog)
-    println("EXECUTE: " + cmdLine)
+    // println("EXECUTE: " + cmdLine)
     executor.execute(cmdLine) == 0
   }
 
