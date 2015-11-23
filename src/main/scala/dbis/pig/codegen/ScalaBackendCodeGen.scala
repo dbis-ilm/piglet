@@ -469,30 +469,86 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   
   val castMethods = Set.empty[String]
 
-  def emitHelperClass(node: PigOperator): String = {
-    def genCmpExpr(col: Int, num: Int) : String =
-      if (col == num) s"{ this.c$col compare that.c$col }"
-      else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col+1, num)} else this.c$col compare that.c$col }"
-
+  def emitHelperClass(node: PigOperator): String =
     node match {
       case OrderBy(out, in, orderSpec, _) => {
-        var params = Map[String,Any]()
+        def genCmpExpr(col: Int, num: Int): String =
+          if (col == num) s"{ this.c$col compare that.c$col }"
+          else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col + 1, num)} else this.c$col compare that.c$col }"
+
+        var params = Map[String, Any]()
         //Spark
         params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
         var col = 0
-        params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
+        params += "fields" -> orderSpec.map(o => {
+          col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}"
+        }).mkString(", ")
         params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
 
         //Flink
-        params += "out"->node.outPipeName
-        params += "key"->orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
-        if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse"->true
+        params += "out" -> node.outPipeName
+        params += "key" -> orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
+        if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
+        callST("orderHelper", Map("params" -> params))
+      }
+      case Top(_, _, orderSpec, _) => {
+        val size = orderSpec.size
+        var params = Map[String, Any]()
+        val hasSchema = node.inputSchema.isDefined
 
-        callST("orderHelper", Map("params"->params))
+        val schemaClass = if (!hasSchema) {
+          "Record"
+        } else {
+          schemaClassName(node.schema.get.className)
+        }
+
+        params += "schemaclass" -> schemaClass
+
+        def genCmpExpr(col: Int): String = {
+          var firstGetter = "first."
+          var secondGetter = "second."
+          if(ascendingSortOrder(orderSpec(col)) == "true") {
+            // If we're not sorting ascending, reverse the getters so the ordering gets reversed
+            firstGetter = "second."
+            secondGetter = "first."
+          }
+
+          if (!hasSchema) {
+            firstGetter += "get"
+            secondGetter += "get"
+          }
+
+          if (hasSchema) {
+            if (col == (size - 1))
+              s"{ ${firstGetter}_$col compare ${secondGetter}_$col }"
+            else
+              s"{ if (${firstGetter}_$col == ${secondGetter}_$col) ${genCmpExpr(col + 1)} else ${firstGetter}_$col compare " +
+                s"${secondGetter}_$col }"
+          } else {
+            if (col == (size - 1))
+              s"{ $firstGetter($col) compare $secondGetter($col) }"
+            else
+              s"{ if ($firstGetter($col) == $secondGetter($col)) ${genCmpExpr(col + 1)} else $firstGetter($col) compare " +
+                s"$secondGetter($col) }"
+          }
+        }
+
+        //Spark
+        params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
+        var col = 0
+        params += "fields" -> orderSpec.map(o => {
+          col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}"
+        }).mkString(", ")
+        params += "cmpExpr" -> genCmpExpr(0)
+
+        //Flink
+        params += "out" -> node.outPipeName
+        params += "key" -> orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
+        if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
+        callST("topHelper", Map("params" -> params))
       }
       case _ => ""
     }
-  }
 
 
   /**

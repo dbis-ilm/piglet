@@ -135,6 +135,17 @@ orderHelper(params) ::=<<
     }
 >>
 
+// ------------------ TOP-k queries -------------------------------------------
+top(out, in, num, key) ::=<<
+        val <out> = sc.parallelize(<in>.top(<num>)(custKey_<out>_<in>))
+>>
+
+topHelper(params) ::=<<
+    object <params.cname> extends Ordering[<params.schemaclass>] {
+        def compare(first: <params.schemaclass>, second: <params.schemaclass>): Int = <params.cmpExpr>
+    }
+>>
+
 // ------------------ STREAM operators ----------------------------------------
 streamOp(out, in, op, params, class, in_fields, out_fields) ::=<<
         val <in>_helper = <in>.map(t => List(<in_fields>))

@@ -323,6 +323,12 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     callST("orderBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "key" -> key, "asc" -> asc))
   }
 
+  def emitTop(node: PigOperator, spec: List[OrderBySpec], num: Int): String = {
+    val key = emitSortKey(node.schema, spec, node.outPipeName, node.inPipeName)
+    val asc = ascendingSortOrder(spec.head)
+    callST("top", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "num" -> num, "key" -> key))
+  }
+
   private def callsAverageFunc(node: PigOperator, e: Expr): Boolean =
     e.traverseOr(node.inputSchema.getOrElse(null), Expr.containsAverageFunc)
 
@@ -439,6 +445,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
       case Limit(out, in, num) => emitLimit(node, num)
       case OrderBy(out, in, orderSpec, _) => emitOrderBy(node, orderSpec)
       case Accumulate(out, in, gen) => emitAccumulate(node, gen)
+      case Top(_, _, spec, num) => emitTop(node, spec, num)
       case _ => super.emitNode(node)
     }
   }
