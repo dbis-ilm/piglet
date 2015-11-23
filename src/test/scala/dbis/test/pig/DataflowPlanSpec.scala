@@ -631,6 +631,17 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
+  it should "allow to use group names in GROUP BY" in {
+    val plan = new DataflowPlan(parseScript(
+      """
+        |A = LOAD 'file' AS (name, value: double);
+        |B = GROUP A BY name;
+        |C = FOREACH B GENERATE A.name, AVG(A.value);
+        |DUMP C;
+      """.stripMargin))
+    plan.checkSchemaConformance
+  }
+
   "Setting operators" should "add all their relation names to the PipeNameGenerator as known names" in {
     PipeNameGenerator.clearGenerated
     val op0 = Load(Pipe("a"), "input/file.csv")
