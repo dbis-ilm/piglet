@@ -18,12 +18,11 @@
 package dbis.test.flink
 
 import org.scalatest.prop.TableDrivenPropertyChecks._
-import scala.io.Source
-import scalax.file.Path
+import org.scalatest.prop.TableDrivenPropertyChecks.Table
 import dbis.test.CompileIt
-import sys.process._
+import org.scalatest.FlatSpec
 
-class FlinkCompileIt extends CompileIt {
+class FlinkCompileIt extends FlatSpec with CompileIt {
 
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
@@ -54,39 +53,8 @@ class FlinkCompileIt extends CompileIt {
     ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "flink"),
     ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "flink")
   )
-
-  "The Pig compiler" should "compile and execute the script" in {
-    forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean, lang: String, backend: String) =>
-
-      if (sys.env.get("FLINK_JAR").isEmpty) {
-        println("FLINK_JAR variable not set - exiting.")
-        System.exit(0)
-      }
-      // checking the flink jobmanager, whether it is working or not, is done in the piglet script
-      // 1. make sure the output directory is empty
-      cleanupResult(resultDir)
-      cleanupResult(script.replace(".pig", ""))
-
-      val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
-      val resourcePath = getClass.getResource("").getPath + "../../../"
-
-      // 2. compile and execute Pig script
-      runCompiler(script, resourcePath, resultPath, lang, backend) should be(true)
-
-      val result = getResult(resultPath)
-      
-      result should not be (null)
-
-      val truth = Source.fromFile(resourcePath + truthFile).getLines()
-      // 4. compare both files
-      if (inOrder)
-        result should contain theSameElementsInOrderAs (truth.toTraversable)
-      else
-        result should contain theSameElementsAs (truth.toTraversable)
-      // 5. delete the output directory
-      cleanupResult(resultDir)
-      cleanupResult(script.replace(".pig", ""))
-    }
-  }
+  //Note: checking the flink jobmanager, whether it is running or not, is done in the piglet script
+  //Note: checking the flink jar inclusion is done also in the piglet
+  it should behave like checkMatch(scripts)
 }
 

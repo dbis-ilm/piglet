@@ -23,7 +23,7 @@ import scala.io.Source
 import scalax.file.Path
 import dbis.test.CompileIt
 
-class SparkCompileIt extends CompileIt {
+class SparkCompileIt extends FlatSpec with CompileIt{
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
 
@@ -67,39 +67,6 @@ class SparkCompileIt extends CompileIt {
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
 
   )
-
-  "The Pig compiler" should "compile and execute the script" in {
-    forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean, lang: String, backend: String) =>
-
-      if (sys.env.get("SPARK_JAR").isEmpty) {
-        println("SPARK_JAR variable not set - exiting.")
-        System.exit(0)
-      }
-      
-      // 1. make sure the output directory is empty
-      cleanupResult(resultDir)
-      cleanupResult(script.replace(".pig", ""))
-
-      val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
-      val resourcePath = getClass.getResource("").getPath + "../../../"
-
-        // 2. compile and execute Pig script
-      runCompiler(script, resourcePath, resultPath, lang, backend) should be(true)
-      
-      val result = getResult(resultPath)
-
-      result should not be (null)
-
-      val truth = Source.fromFile(resourcePath + truthFile).getLines()
-
-      // 4. compare both files
-      if (inOrder)
-        result should contain theSameElementsInOrderAs (truth.toTraversable)
-      else
-        result should contain theSameElementsAs (truth.toTraversable)
-      // 5. delete the output directory
-      cleanupResult(resultDir)
-      cleanupResult(script.replace(".pig", ""))
-    }
-  }
+  //Note: checking the spark jar inclusion is done also in the piglet script
+  it should behave like checkMatch(scripts)
 }
