@@ -87,7 +87,7 @@ object Dependencies {
   val sparkCore = "org.apache.spark" %% "spark-core" % "1.5.1"
   val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.1"
   val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.5.1"
-  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10-SNAPSHOT"
+  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10.0"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
@@ -104,7 +104,7 @@ object Dependencies {
   val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val h2Database = "com.h2database" % "h2" % "1.4.190"
 
-  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10-SNAPSHOT.jar"
+  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10.0.jar"
   
   // Projects
   val rootDeps = Seq(
