@@ -89,6 +89,7 @@ class FuncsSpec extends FlatSpec with Matchers {
     PigFuncs.tokenize(s, "&") should be (List("1", "2", "3", "4", "5", "6"))
   }
 
+/*
   "The toMap function" should "produce a map from a list" in {
     PigFuncs.toMap("a", 1, "b", 2, "c", 3, "d", 4) should be (
       Map("a" -> 1, "b" -> 2, "c" -> 3, "d" -> 4)
@@ -118,4 +119,5 @@ class FuncsSpec extends FlatSpec with Matchers {
       List(1, 2, 3, 4, 5, 6)
     )
   }
+*/
 }
