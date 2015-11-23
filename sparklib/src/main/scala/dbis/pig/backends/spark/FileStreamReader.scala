@@ -5,7 +5,15 @@ import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.receiver.Receiver
 import scala.io.Source
 import java.io.{ FileReader, FileNotFoundException, IOException }
+import org.apache.spark.streaming.scheduler._
+import org.apache.spark.streaming.StreamingContext
 
+class GracefullyStopListener(ssc: StreamingContext) extends StreamingListener {
+  override def onReceiverStopped(receiverStopped: StreamingListenerReceiverStopped) = synchronized {
+    ssc.stop(true, true)
+  }
+
+}
 class FileStreamReader(file: String) extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) with Logging {
 
   def onStart() {
@@ -24,9 +32,9 @@ class FileStreamReader(file: String) extends Receiver[String](StorageLevel.MEMOR
     try {
       for (line <- Source.fromFile(file).getLines()) {
         store(line)
-        Thread sleep 1000 // for testing
+        //Thread sleep 1000 // for testing
       }
-      //stop("The EOF has been reached ... stop Now! ....")
+      stop("The EOF has been reached ... stop Now! ....")
     } catch {
       case ex: FileNotFoundException => println(s"Could not find $file file.")
       case ex: IOException           => println(s"Had an IOException during reading $file file")

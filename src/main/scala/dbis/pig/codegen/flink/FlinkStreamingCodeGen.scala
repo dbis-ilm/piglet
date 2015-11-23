@@ -100,8 +100,9 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
       case _ => super.emitRef(schema, ref, tuplePrefix, aggregate)
   }
 
-  override def emitHelperClass(node: PigOperator): String = {
-     require(node.schema.isDefined)
+  override def emitHelperClass(node: PigOperator): String = { ""
+     //require(node.schema.isDefined)
+    /*
     val className = schemaClassName(node.schema.get.className)
      node match {
     case Distinct(out, in, windowMode) => {
@@ -136,7 +137,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
       } else ""
     }
     case _ => super.emitHelperClass(node)
-     }
+     }*/
   }
 
   /**

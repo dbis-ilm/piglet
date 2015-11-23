@@ -64,9 +64,10 @@ object PigBuild extends Build {
   }
   
   val itTests = backend match{
-    case "flink" => Seq("dbis.test.spark.SparkCompileIt")
+    case "flink" => Seq("dbis.test.flink.FlinkCompileIt")
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
+    case "sparks" => Seq("dbis.test.spark.SparksCompileIt")
     case "mapreduce" => Seq.empty[String] // TODO
     case _ => println(s"Unsupported backend: $backend - Will execute no tests"); Seq.empty[String]
   }

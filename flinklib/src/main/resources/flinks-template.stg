@@ -3,9 +3,7 @@ init_code(includes) ::= <<
 import org.apache.flink.streaming.api.scala._
 import dbis.pig.backends.flink._
 import dbis.pig.backends.flink.streaming._
-import dbis.pig.backends.flink.streaming.FlinkExtensions._
 import java.util.concurrent.TimeUnit
-import org.apache.flink.streaming.api.windowing.helper._
 import org.apache.flink.util.Collector
 import dbis.pig.backends.{SchemaClass, Record}
 
@@ -38,7 +36,7 @@ begin_query(name, profiling) ::= <<<\n>
 
 // ----------------- LOAD text file -------------------------------------------
 loader(out, file, class, func, extractor, params) ::=<<
-    val <out> = PigStream[<class>]().loadStream(env, "<file>", <extractor><if (params)>, <params><endif>)
+    val <out> = <func>[<class>]().loadStream(env, "<file>", <extractor><if (params)>, <params><endif>)
 >>
 
 // ------------------ DUMP Results --------------------------------------------
@@ -225,7 +223,7 @@ socketWrite(in,addr,mode,func) ::=<<
 >>
 
 // ----------------- END of the code implementing the query -------------------
-end_query(name) ::= <<
+end_query(name, hook) ::= <<
     env.execute("<name>")
     
 <if (hook)>

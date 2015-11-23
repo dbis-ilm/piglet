@@ -18,7 +18,6 @@
 package dbis.test.flink
 
 import org.scalatest.prop.TableDrivenPropertyChecks._
-import org.scalatest.prop.TableDrivenPropertyChecks.Table
 import dbis.test.CompileIt
 import org.scalatest.FlatSpec
 

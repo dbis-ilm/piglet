@@ -17,10 +17,8 @@
 
 package dbis.test.spark
 
-import org.scalatest.{ Matchers, FlatSpec }
+import org.scalatest.FlatSpec
 import org.scalatest.prop.TableDrivenPropertyChecks._
-import scala.io.Source
-import scalax.file.Path
 import dbis.test.CompileIt
 
 class SparkCompileIt extends FlatSpec with CompileIt{

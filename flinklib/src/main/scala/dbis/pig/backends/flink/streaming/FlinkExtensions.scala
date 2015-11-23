@@ -4,6 +4,7 @@ import org.apache.flink.streaming.api.scala.WindowedDataStream
 import org.apache.flink.streaming.api.scala.createTypeInformation
 import org.apache.flink.util.Collector
 
+
 object FlinkExtensions {
   implicit class EnhancedWindowedDataStream(val w: WindowedDataStream[List[Any]]) {
 
