@@ -40,7 +40,8 @@ case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends
       return false
     }
 
-    if (inputSchema == RDFLoad.plainSchema) {
+//    if (inputSchema == RDFLoad.plainSchema) {
+    if(inputSchema.get.fields.sameElements(RDFLoad.plainSchema.get.fields)) {
       return true
     }
     if (RDFLoad.groupedSchemas.values.toList contains inputSchema.get) {
