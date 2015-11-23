@@ -40,10 +40,11 @@ class FlinkCompileIt extends CompileIt {
     ("sort.pig", "sorted.out", "truth/sorted.data", true, "pig", "flink"),
     ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
     ("foreach1.pig", "distances.out", "truth/distances.data", true, "pig", "flink"),
-    //("nforeach.pig", "nested.out", "truth/nested.data", true, "pig", "flink"), 
+    ("nforeach.pig", "nested.out", "truth/nested.data", false, "pig", "flink"), 
     //("groupforeach.pig", "groupedrdf.out", "truth/groupedrdf.data", true, "sparql", "spark"), //  the order in flink including the groupBy operator is not preserved ?? but the result is similar to spark
-    //("nforeach2.pig", "rdf.out", "truth/rdf.data", true, "sparql", "flink"),
+    //("nforeach2.pig", "rdf.out", "truth/rdf.data", true, "sparql", "flink"),  //  the same thing here
     ("grouping.pig", "grouping.out", "truth/grouping.data", false, "pig", "flink"),
+    ("groupall.pig", "groupall.out", "truth/groupall.data", false, "pig", "flink"),
     ("wordcount.pig", "marycounts.out", "truth/marycount.data", false, "pig", "flink"),
     ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "flink"),
     ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "flink"),
@@ -73,11 +74,10 @@ class FlinkCompileIt extends CompileIt {
       runCompiler(script, resourcePath, resultPath, lang, backend) should be(true)
 
       val result = getResult(resultPath)
-
+      
       result should not be (null)
 
       val truth = Source.fromFile(resourcePath + truthFile).getLines()
-
       // 4. compare both files
       if (inOrder)
         result should contain theSameElementsInOrderAs (truth.toTraversable)

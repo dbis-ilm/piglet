@@ -23,7 +23,10 @@ import dbis.pig.codegen.flink.FlinkBatchCodeGen
 import dbis.pig.op._
 import dbis.pig.expr._
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.rewriting.Rewriter._
+import dbis.pig.plan.rewriting.Rules
 import dbis.pig.schema._
+import dbis.pig.udf.UDFTable
 import org.scalatest.FlatSpec
 import dbis.pig.backends.BackendManager
 import org.scalatest.{ Matchers, BeforeAndAfterAll, FlatSpec }
@@ -246,29 +249,117 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     val expectedCode = cleanString("val aa = bb.map(t => _t2_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
     assert(generatedCode == expectedCode)
   }
-  /*
-  it should "contain code for deref operator on maps in FOREACH statement" in {
-    // a = FOREACH b GENERATE $0#"k1", $1#"k2";
-    val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefMap(PositionalField(0), "\"k1\""))),
-      GeneratorExpr(RefExpr(DerefMap(PositionalField(1), "\"k2\""))))))
+  
+  it should "contain code for deref operator on maps in foreach statement" in {
+    val ops = parseScript(
+    """
+      |in = LOAD 'file' AS (s1: chararray, s2: chararray);
+      |b = FOREACH in GENERATE ["k1", s1] as map1, ["k2", s2] as map2;
+      |a = FOREACH b GENERATE $0#"k1", $1#"k2";
+    """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("a").get
+
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-        |val a = b.map(t => List(t(0).asInstanceOf[Map[String,Any]]("k1"),t(1).asInstanceOf[Map[String,Any]]("k2")))""".stripMargin)
+      |val a = b.map(t => _t3_Tuple(t._0("k1"), t._1("k2")))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
-  it should "contain code for deref operator on tuple in FOREACH statement" in {
-    // a = FOREACH b GENERATE $0.$1, $2.$0;
-    val op = Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(DerefTuple(PositionalField(0), PositionalField(1)))),
-      GeneratorExpr(RefExpr(DerefTuple(PositionalField(2), PositionalField(0)))))))
+  it should "contain code for deref operator on tuple in foreach statement" in {
+    val ops = parseScript(
+      """
+        |in = LOAD 'file' AS (s1: int, s2: int, s3: int);
+        |b = FOREACH in GENERATE ("k1", s1) as t1, ("k2", s2) as t2, ("k3", s3) as t3;
+        |a = FOREACH b GENERATE $0.$1, $2.$0;
+      """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("a").get
+
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
-      |val a = b.map(t => List(t(0).asInstanceOf[List[Any]](1),t(2).asInstanceOf[List[Any]](0)))""".stripMargin)
+        |val a = b.map(t => _t4_Tuple(t._0._1, t._2._0))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
-*/
+
+  it should "contain code for a nested foreach statement" in {
+    val ops = parseScript(
+      """daily = load 'data.csv' as (exchange, symbol);
+        |grpd  = group daily by exchange;
+        |uniqcnt  = foreach grpd {
+        |           sym      = daily.symbol;
+        |           uniq_sym = distinct sym;
+        |           generate group, COUNT(uniq_sym);
+        |};""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val foreachOp = plan.findOperatorForAlias("uniqcnt").get
+    println("schema = " + foreachOp.schema)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(foreachOp))
+
+    val expectedCode = cleanString(
+      """val uniqcnt = grpd.map(t => {
+        |val sym = t._1.map(l => l._1).toList
+        |val uniq_sym = sym.distinct
+        |_t3_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
+
+    assert(generatedCode == expectedCode)
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(foreachOp.schema.get))
+  }
+
+  it should "contain code for a foreach statement with constructors for tuple, bag, and map" in {
+    val ops = parseScript(
+      """data = load 'file' as (f1: int, f2: int, name:chararray);
+        |out = foreach data generate (f1, f2), {f1, f2}, [name, f1];""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val op = plan.findOperatorForAlias("out").get
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    println("schema class = " + schemaClassCode)
+
+    val expectedCode = cleanString(
+      """val out = data.map(t => _t4_Tuple(_t2_Tuple(t._0,t._1), List(_t3_Tuple(t._0),_t3_Tuple(t._1)),
+        |Map[String,Int](t._2 -> t._0)))""".stripMargin)
+
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for the stream through statement without parameters" in {
+    val ops = parseScript(
+      """data = load 'data.csv' as (f1: int, f2: int);
+        |res = STREAM data THROUGH myOp();""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("res").get
+
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """val data_helper = data.map(t => List(t._0, t._1))
+        |val res = myOp(env, data_helper).map(t => _t1_Tuple(t(0), t(1)))
+        |""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for the stream through statement with parameters" in {
+    val ops = parseScript(
+      """data = load 'data.csv' as (f1: int, f2: int);
+        |res = STREAM data THROUGH package.myOp(1, 42.0);""".stripMargin)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("res").get
+
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """val data_helper = data.map(t => List(t._0, t._1))
+        |val res = package.myOp(env, data_helper,1,42.0).map(t => _t1_Tuple(t(0), t(1)))
+        |""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+  
   it should "contain code for a UNION operator on two relations" in {
     // a = UNION b, c;
     val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c")))
@@ -288,22 +379,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
         |val a = b.union(c).union(d)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
-  /*
 
-  it should "contain code for GROUP BY ALL" in {
-    val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List()))
-    val codeGenerator = new FlinkBatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val a = b"
-      /*"""
-        |val fields = new ListBuffer[Int]
-        |for(i <- 0 to b.getType.getTotalFields()-1)(fields+=i)
-        |val a = b.groupBy(fields.toList:_*)
-        |""".stripMargin*/
-    )
-    assert(generatedCode == expectedCode)
-  }
-*/
   it should "contain code for GROUP BY $0" in {
     val ops = parseScript(
       """
@@ -349,6 +425,29 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code for GROUP BY ALL" in {
+    val ops = parseScript(
+      """
+        |bb = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
+        |aa = GROUP bb ALL;
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("aa").get
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString("""val aa = bb.setParallelism(1).mapPartition( (in, out: Collector[_t2_Tuple]) =>  out.collect(_t2_Tuple("all", in.toIterable)))""")
+    assert(generatedCode == expectedCode)
+
+    val schemaCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    val expectedSchemaCode =
+      cleanString("""
+         |case class _t2_Tuple (_0 : String, _1 : Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
+         |override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
+         |}
+       """.stripMargin)
+    assert(schemaCode == expectedSchemaCode)
+  }
   it should "contain code for complex ORDER BY" in {
     Schema.init()
     // a = ORDER b BY f1, f3
@@ -480,5 +579,224 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers {
 
     assert(generatedCode == expectedCode)
 
+  }
+  
+  it should "not contain code for EMPTY operators" in {
+    val op = Empty(Pipe("_"))
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+
+    assert(codeGenerator.emitNode(op) == "")
+  }
+
+  it should "contain embedded code" in {
+    val ops = parseScript(
+      """
+        |<% def someFunc(s: String): String = {
+        | s
+        |}
+        |%>
+        |A = LOAD 'file.csv';
+      """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    assert(cleanString(codeGenerator.emitHeader1("test", plan.code)) ==
+      cleanString("""
+        |object test {
+        |def someFunc(s: String): String = {
+        | s
+        |}
+      """.stripMargin))
+    val udf = UDFTable.findUDF("someFunc", Types.AnyType)
+    udf shouldBe defined
+  }
+
+  it should "contain code for macros" in {
+    val ops = parseScript(
+    """
+      |DEFINE my_macro(in_alias, p) RETURNS out_alias {
+      |$out_alias = FOREACH $in_alias GENERATE $0 + $p;
+      |};
+      |
+      |in = LOAD 'file' AS (i: double);
+      |out = my_macro(in, 42);
+      |DUMP out;
+    """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val expectedCode = cleanString(
+      """
+        |val out = in.map(t => _t2_Tuple(t._0 + 42))
+        |""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for multiple macros" in {
+    val ops = parseScript(
+      """
+        |DEFINE my_macro(in_alias, p) RETURNS out_alias {
+        |$out_alias = FOREACH $in_alias GENERATE $0 + $p, $1;
+        |};
+        |
+        |DEFINE my_macro2(in_alias, p) RETURNS out_alias {
+        |$out_alias = FOREACH $in_alias GENERATE $0, $1 - $p;
+        |};
+        |
+        |in = LOAD 'file' AS (c1: int, c2: int);
+        |out = my_macro(in, 42);
+        |out2 = my_macro2(out, 5);
+        |DUMP out;
+        |DUMP out2;
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val expectedCode1 = cleanString(
+      """
+        |val out = in.map(t => _t4_Tuple(t._0 + 42, t._1))
+        |""".stripMargin)
+    assert(generatedCode1 == expectedCode1)
+    val generatedCode2 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out2").get))
+    val expectedCode2 = cleanString(
+      """
+        |val out2 = out.map(t => _t4_Tuple(t._0, t._1 - 5))
+        |""".stripMargin)
+    assert(generatedCode2 == expectedCode2)
+  }
+
+  it should "contain code for invoking a macro multiple times" in {
+    val ops = parseScript(
+      """
+        |DEFINE my_macro(in_alias, p) RETURNS out_alias {
+        |$out_alias = FOREACH $in_alias GENERATE $0 + $p;
+        |};
+        |
+        |in = LOAD 'file' AS (c1: int, c2: int);
+        |out = my_macro(in, 42);
+        |out2 = my_macro(out, 43);
+        |DUMP out2;
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val expectedCode1 = cleanString(
+      """
+        |val out = in.map(t => _t3_Tuple(t._0 + 42))
+        |""".stripMargin)
+    assert(generatedCode1 == expectedCode1)
+    val generatedCode2 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out2").get))
+    val expectedCode2 = cleanString(
+      """
+        |val out2 = out.map(t => _t3_Tuple(t._0 + 43))
+        |""".stripMargin)
+    assert(generatedCode2 == expectedCode2)
+  }
+
+  it should "contain code for schema classes" in {
+    val ops = parseScript(
+    """
+      |A = LOAD 'file' AS (f1: int, f2: chararray, f3: double);
+      |B = FILTER A BY f1 > 0;
+      |C = FOREACH B GENERATE f1, f2, f3 + 5, $2 + 44 AS f4:int;
+      |DUMP C;
+    """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+
+    var code: String = ""
+    for (schema <- Schema.schemaList) {
+      code = code + codeGenerator.emitSchemaClass(schema)
+    }
+
+    val generatedCode = cleanString(code)
+    val expectedCode = cleanString(
+    """
+      |case class _t2_Tuple (_0 : Int, _1 : String, _2 : Double, _3 : Int) extends java.io.Serializable with SchemaClass {
+      |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2 + _c + _3
+      |}
+      |case class _t1_Tuple (_0 : Int, _1 : String, _2 : Double) extends java.io.Serializable with SchemaClass {
+      |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2
+      |}
+      |""".stripMargin
+    )
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code for nested schema classes" in {
+    val ops = parseScript(
+      """
+        |daily = load 'file' using PigStorage(',') as (exchange: chararray, symbol: chararray);
+        |grpd  = group daily by exchange;
+        |DUMP grpd;
+      """.stripMargin
+    )
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+
+    var code: String = ""
+    for (schema <- Schema.schemaList) {
+      code = code + codeGenerator.emitSchemaClass(schema)
+    }
+
+    val generatedCode = cleanString(code)
+    val expectedCode = cleanString(
+      """
+        |case class _t1_Tuple (_0 : String, _1 : String) extends java.io.Serializable with SchemaClass {
+        |override def mkString(_c: String = ",") = _0 + _c + _1
+        |}
+        |case class _t2_Tuple (_0 : String, _1 : Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
+        |override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
+        |}
+        |""".stripMargin
+    )
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain code to handle LOAD with PigStorage but without an explicit schema" in {
+    val ops = parseScript(
+    """
+      |in = load 'file' using PigStorage(':');
+      |out = filter in by $1 == "root";
+      |dump out;
+    """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val op = rewrittenPlan.findOperatorForAlias("out").get
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+    """
+      |val out = in.filter(t => {t.get(1) == "root"})
+    """.stripMargin)
+    assert (generatedCode == expectedCode)
+  }
+
+  it should "contain correct code for a function call with bytearray parameters" in {
+    val ops = parseScript(
+    """
+      |in = load 'file' as (x, y);
+      |in2 = foreach in generate x, y;
+      |out = foreach in2 generate tokenize(x);
+      |dump out;
+    """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new FlinkBatchCodeGen(templateFile)
+    val op = rewrittenPlan.findOperatorForAlias("out").get
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """
+        |val out = in2.map(t => _t2_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t3_Tuple(_))))
+      """.stripMargin)
+    assert (generatedCode == expectedCode)
   }
 }

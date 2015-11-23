@@ -50,7 +50,7 @@ class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
     require(node.schema.isDefined)
     val className = schemaClassName(node.schema.get.className)
 
-    // GROUP ALL: no need to generate a key //TODO
+    // GROUP ALL: no need to generate a key 
     if (groupExpr.keyList.isEmpty)
       callST("groupBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className))
     else {

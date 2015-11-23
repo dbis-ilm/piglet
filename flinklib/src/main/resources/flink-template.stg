@@ -76,7 +76,11 @@ foreachFlatMap(out, in, expr) ::=<<
 
 // ------------------ GROUPS elements on an expression ------------------------
 groupBy(out,in,expr,keyExtr, class) ::=<<
-       val <out> = <in>.groupBy(t => <expr>).reduceGroup{ (in, out: Collector[<class>]) => val itr = in.toIterable; out.collect(<class>(<keyExtr>, itr)) }
+   <if (expr)>
+        val <out> = <in>.groupBy(t => <expr>).reduceGroup{ (in, out: Collector[<class>]) => val itr = in.toIterable; out.collect(<class>(<keyExtr>, itr)) }
+    <else>
+       val <out> = <in>.setParallelism(1).mapPartition( (in, out: Collector[<class>]) =>  out.collect(<class>("all", in.toIterable)))
+   <endif>
 >>
 
 // ------------------ Outputs only distinct values ----------------------------
@@ -118,6 +122,12 @@ orderBy(out, in, key, asc) ::=<<
 >>
 
 orderHelper(params) ::=<<
+>>
+
+// ------------------ STREAM operators ----------------------------------------
+streamOp(out, in, op, params, class, in_fields, out_fields) ::=<<
+        val <in>_helper = <in>.map(t => List(<in_fields>))
+        val <out> = <op>(env, <in>_helper<params>).map(t => <class>(<out_fields>))
 >>
 
 stageIdentifier(line,lineage) ::=<< >>
