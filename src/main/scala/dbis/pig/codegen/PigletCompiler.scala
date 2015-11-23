@@ -29,27 +29,53 @@ object PigletCompiler extends LazyLogging {
    * @param inputFile The file to parse
    * @param params Key value pairs to replace placeholders in the script
    * @param backend The name of the backend
+   * @param langFeature the Pig dialect used for parsing
    */
-  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String, langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
-      // 1. we read the Pig file
-      val source = Source.fromFile(inputFile.toFile)
-      
-      logger.debug(s"""loaded pig script from "$inputFile" """)
-  
-      // 2. then we parse it and construct a dataflow plan
-      val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeature))
-      
+  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String,
+                         langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
+    // 1. we read the Pig file
+    val source = Source.fromFile(inputFile.toFile)
 
-      if (!plan.checkConnectivity) {
-        logger.error(s"dataflow plan not connected for $inputFile")
-        return None
-      }
+    logger.debug( s"""loaded pig script from "$inputFile" """)
 
+    // 2. then we parse it and construct a dataflow plan
+    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeature))
+
+    if (!plan.checkConnectivity) {
+      logger.error(s"dataflow plan not connected for $inputFile")
+      None
+    }
+    else {
       logger.debug(s"successfully created dataflow plan for $inputFile")
-
       Some(plan)
+    }
   }
-  
+
+  /**
+    * Helper method to parse the given Piglet script from a string into a dataflow plan
+    *
+    * @param input The file to parse
+    * @param params Key value pairs to replace placeholders in the script
+    * @param backend The name of the backend
+    * @param langFeature the Pig dialect used for parsing
+    */
+  def createDataflowPlan(input: String, params: Map[String,String], backend: String,
+                         langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
+    // 1. we prepare a soure from the string
+    val source = Source.fromString(input.stripMargin)
+    // 2. then we parse it and construct a dataflow plan
+    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeature))
+
+    if (!plan.checkConnectivity) {
+      logger.error("dataflow plan not connected")
+      None
+    }
+    else {
+      logger.debug("successfully created dataflow plan from input")
+      Some(plan)
+    }
+  }
+
   /**
    * Replace placeholders in the script with values provided by the given map
    * 

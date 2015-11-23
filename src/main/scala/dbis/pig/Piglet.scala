@@ -18,6 +18,8 @@
 package dbis.pig
 
 
+import java.nio.file.Path
+
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.parser.LanguageFeature
@@ -51,6 +53,7 @@ import scala.collection.mutable.{Map => MutableMap}
 
 import scalikejdbc._
 
+import com.typesafe.scalalogging.Logger
 
 object Piglet extends LazyLogging {
 
@@ -63,20 +66,23 @@ object Piglet extends LazyLogging {
                             backendPath: String = ".",
                             language: String = "pig",
                             updateConfig: Boolean = false,
+                            showPlan: Boolean = false,
                             backendArgs: Map[String, String] = Map(),
                             profiling: Boolean = false
                           )
 
+  var master: String = "local"
+  var backend: String = null
+  var backendPath: String = null
+  var languageFeature = LanguageFeature.PlainPig
+
   def main(args: Array[String]): Unit = {
-    var master: String = "local"
     var inputFiles: Seq[Path] = null
     var compileOnly: Boolean = false
     var outDir: Path = null
     var params: Map[String,String] = null
-    var backend: String = null
-    var backendPath: String = null
-    var languageFeature = LanguageFeature.PlainPig
     var updateConfig = false
+    var showPlan = false
     var backendArgs: Map[String, String] = null
     var profiling = false
 
@@ -91,6 +97,7 @@ object Piglet extends LazyLogging {
       opt[String]('l', "language") optional() action { (x,c) => c.copy(language = x)} text ("Accepted language (pig = default, sparql, streaming)")
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
       opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in program home (see config file)")
+      opt[Unit]('s', "show-plan") optional() action { (_,c) => c.copy(showPlan = true) } text(s"show the execution plan")
       opt[Map[String,String]]("backend-args") valueName("key1==value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text("parameter(s) to subsitute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
@@ -110,6 +117,7 @@ object Piglet extends LazyLogging {
         backend = config.backend
         backendPath = config.backendPath
         updateConfig = config.updateConfig
+        showPlan = config.showPlan
         backendArgs = config.backendArgs
         languageFeature = config.language match {
           case "sparql" => LanguageFeature.SparqlPig
@@ -135,13 +143,13 @@ object Piglet extends LazyLogging {
     	Conf.copyConfigFile()
     
     // start processing
-    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendPath, backendArgs, profiling)
+    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendPath, backendArgs, profiling, showPlan)
   }
 
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeature: LanguageFeature.LanguageFeature, params: Map[String,String], backendPath: String,
-          backendArgs: Map[String,String], profiling: Boolean): Unit = {
-    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendPath, backendArgs, profiling)
+          backendArgs: Map[String,String], profiling: Boolean, showPlan: Boolean): Unit = {
+    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendPath, backendArgs, profiling, showPlan)
   }
   
   /**
@@ -149,7 +157,7 @@ object Piglet extends LazyLogging {
    */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeature: LanguageFeature.LanguageFeature, params: Map[String,String],
-          backendPath: String, backendArgs: Map[String,String], profiling: Boolean): Unit = {
+          backendPath: String, backendArgs: Map[String,String], profiling: Boolean, showPlan: Boolean): Unit = {
 
 	  try {
 		  // initialize database driver and connection pool
@@ -173,7 +181,8 @@ object Piglet extends LazyLogging {
 			  inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
 
 		  } else {
-			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeature, params, backendPath, backendConf, backendArgs, profiling)
+			  runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeature, params, backendPath,
+          backendConf, backendArgs, profiling, showPlan)
 		  }
 
 	  } catch {
@@ -202,7 +211,8 @@ object Piglet extends LazyLogging {
 
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
                             langFeature: LanguageFeature.LanguageFeature, params: Map[String,String],
-                            backendPath: String, backendConf: BackendConf, backendArgs: Map[String,String], profiling: Boolean) {
+                            backendPath: String, backendConf: BackendConf, backendArgs: Map[String,String],
+                            profiling: Boolean, showPlan: Boolean) {
     logger.debug("start parsing input files")
     
     val schedule = ListBuffer.empty[(DataflowPlan,Path)]
@@ -292,10 +302,12 @@ object Piglet extends LazyLogging {
       
       
       logger.debug("finished optimizations")
-      
-      println("final plan = {")
-      newPlan.printPlan()
-      println("}")
+
+      if (showPlan) {
+        println("final plan = {")
+        newPlan.printPlan()
+        println("}")
+      }
 
       try {
         // if this does _not_ throw an exception, the schema is ok
@@ -366,15 +378,77 @@ object Piglet extends LazyLogging {
         .apply()
       
     }
-    
-//    val entries = DB readOnly { implicit session => 
-//      sql"select * from opcount"
-//        .map{ rs => s"${rs.string("id")}  -->  ${rs.int("cnt")}" }
-//        .list
-//        .apply()
-//      
-//    }
-//    entries.foreach { println }
-    
+  }
+
+  /**
+    * Sets the various configuration parameters to the given string values.
+    *
+    * @param master the master for Spark/Flink
+    * @param backend the backend used for execution (spark, flink, sparks, flinks, ...)
+    * @param language the Piglet dialect used for processing the script
+    * @param backendDir the directory where the backend-specific jars are located
+    */
+  def setConfig(master: String = "local", backend: String = "spark", language: String = "pig",
+                backendDir: String = "."): Unit = {
+    Piglet.master = master
+    Piglet.backend = backend
+    Piglet.backendPath = backendDir
+    Piglet.languageFeature = language match {
+      case "sparql" => LanguageFeature.SparqlPig
+      case "streaming" => LanguageFeature.StreamingPig
+      case "pig" => LanguageFeature.PlainPig
+      case _ => LanguageFeature.PlainPig
+    }
+    val backendConf = BackendManager.backend(backend)
+    BackendManager.backend = backendConf
+  }
+
+  /**
+    * Compiles and executes the given Piglet script represented as string.
+    *
+    * @param source a string containing the Piglet code
+    */
+  def compile(source: String): List[Any] = {
+    def cleanup(s: String): Unit = {
+      import scalax.file.Path
+
+      val path: Path = Path(s)
+      try {
+        path.deleteRecursively(continueOnFailure = false)
+      }
+      catch {
+        case e: java.io.IOException => // some file could not be deleted
+      }
+
+    }
+
+    PigletCompiler.createDataflowPlan(source, Map[String, String](), backend, languageFeature) match {
+      case Some(p) => {
+        val plan = processPlan(p)
+        plan.checkSchemaConformance
+
+        val backendConf = BackendManager.backend
+        val outDir = Paths.get(".")
+        val scriptName = "__r_piglet"
+        val templateFile = backendConf.templateFile
+        val jarFile = Conf.backendJar(backend)
+        val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(s"$backendPath/${jarFile.toString}"),
+          templateFile, backend, false) match {
+          case Some(jarFile) => {
+            val runner = backendConf.runnerClass
+            logger.debug(s"using runner class ${runner.getClass.toString()}")
+
+            logger.info( s"""starting job at "$jarFile" using backend "$backend" """)
+            val resStream = new java.io.ByteArrayOutputStream
+            Console.withOut(resStream)(runner.execute(master, scriptName, jarFile, Map[String,String]()))
+            resStream.toString
+          }
+          case None => ""
+        }
+        cleanup(scriptName)
+        res.split("\n").toList.map(_.split(","))
+      }
+      case None => List()
+    }
   }
 }

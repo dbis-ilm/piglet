@@ -31,7 +31,6 @@ object PigBuild extends Build {
 
   lazy val sparklib = (project in file("sparklib")).
     settings(commonSettings: _*).
-    settings(libraryDependencies += Dependencies.h2Database).
     dependsOn(common)
 
   lazy val flinklib = (project in file("flinklib")).
@@ -82,10 +81,11 @@ object Dependencies {
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.0"
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
-  val jline = "jline" % "jline" % "2.12.1"
-  val sparkCore = "org.apache.spark" %% "spark-core" % "1.5.1"
-  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.1"
-  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.5.1"
+  val jline = "jline" % "jline" % "2.13"
+  val sparkCore = "org.apache.spark" %% "spark-core" % "1.5.2"
+  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.2"
+  val sparkREPL = "org.apache.spark" %% "spark-repl" % "1.5.2"
+  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.5.2"
   val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10-SNAPSHOT"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
@@ -94,11 +94,12 @@ object Dependencies {
   val typesafe = "com.typesafe" % "config" % "1.3.0"
   val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0" 
   val log4j = "log4j" % "log4j" % "1.2.17"
-  val slf4j = "org.slf4j" % "slf4j-simple" % "1.7.5"
+//  val slf4j = "org.slf4j" % "slf4j-simple" % "1.7.5"
+  val slf4j = "org.slf4j" % "slf4j-log4j12" % "1.7.13"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
   val commons = "org.apache.commons" % "commons-exec" % "1.3"
-  val twitterUtil = "com.twitter" %% "util-eval" % "6.27.0"
+  val twitterUtil = "com.twitter" %% "util-eval" % "6.29.0"
   val scalikejdbc = "org.scalikejdbc" %% "scalikejdbc" % "2.2.7"
   val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val h2Database = "com.h2database" % "h2" % "1.4.190"
@@ -122,7 +123,7 @@ object Dependencies {
     scalikejdbc,
     scalikejdbc_config,
     commons,
-    slf4j,
+    slf4j % "provided",
     hadoop % "provided",
     twitterUtil,
     h2Database

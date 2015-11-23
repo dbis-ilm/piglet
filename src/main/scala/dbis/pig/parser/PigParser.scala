@@ -595,7 +595,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt) ~ rep(";") ^^ {
     case op ~ _  => op }
 
   def undelimStmt: Parser[PigOperator] = embedStmt
@@ -605,7 +605,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * defineMacroStmt contains other statements but not other macro definitions
    */
-  def plainStmt: Parser[PigOperator] = stmt | defineMacroStmt
+  def plainStmt: Parser[PigOperator] = defineMacroStmt | stmt
   /*
    * A plain Pig script is a list of statements.
    */
