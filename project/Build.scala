@@ -53,7 +53,10 @@ object PigBuild extends Build {
   val backend = sys.props.getOrElse("backend", default="spark")
   
   val itDeps = backend match {
-    case "flink" | "flinks" => Seq(Dependencies.flinkDist % "test;it" from Dependencies.flinkAddress)
+    case "flink" | "flinks" => Seq(
+       Dependencies.flinkCore % "test;it",
+       Dependencies.flinkStreaming % "test;it"
+    )
     case "spark" | "sparks" => Seq(
       Dependencies.sparkCore % "test;it",
       Dependencies.sparkSql % "test;it",
@@ -83,11 +86,13 @@ object Dependencies {
   val scalaTest = "org.scalatest" %% "scalatest" % "2.2.0"
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
-  val jline = "jline" % "jline" % "2.12.1"
-  val sparkCore = "org.apache.spark" %% "spark-core" % "1.5.1"
-  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.1"
-  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.5.1"
-  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10.0"
+  val jline = "jline" % "jline" % "2.13"
+  val sparkCore = "org.apache.spark" %% "spark-core" % "1.5.2"
+  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.2"
+  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.5.2"
+  //val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10.0"
+  val flinkCore = "org.apache.flink" %% "flink-core" % "0.10.0"
+  val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % "0.10.0"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
@@ -104,7 +109,7 @@ object Dependencies {
   val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val h2Database = "com.h2database" % "h2" % "1.4.190"
 
-  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10.0.jar"
+  //val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10.0.jar"
   
   // Projects
   val rootDeps = Seq(
