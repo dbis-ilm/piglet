@@ -969,4 +969,23 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
+
+  it should "generate code for GROUP BY with group name" in {
+    val plan = new DataflowPlan(parseScript(
+      """
+        |A = LOAD 'file' AS (name, value: double);
+        |B = GROUP A BY name;
+        |C = FOREACH B GENERATE A.name, AVG(A.value);
+        |DUMP C;
+      """.stripMargin))
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new BatchCodeGen(templateFile)
+    val op = rewrittenPlan.findOperatorForAlias("C").get
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """
+        |val C = B.map(t => _t4_Tuple(t._0, PigFuncs.average(t._1.map(e => e._1))))
+      """.stripMargin)
+    generatedCode should matchSnippet(expectedCode)
+  }
 }
