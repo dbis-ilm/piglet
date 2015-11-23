@@ -65,7 +65,11 @@ object GeneralRuleset extends Ruleset {
     *         Filters, None otherwise.
     */
   def mergeFilters(parent: Filter, child: Filter): Option[Filter] = {
-    Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
+    if (parent.pred != child.pred) {
+      Some(Filter(child.outputs.head, parent.inputs.head, And(parent.pred, child.pred)))
+    } else {
+      None
+    }
   }
 
   /** Removes a [[dbis.pig.op.Filter]] object that's a successor of a Filter with the same Predicate
@@ -249,8 +253,8 @@ object GeneralRuleset extends Ruleset {
     // corresponding test methods!
     addStrategy(replaceMacroOp _)
     addStrategy(removeDuplicateFilters)
-    merge[Filter, Filter](mergeFilters)
-    merge[PigOperator, Empty](mergeWithEmpty)
+    merge(mergeFilters)
+    merge(mergeWithEmpty)
     reorder[OrderBy, Filter]
     addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
     addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))

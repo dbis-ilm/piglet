@@ -105,6 +105,21 @@ class RewriterSpec extends FlatSpec
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
   }
 
+  private def performNotMergeTest() = {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
+    val op4 = Dump(Pipe("c"))
+
+    val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
+
+    val pPlan = processPlan(planUnmerged)
+    pPlan.findOperatorForAlias("c").value should be(op3)
+    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
+  }
+
   private def performRemovalTest() = {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -127,8 +142,9 @@ class RewriterSpec extends FlatSpec
 
   // THESIS
   "The rewriter" should "merge two Filter operations" in {
-    merge[Filter, Filter](mergeFilters)
+    merge(mergeFilters)
     performMergeTest()
+    performNotMergeTest()
   }
 
   // THESIS
@@ -143,21 +159,55 @@ class RewriterSpec extends FlatSpec
         }
 
         val filter2 = successors.head.asInstanceOf[Filter]
-        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
-        Some(fixMerge(filter1, filter2, merged))
+
+        if (filter1.pred != filter2.pred) {
+          val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+          Some(fixMerge(filter1, filter2, merged))
+        } else {
+          None
+        }
       case _ => None
     }
 
     addStrategy(strategy _)
 
     performMergeTest()
+    performNotMergeTest()
+  }
+
+  // THESIS
+  it should "merge two filter operations manually with a typed strategy" in {
+    def strategy(filter1: Filter): Option[Filter] = {
+      val successors = filter1.outputs.flatMap(_.consumer)
+
+      //Ensure that the Filter operator is the only successor
+      if (successors.length != 1 || !successors.head.isInstanceOf[Filter]) {
+        return None
+      }
+
+      val filter2 = successors.head.asInstanceOf[Filter]
+
+      if (filter1.pred != filter2.pred) {
+        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+        Some(fixMerge(filter1, filter2, merged))
+      } else {
+        None
+      }
+    }
+
+    addTypedStrategy(strategy _)
+
+    performMergeTest()
+    performNotMergeTest()
   }
 
   // THESIS
   it should "merge Filter operations manually with Extractors" in {
     def strategy(op: Any): Option[Filter] = op match {
-      case SuccE(filter1: Filter, filter2: Filter) =>
-        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+      case SuccE(filter1 @ Filter(_, _, pred1, _),
+                 filter2 @ Filter(_, _, pred2, _))
+          if pred1 != pred2 =>
+        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(pred1, pred2))
         Some(fixMerge(filter1, filter2, merged))
       case _ => None
     }
@@ -165,27 +215,38 @@ class RewriterSpec extends FlatSpec
     addStrategy(strategy _)
 
     performMergeTest()
+    performNotMergeTest()
   }
 
   // THESIS
   it should "merge Filter operations via binary strategies" in {
     def strategy(filter1: Filter, filter2: Filter): Option[Filter] = {
-      val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
-      Some(fixMerge(filter1, filter2, merged))
+      if (filter1.pred != filter2.pred) {
+        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+        Some(fixMerge(filter1, filter2, merged))
+      } else {
+        None
+      }
     }
 
     addBinaryPigOperatorStrategy(strategy)
 
     performMergeTest()
+    performNotMergeTest()
   }
 
   // THESIS
   it should "merge Filter operations via binary strategies and anonymous functions" in {
     addBinaryPigOperatorStrategy({ (filter1: Filter, filter2: Filter) =>
-                                   val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
-                                   Some(fixMerge(filter1, filter2, merged)) })
+                                   if (filter1.pred != filter2.pred) {
+                                     val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+                                     Some(fixMerge(filter1, filter2, merged))
+                                   } else {
+                                     None
+                                   }})
 
     performMergeTest()
+    performNotMergeTest()
   }
 
   it should "remove Filter operation if it has the same predicate as an earlier one" in {
@@ -387,7 +448,7 @@ class RewriterSpec extends FlatSpec
 
   it should "pull up Empty nodes" in {
     addStrategy(removeNonStorageSinks _)
-    merge[PigOperator, Empty](mergeWithEmpty)
+    merge(mergeWithEmpty)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
     val plan = new DataflowPlan(List(op1, op2))
@@ -1720,10 +1781,12 @@ class RewriterSpec extends FlatSpec
 
   it should "allow merging operators" in {
     Rewriter toMerge(classOf[Filter], classOf[Filter]) whenMatches {
-      case (f1 @ Filter(_, _, pred1, _), f2 @ Filter(_, _, pred2, _)) if pred1 != pred2 => } applyRule {
-        tup: (Filter, Filter) => mergeFilters(tup._1, tup ._2)
-      }
+      case (f1 @ Filter(_, _, pred1, _), f2 @ Filter(_, _, pred2, _)) if pred1 != pred2 =>
+    } applyRule {
+      case (f1, f2) => mergeFilters(f1, f2)
+    }
     performMergeTest()
+    performNotMergeTest()
   }
 
   it should "allow removing operators" in {
@@ -1798,11 +1861,13 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "allow merging operators" in {
-    Rewriter toMerge(classOf[Filter], classOf[Filter]) applyRule { case (t1: Filter, t2: Filter) =>
+    Rewriter toMerge(classOf[Filter], classOf[Filter]) when { tup => tup._1.pred != tup._2.pred } applyRule {
+      case (t1: Filter, t2: Filter) =>
       def merger(f1: Filter, f2: Filter) = Filter(f2.outputs.head, f1.inputs.head, And(f1.pred, f2.pred))
       Some(Functions.merge(t1, t2, merger))
     }
     performMergeTest()
+    performNotMergeTest()
   }
 
   it should "allow removing operators" in {
