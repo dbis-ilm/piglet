@@ -25,10 +25,10 @@ import com.typesafe.config.ConfigFactory
 import dbis.pig.backends.BackendConf
 import java.nio.file.Path
 import java.io.File
-import org.apache.flink.client.program.PackagedProgram
-import org.apache.flink.configuration.Configuration
-import org.apache.flink.configuration.ConfigConstants
-import org.apache.flink.client.program.Client
+//import org.apache.flink.client.program.PackagedProgram
+//import org.apache.flink.configuration.Configuration
+//import org.apache.flink.configuration.ConfigConstants
+//import org.apache.flink.client.program.Client
 import org.apache.flink.client.program.ProgramInvocationException
 import java.net.URI
 import java.net.URISyntaxException
@@ -37,22 +37,22 @@ import java.net.InetSocketAddress
 import com.typesafe.scalalogging.LazyLogging
 
 class FlinkRun extends PigletBackend with LazyLogging {
-  
+   //TODO: find better solution since client linking causes problems
   override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]){
-    if (master.startsWith("local") && !master.startsWith("localhost")){
-      //val cli = new CliFrontend
-      //val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
-      submitJar("localhost:6123", jarFile, backendArgs, className)
+    if (master.startsWith("local") && !master.startsWith("localhost")){  
+      val cli = new CliFrontend
+      val ret = cli.parseParameters(Array("run", "--class", className, jarFile.toString()))
+      //submitJar("localhost:6123", jarFile, backendArgs, className)
     }
     else {
-      //val cli = new CliFrontend
-      //val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
-      submitJar(master, jarFile, backendArgs, className)
+      val cli = new CliFrontend
+      val ret = cli.parseParameters(Array("run", "--jobmanager", master, "--class", className, jarFile.toString()))
+     // submitJar(master, jarFile, backendArgs, className)
     }
   }
 
   override def executeRaw(file: Path, master: String, backendArgs: Map[String,String]) = ???
-
+  /*
   def submitJar(master: String, path: Path, backendArgs: Map[String,String], className: String, args: String*) = {
 
     val file = path.toFile().getAbsoluteFile()
@@ -98,5 +98,5 @@ class FlinkRun extends PigletBackend with LazyLogging {
     }
     new InetSocketAddress(host, port)
 
-  }
+  }*/
 }
