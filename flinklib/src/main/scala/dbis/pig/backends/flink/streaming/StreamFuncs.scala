@@ -22,15 +22,17 @@ import org.apache.flink.streaming.api.scala._
 import scala.reflect.ClassTag
 import dbis.pig.backends._
 
+
 class PigStream [T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Serializable {
  
   def loadStream (env: StreamExecutionEnvironment,  path: String,  extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
-    env.readTextFile(path).map(line => extract(line.split(delim, -1)))
+    env.readTextFile(path).setParallelism(1).map(line => extract(line.split(delim, -1)))
   }
 
   def writeStream(path: String, result: DataStream[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path).setParallelism(1)
-
-  /*
+  
+  
+   /*
   def connect(env: StreamExecutionEnvironment, host: String, port: Int, delim: Char = '\t'): DataStream[List[String]] = {
     env.socketTextStream(host,port).map(line => line.split(delim).toList)
   }

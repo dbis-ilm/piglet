@@ -66,6 +66,7 @@ object PigBuild extends Build {
     case "flink" => Seq("dbis.test.flink.FlinkCompileIt")
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
+    case "sparks" => Seq("dbis.test.spark.SparksCompileIt")
     case "mapreduce" => Seq.empty[String] // TODO
     case _ => println(s"Unsupported backend: $backend - Will execute no tests"); Seq.empty[String]
   }
@@ -86,7 +87,7 @@ object Dependencies {
   val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.2"
   val sparkREPL = "org.apache.spark" %% "spark-repl" % "1.5.2"
   val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.5.2"
-  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10-SNAPSHOT"
+  val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10.0"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
@@ -104,7 +105,7 @@ object Dependencies {
   val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val h2Database = "com.h2database" % "h2" % "1.4.190"
 
-  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10-SNAPSHOT.jar"
+  val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10.0.jar"
   
   // Projects
   val rootDeps = Seq(

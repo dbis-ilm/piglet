@@ -39,7 +39,6 @@ trait CompileIt extends Matchers {
 
         val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
         val resourcePath = getClass.getResource("").getPath + "../../../"
-
         // 2. compile and execute Pig script
         runCompiler(script, resourcePath, resultPath, lang, backend) should be(true)
 
