@@ -99,9 +99,9 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     Types.LongType -> "Long",
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
-    Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "Any",
-    Types.AnyType -> "Any")
+    Types.CharArrayType -> "String",  
+    Types.ByteArrayType -> "String", //TODO: check this
+    Types.AnyType -> "String") //TODO: check this
 
   /**
    * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
@@ -483,7 +483,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
         params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
 
-        //Flink
+        //Flink??
         params += "out"->node.outPipeName
         params += "key"->orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse"->true

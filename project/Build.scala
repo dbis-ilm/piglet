@@ -63,7 +63,7 @@ object PigBuild extends Build {
   }
   
   val itTests = backend match{
-    case "flink" => Seq("dbis.test.spark.SparkCompileIt")
+    case "flink" => Seq("dbis.test.flink.FlinkCompileIt")
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
     case "spark" => Seq("dbis.test.spark.SparkCompileIt")
     case "mapreduce" => Seq.empty[String] // TODO
@@ -78,7 +78,7 @@ object Dependencies {
   // Libraries
   val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.7"
   val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.7"
-  val scalaTest = "org.scalatest" %% "scalatest" % "2.2.0"
+  val scalaTest = "org.scalatest" %% "scalatest" % "3.0.0-M12"
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
   val jline = "jline" % "jline" % "2.13"

@@ -17,33 +17,16 @@
 
 package dbis.test.spark
 
-import dbis.pig.Piglet
-import dbis.pig.backends.BackendManager
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest.{ Matchers, FlatSpec }
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import scala.io.Source
 import scalax.file.Path
-import org.apache.commons.exec._
-import org.apache.commons.exec.environment.EnvironmentUtils
+import dbis.test.CompileIt
 
-class SparkCompileIt extends FlatSpec with Matchers {
+class SparkCompileIt extends FlatSpec with CompileIt{
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
 
-    //FLINK
-  /*
-    ("load.pig", "result1.out", "truth/result1.data", true, "pig", "flink"),
-    ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "flink"),
-    ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
-//    ("selfjoin.pig", "joined.out", "truth/joined.data", false, "pig", "flink"),
-//    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true, "pig", "flink"),
-//    ("sort.pig", "sorted.out", "sorted.data", true, "pig", "flink"),
-    ("foreach1.pig", "distances.out", "truth/distances.data", true, "pig", "flink"),
-//    ("nforeach.pig", "nested.out", "nested.data", true, "pig", "flink"),
-//    ("grouping.pig", "grouping.out", "grouping.data", false, "pig", "flink"),
-//    ("wordcount.pig", "marycounts.out", "marycount.data", false, "pig", "flink"),
-    ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "flink"),
-*/
     //SPARK
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
@@ -85,98 +68,6 @@ class SparkCompileIt extends FlatSpec with Matchers {
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
 
   )
-
-  def cleanupResult(dir: String): Unit = {
-    import scalax.file.Path
-
-    val path: Path = Path(dir)
-    try {
-      path.deleteRecursively(continueOnFailure = false)
-    }
-    catch {
-      case e: java.io.IOException => // some file could not be deleted
-    }
-
-  }
-
-  def runCompiler(script: String, resourceName: String, resultPath: Path, lang: String, backend: String): Boolean = {
-    println("execute: " + script)
-    val params = new java.util.HashMap[String, Object]()
-    params.put("backend", backend)
-    params.put("language", lang)
-    params.put("master", "local[2]")
-    params.put("outdir", ".")
-    params.put("params", s"inbase=$resourceName,outfile=${resultPath.path}")
-    params.put("script", resourceName + script)
-    val cmdLine = new CommandLine("script/piglet")
-
-    cmdLine.addArgument("--backend")
-    cmdLine.addArgument("${backend}")
-    cmdLine.addArgument("--master")
-    cmdLine.addArgument("${master}")
-    cmdLine.addArgument("--language")
-    cmdLine.addArgument("${language}")
-    cmdLine.addArgument("--outdir")
-    cmdLine.addArgument("${outdir}")
-    cmdLine.addArgument("--params")
-    cmdLine.addArgument("${params}")
-    cmdLine.addArgument("${script}")
-
-    cmdLine.setSubstitutionMap(params)
-
-    val executor = new DefaultExecutor()
-    executor.setExitValue(0)
-    val watchdog = new ExecuteWatchdog(120000)
-    executor.setWatchdog(watchdog)
-    println("EXECUTE: " + cmdLine)
-    executor.execute(cmdLine) == 0
-  }
-
-  "The Pig compiler" should "compile and execute the script" in {
-    forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean, lang: String, backend: String) =>
-
-      if (sys.env.get("SPARK_JAR").isEmpty) {
-        println("SPARK_JAR variable not set - exiting.")
-        System.exit(0)
-      }
-
-      if (sys.env.get("FLINK_JAR").isEmpty) {
-        println("FLINK_JAR variable not set - exiting.")
-        System.exit(0)
-      }
-
-      // 1. make sure the output directory is empty
-      cleanupResult(resultDir)
-      cleanupResult(script.replace(".pig",""))
-
-      val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
-      val resourcePath = getClass.getResource("").getPath + "../../../"
-
-      // 2. compile and execute Pig script
-      runCompiler(script, resourcePath, resultPath, lang, backend) should be (true)
-      
-      // 3. load the output file(s) and the truth file
-      //val result = Source.fromFile(resultDir + "/part-00000").getLines()
-      var result = Iterator[String]()
-      val resultFile = new java.io.File(resultPath.path)
-      if(resultFile.isFile)
-        result ++= Source.fromFile(resultFile).getLines()
-      else {
-        // for the test cases we assume only a single file part-00000
-        for (file <- resultFile.listFiles if file.getName == "part-00000")
-          result ++= Source.fromFile(file).getLines()
-      }
-      val truth = Source.fromFile(resourcePath + truthFile).getLines()
-
-      // 4. compare both files
-      if (inOrder)
-        result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
-      else
-        result.toSeq should contain theSameElementsAs (truth.toTraversable)
-
-      // 5. delete the output directory
-      cleanupResult(resultDir)
-      cleanupResult(script.replace(".pig",""))
-    }
-  }
+  //Note: checking the spark jar inclusion is done also in the piglet script
+  it should behave like checkMatch(scripts)
 }

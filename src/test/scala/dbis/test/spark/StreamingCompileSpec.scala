@@ -17,13 +17,13 @@
 package dbis.test.spark
 
 import dbis.pig.backends.BackendManager
-import dbis.pig.codegen.BatchCodeGen
-import dbis.pig.codegen.StreamingCodeGen
+import dbis.pig.codegen.spark.BatchCodeGen
+import dbis.pig.codegen.spark.StreamingCodeGen
 import dbis.pig.expr._
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.backends.BackendManager
-import dbis.pig.codegen.{StreamingCodeGen, BatchCodeGen}
+import dbis.pig.codegen.spark.{StreamingCodeGen, BatchCodeGen}
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
