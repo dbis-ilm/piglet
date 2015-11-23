@@ -47,10 +47,10 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
   }
 
   after {
-    // cleanup SparkContext data
+    // cleanup
     env = null
   }
-
+  /*
   "PigStorage" should "load objects using an extractor" in {
     val res = PigStorage[Person]().load(env, "sparklib/src/test/resources/person.csv",
       (data: Array[String]) => Person(data(0), data(1).toInt), ",")
@@ -81,7 +81,6 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
     resArray(2).fields should be (Array("Mike", "32"))
   }
 
-  /*
   "BinStorage" should "save and load a RDD" in {
     val data = PigStorage[Person]().load(sc, "sparklib/src/test/resources/person.csv",
       (data: Array[String]) => Person(data(0), data(1).toInt), ",")
@@ -113,12 +112,11 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
     data.collect() should be (Array(DataRecord(1, "One"), DataRecord(2, "Two"), DataRecord(3, "Three"),
       DataRecord(4, "Four"), DataRecord(5, "Five"), DataRecord(6, "Six")))
   }
-*/
+
   "RDFStorage" should "load RDF data from NTriple file" in {
-    /*
     val res = RDFFileStorage[Record]().load(sc, "sparklib/src/test/resources/person.csv",
       (data: Array[String]) => Record(data))
     val resArray = res.collect()
-*/
   }
+  */
 }
