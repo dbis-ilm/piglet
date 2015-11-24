@@ -35,6 +35,8 @@ class SparkCompileIt extends FlatSpec with CompileIt{
       false, "pig", "spark"),
     ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true, "pig", "spark"),
     ("sort.pig", "sorted.out", "truth/sorted.data", true, "pig", "spark"),
+    ("sort_multiple_directions.pig", "sorted_multiple_directions.out",
+      "truth/sorted_multiple_directions.data", true, "pig", "spark"),
     ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "spark"),
     ("foreach1.pig", "distances.out", "truth/distances.data", true, "pig", "spark"),
     ("nforeach.pig", "nested.out", "truth/nested.data", true, "pig", "spark"),
