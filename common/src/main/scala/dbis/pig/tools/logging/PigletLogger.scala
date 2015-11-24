@@ -24,6 +24,7 @@ object PigletLogger {
   
   protected[logging] def apply(underlying: Underlying): PigletLogger = new PigletLogger(underlying)
 
+  private[logging] var level: LogLevel = WARN
   
   private[logging] def underlyingLevel(lvl: LogLevel): UnderlyingLevel = lvl match {
     case OFF => UnderlyingLevel.OFF
@@ -45,7 +46,12 @@ object PigletLogger {
 
 final class PigletLogger private(private[this] val underlying: Underlying) {
   
-  def setLevel(level: LogLevel): Unit = underlying.setLevel(PigletLogger.underlyingLevel(level))
+  setLevel(PigletLogger.level)
+  
+  def setLevel(level: LogLevel): Unit = {
+    underlying.setLevel(PigletLogger.underlyingLevel(level))
+    PigletLogger.level = level
+  }
   
   def getLevel: LogLevel = PigletLogger.level(underlying.getLevel)
   
