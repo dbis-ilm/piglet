@@ -64,6 +64,26 @@ where Pig statements can be entered at the prompt and are executed as soon as
 a `DUMP` or `STORE` statement is entered. Furthermore, the schema can be printed using `DESCRIBE`.
 With the `-b` option you can specify which backend (spark, flink) will be used.
 
+#### Docker ####
+
+Piglet can also be run as a [Docker](https://www.docker.com/) container. However, the image is not 
+yet on DockerHub, so it has to be built manually:
+```
+sbt clean package assembly
+docker build -t dbis/piglet .
+```
+
+Currently, the Docker image supports the Spark backend only. To start the container, run:
+```
+docker run -it --rm --name piglet dbis/piglet /piglet/piglet --help
+```
+
+You can start the interactive mode, using `-i` option and enter your script. Alternatively, you can add
+your existing files into the container by [mounting volumes](https://docs.docker.com/engine/userguide/dockervolumes/#mount-a-host-file-as-a-data-volume):
+```
+docker run -it --rm --name piglet -v /tmp/test.pig:/test.pig dbis/piglet /piglet/piglet -b spark /test.pig
+```
+
 ### Testing ###
 
 We use the Scala testing framework as well as the scoverage tool for test coverage. You can produce
