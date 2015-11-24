@@ -98,10 +98,6 @@ object Dependencies {
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
   val kiama = "com.googlecode.kiama" %% "kiama" % "1.8.0"
   val typesafe = "com.typesafe" % "config" % "1.3.0"
-  val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0" 
-  val log4j = "log4j" % "log4j" % "1.2.17"
-//  val slf4j = "org.slf4j" % "slf4j-simple" % "1.7.5"
-  val slf4j = "org.slf4j" % "slf4j-log4j12" % "1.7.13"
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
   val commons = "org.apache.commons" % "commons-exec" % "1.3"
@@ -110,8 +106,6 @@ object Dependencies {
   val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val h2Database = "com.h2database" % "h2" % "1.4.190"
 
-  //val flinkAddress = "http://cloud01.prakinf.tu-ilmenau.de/flink-dist-0.10.0.jar"
-  
   // Projects
   val rootDeps = Seq(
     scalaLib,
@@ -124,12 +118,9 @@ object Dependencies {
     scalasti,
     kiama,
     typesafe,
-    scalaLogging,
-    log4j,
     scalikejdbc,
     scalikejdbc_config,
     commons,
-    slf4j % "provided",
     hadoop % "provided",
     twitterUtil,
     h2Database

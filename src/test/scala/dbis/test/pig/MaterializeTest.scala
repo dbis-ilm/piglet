@@ -17,7 +17,7 @@ import java.nio.file.Path
 import scala.collection.JavaConversions._
 import java.nio.file.SimpleFileVisitor
 import java.net.URI
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 /**
  * @author hage

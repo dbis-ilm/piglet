@@ -36,7 +36,6 @@ import scala.collection.mutable.ListBuffer
 import java.nio.file.{Path, Paths}
 import jline.console.history.FileHistory
 import dbis.pig.tools.Conf
-import com.typesafe.scalalogging.LazyLogging
 
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
@@ -55,7 +54,7 @@ case object EOF extends JLineEvent
 /**
   * A singleton object implementing the REPL for Piglet.
   */
-object PigletREPL extends LazyLogging {
+object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
 
   case class REPLConfig(master: String = "local",
                         outDir: String = ".",

@@ -26,9 +26,9 @@ import org.scalatest.FlatSpec
 import java.net.URI
 import dbis.pig.tools.Conf
 import dbis.pig.backends.BackendManager
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
-class FlinksCompileSpec extends FlatSpec with LazyLogging {
+class FlinksCompileSpec extends FlatSpec with PigletLogging {
 
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
 

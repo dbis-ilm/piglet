@@ -1,11 +1,11 @@
 package dbis.pig.tools
 
 import scalikejdbc._
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 case class ConnectionSetting(val driver: String, val url: String, val user: String, val pw: String)
 
-object DBConnection extends LazyLogging {
+object DBConnection extends PigletLogging {
   
   
   def init(setting: ConnectionSetting) {

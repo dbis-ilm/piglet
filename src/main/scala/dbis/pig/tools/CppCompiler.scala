@@ -4,9 +4,9 @@ import org.apache.commons.exec._
 import org.apache.commons.exec.environment.EnvironmentUtils
 import com.typesafe.config.ConfigFactory
 import dbis.pig.backends.CppConfig
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
-object CppCompilerConf extends LazyLogging {
+object CppCompilerConf extends PigletLogging {
  
   /**
    * Get the config class for the c++ compiler with the given backend
