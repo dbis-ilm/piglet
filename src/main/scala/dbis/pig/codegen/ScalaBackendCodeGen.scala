@@ -347,7 +347,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     }
     case ConstructMapExpr(exprs) => {
       val exType = expr.resultType(schema).asInstanceOf[MapType]
-      println("MapType = " + exType)
       val valType = exType.valueType
       val exprList = exprs.map(e => emitExpr(schema, e, namedRef = namedRef))
       // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
@@ -469,10 +468,28 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   
   val castMethods = Set.empty[String]
 
+  /**
+    * Create helper class for operators such as ORDER BY.
+    *
+    * @param node the Pig operator requiring helper code
+    * @return a string representing the helper code
+    */
   def emitHelperClass(node: PigOperator): String = {
-    def genCmpExpr(col: Int, num: Int) : String =
-      if (col == num) s"{ this.c$col compare that.c$col }"
-      else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col+1, num)} else this.c$col compare that.c$col }"
+    /**
+      * Emit the comparison expression used in in the orderHelper class
+      *
+      * @param col the current position of the comparison field
+      * @param orderSpec the list of OrderBySpec (field, direction)
+      * @return the expression code
+      */
+    def genCmpExpr(col: Int, orderSpec: List[OrderBySpec]) : String = {
+      val num = orderSpec.length
+      val cmpStr = if (orderSpec(col-1).dir == OrderByDirection.AscendingOrder)
+        s"this.c$col compare that.c$col"
+      else s"that.c$col compare this.c$col"
+      if (col == num) s"{ $cmpStr }"
+      else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col + 1, orderSpec)} else $cmpStr }"
+    }
 
     node match {
       case OrderBy(out, in, orderSpec, _) => {
@@ -481,7 +498,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
         var col = 0
         params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
-        params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
+        params += "cmpExpr" -> genCmpExpr(1, orderSpec)
 
         //Flink??
         params += "out"->node.outPipeName
