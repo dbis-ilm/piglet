@@ -16,7 +16,7 @@
  */
 package dbis.pig.codegen
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 import dbis.pig.op._
 import dbis.pig.op.cmd._
@@ -43,7 +43,7 @@ import scala.collection.mutable.Set
  *
  * @param template the name of the backend-specific template fle
  */
-abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with LazyLogging {
+abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with PigletLogging {
 
   templateFile = template 
   /*------------------------------------------------------------------------------------------------- */
@@ -99,9 +99,9 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     Types.LongType -> "Long",
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
-    Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "Any",
-    Types.AnyType -> "Any")
+    Types.CharArrayType -> "String",  
+    Types.ByteArrayType -> "String", //TODO: check this
+    Types.AnyType -> "String") //TODO: check this
 
   /**
    * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
@@ -347,7 +347,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     }
     case ConstructMapExpr(exprs) => {
       val exType = expr.resultType(schema).asInstanceOf[MapType]
-      println("MapType = " + exType)
       val valType = exType.valueType
       val exprList = exprs.map(e => emitExpr(schema, e, namedRef = namedRef))
       // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
@@ -469,26 +468,45 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   
   val castMethods = Set.empty[String]
 
-  def emitHelperClass(node: PigOperator): String =
+  /**
+    * Create helper class for operators such as ORDER BY.
+    *
+    * @param node the Pig operator requiring helper code
+    * @return a string representing the helper code
+    */
+  def emitHelperClass(node: PigOperator): String = {
     node match {
       case OrderBy(out, in, orderSpec, _) => {
-        def genCmpExpr(col: Int, num: Int): String =
-          if (col == num) s"{ this.c$col compare that.c$col }"
-          else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col + 1, num)} else this.c$col compare that.c$col }"
+        val num = orderSpec.length
+        /**
+          * Emit the comparison expression used in in the orderHelper class
+          *
+          * @param col the current position of the comparison field
+          * @return the expression code
+          */
+        def genCmpExpr(col: Int): String = {
+          val cmpStr = if (orderSpec(col - 1).dir == OrderByDirection.AscendingOrder)
+            s"this.c$col compare that.c$col"
+          else s"that.c$col compare this.c$col"
+          if (col == num) s"{ $cmpStr }"
+          else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col + 1)} else $cmpStr }"
+        }
 
         var params = Map[String, Any]()
         //Spark
         params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
         var col = 0
         params += "fields" -> orderSpec.map(o => {
-          col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}"
+          col += 1;
+          s"c$col: ${scalaTypeOfField(o.field, node.schema)}"
         }).mkString(", ")
-        params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
+        params += "cmpExpr" -> genCmpExpr(1)
 
-        //Flink
+        //Flink??
         params += "out" -> node.outPipeName
         params += "key" -> orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
+
         callST("orderHelper", Map("params" -> params))
       }
       case Top(_, _, orderSpec, _) => {
@@ -507,7 +525,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         def genCmpExpr(col: Int): String = {
           var firstGetter = "first."
           var secondGetter = "second."
-          if(ascendingSortOrder(orderSpec(col)) == "true") {
+          if (ascendingSortOrder(orderSpec(col)) == "true") {
             // If we're not sorting ascending, reverse the getters so the ordering gets reversed
             firstGetter = "second."
             secondGetter = "first."
@@ -537,7 +555,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
         var col = 0
         params += "fields" -> orderSpec.map(o => {
-          col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}"
+          col += 1;
+          s"c$col: ${scalaTypeOfField(o.field, node.schema)}"
         }).mkString(", ")
         params += "cmpExpr" -> genCmpExpr(0)
 
@@ -549,6 +568,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       }
       case _ => ""
     }
+  }
 
 
   /**

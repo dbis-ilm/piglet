@@ -3,16 +3,23 @@ init_code(includes) ::= <<
 import org.apache.flink.streaming.api.scala._
 import dbis.pig.backends.flink._
 import dbis.pig.backends.flink.streaming._
-import dbis.pig.backends.flink.streaming.FlinkExtensions._
 import java.util.concurrent.TimeUnit
-import org.apache.flink.streaming.api.windowing.helper._
 import org.apache.flink.util.Collector
+import dbis.pig.backends.{SchemaClass, Record}
 
 <if (includes)>
 <includes>
 <endif>
 
 <\n>
+>>
+
+// ----------------- schema class -----------------
+schema_class(name, fields, string_rep) ::= <<
+case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+override def mkString(_c: String = ",") = <string_rep>
+}
+
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
@@ -29,27 +36,29 @@ begin_query(name, profiling) ::= <<<\n>
 
 // ----------------- LOAD text file -------------------------------------------
 loader(out, file, class, func, extractor, params) ::=<<
-    val <out> = <func>().load(env, "<file>"<params>)
+    val <out> = <func>[<class>]().loadStream(env, "<file>", <extractor><if (params)>, <params><endif>)
 >>
 
 // ------------------ DUMP Results --------------------------------------------
 dump(in) ::=<<
-    <in>.map(_.mkString(",")).print
+    <in>.map(_.mkString()).print
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
-store(in, file, class, func, schema) ::=<<
+store(in, file, class, func, schema, params) ::=<<
+    /*
     <if (schema)>
         val <in>_storehelper = <in>.map(t => <schema>)
     <else>
         val <in>_storehelper = <in>
     <endif>
-
-    <func>().write("<file>", <in>_storehelper)
+    */
+    //val <in>_helper = <in>.setParallelism(1)
+    <func>[<class>]().writeStream("<file>", <in><if (params)>, <params><endif>)
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
-filter(out,in,pred,windowMode) ::=<<
+filter(out,in,pred,windowMode, class) ::=<<
 <if (windowMode)>
     val <out> = <in>.mapWindow(custom<out>Filter _)
 <else>
@@ -58,7 +67,7 @@ filter(out,in,pred,windowMode) ::=<<
 >>
 
 filterHelper(params) ::=<<
-    def custom<params.out>Filter(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
+    def custom<params.out>Filter(ts: Iterable[<params.class>], out: Collector[<params.class>]) ={
       ts.filter(t => {<params.pred>}).foreach(x => out.collect(x))
     }
 >>
@@ -72,22 +81,22 @@ splitInto(in,out,pred) ::=<<
 
 
 // ------------------ Executes an expression FOREACH input element ------------
-foreach(out,in,expr,aggrs,windowMode) ::=<<
+foreach(out,in,expr,aggrs,windowMode, class) ::=<<
 <if(windowMode)>
     val <out> = <in>.mapWindow(custom<out>Map _)
 <else>
     <if (aggrs)>
     val <out> = <in>.mapWithState(PigFuncs.streamFunc(<aggrs>)).map(t => <expr>)
     <else>
-    val <out> = <in>.map(t => <expr>)
+    val <out> = <in>.map(t => <class>(<expr>))
     <endif>
 <endif>
 >>
 
 foreachHelper(params) ::=<<
 <if(params.windowMode)>
-    def custom<params.out>Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
-      ts.foreach { t => out.collect(<params.expr>)}
+    def custom<params.out>Map(ts: Iterable[<params.class>], out: Collector[<params.class>]) = {
+      ts.foreach { t => out.collect(<params.class>(<params.expr>))}
     }
 <else>    
 <endif>
@@ -99,32 +108,32 @@ foreachFlatMap(out,in,expr,windowMode) ::=<<
 >>
 
 // ------------------ GROUPS elements on an expression ------------------------
-groupBy(out,in,expr,windowMode) ::=<<
+groupBy(out,in,expr,windowMode, class) ::=<<
 <if (expr)>
   <if(windowMode)>
-    val <out> = <in>.mapWindow(custom<out>Map _).groupBy(t => t(0))
+    val <out> = <in>.mapWindow(custom<out>Map _).groupBy(t => t._0)
   <else>
-    val <out> = <in>.map(t => List((<expr>),List(t))).groupBy(t => t(0))
+    val <out> = <in>.map(t => <class>((<expr>),List(t))).groupBy(t => t._0)
   <endif>
 <else>
-    val <out> = <in>.map(t => List("all", List(t))).groupBy(t => t(0))
+    val <out> = <in>.map(t => List("all", List(t))).groupBy(t => t._0)
 <endif>
 >>
 
 groupByHelper(params) ::=<<
-    def custom<params.out>Map(ts: Iterable[List[Any]], out: Collector[List[Any]]) = {
+    def custom<params.out>Map(ts: Iterable[<params.class>], out: Collector[<params.class>]) = {
 <!      out.collect(ts.groupBy(t => <params.expr>).flatMap(x => List(x._1,x._2)).toList) !>
-      ts.groupBy(t => <params.expr>).foreach(t => out.collect(List(t._1,t._2)))
+      ts.groupBy(t => <params.expr>).foreach(t => out.collect(<params.class>(t._1,t._2)))
     }
 >>
 
 // ------------------ Outputs only distinct values ----------------------------
-distinct(out,in) ::=<<
+distinct(out,in, class) ::=<<
     val <out> = <in>.mapWindow(distinct _)
 >>
 
 distinctHelper(params) ::=<<
-    def distinct(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
+    def distinct(ts: Iterable[<params.class>], out: Collector[<params.class>]) ={
       ts.toList.distinct.foreach{ x => out.collect(x) }
     }
 >>
@@ -214,7 +223,7 @@ socketWrite(in,addr,mode,func) ::=<<
 >>
 
 // ----------------- END of the code implementing the query -------------------
-end_query(name) ::= <<
+end_query(name, hook) ::= <<
     env.execute("<name>")
     
 <if (hook)>

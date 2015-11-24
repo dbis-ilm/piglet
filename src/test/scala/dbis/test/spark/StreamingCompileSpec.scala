@@ -17,13 +17,13 @@
 package dbis.test.spark
 
 import dbis.pig.backends.BackendManager
-import dbis.pig.codegen.BatchCodeGen
-import dbis.pig.codegen.StreamingCodeGen
+import dbis.pig.codegen.spark.BatchCodeGen
+import dbis.pig.codegen.spark.StreamingCodeGen
 import dbis.pig.expr._
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.backends.BackendManager
-import dbis.pig.codegen.{StreamingCodeGen, BatchCodeGen}
+import dbis.pig.codegen.spark.{StreamingCodeGen, BatchCodeGen}
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
@@ -70,6 +70,8 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
         |    def main(args: Array[String]) {
         |      val conf = new SparkConf().setAppName("test_App")
         |      val ssc = new StreamingContext(conf, Seconds(1))
+        |      val listen = new GracefullyStopListener(ssc)
+        |      ssc.addStreamingListener(listen)
         |      ssc.start()
         |      ssc.awaitTermination()
         |   }

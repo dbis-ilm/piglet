@@ -16,7 +16,6 @@
  */
 package dbis.pig.plan.rewriting
 
-import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.plan.rewriting.rulesets.{SparkRuleset, GeneralRuleset, RDFRuleset}
 
 
@@ -25,7 +24,7 @@ import dbis.pig.plan.rewriting.rulesets.{SparkRuleset, GeneralRuleset, RDFRulese
   *
   */
 //noinspection ScalaDocMissingParameterDescription
-object Rules extends LazyLogging {
+object Rules {
   val rulesets = List(GeneralRuleset, RDFRuleset)
   def registerAllRules() = {
     // IMPORTANT: If you change one of the rule registration calls in here, please also change the call in the
@@ -35,6 +34,6 @@ object Rules extends LazyLogging {
 
   def registerBackendRules(backend: String) = backend match {
     case "spark" => SparkRuleset.registerRules()
-    case _ => logger.debug("No rules known for " + backend)
+    case _ =>
   }
 }

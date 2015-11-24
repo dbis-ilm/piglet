@@ -36,13 +36,14 @@ import dbis.pig.tools.DBConnection
 import dbis.pig.tools.{DepthFirstTopDownWalker, BreadthFirstTopDownWalker}
 import dbis.pig.mm.{DataflowProfiler, MaterializationPoint}
 import dbis.pig.codegen.PigletCompiler
+import dbis.pig.tools.logging.PigletLogging
+import dbis.pig.tools.logging.LogLevel
+import dbis.pig.tools.logging.LogLevel._
 
 import java.io.File
 
 import scopt.OptionParser
 import scala.io.Source
-
-import com.typesafe.scalalogging.LazyLogging
 
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -53,9 +54,7 @@ import scala.collection.mutable.{Map => MutableMap}
 
 import scalikejdbc._
 
-import com.typesafe.scalalogging.Logger
-
-object Piglet extends LazyLogging {
+object Piglet extends PigletLogging {
 
   case class CompilerConfig(master: String = "local",
                             inputs: Seq[File] = Seq.empty,
@@ -68,13 +67,15 @@ object Piglet extends LazyLogging {
                             updateConfig: Boolean = false,
                             showPlan: Boolean = false,
                             backendArgs: Map[String, String] = Map(),
-                            profiling: Boolean = false
+                            profiling: Boolean = false,
+                            loglevel: Option[String] = None
                           )
 
   var master: String = "local"
   var backend: String = null
   var backendPath: String = null
   var languageFeature = LanguageFeature.PlainPig
+  var logLevel: Option[String] = None 
 
   def main(args: Array[String]): Unit = {
     var inputFiles: Seq[Path] = null
@@ -98,6 +99,7 @@ object Piglet extends LazyLogging {
       opt[Map[String,String]]('p', "params") valueName("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text("parameter(s) to subsitute")
       opt[Unit]('u',"update-config") optional() action { (_,c) => c.copy(updateConfig = true) } text(s"update config file in program home (see config file)")
       opt[Unit]('s', "show-plan") optional() action { (_,c) => c.copy(showPlan = true) } text(s"show the execution plan")
+      opt[String]('g', "log-level") optional() action { (x,c) => c.copy(loglevel = Some(x.toUpperCase()))} text ("Set the log level: DEBUG, INFO, WARN, ERROR")
       opt[Map[String,String]]("backend-args") valueName("key1==value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text("parameter(s) to subsitute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
@@ -127,6 +129,7 @@ object Piglet extends LazyLogging {
         }
         // note: for some backends we could determine the language automatically
         profiling = config.profiling
+        logLevel = config.loglevel
       }
       case None =>
         // arguments are bad, error message will have been displayed
@@ -142,6 +145,14 @@ object Piglet extends LazyLogging {
     if(updateConfig)
     	Conf.copyConfigFile()
     
+    if(logLevel.isDefined) {
+      try {
+      logger.setLevel(LogLevel.withName(logLevel.get))
+      } catch {
+      case e: NoSuchElementException => println(s"ERROR: invalid log level ${logLevel} - continue with default")
+      }
+    }
+    	
     // start processing
     run(files, outDir, compileOnly, master, backend, languageFeature, params, backendPath, backendArgs, profiling, showPlan)
   }

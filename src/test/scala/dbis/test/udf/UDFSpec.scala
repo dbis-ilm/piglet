@@ -21,7 +21,7 @@ import dbis.pig.udf._
 import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.OptionValues._
 
-class PigOperatorSpec extends FlatSpec with Matchers {
+class UDFSpec extends FlatSpec with Matchers {
   "The UDF table" should "contain some predefined functions" in {
     val f1: UDF = UDFTable.findUDF("sum", Types.DoubleType).value
     f1.name should be ("SUM")

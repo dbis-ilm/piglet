@@ -17,7 +17,7 @@
 package dbis.pig.plan.rewriting.internals
 import java.net.URI
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.op.{Load, Materialize, Store}
 import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
@@ -27,7 +27,7 @@ import scala.collection.mutable.ListBuffer
 /** Provides methods to deal with Materialization in a [[dbis.pig.plan.DataflowPlan]].
   *
   */
-trait MaterializationSupport extends LazyLogging {
+trait MaterializationSupport extends PigletLogging {
   def processMaterializations(plan: DataflowPlan, mm: MaterializationManager): DataflowPlan = {
     require(plan != null, "Plan must not be null")
     require(mm != null, "Materialization Manager must not be null")

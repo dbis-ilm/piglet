@@ -19,7 +19,7 @@ package dbis.test.spark
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.backends.BackendManager
-import dbis.pig.codegen.{StreamingCodeGen, BatchCodeGen}
+import dbis.pig.codegen.spark.BatchCodeGen
 import dbis.pig.op._
 import dbis.pig.expr._
 import dbis.pig.plan.DataflowPlan
@@ -676,6 +676,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for flattening a tuple in FOREACH" in {
+    Schema.init()
     val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
     val schema = Schema(Array(
       Field("f1", Types.CharArrayType),
@@ -743,7 +744,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperClass = cleanString(
-    """case class _t$2_HelperTuple (_t: _t$1_Tuple = null, _0: Int = 0, _1sum: Int = 0, _1cnt: Int = 0, _2: Int = 0)
+    """case class _t$2_HelperTuple (_t: _t$1_Tuple = null, _0: Long = 0, _1sum: Long = 0, _1cnt: Long = 0, _2: Int = 0)
       |extends java.io.Serializable with SchemaClass { override def mkString(_c: String = ",") = "" }
       |""".stripMargin)
     generatedHelperClass should matchSnippet(expectedHelperClass)
@@ -984,7 +985,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
-        |val C = B.map(t => _t4_Tuple(t._0, PigFuncs.average(t._1.map(e => e._1))))
+        |val C = B.map(t => _t$1_Tuple(t._0, PigFuncs.average(t._1.map(e => e._1))))
       """.stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }

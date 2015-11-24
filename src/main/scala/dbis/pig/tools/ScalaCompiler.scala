@@ -22,7 +22,7 @@ import scala.tools.nsc.io.AbstractFile
 import scala.tools.nsc.reporters.ConsoleReporter
 import scala.tools.nsc.{Global, Settings}
 import java.nio.file.Path
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 trait Probe
 
@@ -31,7 +31,7 @@ trait Probe
  * for compiling source files.
  */
 
-object ScalaCompiler extends LazyLogging {
+object ScalaCompiler extends PigletLogging {
   
   
   def compile (targetDir: Path, sourceFile: Path) : Boolean = compile(targetDir, Seq(sourceFile))

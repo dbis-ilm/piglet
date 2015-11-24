@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.codegen
+package dbis.pig.codegen.spark
 
 import dbis.pig.expr.RefExprExtractor
 import dbis.pig.op._
@@ -28,6 +28,9 @@ import dbis.pig.expr.Expr
 import dbis.pig.expr.Func
 import dbis.pig.expr.NamedField
 import dbis.pig.expr.PositionalField
+import dbis.pig.codegen.CodeGenerator
+import dbis.pig.codegen.ScalaBackendCodeGen
+import dbis.pig.codegen.TemplateException
 
 
 class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
@@ -468,8 +471,8 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
         val fieldStr = s"_t: ${inSchemaClassName} = null, " + op.generator.exprs.zipWithIndex.map{ case (e, i) =>
           if (callsAverageFunc(node, e.expr)) {
             // TODO: determine type
-            val inType = "Int"
-            s"_${i}sum: ${inType} = 0, _${i}cnt: Int = 0"
+            val inType = "Long"
+            s"_${i}sum: ${inType} = 0, _${i}cnt: Long = 0"
           }
           else {
             val resType = e.expr.resultType(op.inputSchema)

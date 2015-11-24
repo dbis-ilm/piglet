@@ -189,8 +189,10 @@ rscript(out,in,script) ::=<<
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
+        val listen = new GracefullyStopListener(ssc)
+        ssc.addStreamingListener(listen)
         ssc.start()             
-        ssc.awaitTermination() 
+        ssc.awaitTermination()
     }
 }
 >>

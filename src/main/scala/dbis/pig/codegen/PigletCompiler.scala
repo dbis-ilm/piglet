@@ -4,7 +4,7 @@ import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.parser.LanguageFeature
 import java.nio.file.Path
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.parser.PigParser
 import dbis.pig.plan.rewriting.Rewriter._
 import scala.io.Source
@@ -21,7 +21,7 @@ import dbis.pig.tools.CppCompiler
 import dbis.pig.tools.CppCompilerConf
 import dbis.pig.tools.Conf
 
-object PigletCompiler extends LazyLogging {
+object PigletCompiler extends PigletLogging {
   
   /**
    * Helper method to parse the given file into a dataflow plan

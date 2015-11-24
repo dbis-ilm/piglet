@@ -203,7 +203,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.IntType))
+        s.field(0).name should equal("group")
+        s.field(0).fType should equal(Types.IntType)
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.IntType),
                                                                       Field("f2", Types.DoubleType),
                                                                       Field("f3", MapType(Types.ByteArrayType))
@@ -222,7 +223,9 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.CharArrayType))
+        s.field(0).name should equal ("group")
+        s.field(0).lineage should be (List("a.f1"))
+        s.field(0).fType should be (Types.CharArrayType)
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.CharArrayType),
           Field("f2", Types.DoubleType),
           Field("f3", MapType(Types.ByteArrayType))
@@ -241,7 +244,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.IntType)))))
+        s.field(0).name should be ("group")
+        s.field(0).fType should be (TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.IntType))))
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.CharArrayType),
           Field("f2", Types.IntType),
           Field("f3", MapType(Types.ByteArrayType))
@@ -260,7 +264,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.CharArrayType))
+        s.field(0).name should be ("group")
+        s.field(0).fType should be (Types.CharArrayType)
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.IntType),
           Field("f2", Types.DoubleType),
           Field("f3", MapType(Types.ByteArrayType))
