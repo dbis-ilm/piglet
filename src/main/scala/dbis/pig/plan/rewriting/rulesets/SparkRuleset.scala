@@ -14,26 +14,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting
+package dbis.pig.plan.rewriting.rulesets
 
-import dbis.pig.plan.rewriting.rulesets.{SparkRuleset, GeneralRuleset, RDFRuleset}
+import dbis.pig.op.{Top, Limit, OrderBy}
+import dbis.pig.plan.rewriting.Rewriter._
 
-
-
-/** This object contains all the rewriting rules that are currently implemented
-  *
-  */
-//noinspection ScalaDocMissingParameterDescription
-object Rules {
-  val rulesets = List(GeneralRuleset, RDFRuleset)
-  def registerAllRules() = {
-    // IMPORTANT: If you change one of the rule registration calls in here, please also change the call in the
-    // corresponding test methods!
-    rulesets foreach { _.registerRules() }
-  }
-
-  def registerBackendRules(backend: String) = backend match {
-    case "spark" => SparkRuleset.registerRules()
-    case _ =>
+object SparkRuleset extends Ruleset {
+  override def registerRules(): Unit = {
+    toMerge(classOf[OrderBy], classOf[Limit]) applyPattern {
+      case (o @ OrderBy(_, in, spec, _), l @ Limit(out, _, num)) => Top(out, in, spec, num)
+    }
   }
 }

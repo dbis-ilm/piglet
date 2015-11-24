@@ -25,6 +25,7 @@ import dbis.pig.parser.PigParser
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
+import dbis.pig.plan.rewriting.Rules
 import dbis.pig.schema.SchemaException
 import dbis.pig.tools.FileTools
 import dbis.pig.plan.MaterializationManager
@@ -266,7 +267,8 @@ object Piglet extends PigletLogging {
 		  
       if (langFeature == LanguageFeature.StreamingPig && backend == "flinks")
         newPlan = processWindows(newPlan)
-        
+
+      Rules.registerBackendRules(backend)
       newPlan = processPlan(newPlan)   
       // find materialization points
       

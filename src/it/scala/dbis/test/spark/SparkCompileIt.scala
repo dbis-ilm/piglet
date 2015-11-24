@@ -54,6 +54,8 @@ class SparkCompileIt extends FlatSpec with CompileIt{
     ("accumulate.pig", "accumulate.out", "truth/accumulate.data", false, "pig", "spark"),
     ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "spark"),
     ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "spark"),
+    ("top.pig", "top.out", "truth/top.data", true, "pig", "spark"),
+    ("top_schema.pig", "top_schema.out", "truth/top.data", true, "pig", "spark"),
     /* Works, but requires a R installation
     ("rscript.pig", "cluster.out", "truth/cluster.data", true)
     */
