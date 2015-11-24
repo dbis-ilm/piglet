@@ -33,11 +33,21 @@ object PigletLogger {
     case DEBUG => UnderlyingLevel.DEBUG
   }
   
+  private[logging] def level(lvl: UnderlyingLevel): LogLevel = lvl match {
+    case UnderlyingLevel.OFF => OFF
+    case UnderlyingLevel.ERROR => ERROR
+    case UnderlyingLevel.WARN => WARN
+    case UnderlyingLevel.INFO => INFO
+    case UnderlyingLevel.DEBUG => DEBUG
+  }
+  
 }
 
-final class PigletLogger private(val underlying: Underlying) {
+final class PigletLogger private(private[this] val underlying: Underlying) {
   
   def setLevel(level: LogLevel): Unit = underlying.setLevel(PigletLogger.underlyingLevel(level))
+  
+  def getLevel: LogLevel = PigletLogger.level(underlying.getLevel)
   
   def error(msg: String): Unit = if(underlying.isErrorEnabled()) underlying.error(msg)
   

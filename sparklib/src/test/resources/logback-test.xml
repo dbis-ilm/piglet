@@ -33,7 +33,7 @@
             <appender-ref ref="STDOUT" />
 	</logger>
 	
-	<logger name="org.apache.hadoop.conf.Configuration" level="ERROR" additivity="false">
+	<logger name="org.apache.hadoop.conf.Configuration" level="OFF" additivity="false">
             <appender-ref ref="STDOUT" />
 	</logger>
 		
