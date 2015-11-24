@@ -35,9 +35,9 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.net.InetSocketAddress
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
-class FlinkRun extends PigletBackend with LazyLogging {
+class FlinkRun extends PigletBackend with PigletLogging {
 
   override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]){
     if (master.startsWith("local") && !master.startsWith("localhost")){  

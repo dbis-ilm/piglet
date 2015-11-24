@@ -35,13 +35,12 @@ import dbis.pig.tools.DBConnection
 import dbis.pig.tools.{DepthFirstTopDownWalker, BreadthFirstTopDownWalker}
 import dbis.pig.mm.{DataflowProfiler, MaterializationPoint}
 import dbis.pig.codegen.PigletCompiler
+import dbis.pig.tools.logging.PigletLogging
 
 import java.io.File
 
 import scopt.OptionParser
 import scala.io.Source
-
-import com.typesafe.scalalogging.LazyLogging
 
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -52,9 +51,7 @@ import scala.collection.mutable.{Map => MutableMap}
 
 import scalikejdbc._
 
-import com.typesafe.scalalogging.Logger
-
-object Piglet extends LazyLogging {
+object Piglet extends PigletLogging {
 
   case class CompilerConfig(master: String = "local",
                             inputs: Seq[File] = Seq.empty,

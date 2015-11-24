@@ -24,7 +24,7 @@ import dbis.pig.schema._
 
 import java.net.URI
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.input.CharSequenceReader
@@ -49,7 +49,7 @@ import dbis.pig.parser.LanguageFeature._
 /**
  * A parser for the (extended) Pig language.
  */
-class PigParser extends JavaTokenParsers with LazyLogging {
+class PigParser extends JavaTokenParsers with PigletLogging {
   override protected val whiteSpace = """(\s|--.*)+""".r
 
   /**

@@ -16,7 +16,7 @@
  */
 package dbis.pig.codegen
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 import dbis.pig.op._
 import dbis.pig.op.cmd._
@@ -43,7 +43,7 @@ import scala.collection.mutable.Set
  *
  * @param template the name of the backend-specific template fle
  */
-abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with LazyLogging {
+abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with PigletLogging {
 
   templateFile = template 
   /*------------------------------------------------------------------------------------------------- */

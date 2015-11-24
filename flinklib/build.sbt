@@ -8,8 +8,7 @@ libraryDependencies ++= Seq(
     jeromq,
     flinkCore % "provided",
     flinkStreaming % "provided",
-    typesafe,
-    scalaLogging
+    typesafe
 )
 
 resolvers += "Sonatype (releases)" at "https://oss.sonatype.org/content/repositories/releases/"
