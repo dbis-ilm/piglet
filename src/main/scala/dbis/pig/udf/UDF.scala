@@ -129,4 +129,15 @@ object UDFTable {
       candidates.find { udf: UDF => typeListCompatibility(udf.paramTypes, paramTypes) }
     }
   }
+
+  /**
+    * Try to find a UDF with the given name and return the first of the list.
+    *
+    * @param name the name of the UDF
+    * @return the UDF object
+    */
+  def findFirstUDF(name: String): Option[UDF] = {
+    val res = funcTable.filter{ udf: UDF => udf.name == name }
+    if (res.isEmpty) None else Some(res.head)
+  }
 }
