@@ -29,6 +29,9 @@ import dbis.pig.backends.{BackendConf, BackendManager}
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.codegen.PigletCompiler
+import dbis.pig.tools.logging.PigletLogging
+import dbis.pig.tools.logging.LogLevel
+import dbis.pig.tools.logging.LogLevel._
 
 import jline.console.ConsoleReader
 
@@ -63,7 +66,8 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
                         language: String = "pig",
                         interactive: Boolean = true,
                         profiling: Boolean = false,
-                        backendArgs: Map[String, String] = Map())
+                        backendArgs: Map[String, String] = Map(),
+                        loglevel: Option[String] = None)
 
 
   val profiling = false
@@ -427,6 +431,8 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     var outDir: Path = null
     var interactive: Boolean = true
     var profiling = false
+    var logLevel: Option[String] = None
+    
     val parser = new OptionParser[REPLConfig]("PigShell") {
       head("PigShell", "0.3")
       opt[Unit]('i', "interactive") hidden() action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
@@ -436,6 +442,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
       opt[Boolean]("profiling") optional() action { (x, c) => c.copy(profiling = x) } text ("Switch on profiling")
       opt[String]('l', "language") optional() action { (x, c) => c.copy(language = x) } text ("Accepted language (pig = default, sparql, streaming)")
+      opt[String]('g', "log-level") optional() action { (x,c) => c.copy(loglevel = Some(x.toUpperCase()))} text ("Set the log level: DEBUG, INFO, WARN, ERROR")
       opt[Map[String, String]]("<backend-arguments>...") optional() action { (x, c) => c.copy(backendArgs = x) } text ("Pig script files to execute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
@@ -455,12 +462,21 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
           case _ => LanguageFeature.PlainPig
         }
         backendArgs = config.backendArgs
+        logLevel = config.loglevel
       }
       case None =>
         // arguments are bad, error message will have been displayed
         return
     }
 
+    if(logLevel.isDefined) {
+      try {
+        logger.setLevel(LogLevel.withName(logLevel.get))
+      } catch {
+        case e: NoSuchElementException => println(s"ERROR: invalid log level ${logLevel} - continue with default")
+      }
+    }
+    
     logger debug s"""Running REPL with backend "$backend" """
 
     backendConf = BackendManager.backend(backend)
