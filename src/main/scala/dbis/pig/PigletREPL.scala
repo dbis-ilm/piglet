@@ -29,9 +29,6 @@ import dbis.pig.backends.{BackendConf, BackendManager}
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.codegen.PigletCompiler
-import dbis.pig.tools.logging.PigletLogging
-import dbis.pig.tools.logging.LogLevel
-import dbis.pig.tools.logging.LogLevel._
 
 import jline.console.ConsoleReader
 
@@ -242,9 +239,8 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     * Prints the usage string.
     */
   def usage: Unit = {
-    consoleReader.println(
-      """
-        |Commands:
+    println(
+      """Commands:
         |<pig latin statement>; - See the PigLatin manual for details: http://hadoop.apache.org/pig
         |Diagnostic commands:
         |    describe <alias> - Show the schema for the alias.
@@ -377,7 +373,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     catch {
       case e: Throwable =>
         Console.err.println(s"error while executing: ${e.getMessage}")
-        e.printStackTrace(Console.err)
+        // e.printStackTrace(Console.err)
         cleanupResult(scriptName)
     }
 
@@ -432,9 +428,8 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     var interactive: Boolean = true
     var profiling = false
     var logLevel: Option[String] = None
-    
-    val parser = new OptionParser[REPLConfig]("PigShell") {
-      head("PigShell", "0.3")
+    val parser = new OptionParser[REPLConfig]("PigREPL") {
+      head("PigletREPL", BuildInfo.version)
       opt[Unit]('i', "interactive") hidden() action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x) } text ("output directory for generated code")
@@ -469,6 +464,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         return
     }
 
+    println(s"Welcome to PigREPL ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
     if(logLevel.isDefined) {
       try {
         logger.setLevel(LogLevel.withName(logLevel.get))

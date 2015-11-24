@@ -1,5 +1,7 @@
 import sbt._
 import Keys._
+import sbtbuildinfo._
+import sbtbuildinfo.BuildInfoKeys._
 
 object PigBuild extends Build {
 
@@ -7,7 +9,7 @@ object PigBuild extends Build {
    * Common Settings **********************************************************
    */
   lazy val commonSettings = Seq(
-    version := "1.0",
+    version := "0.3",
     scalaVersion := "2.11.7",
     organization := "dbis",
     unmanagedJars in Compile += file("lib_unmanaged/jvmr_2.11-2.11.2.1.jar")
@@ -17,6 +19,12 @@ object PigBuild extends Build {
    * Projects *****************************************************************
    */
   lazy val root = (project in file(".")).
+    enablePlugins(BuildInfoPlugin).
+    settings(
+      buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, buildInfoBuildNumber),
+      buildInfoOptions += BuildInfoOption.BuildTime,
+      buildInfoPackage := "dbis.pig"
+    ).
     configs(IntegrationTest).
     settings(commonSettings: _*).
     settings(Defaults.itSettings: _*).
