@@ -17,6 +17,11 @@
 
 package dbis.pig.op
 
+import scala.collection.mutable.Map
+import dbis.pig.expr.Predicate
+import dbis.pig.expr.Ref
+import dbis.pig.expr.Expr
+
 /**
  * Filter represents the FILTER operator of Pig.
  *
@@ -38,6 +43,8 @@ case class Filter(out: Pipe, in: Pipe, pred: Predicate, var windowMode: Boolean 
     s"""FILTER%${pred}%""" + super.lineageString
   }
 
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = pred.resolveReferences(mapping)
+
   override def checkSchemaConformance: Boolean = {
     schema match {
       case Some(s) => {
@@ -51,5 +58,11 @@ case class Filter(out: Pipe, in: Pipe, pred: Predicate, var windowMode: Boolean 
     }
   }
 
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"FILTER { out = ${outPipeName} , in = ${inPipeName} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "expr = " + pred)
+  }
 
 }

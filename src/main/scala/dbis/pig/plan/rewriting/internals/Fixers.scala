@@ -17,11 +17,47 @@
 package dbis.pig.plan.rewriting.internals
 
 import dbis.pig.op.{PigOperator, Pipe}
+import dbis.pig.plan.PipeNameGenerator
 
 /** Provides helper methods for fixing inputs and outputs after rewriting operations.
   *
   */
 trait Fixers {
+  /** Makes ``succ`` a successor of ``pred``.
+    *
+    * @param overwrite If true, disables all safety mechanisms (no IllegalArgumentExceptions will be raised) and
+    *                  clear inputs and outputs before connecting the two operators.
+    */
+  @throws[IllegalArgumentException]("If pred has more than one output pipe")
+  @throws[IllegalArgumentException]("If succ has more than one input pipe")
+  @throws[IllegalArgumentException]("If succ already has an input pipe with a producer that's not pred")
+  def connect(pred: PigOperator, succ: PigOperator, overwrite: Boolean = false): Unit = {
+    if (!overwrite) {
+      require(pred.outputs.length <= 1, "The new predecessor more than one output pipe")
+      require(succ.inputs.length < 2 || succ.inputs.exists(_.name == pred.outPipeName),
+        "The new successor has more then one input pipe and none matches the new predecessors output name")
+      require(succ.inputs.isEmpty || succ.inputs.head.producer == null || succ.inputs.head.producer == pred,
+        "The new successors input pipe already has a producer that is not the same as pred")
+      require(succ.inputs.isEmpty || pred.outputs.find(_.name == succ.inPipeName).isDefined,
+        pred + " writes " + pred.outPipeName + ", but " + succ + " reads " + succ.inPipeName)
+    } else {
+      pred.outputs = List.empty
+      pred.inputs = List.empty
+    }
+
+    if (pred.outputs.isEmpty) {
+      pred.outputs = List(Pipe(PipeNameGenerator.generate()))
+    }
+
+    // If there is an input pipe matching `pred`s output name, use it, otherwise build a new one
+    val inPipe = succ.inputs.find {_.name == pred.outputs.head.name}.orElse(Some(Pipe(pred.outputs.head.name, pred))).get
+    inPipe.producer = pred
+    inPipe.consumer = List(succ)
+    succ.inputs = List(inPipe)
+
+    pred.outputs.head.consumer = pred.outputs.head.consumer :+ succ
+  }
+
   /** Fix the inputs and outputs attributes of PigOperators after an operation merged two of them into one.
     *
     * @param oldParent The old parent operator.
@@ -32,17 +68,12 @@ trait Fixers {
     * @tparam T3 The type of the new operator.
     * @return
     */
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
+  def fixMerge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                   newParent: T3): T3 = {
     newParent.inputs = oldParent.inputs
     newParent.outputs = oldChild.outputs
 
-    // Each Operator that has oldChild in its inputs list as a producer needs to have it replaced with newParent
-    oldChild.outputs foreach { output =>
-      output.consumer foreach { op =>
-        op.inputs = op.inputs.filter(_.producer != oldChild) :+ Pipe(newParent.outPipeName, newParent, List(op))
-      }
-    }
+    replaceOpInSuccessorsInputs(oldChild, newParent)
 
     // Replacing oldParent with newParent in the outputs attribute of oldParents inputs producers is done by kiamas
     // Rewritable trait
@@ -59,7 +90,7 @@ trait Fixers {
     * @tparam T2 The type of the old child and new parent operators.
     * @return
     */
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
+  def fixReordering[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                newChild: T): T2 = {
     // If oldParent == newChild (for example when this is called from `swap`, we need to save oldParent.outPipename
     // because it depends on oldParent.outputs
@@ -94,6 +125,8 @@ trait Fixers {
     */
   def pullOpAcrossMultipleInputOp(toBePulled: PigOperator, multipleInputOp: PigOperator, indicator: PigOperator):
   PigOperator = {
+    require(multipleInputOp.inputs.map(_.producer) contains indicator, "indicator is not a predecessor of " +
+      "multipleInputOp")
     require(multipleInputOp.outputs.flatMap(_.consumer) contains toBePulled, "toBePulled is not a consumer of " +
       "multipleInputOp")
     // First, make the toBePulled a consumer of the correct input
@@ -143,5 +176,79 @@ trait Fixers {
     toBePulled.constructSchema
 
     toBePulled
+  }
+
+  /** Changes inputs and outputs such that `newParent` is the new consumer of `old`s inputs outputs and newChild the
+    * producer of `old`s outputs inputs.
+    *
+    * `newChild` does not have do be a direct successor of `newParent`.
+    *
+    * @param old
+    * @param newParent
+    * @param newChild
+    * @tparam T
+    * @tparam T2
+    * @tparam T3
+    * @return
+    */
+  def fixReplacementwithMultipleOperators[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator]
+  (old: T, newParent: T2, newChild: T3): T2 = {
+    newParent.inputs = old.inputs
+    newChild.outputs = old.outputs
+
+    // Remove `old` as a consumer of its inputs
+    old.inputs.foreach { in =>
+     in.removeConsumer(old)
+    }
+
+    replaceOpInSuccessorsInputs(old, newChild)
+
+    newParent
+  }
+
+  /** Replaces ``oldOp`` in its outputs inputs as a producer with ``newOp``.
+    *
+    * @param oldOp
+    * @param newOp
+    */
+  def replaceOpInSuccessorsInputs(oldOp: PigOperator, newOp: PigOperator) = {
+    oldOp.outputs foreach { output =>
+      output.consumer foreach { consumer =>
+        consumer.inputs foreach { input =>
+          // If `op` (the old term) is the producer of any of the input pipes of `newChild` (the new terms)
+          // successors, replace it with `newChild` in that attribute. Replacing `op` with `other_filter` in
+          // the pipes on `newChild` itself is not necessary because the setters of `inputs` and `outputs` do
+          // that.
+          if (input.producer == oldOp) {
+            input.producer = newOp
+          }
+        }
+      }
+    }
+  }
+
+  /** Changes inputs and outputs after ``old`` has been replaced by ``new_``.
+    *
+    * @param old
+    * @param new_
+    * @tparam T
+    * @return ``new_``
+    */
+  def fixReplacement[T <: PigOperator](old: PigOperator) (new_ : T): T = {
+    new_.inputs = old.inputs
+    new_.outputs = old.outputs
+    new_.outputs foreach { output =>
+      output.consumer foreach { consumer =>
+        consumer.inputs foreach { input =>
+          // If `t` (the old term) is the producer of any of the input pipes of `op` (the new terms) successors,
+          // replace it with `op` in that attribute. Replacing `t` with `op` in the pipes on `op` itself is not
+          // necessary because the setters of `inputs` and `outputs` do that.
+          if (input.producer == old) {
+            input.producer = new_
+          }
+        }
+      }
+    }
+    new_
   }
 }

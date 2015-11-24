@@ -31,10 +31,10 @@ trait DFPSupport {
 
   def buildRemovalStrategy(rem: PigOperator): Strategy
 
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
+  def fixMerge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                           newParent: T3): T3
 
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
+  def fixReordering[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                newChild: T): T2
 
   def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
@@ -170,7 +170,7 @@ trait DFPSupport {
   def swap(plan: DataflowPlan, op1: PigOperator, op2: PigOperator): DataflowPlan = {
     val strategy = (parent: PigOperator, child: PigOperator) => {
       if (parent == op1 && child == op2) {
-        val np = fixInputsAndOutputs(parent, child, child, parent)
+        val np = fixReordering(parent, child, child, parent)
         Some(np)
       }
       else {

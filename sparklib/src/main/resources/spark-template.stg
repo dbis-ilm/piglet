@@ -4,13 +4,18 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd._
+import dbis.pig.backends.{SchemaClass, Record}
 import dbis.pig.backends.spark._
 
-<if (includes)>
-<includes>
-<endif>
-
 <\n>
+>>
+
+// ----------------- schema class -----------------
+schema_class(name, fields, string_rep) ::= <<
+case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+override def mkString(_c: String = ",") = <string_rep>
+}
+
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
@@ -21,35 +26,37 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
-        val perfMon = new PerfMonitor("<name>_App")
-        sc.addSparkListener(perfMon)
+        <if (profiling)>
+    	val perfMon = new PerfMonitor("<name>_App")
+    	sc.addSparkListener(perfMon)
+    	<endif>
         
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,func,schema,params) ::=<<
-        val <out> = <func>().load(sc, "<file>"<params>)
+loader(out, file, class, func, extractor, params) ::= <<
+        val <out> = <func>[<class>]().load(sc, "<file>", <extractor><if (params)>, <params><endif>)
 >>
 
 // ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
-        <in>.collect.map(t => println(t.mkString(",")))
+        <in>.collect.map(t => println(t.mkString()))
+>>
+
+// ------------------ DISPLAY results in Zeppelin -----------------------------
+display(in, tableHeader) ::=<<
+        println("%table <tableHeader>\n" + <in>.collect.map(t => t.mkString("\t")).mkString("\n") + "\n\n")
 >>
 
 // ------------------ STORE Results on disk -----------------------------------
 
-store(in,file,schema,func) ::=<<
-	<if (schema)>
-    	val <in>_storehelper = <in>.map(t => <schema>) //.coalesce(1, true)
-	<else>
-		val <in>_storehelper = <in>
-	<endif>
-	
-    <func>().write("<file>", <in>_storehelper)
+store(in, file, class, func, params) ::= <<
+    val <in>_helper = <in>.coalesce(1, true)
+    <func>[<class>]().write("<file>", <in>_helper<if (params)>, <params><endif>)
 >>
 
 // ------------------ FILTER for a predicate ----------------------------------
@@ -58,43 +65,53 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element -----------
-foreach(out,in,expr) ::=<<
+foreach(out, in, expr, class) ::=<<
+        val <out> = <in>.map(t => <class>(<expr>))
+>>
+
+// ------------------ Executes an expression FOREACH input element where the expression is a nested plan -----------
+foreachNested(out, in, expr) ::=<<
         val <out> = <in>.map(t => <expr>)
 >>
 
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
-foreachFlatMap(out,in,expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
+// Note, that the closing parenthesis is intentionally missing
+foreachFlatMap(out, in, expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------
-groupBy(out,in,expr,keyExtr) ::=<<
+groupBy(out, in, expr, class, keyExtr) ::=<<
 <if (expr)>
-        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => List(<keyExtr>,v)}
+        val <out> = <in>.groupBy(t => {<expr>}).map{case (k,v) => <class>(<keyExtr>,v)}
 <else>
-        val <out> = <in>.coalesce(1).glom.map(t => List("all", t.toList))
+        val <out> = <in>.coalesce(1).glom.map(t => <class>("all", t))
 <endif>
 >>
 
 // ------------------ Outputs only distinct values ----------------------------
-distinct(out,in) ::=<<
+distinct(out, in) ::=<<
         val <out> = <in>.distinct
 >>
 
 // ------------------ Outputs only num records --------------------------------
-limit(out,in,num) ::=<<
+limit(out, in, num) ::=<<
         val <out> = sc.parallelize(<in>.take(<num>))
 >>
 
 // ------------------ Joins two streams on the specified keys -----------------
-join_key_map(rels,keys) ::=<<
+join_key_map(rels, keys) ::=<<
         <rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
         }>
 >>
 
-join(out,rel1,key1,rel2,key2) ::=<<
-        val <out> = <rel1>_kv<rel2:{ rel |.join(<rel>_kv).map{case (k,(v,w)) => (k, v ++ w)\}}>.map{case (k,v) => v}
+join(out, class, rel1, rel2, fields) ::=<<
+        val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)\}
+>>
 
+
+m_join(out, class, rel1, rel2, pairs, fields) ::=<<
+        val <out> = <rel1>_kv<rel2: {rel | .join(<rel>_kv)}>.map{case (k,<pairs>) => <class>(<fields>)\}
 >>
 
 // ------------------ UNIONs multiple streams to one --------------------------
@@ -108,7 +125,7 @@ sample(out,in,expr) ::=<<
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------
-orderBy(out,in,key,asc) ::=<<
+orderBy(out, in, key, asc) ::=<<
         val <out> = <in>.keyBy(t => <key>).sortByKey(<asc>).map{case (k,v) => v}
 >>
 
@@ -119,13 +136,9 @@ orderHelper(params) ::=<<
 >>
 
 // ------------------ STREAM operators ----------------------------------------
-streamOp(out,in,op,params) ::=<<
-        val <out> = <op>(sc, <in><params>)
->>
-
-// ------------------ DELAY operator ----------------------------------------
-delay(out,in,op,size,wait) ::=<<
-        val <out> = <in>.map(t => {Thread.sleep(<wait>); t}).sample(true, <size>)
+streamOp(out, in, op, params, class, in_fields, out_fields) ::=<<
+        val <in>_helper = <in>.map(t => List(<in_fields>))
+        val <out> = <op>(sc, <in>_helper<params>).map(t => <class>(<out_fields>))
 >>
 
 // ----------------------- FS commands ----------------------------------------
@@ -134,18 +147,31 @@ fs(cmd,params) ::=<<
 >>
 
 // ------------------ RSCRIPT operators ----------------------------------------
-rscript(out,in,script) ::=<<
+rscript(out, in, script) ::=<<
         val <out> = RScriptOp.process(sc, <in>, <script>, "res")
 >>
 stageIdentifier(line, lineage) ::=<<
 	perfMon.register(<line>, "<lineage>")
 >>	
 
+// ------------------- ACCUMULATE operator ------------------------------------
+accumulate_aggr(out, helper_class, seq_expr, comp_expr) ::=<<
+        def aggr_<out>_seq(acc: <helper_class>, v: <helper_class>): <helper_class> =
+                <helper_class>(v._t, <seq_expr>)
+        def aggr_<out>_comp(acc: <helper_class>, v: <helper_class>): <helper_class> =
+                <helper_class>(v._t, <comp_expr>)
+>>
+
+accumulate(out, in, helper_class, class, init_expr, aggr_expr) ::=<<
+        val <out>_fold = <in>.map(t => <helper_class>(t, <init_expr>))
+                                        .aggregate(<helper_class>())(aggr_<out>_seq, aggr_<out>_comp)
+        val <out> = sc.parallelize(Array(<class>(<aggr_expr>)))
+>>
+
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
-    		
-        sc.stop()
     
+        sc.stop()
     }
 }
 >>

@@ -27,6 +27,7 @@ lodhub_data
 *.class
 *.log
 
+__my_script/
 
 #####
 # ignore database
@@ -37,6 +38,7 @@ db
 .cache-*
 .history
 .lib/
+.scalastyle
 dist/*
 target/
 lib_managed/

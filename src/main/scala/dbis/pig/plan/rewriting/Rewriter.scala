@@ -16,15 +16,18 @@
  */
 package dbis.pig.plan.rewriting
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.op.{PigOperator, _}
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rules.registerAllRules
+import dbis.pig.plan.rewriting.dsl.RewriterDSL
 import dbis.pig.plan.rewriting.internals._
 import org.kiama.rewriting.Rewriter._
+import org.kiama.rewriting.Rewriter.{rewrite => kiamarewrite}
 import org.kiama.rewriting.Strategy
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 case class RewriterException(msg: String) extends Exception(msg)
 
@@ -65,6 +68,10 @@ case class RewriterException(msg: String) extends Exception(msg)
   *
   * - [[reorder]] for reordering two operators
   *
+  * ==DSL==
+  *
+  * A DSL for easily adding rewriting operations is provided as well, its documented in [[dbis.pig.plan.rewriting.dsl]].
+  *
   * ==DataflowPlan helper methods==
   *
   * Some operations provided by [[DataflowPlan]] objects are not implemented there, but on this object. These include
@@ -81,21 +88,27 @@ case class RewriterException(msg: String) extends Exception(msg)
   *
   * After a rewriting operation, the `inputs` and `outputs` attribute of operators other than the rewritten ones
   * might be changed (for example to accommodate new or deleted operators). To help maintaining these relationships,
-  * the methods [[fixInputsAndOutputs]] and [[pullOpAcrossMultipleInputOp]] in several versions is provided. Their
-  * documentation include hints in which cases they apply.
+  * the methods [[fixMerge]], [[fixReordering]] and [[pullOpAcrossMultipleInputOp]] in several versions is provided.
+  * Their documentation include hints in which cases they apply.
   *
   * @todo Not all links in this documentation link to the correct methods, most notably links to overloaded ones.
   *
   */
-object Rewriter extends LazyLogging
+object Rewriter extends PigletLogging
                 with StrategyBuilders
                 with DFPSupport
                 with WindowSupport
                 with EmbedSupport
                 with MaterializationSupport
                 with Fixers
-                with FastStrategyAdder {
+                with FastStrategyAdder
+                with RewriterDSL {
   private var ourStrategy = fail
+
+  /** Resets [[ourStrategy]] to [[fail]].
+    *
+    */
+  private def resetStrategy = ourStrategy = fail
 
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
     *
@@ -116,19 +129,6 @@ object Rewriter extends LazyLogging
   //noinspection ScalaDocMissingParameterDescription
   def addStrategy(f: Any => Option[PigOperator]): Unit = addStrategy(strategyf(t => f(t)))
 
-  /** Adds a function `f` that replaces a single [[PigOperator]] with another one as a [[org.kiama.rewriting.Strategy]]
-    * to this object.
-    *
-    * If applying `f` to a term succeeded (Some(_)) was returned, the input term will be replaced by the new term in
-    * the input pipes of the new terms successors (the consumers of its output pipes).
-    *
-    * @param f
-    */
-  //noinspection ScalaDocMissingParameterDescription
-  def addOperatorReplacementStrategy(f: Any => Option[PigOperator]): Unit = {
-    addStrategy(buildOperatorReplacementStrategy(f))
-  }
-
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
     * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
     *
@@ -147,7 +147,7 @@ object Rewriter extends LazyLogging
     */
   private def processPigOperator(sink: PigOperator, strategy: Strategy): Any = {
     val rewriter = downup(attempt(strategy))
-    rewrite(rewriter)(sink)
+    kiamarewrite(rewriter)(sink)
   }
 
   /** Apply all rewriting rules of this Rewriter to a [[dbis.pig.plan.DataflowPlan]].

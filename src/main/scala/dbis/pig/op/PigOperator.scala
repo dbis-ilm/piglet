@@ -17,18 +17,20 @@
 package dbis.pig.op
 
 import java.security.MessageDigest
-
 import dbis.pig.plan.InvalidPlanException
 import dbis.pig.schema._
 import org.kiama.rewriting.Rewritable
 import scala.collection.immutable.Seq
+import scala.collection.mutable.Map
+import dbis.pig.expr.NamedField
+import dbis.pig.expr.Ref
 
 /**
  * PigOperator is the base trait for all Pig operators. An operator contains
  * pipes representing the input and output connections to other operators in the
  * dataflow.
  */
-trait PigOperator extends Rewritable {
+trait PigOperator extends Rewritable with Serializable {
   protected var _outputs: List[Pipe] = _
   protected var _inputs: List[Pipe] = _
 
@@ -97,10 +99,54 @@ trait PigOperator extends Rewritable {
 
   def inPipeNames: List[String] = inputs.map(p => p.name)
 
+  /**
+   * Checks whether the pipe names are valid identifiers. If not an exception is raised.
+   */
+  def checkPipeNames: Unit = {
+    def validPipeName(s: String) = if (!s.matches("""[a-zA-Z_]\w*""")) throw InvalidPipeNameException(s)
+
+    outputs.foreach(p => validPipeName(p.name))
+    inputs.foreach(p => validPipeName(p.name))
+  }
 
   def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 
   def preparePlan: Unit = {}
+
+  /**
+   * Try to replace all pipes/references with a leading $ via the mapping table.
+   *
+   * @param mapping a map from identifiers to values
+   */
+  def resolveParameters(mapping: Map[String, Ref]): Unit = {
+    def rename(p: Pipe): Unit = {
+      if (p.name.startsWith("$") && mapping.contains(p.name)) {
+        val s2 = mapping(p.name) match {
+          case NamedField(n, _) => n
+          case _ => p.name
+        }
+        p.name = s2
+      }
+    }
+
+    /*
+     * We resolve only the pipe names here.
+     */
+    outputs.foreach(p => rename(p))
+    inputs.foreach(p => rename(p))
+
+    /*
+     * This method has to be overriden by the subclasses.
+     */
+    resolveReferences(mapping)
+  }
+
+  /**
+   * Try to replace all references in expressions with a leading $ via the mapping table.
+   *
+   * @param mapping a map from identifiers to values
+   */
+  def resolveReferences(mapping: Map[String, Ref]): Unit = {}
 
   def checkConnectivity: Boolean = true
 
@@ -128,7 +174,7 @@ trait PigOperator extends Rewritable {
       schema = inputs.head.producer.schema
       // the bag should be named with the output pipe
       schema match {
-        case Some(s) => s.setBagName(outPipeName)
+        case Some(s) => if (! outPipeName.isEmpty) s.setBagName(outPipeName)
         case None =>
       }
     }
@@ -225,7 +271,7 @@ trait PigOperator extends Rewritable {
       case op: PigOperator =>
         val idx = this.outputs.indexWhere(_.name == outname)
         if (idx > -1) {
-          // There already is a Pipe to `outname`
+          // There is already  a pipe to `outname`
           this.outputs(idx).consumer = this.outputs(idx).consumer :+ op
         } else {
           this.outputs = this.outputs :+ Pipe(outname, this, List(op))
@@ -233,8 +279,28 @@ trait PigOperator extends Rewritable {
       // Some rewriting rules turn one operator into multiple ones, for example Split Into into multiple Filter
       // operators
       case ops: Seq[_] => this.reconstruct(ops, outname)
+      case (op : PigOperator, _) => this.reconstruct(List(op), outname)
       case _ => illegalArgs("PigOperator", "PigOperator", outputs)
     }
     this
+  }
+
+  /**
+    * Returns a string of whitespaces for indenting a line by the given number.
+    *
+    * @param tab number of tabs to indent
+    * @return a string with whitespaces
+    */
+  def indent(tab: Int): String = new String((for (i <-1 to tab) yield ' ').toArray)
+
+  /**
+    * Prints a description of the operator to standard output but indent it by the given
+    * number of characters.
+    * Note this method is used to pretty print a execution plan.
+    *
+    * @param tab the number of characters for indenting the output
+    */
+  def printOperator(tab: Int): Unit = {
+    println(indent(tab) + this.toString + s" { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
   }
 }

@@ -24,7 +24,7 @@ class PigRun extends PigletBackend with BackendConf {
     val stats = PigRunner.run(args, null)
     
   }
-  
+
   /**
    * Get the name of this backend
    * 

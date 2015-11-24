@@ -2,13 +2,11 @@ import Dependencies._
 
 name := "piglet-interpreter"
 
+
 libraryDependencies ++= Seq(
-/*
-    scalaCompiler,
-    scalaTest % "test" withSources(),
     sparkCore % "provided",
     sparkSql % "provided",
-*/
+    "org.apache.spark" %% "spark-repl" % "1.5.0",
     "org.apache.zeppelin" % "zeppelin-interpreter" % "0.5.0-incubating"
 )
 

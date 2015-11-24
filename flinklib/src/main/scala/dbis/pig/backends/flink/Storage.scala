@@ -17,23 +17,32 @@
 
 package dbis.pig.backends.flink
 
+import dbis.pig.backends._
+import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala._
+import org.apache.flink.core.fs.FileSystem.WriteMode._
 
-class PigStorage extends java.io.Serializable {
-  def load(env: ExecutionEnvironment, path: String, delim: Char = ' '): DataSet[List[String]] = {
-    env.readTextFile(path).map(line => line.split(delim).toList)
+import scala.reflect.ClassTag
+
+
+//-----------------------------------------------------------------------------------------------------
+
+class PigStorage[T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Serializable {
+  def load(env: ExecutionEnvironment, path: String,  extract: (Array[String]) => T, delim: String = "\t"): DataSet[T] = {
+    env.readTextFile(path).map(line => extract(line.split(delim, -1)))
   }
 
-  def write(path: String, result: DataSet[String]) = result.writeAsText(path)
+  def write(path: String, result: DataSet[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path).setParallelism(1)
 }
 
 object PigStorage {
-  def apply(): PigStorage = {
-    new PigStorage
+  def apply[T <: SchemaClass :ClassTag: TypeInformation](): PigStorage[T] = {
+    new PigStorage[T]
   }
 }
 
-class RDFFileStorage extends java.io.Serializable {
+
+class RDFFileStorage[T:ClassTag: TypeInformation] extends java.io.Serializable {
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
   def rdfize(line: String): Array[String] = {
@@ -41,13 +50,12 @@ class RDFFileStorage extends java.io.Serializable {
     fields.toArray.slice(0, 3)
   }
 
-  def load(env: ExecutionEnvironment, path: String): DataSet[Array[String]] = {
-    env.readTextFile(path).map(line => rdfize(line))
-  }
+  def load(env: ExecutionEnvironment, path: String, extract: (Array[String]) => T): DataSet[T] =
+    env.readTextFile(path).map(line => extract(rdfize(line)))
 }
 
 object RDFFileStorage {
-  def apply(): RDFFileStorage = {
-    new RDFFileStorage
+  def apply[T:ClassTag: TypeInformation](): RDFFileStorage[T] = {
+    new RDFFileStorage[T]
   }
 }

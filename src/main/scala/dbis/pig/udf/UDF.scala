@@ -18,12 +18,14 @@ package dbis.pig.udf
 
 import dbis.pig.schema._
 
+import scala.collection.mutable.ListBuffer
+
 case class UDF(name: String, scalaName: String, paramTypes: List[PigType], resultType: PigType, isAggregate: Boolean) {
   def numParams = paramTypes.size
 }
 
 object UDFTable {
-  lazy val funcTable: List[UDF] = List(
+  lazy val funcTable = ListBuffer[UDF](
     UDF("COUNT", "PigFuncs.count", List(Types.AnyType), Types.LongType, true),
     UDF("AVG", "PigFuncs.average", List(Types.IntType), Types.DoubleType, true),
     UDF("AVG", "PigFuncs.average", List(Types.LongType), Types.DoubleType, true),
@@ -45,8 +47,14 @@ object UDFTable {
     UDF("TOMAP", "PigFuncs.toMap", List(Types.AnyType), MapType(Types.ByteArrayType), false),
     UDF("STARTSWITH","PigFuncs.startswith", List(Types.CharArrayType, Types.CharArrayType), Types.BooleanType, false),
     UDF("STRLEN", "PigFuncs.strlen", List(Types.CharArrayType), Types.IntType,false),
-    UDF("TODOUBLE", "PigFuncs.toDouble", List(Types.CharArrayType), Types.DoubleType, false)
+    UDF("TODOUBLE", "PigFuncs.toDouble", List(Types.CharArrayType), Types.DoubleType, false),
+    UDF("SQRT", "math.sqrt", List(Types.DoubleType), Types.DoubleType, false),
+    UDF("POW", "math.pow", List(Types.DoubleType, Types.DoubleType), Types.DoubleType, false)
   )
+
+  def addUDF(func: UDF): Unit = {
+    funcTable += func
+  }
 
   /**
    * Checks whether two parameter types are the same.
@@ -120,5 +128,16 @@ object UDFTable {
       // otherwise we check for a udf with type compatible parameter
       candidates.find { udf: UDF => typeListCompatibility(udf.paramTypes, paramTypes) }
     }
+  }
+
+  /**
+    * Try to find a UDF with the given name and return the first of the list.
+    *
+    * @param name the name of the UDF
+    * @return the UDF object
+    */
+  def findFirstUDF(name: String): Option[UDF] = {
+    val res = funcTable.filter{ udf: UDF => udf.name == name }
+    if (res.isEmpty) None else Some(res.head)
   }
 }

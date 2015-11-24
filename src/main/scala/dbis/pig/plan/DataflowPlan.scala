@@ -17,10 +17,15 @@
 package dbis.pig.plan
 
 import dbis.pig.op._
-import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.schema.SchemaException
+import dbis.pig.op.cmd._
+import dbis.pig.expr._
 
+import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.schema.{Types, PigType, Schema, SchemaException}
+import dbis.pig.udf.{UDFTable, UDF}
 import scala.collection.mutable.{ListBuffer, Map}
+
+
 
 /**
  * An exception indicating that the dataflow plan is invalid.
@@ -29,7 +34,23 @@ import scala.collection.mutable.{ListBuffer, Map}
  */
 case class InvalidPlanException(msg: String) extends Exception(msg)
 
-class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) {
+/**
+ * A DataflowPlan is a graph of operators representing a Piglet script and provides methods
+ * to construct the graph from a list of PigOperators with their pipes as well as to check and manipulate
+ * the graph.
+ *
+ * @param _operators a list of operators used to construct the plan
+ * @param ctx an optional list of pipes representing the context, i.e. the
+ *            pipes of a nesting operator (e.g. FOREACH).
+ */
+class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable {
+  def operators_=(ops: List[PigOperator]) = {
+    ops map { _.outPipeNames map { PipeNameGenerator.addKnownName(_)}}
+    _operators = ops
+  }
+
+  def operators = _operators
+
   /**
    * A list of JAR files specified by the REGISTER statement
    */
@@ -38,7 +59,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
   /**
    * A map for UDF aliases + constructor arguments.
    */
-  val udfAliases = Map[String,(String,  List[dbis.pig.op.Value])]()
+  val udfAliases = Map[String,(String, List[Any])]()
 
   var code: String = ""
   var extraRuleCode: Seq[String] = List.empty
@@ -57,27 +78,59 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
 
     // This maps a String (the relation name, a string) to the pipe that writes it and the list of
     // operators that read it.
-    val pipes: Map[String, Pipe] = Map[String, Pipe]()
+    var pipes = Map[String, Pipe]()
+
+    // This maps macro names to their definitions
+    val macros = Map[String, DefineMacroCmd]()
 
     /*
-     * 0. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
+     * 1. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
      *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
      */
-    ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += unquote(op.asInstanceOf[RegisterCmd].jarFile))
+    ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += op.asInstanceOf[RegisterCmd].jarFile)
     ops.filter(_.isInstanceOf[DefineCmd]).foreach { op =>
       val defineOp = op.asInstanceOf[DefineCmd]
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
     }
     ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => {
-      code += op.asInstanceOf[EmbedCmd].code
       val castedOp = op.asInstanceOf[EmbedCmd]
+      code += castedOp.code
+      castedOp.extractUDFs
       castedOp.ruleCode.foreach { c: String => extraRuleCode = extraRuleCode :+ c}
     })
 
-    val allOps = ops.filterNot(_.isInstanceOf[RegisterCmd]).filterNot(_.isInstanceOf[DefineCmd]).filterNot(_.isInstanceOf[EmbedCmd])
-    val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])
     /*
-     * 1. We create a Map from names to the pipes that *write* them.
+     * 2. We collect all macro definitions
+     */
+    ops.filter(_.isInstanceOf[DefineMacroCmd]).foreach(op => {
+      val macroOp = op.asInstanceOf[DefineMacroCmd]
+      macroOp.preparePlan
+      macros += (macroOp.macroName -> macroOp)
+    })
+
+    /*
+     * 3. We assign to each MacroOp the corresponding definition. Note, that the actual replacement
+     * is done later in the rewriting phase
+     */
+    ops.filter(_.isInstanceOf[MacroOp]).foreach(op => {
+      val macroOp = op.asInstanceOf[MacroOp]
+      if (macros.contains(macroOp.macroName))
+        macroOp.setMacroDefinition(macros(macroOp.macroName))
+    })
+
+    /*
+     * 4. ... and finally, filter out all commands not representing a dataflow operator
+     */
+    val allOps = ops.filterNot(o =>
+      o.isInstanceOf[RegisterCmd] ||
+      o.isInstanceOf[DefineCmd] ||
+      o.isInstanceOf[EmbedCmd] ||
+      o.isInstanceOf[DefineMacroCmd]
+    )
+    val planOps = processSetCmds(allOps).filterNot(_.isInstanceOf[SetCmd])
+
+    /*
+     * 5. We create a Map from names to the pipes that *write* them.
      */
     planOps.foreach(op => {
       // we can have multiple outputs (e.g. in SplitInto)
@@ -94,7 +147,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     })
 
     /*
-     * 2. We add operators that *read* from a pipe to this pipe
+     * 6. We add operators that *read* from a pipe to this pipe
      */
     // TODO: replace by PigOperator.addConsumer
     var varCnt = 1
@@ -102,14 +155,25 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     planOps.foreach(op => {
         for (p <- op.inputs) {
           if (! pipes.contains(p.name)) {
+            /*
+             * If we cannot find the pipe we look in the context: perhaps we can get it from the outer
+             * scope of a nested statement
+             */
             val outerPipe = resolvePipeFromContext(p.name)
             outerPipe match {
               case Some(oPipe) => {
-                val cbOp = ConstructBag(Pipe(s"${p.name}_${varCnt}"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
-                newOps += ((cbOp, op))
-                varCnt += 1
+                if (oPipe.name != p.name) {
+                  /*
+                   * The outer pipe name is different from the input pipe. Thus, we have to insert
+                   * a ConstructBag operator before the current operator. For this purpose, we collect
+                   * pairs of (ConstructBag, operator) which we later insert.
+                   */
+                  val cbOp = ConstructBag(Pipe(s"${p.name}_${varCnt}"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
+                  newOps += ((cbOp, op))
+                  varCnt += 1
+                }
               }
-              case None => throw new InvalidPlanException("invalid pipe: " + p.name)
+              case None => throw new InvalidPlanException("invalid pipe: " + p.name + " for " + op)
             }
           }
           else {
@@ -124,18 +188,22 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     })
 
     /*
-     * 3. If new operators were constructed we have to insert them now.
+     * 7. If new operators were constructed we have to insert them now.
      */
-    val resolvedPlanOps = insertOperators(planOps, newOps.toList, pipes)
+    val (newOpList, newPipes) = insertOperators(planOps, newOps.toList, pipes)
+    pipes = newPipes
 
     /*
-     * 4. Because we have completed only the pipes from the operator outputs
+     * 8. Because we have completed only the pipes from the operator outputs
      *    we have to replace the inputs list of each operator
      */
     try {
-      resolvedPlanOps.foreach(op => {
-        val newPipes = op.inputs.map(p => pipes(p.name))
-        op.inputs = newPipes
+      newOpList.foreach(op => {
+        // we ignore $name here because this appears only inside a macro
+        if (op.inputs.filter(p => p.name.startsWith("$")).isEmpty) {
+          val newPipes = op.inputs.map(p => pipes(p.name))
+          op.inputs = newPipes
+        }
         op.preparePlan
         op.constructSchema
       })
@@ -143,17 +211,22 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     catch {
       case e: java.util.NoSuchElementException => throw new InvalidPlanException("invalid pipe: " + e.getMessage)
     }
-    operators = resolvedPlanOps.toList
+    operators = newOpList.toList
   }
 
   /**
+   * Insert an operator from the newOps list into the list opList. The position of the new operator
+   * is specified by the newOps pair (newOp, currOp), i.e. newOp is inserted before currOp and the pipes
+   * are updated accordingly.
    *
-   * @param opList
-   * @param newOps
-   * @param pipes
-   * @return
+   * @param opList the current list of operators
+   * @param newOps a list of pairs (newOp, currOp) determining the operators to be inserted as well as
+   *               their position
+   * @param pipes the map of pipes
+   * @return the updated operator list + the updated pipe map
    */
-  def insertOperators(opList: List[PigOperator], newOps: List[(PigOperator, PigOperator)], pipes: Map[String, Pipe]): List[PigOperator] = {
+  def insertOperators(opList: List[PigOperator], newOps: List[(PigOperator, PigOperator)],
+                      pipes: Map[String, Pipe]): (List[PigOperator], Map[String, Pipe]) = {
 
     /*
      * Replace the name of the pipe with the oName by the name of the pipe.
@@ -187,10 +260,10 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
         val pos = newOpList.indexOf(consumer)
         newOpList.insert(pos, op)
       })
-      newOpList.toList
+      (newOpList.toList, pipes)
     }
     else
-      opList
+      (opList, pipes)
   }
 
   /**
@@ -207,7 +280,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
       for (pipe <- ctx.get) {
         pipe.inputSchema match {
           case Some(schema) => if (schema.indexOfField(pName) != -1) res = Some(pipe)
-          case None => None
+          case None => res = Some(pipe) // None
         }
       }
       res
@@ -313,9 +386,22 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
    */
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
 
-  def containsOperator(op: PigOperator): Boolean = operators.contains(op)
-  
   /**
+   * Checks whether the plan contains the given operator.
+   *
+   * @param op the operator we are looking for
+   * @return true if the operator exists
+   */
+  def containsOperator(op: PigOperator): Boolean = operators.contains(op)
+
+  /**
+   * Prints a textual representation of the plan to standard output.
+   *
+   * @param tab the number of whitespaces for indention
+   */
+  def printPlan(tab: Int = 0): Unit = operators.foreach(_.printOperator(tab))
+
+   /**
    * Swaps two successive operators in the dataflow plan. Both operators are unary operators and have to be already
    * part of the plan.
    *
@@ -381,8 +467,10 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
     
     op2.inputs = op2.inputs.filter { op => op.producer != op1 }
     op1.outputs = op1.outputs.filter { op => op != op2 }
-    
-    
+
     this
   }
+
+  def resolveParameters(mapping: Map[String, Ref]): Unit = operators.foreach(p => p.resolveParameters(mapping))
+
 }

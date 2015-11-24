@@ -17,95 +17,57 @@
 
 package dbis.test.spark
 
-import dbis.pig.PigCompiler
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest.FlatSpec
 import org.scalatest.prop.TableDrivenPropertyChecks._
-import scala.io.Source
-import scalax.file.Path
-import java.nio.file.Files
-import scala.collection.mutable.ListBuffer
+import dbis.test.CompileIt
 
-import scala.collection.JavaConversions._
-
-class SparkCompileIt extends FlatSpec with Matchers {
+class SparkCompileIt extends FlatSpec with CompileIt{
   val scripts = Table(
-    ("script", "result", "truth", "inOrder"), // only the header of the table
-    ("load.pig", "result1.out", "truth/result1.data", true),
-    ("load2.pig", "result2.out", "truth/result2.data", true),
-    ("selfjoin.pig", "joined.out", "truth/joined.data", true),
+    ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
+
+    //SPARK
+    ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
+    ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
+    ("load3.pig", "result3.out", "truth/result3.data", true, "pig", "spark"),
+    ("selfjoin.pig", "joined.out", "truth/joined.data", true, "pig", "spark"),
     ("selfjoin_ambiguous_fieldnames.pig", "joined_ambiguous_fieldnames.out", "truth/joined_ambiguous_fieldnames.data",
       // Pigs OrderBy is not a stable sort
-      false),
-    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true),
-    ("sort.pig", "sorted.out", "truth/sorted.data", true),
-    ("filter.pig", "filtered.out", "truth/filtered.data", true),
-    ("foreach1.pig", "distances.out", "truth/distances.data", true),
-    ("nforeach.pig", "nested.out", "truth/nested.data", true),
-    ("grouping.pig", "grouping.out", "truth/grouping.data", false),
-    ("groupall.pig", "groupall.out", "truth/groupall.data", false),
-    ("wordcount.pig", "marycounts.out", "truth/marycount.data", false),
-    ("construct.pig", "result3.out", "truth/result3.data", true),
-    ("union.pig", "united.out", "truth/united.data", true),
-    ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false),
-    ("sampling.pig", "sampling.out", "truth/sampling.data", false),
-    ("embedded.pig", "embedded.out", "truth/embedded.data", true)
-    //("rscript.pig", "cluster.out", "truth/cluster.data", true),
-    //("json.pig", "json.out", "json.data", true),
-    // ("jdbc.pig", "jdbc-data.out", "truth/jdbc-data.data", true)
+      false, "pig", "spark"),
+    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true, "pig", "spark"),
+    ("sort.pig", "sorted.out", "truth/sorted.data", true, "pig", "spark"),
+    ("sort_multiple_directions.pig", "sorted_multiple_directions.out",
+      "truth/sorted_multiple_directions.data", true, "pig", "spark"),
+    ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "spark"),
+    ("foreach1.pig", "distances.out", "truth/distances.data", true, "pig", "spark"),
+    ("nforeach.pig", "nested.out", "truth/nested.data", true, "pig", "spark"),
+    ("groupforeach.pig", "groupedrdf.out", "truth/groupedrdf.data", true, "sparql", "spark"),
+    ("nforeach2.pig", "rdf.out", "truth/rdf.data", true, "sparql", "spark"),
+    ("grouping.pig", "grouping.out", "truth/grouping.data", false, "pig", "spark"),
+    ("grouping2.pig", "grouping2.out", "truth/grouping2.data", false, "pig", "spark"),
+    ("groupall.pig", "groupall.out", "truth/groupall.data", false, "pig", "spark"),
+    ("wordcount.pig", "marycounts.out", "truth/marycount.data", false, "pig", "spark"),
+    ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "spark"),
+    ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "spark"),
+    ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
+    ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "spark"),
+    ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "spark"),
+    ("accumulate.pig", "accumulate.out", "truth/accumulate.data", false, "pig", "spark"),
+    ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "spark"),
+    ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "spark"),
+    /* Works, but requires a R installation
+    ("rscript.pig", "cluster.out", "truth/cluster.data", true)
+    */
+    /* Not working yet
+    ("json.pig", "json.out", "json.data", true), // not working yet
+    */
+    /* Works, but requires a H2 database and the corresponding JDBC driver */
+    ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true, "pig", "spark")
+  // RDF integration tests don't work because the standard language feature is not sparqlpig
+//    ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false),
+//    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false)
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)
+
   )
-
-  def cleanupResult(dir: String): Unit = {
-    import scalax.file.Path
-
-    val path: Path = Path(dir)
-    try {
-      path.deleteRecursively(continueOnFailure = false)
-    }
-    catch {
-      case e: java.io.IOException => // some file could not be deleted
-    }
-
-  }
-
-  "The Pig compiler" should "compile and execute the script" in {
-    forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean) =>
-      // 1. make sure the output directory is empty
-      cleanupResult(resultDir)
-      cleanupResult(script.replace(".pig",""))
-
-      val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
-      val resourcePath = getClass.getResource("").getPath + "../../../"
-      
-      // 2. compile and execute Pig script
-      PigCompiler.main(Array("--backend", "spark", "--params", s"inbase=$resourcePath,outfile=${resultPath.path}", "--master", "local[2]", "--outdir", ".", resourcePath + script))
-      println("execute: " + script)
-
-      // 3. load the output file and the truth file
-
-      /* Since we do not use coalesce for STORE, we probably end up with multiple result files
-       * named with schema part-xxxxx. 
-       * 
-       * To retreive the complete output, we search the result folder for all files starting with "part-",
-       * sort, this list in ascending order, and read the file contents line by line into a list of strings
-       */
-      val result = Path(resultDir).descendants().view
-                    .filter { _.name.toLowerCase().startsWith("part-") }
-                    .toList
-                    .sortBy { _.name }
-                    .foldLeft(ListBuffer.empty[String])( (lines, path) => lines ++= Source.fromFile(path.jfile).getLines())
-      
-
-      val truth = Source.fromFile(resourcePath + truthFile).getLines()
-      // 4. compare both files
-      if (inOrder)
-        result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
-      else
-        result.toSeq should contain theSameElementsAs (truth.toTraversable)
-
-      // 5. delete the output directory
-      cleanupResult(resultDir)
-      cleanupResult(script.replace(".pig",""))
-    }
-  }
+  //Note: checking the spark jar inclusion is done also in the piglet script
+  it should behave like checkMatch(scripts)
 }

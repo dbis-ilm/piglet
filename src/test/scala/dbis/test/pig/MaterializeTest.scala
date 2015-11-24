@@ -1,6 +1,6 @@
 package dbis.test.pig
 
-import dbis.pig.PigCompiler._
+import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
@@ -17,7 +17,7 @@ import java.nio.file.Path
 import scala.collection.JavaConversions._
 import java.nio.file.SimpleFileVisitor
 import java.net.URI
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 /**
  * @author hage

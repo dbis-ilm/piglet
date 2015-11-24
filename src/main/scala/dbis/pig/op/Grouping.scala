@@ -18,6 +18,9 @@
 package dbis.pig.op
 
 import dbis.pig.schema._
+import dbis.pig.expr.Ref
+import dbis.pig.expr.RefExpr
+import dbis.pig.expr.NamedField
 
 
 /**
@@ -33,7 +36,7 @@ case class GroupingExpression(val keyList: List[Ref]) {
    * @return the expression type
    */
   def resultType(schema: Option[Schema]): PigType = {
-    def typeForRef(r: Ref): (String, PigType) = {
+    def typeForRef(r: Ref): PigType = {
        /*
         * We create a temporary expression, because the result type construction is already
         * implemented there.
@@ -47,11 +50,15 @@ case class GroupingExpression(val keyList: List[Ref]) {
       Types.CharArrayType
     }
     else if (keyList.size == 1) {
-      val res = typeForRef(keyList.head)
-      res._2
+      typeForRef(keyList.head)
     }
     else {
-      val resList = keyList.map(r => typeForRef(r)).map(pair => Field(pair._1, pair._2))
+      val resList = keyList.map(r => {
+        r match {
+          case NamedField(n, _) => (n, typeForRef(r))
+          case _ => ("", typeForRef(r))
+        }
+      }).map{ case (n, t) => Field(n, t)}
       TupleType(resList.toArray)
     }
   }
@@ -85,9 +92,10 @@ case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var wind
       case None => TupleType(Array(Field("", Types.ByteArrayType)))
     }
     val groupingType = groupExpr.resultType(inputSchema)
-    val fields = Array(Field("group", groupingType),
+    // the group field gets the original grouping expression as lineage, e.g. rel.column
+    val fields = Array(Field("group", groupingType, List(s"${inPipeName}.${groupExpr.keyList.mkString}")),
       Field(inputs.head.name, BagType(inputType)))
-    schema = Some(new Schema(new BagType(new TupleType(fields), outPipeName)))
+    schema = Some(Schema(BagType(TupleType(fields))))
     schema
   }
 
@@ -103,6 +111,14 @@ case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var wind
       }
     }
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"GROUPING { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "group on = " + groupExpr)
+  }
+
 }
 
 

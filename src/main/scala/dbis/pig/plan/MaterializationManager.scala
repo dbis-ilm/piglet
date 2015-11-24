@@ -10,9 +10,9 @@ import dbis.pig.tools.Conf
 import java.nio.file.Path
 import java.net.URI
 import java.nio.file.Files
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
-class MaterializationManager(private val mapFile: Path, private val matBaseDir: URI) extends LazyLogging {
+class MaterializationManager(private val mapFile: Path, private val matBaseDir: URI) extends PigletLogging {
 
   private final val sep = ";"
   

@@ -22,7 +22,7 @@ import scala.tools.nsc.io.AbstractFile
 import scala.tools.nsc.reporters.ConsoleReporter
 import scala.tools.nsc.{Global, Settings}
 import java.nio.file.Path
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 trait Probe
 
@@ -31,7 +31,7 @@ trait Probe
  * for compiling source files.
  */
 
-object ScalaCompiler extends LazyLogging {
+object ScalaCompiler extends PigletLogging {
   
   
   def compile (targetDir: Path, sourceFile: Path) : Boolean = compile(targetDir, Seq(sourceFile))
@@ -41,7 +41,7 @@ object ScalaCompiler extends LazyLogging {
    * in targetDir.
    *
    * @param targetDir the target directory for the compiled code
-   * @param sourceFile the Scala file to be compiled
+   * @param sourceFiles the Scala files to be compiled
    */
   def compile (targetDir: Path, sourceFiles: Seq[Path]) : Boolean = {
     
@@ -54,11 +54,12 @@ object ScalaCompiler extends LazyLogging {
     settings.unchecked.value = true // enable detailed unchecked warnings
     settings.usejavacp.value = true
 */
-    
-    settings.classpath.value = targetDir.toString()
-        
+    settings.classpath.append(targetDir.toString())
+
     settings.outputDirs.setSingleOutput(target)
     settings.embeddedDefaults[Probe]
+
+    // println("settings = " + settings)
     val reporter = new ConsoleReporter(settings)
 
     val global = Global(settings, reporter)
@@ -67,14 +68,7 @@ object ScalaCompiler extends LazyLogging {
     
     val sources = sourceFiles.map { f => 
         new BatchSourceFile(f.toString(), Source.fromFile(f.toFile()).mkString) 
-      }
-      .toList
-    
-//    val file = sourceFiles(0)
-//    val fileContent = Source.fromFile(file.toFile()).mkString
-
-    
-//    val sources = List(new BatchSourceFile(file.toString(), fileContent))
+      }.toList
     
     val run = new Run
     run.compileSources(sources)

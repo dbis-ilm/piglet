@@ -36,19 +36,28 @@ you have to build an assembly:
 sbt assembly
 ```
 
-We provide a simple wrapper script for processing Pig scripts on Spark. Just call it with
+We provide a simple wrapper script for processing Pig scripts. Just call it with
 
 ```
-pigs --master local[4] your_script.pig
+piglet --master local[4] --backend spark your_script.pig
 ```
 
 to compile the script and execute it on your local Spark
-installation. A corresponding script called `pigf` exists for Flink.
+installation. The backend can be selected via the `--backend` option - currently
+we support the following backends 
+ * `spark`: Apache Spark in batch mode
+ * `sparks`: Apache Spark Streaming
+ * `flink`: Apache Flink in batch mode
+ * `flinks`: Apache Flink Streaming
+ * `mapreduce`: Apache Hadoop (by simply passing the script to the original Pig compiler)
+ * `pipefabric`: the PipeFabric data stream engine
+ * `storm`: Twitter Storm
+   
 
-In addition, there is an interactive Pig shell similar to Grunt:
+In addition, you can start an interactive Pig shell similar to Grunt:
 
 ```
-pigsh -b spark
+piglet --interactive --backend spark
 ```
 
 where Pig statements can be entered at the prompt and are executed as soon as
@@ -96,7 +105,7 @@ Depending on the target backend Piglet supports different language features. For
  * SAMPLE
  * ORDER BY
  * STREAM
- * DEFINE (but no macros yet)
+ * DEFINE (including macros)
  * REGISTER
  * SET
  
@@ -107,7 +116,7 @@ In addition to the standard Pig Latin statements we provide the following extens
  out = RSCRIPT in USING '<R code>';
  ```
  Within the R code `$_` refers to the input data (a matrix), the result which will returned to the Piglet script has to be assigned to the R variable `res`.
- * ACCUMULATE - tbd
+ * ACCUMULATE - is used for incrementally calculating aggregates on (large) bags or streams of tuples.
  * MATERIALIZE - creates a materialization point, i.e. the bag is serialized into a HDFS file. Subsequent runs of the script (or other scripts sharing the same dataflow until the materialization point) can just start from this point. Usage:
 
 ```
@@ -127,6 +136,12 @@ Furthermore, Piglet adds two statements simplifying the processing of RDF data:
  
 Finally, for processing streaming data using streaming backends (Flink Streaming, Spark Streaming, Storm, PipeFabric) we have added the following statements:
  * WINDOW
- * MATCHER
+ * MATCH_EVENT - implements complex event processing. The statement supports the following clauses
+    * PATTERN - defines the sequence of events, e.g. SEQ for a sequence, OR for alternative occurence, AND for mandatory occurence of both events, and NEG
+      for the absence of an event 
+    * WITH - describes the diffent events, e.g. (A: x == 0) means that the current tuple is detected as event A if x == 0
+    * MODE
+    * WITHIN - specifies the time frame for considering the sequence as a single event sequence
+     
  * SOCKET_READ
  * SOCKET_WRITE

@@ -17,31 +17,24 @@
 
 package dbis.test.pig
 
-import dbis.pig.op.NamedField
+import dbis.pig.expr.NamedField
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import org.scalatest.{Matchers, OptionValues, FlatSpec}
-import dbis.pig.PigCompiler._
+import dbis.pig.parser.PigParser.parseScript
 
 class SchemaSpec extends FlatSpec with OptionValues with Matchers {
 
   "The schema" should "contain f1, f2" in {
-    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.DoubleType),
-                                                              Field("f2", Types.CharArrayType)), "t"), "s"))
+    val schema = Schema(Array(Field("f1", Types.DoubleType),
+                                                              Field("f2", Types.CharArrayType)))
     assert(schema.indexOfField("f1") == 0)
     assert(schema.indexOfField("f2") == 1)
     assert(schema.field(0) == Field("f1", Types.DoubleType))
     assert(schema.field(1) == Field("f2", Types.CharArrayType))
   }
 
-  it should "allow to change the bag name" in {
-    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.DoubleType),
-      Field("f2", Types.CharArrayType)), "t"), "s"))
-    schema.setBagName("bag")
-    assert(schema.element.name == "bag")
-  }
-
-  "A Fields toString" should "contain its lineage information after a JOIN" in {
+  "A fields toString" should "contain its lineage information after a JOIN" in {
     val plan = new DataflowPlan(parseScript(
       """
         | A = LOAD '$inbase/input/joinInput.csv' USING PigStorage(',') AS (a1:int,a2:int);
@@ -111,5 +104,21 @@ class SchemaSpec extends FlatSpec with OptionValues with Matchers {
       """.stripMargin))
     val s = plan.findOperatorForAlias("Y").value.schema.value
     s.indexOfField(NamedField("b1", List("C"))) shouldBe -1
+  }
+
+  it should "support equality based only on the element type" in {
+    val schema1 = Schema(Array(Field("f1", Types.IntType), Field("f2", Types.DoubleType)))
+    val schema2 = Schema(Array(Field("f1", Types.IntType), Field("f2", Types.DoubleType)))
+    schema2.className = "t1434233"
+    
+    schema1 should be theSameInstanceAs schema2
+    
+    val schema3 = Schema(Array(Field("f1", Types.DoubleType), Field("f2", Types.CharArrayType)))
+    val schema4 = Schema(Array(Field("f3", Types.IntType), Field("f4", Types.DoubleType)))
+    schema1 should be (schema2)
+    schema1 should equal (schema2)
+    schema1 == schema2 should be (true)
+    schema1 shouldNot equal (schema3)
+    schema1 shouldNot equal (schema4)
   }
 }

@@ -28,7 +28,9 @@ case class TypeException(msg: String) extends Exception(msg)
  */
 object TypeCode extends Enumeration {
   type TypeCode = Value
-  val AnyType, IntType, LongType, FloatType, BooleanType, DoubleType, ByteArrayType, CharArrayType = Value
+  val AnyType, IntType, LongType, FloatType, BooleanType, DoubleType,
+  ByteArrayType, CharArrayType,
+  TupleType, MapType, BagType = Value
 }
 
 import dbis.pig.schema.TypeCode._
@@ -36,21 +38,33 @@ import dbis.pig.schema.TypeCode._
 /**
  * The base class for all Pig types.
  */
-abstract class PigType {
-  var name: String = ""
-
-  def this(s: String) = { this(); name = s }
-
-  def descriptionString: String = name
+trait PigType {
+  def name: String
+  def tc: TypeCode
+  def descriptionString: String
+  def encode: String
 }
 
 /**
  * The base class for all primitive types (int, float, double, ...).
  *
- * @param s the name of the type.
+ * @param name the name of the type.
  * @param tc the typecode representing this type.
  */
-case class SimpleType(s: String, tc: TypeCode) extends PigType(s)
+case class SimpleType(name: String, tc: TypeCode) extends java.io.Serializable with PigType {
+  override def descriptionString = name
+
+  override def encode: String = tc match {
+    case TypeCode.AnyType => "?"
+    case TypeCode.IntType => "i"
+    case TypeCode.LongType => "l"
+    case TypeCode.FloatType => "f"
+    case TypeCode.BooleanType => "b"
+    case TypeCode.DoubleType => "d"
+    case TypeCode.CharArrayType => "c"
+    case TypeCode.ByteArrayType => "a"
+    case _ => "_"
+  }}
 
 /**
  * An object with some helper functions for type handling.
@@ -72,7 +86,7 @@ object Types {
     case DoubleType => 4
     // tuple|bag|map|chararray > bytearray
     case CharArrayType => 10
-    case _ => 10
+    case _ => 20
   }
 
   def escalateTypes(t1: PigType, t2: PigType): PigType = {
@@ -140,7 +154,8 @@ object Types {
    * @param t the type to be checked
    * @return true if int, long, float or double
    */
-  def isNumericType(t: PigType): Boolean = t == IntType || t == LongType || t == FloatType || t == DoubleType
+  def isNumericType(t: PigType): Boolean = t.tc == TypeCode.IntType ||
+    t.tc == TypeCode.LongType || t.tc == TypeCode.FloatType || t.tc == TypeCode.DoubleType
 
   /**
    * Predefined type instances for simple types.

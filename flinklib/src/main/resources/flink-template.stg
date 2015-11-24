@@ -2,12 +2,25 @@
 init_code(includes) ::= <<
 import org.apache.flink.api.scala._
 import dbis.pig.backends.flink._
+import dbis.pig.backends.{SchemaClass, Record}
+import org.apache.flink.util.Collector
+import org.apache.flink.api.common.operators.Order
+import dbis.pig.backends.flink.Sampler._
+
 
 <if (includes)>
 <includes>
 <endif>
 
 <\n>
+>>
+
+// ----------------- schema class -----------------
+schema_class(name, fields, string_rep) ::= <<
+case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+override def mkString(_c: String = ",") = <string_rep>
+}
+
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
@@ -17,34 +30,25 @@ object <name> {
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-begin_query(name) ::= <<
+begin_query(name,profiling) ::= <<
         def main(args: Array[String]) {
         val env = ExecutionEnvironment.getExecutionEnvironment<\n>
-        
-    <if (hook)>
-		setupHook()
-	<endif>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
-loader(out,file,func,params) ::=<<
-<if (func)>
-        val <out> = <func>().load(env, "<file>"<params>)
-<else>
-        val <out> = PigStorage().load(env, "<file>", '\t')
-<endif>
+loader(out, file, class, func, extractor, params) ::=<<
+        val <out> = <func>[<class>]().load(env, "<file>", <extractor><if (params)>, <params><endif>)
 >>
 
 // ------------------ DUMP Results --------------------------------------------
 dump(in) ::=<<
-        <in>.map(_.mkString(",")).print
+        <in>.map(_.mkString()).print
 >>
 
 // ------------------ STORE Results on Disk -----------------------------------
-store(in,file,schema,func) ::=<<
-        <in>.map(t => <schema>).writeAsText("<file>")
-        
-        env.execute()
+store(in, file, class, func, params) ::=<<
+        <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)
+        env.execute("Starting Query")
 >>
 
 // ------------------ FILTER for a Predicate ----------------------------------
@@ -53,28 +57,35 @@ filter(out,in,pred) ::=<<
 >>
 
 // ------------------ Executes an expression FOREACH input element ------------
-foreach(out,in,expr) ::=<<
+foreach(out, in, expr, class) ::=<<
+        val <out> = <in>.map(t => <class>(<expr>))
+>>
+
+// ------------------ Executes an expression FOREACH input element where the expression is a nested plan -----------
+foreachNested(out, in, expr) ::=<<
         val <out> = <in>.map(t => <expr>)
 >>
 
-// ----- Executes an expression FOREACH input element requiring flatMap -------
-foreachFlatMap(out,in,expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
+// ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
+// Note, that the closing parenthesis is intentionally missing
+foreachFlatMap(out, in, expr) ::=<<
+        val <out> = <in>.flatMap(t => <expr>
 >>
 
 
+
 // ------------------ GROUPS elements on an expression ------------------------
-groupBy(out,in,expr,keyExtr) ::=<<
-<if (expr)>
-        val <out> = <in>.groupBy(t => <expr>)
-<else>
-        val <out> = <in>
-<endif>
+groupBy(out,in,expr,keyExtr, class) ::=<<
+   <if (expr)>
+        val <out> = <in>.groupBy(t => <expr>).reduceGroup{ (in, out: Collector[<class>]) => val itr = in.toIterable; out.collect(<class>(<keyExtr>, itr)) }
+    <else>
+       val <out> = <in>.setParallelism(1).mapPartition( (in, out: Collector[<class>]) =>  out.collect(<class>("all", in.toIterable)))
+   <endif>
 >>
 
 // ------------------ Outputs only distinct values ----------------------------
 distinct(out,in) ::=<<
-        val <out> = <in>.distinct(t => t(0))
+        val <out> = <in>.distinct
 >>
 
 // ------------------ Outputs only num records --------------------------------
@@ -86,25 +97,44 @@ limit(out,in,num) ::=<<
 join_key_map(rels,keys) ::=<<
 >>
 
-join(out,rel1,key1,rel2,key2) ::=<<
-        val <out> = <rel1><rel2,key2:{ r,k |<\\>
-        .join(<r>).where(t => <key1>).equalTo(t => <k>)<\\>
-        .map{ t => t._1 ++ t._2 \}<\\>
-        }>
+join(out,rel1, rels, rel1_keys, rel2_keys, pairs, fields, class) ::=<<
+        val <out> = <rel1><rels, rel1_keys, rel2_keys:{ r,k1, k2 | .join(<r>).where(<k1>).equalTo(<k2>)}>.map{ 
+         t => 
+         val <pairs> = t
+         <class>(<fields>)
+        }
 
 >>
 
+// ------------------ Returns a SAMPLE of the data ----------------------------
+sample(out,in,expr) ::=<<
+        val <out> = <in>.sample(false, <expr>)
+>>
+
 // ------------------ UNIONs multiple streams to one --------------------------
-union(out,in,others) ::=<<
+union(out, in, others) ::=<<
         val <out> = <in><others:{ e | .union(<e>)}>
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------
-orderBy(out,in,key,asc) ::=<<
-        val <out> = <in>.sortPartition(t => <key>, Order.ASCENDING)
+orderBy(out, in, key, asc) ::=<<
+        val <out> = <in>.setParallelism(1)<key,asc:{k, a|.sortPartition(<k>, Order.<a>)}>
+>>
+
+orderHelper(params) ::=<<
+>>
+
+// ------------------ STREAM operators ----------------------------------------
+streamOp(out, in, op, params, class, in_fields, out_fields) ::=<<
+        val <in>_helper = <in>.map(t => List(<in_fields>))
+        val <out> = <op>(env, <in>_helper<params>).map(t => <class>(<out_fields>))
 >>
 
 stageIdentifier(line,lineage) ::=<< >>
+
+accumulate(out, in,  class, init_aggr_expr, more_aggr_expr) ::=<<
+        val <out> = <in>.aggregate(Aggregations.<init_aggr_expr>)<more_aggr_expr:{exp|.and(Aggregations.<exp>)}>
+>>
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name, hook) ::= <<        

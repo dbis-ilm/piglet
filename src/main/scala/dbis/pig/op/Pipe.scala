@@ -16,6 +16,13 @@
  */
 package dbis.pig.op
 
+/**
+ * An exception indicating that the name of the pipe isn't a valid identifier (e.g. contains still a leading '$').
+ *
+ * @param msg a message describing the exception.
+ */
+case class InvalidPipeNameException(private val msg: String) extends Exception("invalid pipe name: " + msg)
+
 
 /**
  * A pipe connects some Pig operator and associates a name to this channel.
@@ -24,7 +31,7 @@ package dbis.pig.op
  * @param producer the operator producing the data
  * @param consumer the list of operators reading this data
  */
-class Pipe (var name: String, var producer: PigOperator = null, var consumer: List[PigOperator] = List()) {
+class Pipe (var name: String, var producer: PigOperator = null, var consumer: List[PigOperator] = List()) extends Serializable {
   override def toString = s"Pipe($name)"
 
   def canEqual(a: Any) = a.isInstanceOf[Pipe]

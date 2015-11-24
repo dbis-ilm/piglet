@@ -17,6 +17,7 @@
 package dbis.pig.plan.rewriting.internals
 
 import dbis.pig.op._
+import dbis.pig.expr._
 
 object FilterUtils {
   /** Extract the [[dbis.pig.op.Predicate]] from one. This also extracts the Predicate from a [[dbis.pig.op.PPredicate]]

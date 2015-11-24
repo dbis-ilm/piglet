@@ -16,16 +16,19 @@
  */
 package dbis.test.pig
 
-import dbis.test.TestTools._
-
-import dbis.pig.PigCompiler._
+import dbis.pig.expr._
 import dbis.pig.op._
-import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
+import dbis.pig.op.cmd.RegisterCmd
+import dbis.pig.parser.PigParser.parseScript
+import dbis.pig.plan.{DataflowPlan, InvalidPlanException, PipeNameGenerator}
 import dbis.pig.schema._
+import dbis.test.TestTools._
 import org.scalatest.OptionValues._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FlatSpec, Matchers, PrivateMethodTester}
 
-class DataflowPlanSpec extends FlatSpec with Matchers {
+import scala.collection.mutable.{Set => MutableSet}
+
+class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
   /*
   "The plan" should "contain all pipes" in {
     val op1 = Load("a", "file.csv")
@@ -100,7 +103,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
 
   it should "eliminate register statements" in {
     val plan = new DataflowPlan(parseScript("""
-         |register "myfile.jar";
+         |register 'myfile.jar';
          |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
          |b = filter a by f1 > 0;
          |""".stripMargin))
@@ -200,7 +203,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.IntType))
+        s.field(0).name should equal("group")
+        s.field(0).fType should equal(Types.IntType)
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.IntType),
                                                                       Field("f2", Types.DoubleType),
                                                                       Field("f3", MapType(Types.ByteArrayType))
@@ -219,7 +223,9 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.CharArrayType))
+        s.field(0).name should equal ("group")
+        s.field(0).lineage should be (List("a.f1"))
+        s.field(0).fType should be (Types.CharArrayType)
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.CharArrayType),
           Field("f2", Types.DoubleType),
           Field("f3", MapType(Types.ByteArrayType))
@@ -238,7 +244,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.IntType)))))
+        s.field(0).name should be ("group")
+        s.field(0).fType should be (TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.IntType))))
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.CharArrayType),
           Field("f2", Types.IntType),
           Field("f3", MapType(Types.ByteArrayType))
@@ -257,7 +264,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.CharArrayType))
+        s.field(0).name should be ("group")
+        s.field(0).fType should be (Types.CharArrayType)
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.IntType),
           Field("f2", Types.DoubleType),
           Field("f3", MapType(Types.ByteArrayType))
@@ -267,6 +275,29 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     }
     plan.operators(1).checkSchemaConformance should be (true)
   }
+
+  /*
+  TODO: Something is wrong with this test.
+
+  it should "infer the schema for ConstructBag" in {
+    val plan = new DataflowPlan(parseScript("""
+                                              |a = load 'file.csv' as (f1: chararray, f2: double);
+                                              |b = group a by f1;
+                                              |""".stripMargin))
+    val op = ConstructBag(Pipe("c"), DerefTuple(NamedField("b"), NamedField("a")))
+    op.parentSchema = plan.operators(1).schema
+    val schema = op.constructSchema
+    schema match {
+      case Some(s) => {
+        s.fields.length should be (2)
+        s.field(0) should equal (Field("f1", Types.CharArrayType))
+        s.field(1) should equal (Field("f2", Types.DoubleType))
+      }
+      case None => fail()
+    }
+    op.checkSchemaConformance should be (true)
+  }
+ */
 
   it should "detect an invalid schema for group by" in {
     val plan = new DataflowPlan(parseScript( """
@@ -555,7 +586,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     }
   }
 
-  it should "propage set parameters to the operators" in {
+  it should "propagate set parameters to the operators" in {
     val plan = new DataflowPlan(parseScript(s"""
        |A = LOAD 'file' AS (x, y);
        |SET parallelismHint 5;
@@ -568,13 +599,13 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     val opC = plan.findOperatorForAlias("C")
     val opD = plan.findOperatorForAlias("D")
     opB.get.configParams should contain key ("parallelismHint")
-    opB.get.configParams("parallelismHint") should be (Value("5"))
+    opB.get.configParams("parallelismHint") should be (Value(5))
     opC.get.configParams should contain key ("parallelismHint")
-    opC.get.configParams("parallelismHint") should be (Value("5"))
+    opC.get.configParams("parallelismHint") should be (Value(5))
     opC.get.configParams should not contain key ("some")
     opD.get.configParams should contain key ("parallelismHint")
     opD.get.configParams should contain key ("some")
-    opD.get.configParams("parallelismHint") should be (Value("3"))
+    opD.get.configParams("parallelismHint") should be (Value(3))
     opD.get.configParams("some") should be (Value("\"thing\""))
   }
 
@@ -585,5 +616,48 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
       """.stripMargin))
     val op = plan.findOperatorForAlias("stmts")
     op shouldBe defined
+  }
+
+  it should "reject a ACCUMULATE statement with incorrect expressions" in {
+    val plan = new DataflowPlan(parseScript("""
+                                              |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
+                                              |b = accumulate a generate f1, sum(f2) + 13;
+                                              |""".stripMargin))
+    //    plan.checkSchemaConformance should equal (false)
+    an [SchemaException] should be thrownBy plan.checkSchemaConformance
+  }
+
+  it should "reject a ACCUMULATE statement with another incorrect expressions" in {
+    val plan = new DataflowPlan(parseScript("""
+                                              |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
+                                              |b = accumulate a generate avg(f4);
+                                              |""".stripMargin))
+    //    plan.checkSchemaConformance should equal (false)
+    an [SchemaException] should be thrownBy plan.checkSchemaConformance
+  }
+
+  it should "allow to use group names in GROUP BY" in {
+    val plan = new DataflowPlan(parseScript(
+      """
+        |A = LOAD 'file' AS (name, value: double);
+        |B = GROUP A BY name;
+        |C = FOREACH B GENERATE A.name, AVG(A.value);
+        |DUMP C;
+      """.stripMargin))
+    plan.checkSchemaConformance
+  }
+
+  "Setting operators" should "add all their relation names to the PipeNameGenerator as known names" in {
+    PipeNameGenerator.clearGenerated
+    val op0 = Load(Pipe("a"), "input/file.csv")
+    val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op2 = OrderBy(Pipe("c"), Pipe("b"), List())
+    val op3 = OrderBy(Pipe("d"), Pipe("b"), List())
+    val plan = new DataflowPlan(List(op0, op1, op2, op3))
+
+    val generatedMethod = PrivateMethod[MutableSet[String]]('generated)
+    val generatedSet = PipeNameGenerator invokePrivate generatedMethod()
+
+    generatedSet should contain only ("a", "b", "c", "d")
   }
 }

@@ -25,18 +25,21 @@ import scala.reflect.ClassTag
   *
   */
 trait FastStrategyAdder {
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
+  def fixMerge[T <: PigOperator, T2 <: PigOperator, T3 <: PigOperator](oldParent: T, oldChild: T2,
                                                                                   newParent: T3): T3
   def buildBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
   (f: (T, T2) => Option[PigOperator]): Strategy
   def addStrategy(strategy: Strategy): Unit
 
-  def fixInputsAndOutputs[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
+  def fixReordering[T <: PigOperator, T2 <: PigOperator](oldParent: T, newParent: T2, oldChild: T2,
                                                                newChild: T): T2
 
-  def buildTypedCaseWrapper[T <: PigOperator : ClassTag](f: (T => Option[PigOperator])): (Any => Option[PigOperator])
+  def buildTypedCaseWrapper[T <: PigOperator : ClassTag, T2](f: (T => Option[T2])): (Any => Option[T2])
 
   def addStrategy(f: Any => Option[PigOperator]): Unit
+
+  def buildOperatorReplacementStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+   (f: T => Option[T2]): Strategy
 
   /** Add a new strategy for merging operators of two types.
     *
@@ -60,7 +63,7 @@ trait FastStrategyAdder {
   def merge[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[PigOperator]):
   Unit = {
     val strategy = (parent: T, child: T2) =>
-      f(parent, child).map(fixInputsAndOutputs(parent, child, _))
+      f(parent, child).map(fixMerge(parent, child, _))
     addBinaryPigOperatorStrategy(strategy)
   }
 
@@ -82,7 +85,7 @@ trait FastStrategyAdder {
   def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2) => Option[(T2, T)]):
   Unit = {
     val strategy = (parent: T, child: T2) =>
-      f(parent, child).map(tup => fixInputsAndOutputs(tup._2, tup._1, tup._1, tup._2))
+      f(parent, child).map(tup => fixReordering(tup._2, tup._1, tup._1, tup._2))
     addBinaryPigOperatorStrategy(strategy)
   }
 
@@ -99,7 +102,7 @@ trait FastStrategyAdder {
   def reorder[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]:
   Unit = {
     val strategy = (parent: T, child: T2) =>
-      Some(fixInputsAndOutputs(parent, child, child, parent))
+      Some(fixReordering(parent, child, child, parent))
     addBinaryPigOperatorStrategy(strategy)
   }
 
@@ -117,11 +120,24 @@ trait FastStrategyAdder {
 
   /** Given a function `f: (T => Option[T])`, add a strategy that applies `f` if the input term is of type `T`.
     *
-    * @param f
-    * @tparam T
     */
-  def addTypedStrategy[T <: PigOperator : ClassTag](f: (T => Option[T])): Unit = {
-    val wrapper = buildTypedCaseWrapper[T](f)
+  def addTypedStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T => Option[T2])): Unit = {
+    val wrapper = buildTypedCaseWrapper(f)
     addStrategy(wrapper)
   }
+
+  /** Adds a function `f` that replaces a single [[PigOperator]] with another one as a [[org.kiama.rewriting.Strategy]]
+    * to this object.
+    *
+    * If applying `f` to a term succeeded (Some(_)) was returned, the input term will be replaced by the new term in
+    * the input pipes of the new terms successors (the consumers of its output pipes).
+    *
+    * @param f
+    */
+  //noinspection ScalaDocMissingParameterDescription
+  def addOperatorReplacementStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag]
+  (f: T => Option[T2]): Unit = {
+    addStrategy(buildOperatorReplacementStrategy(f))
+  }
+
 }

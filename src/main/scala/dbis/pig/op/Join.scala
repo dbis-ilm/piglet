@@ -17,10 +17,9 @@
 package dbis.pig.op
 
 import dbis.pig.schema._
-
 import scala.collection.mutable.ArrayBuffer
-
 import java.util.concurrent.TimeUnit
+import dbis.pig.expr.Ref
 
 
 /**
@@ -48,8 +47,14 @@ case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]],
       }
       case None => newFields += Field("", Types.ByteArrayType)
     })
-    schema = Some(new Schema(BagType(TupleType(newFields.toArray))))
+    schema = Some(Schema(BagType(TupleType(newFields.toArray))))
     schema
+  }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"JOIN { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
+    println(indent(tab + 2) + "inSchema = {}")
+    println(indent(tab + 2) + "outSchema = " + schema)
   }
 
 }

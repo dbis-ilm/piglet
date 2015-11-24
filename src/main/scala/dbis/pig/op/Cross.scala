@@ -42,7 +42,7 @@ case class Cross(out: Pipe, in: List[Pipe], timeWindow: Tuple2[Int,String]= null
       }
       case None => ???
     })
-    schema = Some(new Schema(BagType(TupleType(newFields.toArray))))
+    schema = Some(Schema(BagType(TupleType(newFields.toArray))))
     schema
   }
 

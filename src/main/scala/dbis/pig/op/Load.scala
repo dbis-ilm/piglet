@@ -17,8 +17,11 @@
 package dbis.pig.op
 
 import dbis.pig.backends.BackendManager
+import dbis.pig.expr.{Value, Ref}
 import dbis.pig.schema.Schema
 import java.net.URI
+
+import scala.collection.mutable.Map
 
 /**
  * Load represents the LOAD operator of Pig.
@@ -30,7 +33,7 @@ import java.net.URI
  * @param loaderParams
  */
 case class Load(out: Pipe, 
-                file: URI,
+                var file: URI,
                 var loadSchema: Option[Schema] = None,
                 loaderFunc: Option[String] = None, //BackendManager.backend.defaultConnector,
                 loaderParams: List[String] = null) extends PigOperator {
@@ -42,6 +45,8 @@ case class Load(out: Pipe,
     /*
      * Either the schema was defined or it is None.
      */
+    if (schema.isDefined)
+      schema.get.setBagName(outPipeName)
     schema
   }
 
@@ -53,4 +58,28 @@ case class Load(out: Pipe,
   override def lineageString: String = {
     s"""LOAD%${file}%""" + super.lineageString
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"LOAD { out = ${outPipeName} }")
+    println(indent(tab + 2) + "file = " + file.toString)
+    if (loaderFunc.isDefined) {
+      println(indent(tab + 2) + "func = " + loaderFunc.get)
+    }
+    println(indent(tab + 2) + "outSchema = " + schema)
+  }
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = {
+    // we replace only the filename
+    if (file.toString.startsWith("$") && mapping.contains(file.toString)) {
+      mapping(file.toString) match {
+        case Value(v) => {
+          val s = v.toString
+          if (s(0) == '"')
+            file = new URI(s.substring(1, s.length-1))
+        }
+        case _ => {}
+      }
+    }
+  }
+
 }

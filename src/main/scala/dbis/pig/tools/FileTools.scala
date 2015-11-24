@@ -22,7 +22,7 @@ import java.util.jar.JarFile
 import dbis.pig._
 import dbis.pig.codegen._
 import dbis.pig.plan.DataflowPlan
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.backends.BackendManager
 import dbis.pig.backends.BackendConf
 import java.nio.file.Path
@@ -31,7 +31,8 @@ import java.nio.file.Paths
 
 import scala.collection.mutable.ListBuffer
 
-object FileTools extends LazyLogging {
+object FileTools extends PigletLogging {
+  
   def copyStream(istream: InputStream, ostream: OutputStream): Unit = {
     var bytes = new Array[Byte](1024)
     var len = -1
@@ -65,85 +66,4 @@ object FileTools extends LazyLogging {
       }
     }
   }
-
-  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, compileOnly: Boolean, backendJar: Path, templateFile: String, backend: String): Option[Path] = {
-    // 4. compile it into Scala code for Spark
-    val generatorClass = Conf.backendGenerator(backend)
-    logger.debug(s"using generator class: $generatorClass")
-    val extension = Conf.backendExtension(backend)
-    logger.debug(s"file extension for generated code: $extension")
-    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
-    logger.debug(s"""arguments to generator class: "${args.mkString(",")}" """)
-    
-    val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[Compile]
-    logger.debug(s"successfully created code generator class $compiler")
-
-    // 5. generate the Scala code
-    val code = compiler.compile(scriptName, plan)
-
-    logger.debug("successfully generated scala program")
-
-    // 6. write it to a file
-
-    val outputDir = outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
-
-    logger.debug(s"outputDir: $outputDir")
-
-    if (!Files.exists(outputDir)) {
-      Files.createDirectories(outputDir)
-    }
-    
-
-    val outputDirectory = outputDir.resolve("out") //s"${outputDir.getCanonicalPath}${File.separator}out"
-    logger.debug(s"outputDirectory: $outputDirectory")
-
-    // check whether output directory exists
-    if (!Files.exists(outputDirectory)) {
-      Files.createDirectory(outputDirectory)
-    }
-
-    val outputFile = outputDirectory.resolve(s"$scriptName.$extension")
-    logger.debug(s"outputFile: $outputFile")
-    val writer = new FileWriter(outputFile.toFile())
-    writer.append(code)
-    writer.close()
-    if (extension.equalsIgnoreCase("scala")) {
-      // 7. extract all additional jar files to output
-      plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
-
-      // 8. copy the sparklib library to output
-      val jobJar = backendJar.toAbsolutePath().toString()
-      FileTools.extractJarToDir(jobJar, outputDirectory)
-
-      val sources = ListBuffer(outputFile)
-      
-      // 9. compile the scala code
-      if (!ScalaCompiler.compile(outputDirectory, sources))
-        return None
-
-      // 10. build a jar file
-      val jarFile = Paths.get(outDir.toAbsolutePath().toString(), scriptName, s"$scriptName.jar") //s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
-
-      if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
-        logger.info(s"created job's jar file at $jarFile")
-        return Some(jarFile)
-      } else
-        return None
-    } else {
-      if (CppCompiler.compile(outputDirectory.toString(), outputFile.toString(), CppCompilerConf.cppConf(backend))) {
-        logger.info(s"created job's file at $outputFile")
-        return Some(outputFile)
-      } else
-        return None
-    }
-  }
-
-  //  private def getTemplateFile(backend: String): String = {
-  //    BuildSettings.backends.get(backend).get("templateFile")
-  //  }
-  //
-  //  def getRunner(backend: String): Run = { 
-  //    val className = BuildSettings.backends.get(backend).get("runClass")
-  //    Class.forName(className).newInstance().asInstanceOf[Run]
-  //  }
 }

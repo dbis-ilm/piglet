@@ -17,8 +17,13 @@
 package dbis.pig.plan.rewriting
 
 import dbis.pig.op._
+import dbis.pig.expr.Func
+
+import scala.reflect.ClassTag
 
 /** Provides extractor objects for [[dbis.pig.op.PigOperator]]s.
+  *
+  * The first object returned by any unapply method in this object is always the input itself.
   *
   */
 object Extractors {
@@ -32,26 +37,67 @@ object Extractors {
     *   B = FOREACH A GENERATE myFunc(f1, f2);
     * }}}
     *
-    * this extractor returns "myFunc".
+    * the pattern
+    *
+    * {{{
+    *   case ForEachCallingFunctionE(op, "myFunc") =>
+    * }}}
+    *
+    * will match bind ``op`` to the [[dbis.pig.op.Foreach]] operator if the function called in its ``GENERATE``
+    * statement is ``myFunc``.
     */
   object ForEachCallingFunctionE {
-    def unapply(f: Foreach): Option[String] = f match {
-      case f @ Foreach(_, _, GeneratorList(List(GeneratorExpr(Func(funcname, _), _))), _) => Some(funcname)
+    def unapply(f: Foreach): Option[(PigOperator, String)] = f match {
+      case f @ Foreach(_, _, GeneratorList(List(GeneratorExpr(Func(funcname, _), _))), _) => Some((f, funcname))
       case _ => None
     }
   }
 
   /** Extracts the successor of ``op`` if there is only one.
     *
+    * The pattern
+    *
+    * {{{
+    *   case SuccE(op, succ) =>
+    * }}}
+    *
+    * will bind ``op`` to a [[dbis.pig.op.PigOperator]] object and ``succ`` to its successor.
+    *
     */
-  object OnlyFollowedByE {
-    def unapply(op: PigOperator): Option[PigOperator] = {
+  object SuccE {
+    def unapply(op: PigOperator): Option[(PigOperator, PigOperator)] = {
       val suc = op.outputs.flatMap(_.consumer)
       if (suc.length == 1) {
-        Some(suc.head)
+        Some((op, suc.head))
       } else {
         None
       }
+    }
+  }
+
+  /** Extracts all successors of ``op``.
+    *
+    * The pattern
+    *
+    * {{{
+    *  case AllSuccE(op, succs) =>
+    * }}}
+    *
+    * will bind ``op`` to a [[dbis.pig.op.PigOperator]] object and ``succs`` to its successors.
+    *
+    * Of course, this can be combined with other patterns like
+    *
+    * {{{
+    *  case AllSuccE(op, first :: second) =>
+    * }}}
+    *
+    * to only match and bind ``op`` if it has only two successors, namely ``first`` and ``second``.
+    *
+    */
+  object AllSuccE {
+    def unapply(op: PigOperator): Option[(PigOperator, Seq[PigOperator])] = {
+      val succ = op.outputs.flatMap(_.consumer)
+      Some((op, succ))
     }
   }
 }

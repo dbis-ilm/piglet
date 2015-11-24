@@ -16,6 +16,7 @@
  */
 package dbis.pig.op
 import dbis.pig.schema._
+import dbis.pig.expr.Predicate
 /**
  * @brief Matcher represents the complex event processing operator of Pig.
  */
@@ -40,7 +41,7 @@ case class SimplePattern(name: String) extends Pattern
  * patterns can be simple or complex ones
  * @param patterns a list of patterns which the sequence pattern consists from
  */
-case class SeqPattern(paterns: List[Pattern]) extends Pattern
+case class SeqPattern(patterns: List[Pattern]) extends Pattern
 
 /**
  * A class represents the conjunction pattern (i.e., complex one ) which has to consist other patterns. These
@@ -48,7 +49,7 @@ case class SeqPattern(paterns: List[Pattern]) extends Pattern
  * @param patterns a list of patterns which the conjunction pattern consists from
  */
 
-case class ConjPattern(paterns: List[Pattern]) extends Pattern
+case class ConjPattern(patterns: List[Pattern]) extends Pattern
 
 /**
  * A class represents the negation pattern. It receives only one pattern as its parameter to perform
@@ -56,7 +57,7 @@ case class ConjPattern(paterns: List[Pattern]) extends Pattern
  * @param patterns a list of patterns which the sequence pattern consists from
  */
 
-case class NegPattern(patter: Pattern) extends Pattern
+case class NegPattern(patterns: Pattern) extends Pattern
 
 /**
  * A class represents the disjunction pattern (i.e., complex one ) which has to consist other patterns. These
@@ -64,7 +65,7 @@ case class NegPattern(patter: Pattern) extends Pattern
  * @param patterns a list of patterns which the disjunction pattern consists from
  */
 
-case class DisjPattern(paterns: List[Pattern]) extends Pattern
+case class DisjPattern(patterns: List[Pattern]) extends Pattern
 
 /**
  * A simple event represents the definition or the predicate of a particular simple pattern

@@ -6,13 +6,13 @@ import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.fs._
 import org.apache.hadoop.hdfs.DistributedFileSystem
 import collection.JavaConversions._
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import java.nio.file.Files
 
 /**
  * Created by kai on 06.08.15.
  */
-object HDFSService extends LazyLogging {
+object HDFSService extends PigletLogging {
   private val conf = new Configuration()
   
   val coreSite = Conf.hdfsCoreSiteFile.toAbsolutePath()

@@ -6,9 +6,9 @@ libraryDependencies ++= Seq(
     scalaCompiler,
     scalaTest % "test" withSources(),
     jeromq,
-    flinkDist % "provided" from flinkAddress,
-    typesafe,
-    scalaLogging
+    flinkCore % "provided",
+    flinkStreaming % "provided",
+    typesafe
 )
 
 resolvers += "Sonatype (releases)" at "https://oss.sonatype.org/content/repositories/releases/"

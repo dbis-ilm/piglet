@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan.rewriting.internals
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.op._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.RewriterException
@@ -30,7 +30,7 @@ import scala.collection.mutable.ListBuffer
 /** Provides methods to deal with windows in a [[dbis.pig.plan.DataflowPlan]].
   *
   */
-trait WindowSupport extends LazyLogging {
+trait WindowSupport extends PigletLogging {
   def processPlan(newPlan: DataflowPlan, strategy: Strategy): DataflowPlan
 
   def processWindows(plan: DataflowPlan): DataflowPlan = {
