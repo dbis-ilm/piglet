@@ -1,20 +1,9 @@
-backends.md
-bin
-buildinfo.properties
-build.sbt
-common
-flinklib
-h2shell
-lib_unmanaged
-LICENSE
-mapreduce
-project
-README.md
-run
-src
-target
-zeppelin
-sparklib
+# Currently, it's easier to to exclude all files and
+# to specify excludes from these excludes. :)
 
+*
+
+!Dockerfile
+!script/piglet
 !sparklib/target/scala-2.11/sparklib_2.11-*.jar
 !target/scala-2.11/PigCompiler.jar
