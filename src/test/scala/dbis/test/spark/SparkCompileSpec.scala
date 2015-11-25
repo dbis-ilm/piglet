@@ -54,6 +54,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |import org.apache.spark.SparkConf
         |import org.apache.spark.rdd._
         |import dbis.pig.backends.{SchemaClass, Record}
+        |import dbis.pig.tools._
         |import dbis.pig.backends.spark._
         |
         |object test {

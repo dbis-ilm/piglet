@@ -7,7 +7,7 @@ import org.apache.hadoop.fs._
 import org.apache.hadoop.hdfs.DistributedFileSystem
 import collection.JavaConversions._
 import dbis.pig.tools.logging.PigletLogging
-import java.nio.file.Files
+import java.nio.file.{Paths, Files}
 
 /**
  * Created by kai on 06.08.15.
@@ -15,9 +15,11 @@ import java.nio.file.Files
 object HDFSService extends PigletLogging {
   private val conf = new Configuration()
   
-  val coreSite = Conf.hdfsCoreSiteFile.toAbsolutePath()
-  val hdfsSite = Conf.hdfsHdfsSiteFile.toAbsolutePath()
-  
+  // val coreSite = Conf.hdfsCoreSiteFile.toAbsolutePath()
+  // val hdfsSite = Conf.hdfsHdfsSiteFile.toAbsolutePath()
+  val coreSite = Paths.get(scala.util.Properties.envOrElse("HADOOP_CONF_DIR", "/etc/hadoop/conf") + "/core-site.xml")
+  val hdfsSite = Paths.get(scala.util.Properties.envOrElse("HADOOP_CONF_DIR", "/etc/hadoop/conf") + "/hdfs-site.xml")
+
   if(!Files.exists(coreSite))
     logger.warn(s"HDFS core site file does not exist at: $coreSite")
     

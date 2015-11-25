@@ -57,6 +57,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
         |import org.apache.spark._
         |import org.apache.spark.streaming._
         |import dbis.pig.backends.{SchemaClass, Record}
+        |import dbis.pig.tools._
         |import dbis.pig.backends.spark._
         |
         |object SECONDS {

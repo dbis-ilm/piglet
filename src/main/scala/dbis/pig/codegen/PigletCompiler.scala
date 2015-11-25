@@ -253,7 +253,9 @@ def createCodeFromInput(source: String, backend: String): String = {
                                     langFeature: LanguageFeature.LanguageFeature): List[PigOperator] = {
     // Handle IMPORT statements.
 	  val sourceLines = resolveImports(source.getLines())
-	  
+
+    // Handle %declare statements.
+
 	  if (params.nonEmpty) {
 	    // Replace placeholders by parameters.
 		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"), langFeature)
