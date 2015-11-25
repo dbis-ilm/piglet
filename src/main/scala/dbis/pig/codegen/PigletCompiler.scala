@@ -61,7 +61,7 @@ object PigletCompiler extends PigletLogging {
     */
   def createDataflowPlan(input: String, params: Map[String,String], backend: String,
                          langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
-    // 1. we prepare a soure from the string
+    // 1. we prepare a source from the string
     val source = Source.fromString(input.stripMargin)
     // 2. then we parse it and construct a dataflow plan
     val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeature))

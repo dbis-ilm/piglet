@@ -269,7 +269,7 @@ object Piglet extends PigletLogging {
         newPlan = processWindows(newPlan)
 
       Rules.registerBackendRules(backend)
-      newPlan = processPlan(newPlan)   
+      newPlan = processPlan(newPlan)
       // find materialization points
 
       if (profiling) {
@@ -415,11 +415,34 @@ object Piglet extends PigletLogging {
   }
 
   /**
+    * Compiles and executes the given Piglet script.
+    *
+    * @param fileName the file name of the Piglet script
+    */
+  def compileFile(fileName: String): Unit = {
+    val path = Paths.get(fileName)
+    PigletCompiler.createDataflowPlan(path, Map[String, String](), backend, languageFeature) match {
+      case Some(p) => compileAndExecute(p)
+      case None => {}
+    }
+  }
+
+  /**
     * Compiles and executes the given Piglet script represented as string.
     *
     * @param source a string containing the Piglet code
     */
   def compile(source: String): List[Any] = {
+    PigletCompiler.createDataflowPlan(source, Map[String, String](), backend, languageFeature) match {
+      case Some(p) => {
+        val res = compileAndExecute(p)
+        res.split("\n").toList.map(_.split(","))
+      }
+      case None => List()
+    }
+  }
+
+  private def compileAndExecute(p: DataflowPlan): String = {
     def cleanup(s: String): Unit = {
       import scalax.file.Path
 
@@ -430,36 +453,31 @@ object Piglet extends PigletLogging {
       catch {
         case e: java.io.IOException => // some file could not be deleted
       }
-
     }
 
-    PigletCompiler.createDataflowPlan(source, Map[String, String](), backend, languageFeature) match {
-      case Some(p) => {
-        val plan = processPlan(p)
-        plan.checkSchemaConformance
+    val plan = processPlan(p)
+    plan.checkSchemaConformance
 
-        val backendConf = BackendManager.backend
-        val outDir = Paths.get(".")
-        val scriptName = "__r_piglet"
-        val templateFile = backendConf.templateFile
-        val jarFile = Conf.backendJar(backend)
-        val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(s"$backendPath/${jarFile.toString}"),
-          templateFile, backend, false) match {
-          case Some(jarFile) => {
-            val runner = backendConf.runnerClass
-            logger.debug(s"using runner class ${runner.getClass.toString()}")
+    val backendConf = BackendManager.backend
+    val outDir = Paths.get(".")
+    val scriptName = "__r_piglet"
+    val templateFile = backendConf.templateFile
+    val jarFile = Conf.backendJar(backend)
+    val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(s"$backendPath/${jarFile.toString}"),
+      templateFile, backend, false) match {
+      case Some(jarFile) => {
+        val runner = backendConf.runnerClass
+        logger.debug(s"using runner class ${runner.getClass.toString()}")
 
-            logger.info( s"""starting job at "$jarFile" using backend "$backend" """)
-            val resStream = new java.io.ByteArrayOutputStream
-            Console.withOut(resStream)(runner.execute(master, scriptName, jarFile, Map[String, String]()))
-            resStream.toString
-          }
-          case None => ""
-        }
-        cleanup(scriptName)
-        res.split("\n").toList.map(_.split(","))
+        logger.info( s"""starting job at "$jarFile" using backend "$backend" """)
+        val resStream = new java.io.ByteArrayOutputStream
+        Console.withOut(resStream)(runner.execute(master, scriptName, jarFile, Map[String, String]()))
+        resStream.toString
       }
-      case None => List()
+      case None => ""
     }
+    cleanup(scriptName)
+    res
   }
+
 }

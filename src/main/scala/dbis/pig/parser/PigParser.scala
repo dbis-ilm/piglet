@@ -351,7 +351,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     case _ ~ b ~  _ ~ f ~ u => 
       val uri = new URI(f)
       u match {
-        case Some(p) => new Store(Pipe(b), uri, Some(p._1), if(p._2.isEmpty) null else p._2)
+        case Some(p) => new Store(Pipe(b), uri, Some(p._1), if(p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
         case None => new Store(Pipe(b), uri)
       }
   }
