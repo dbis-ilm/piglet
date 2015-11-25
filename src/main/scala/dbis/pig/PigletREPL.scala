@@ -24,6 +24,7 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.PrettyPrinter._
 import dbis.pig.schema.SchemaException
+import dbis.pig.tools.logging.LogLevel
 import dbis.pig.tools.{HDFSService, FileTools, Conf}
 import dbis.pig.backends.{BackendConf, BackendManager}
 import dbis.pig.plan.MaterializationManager
