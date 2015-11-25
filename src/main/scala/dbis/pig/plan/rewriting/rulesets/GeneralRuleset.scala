@@ -228,6 +228,12 @@ object GeneralRuleset extends Ruleset {
       None
   }
 
+  /*
+  def f(g: Grouping): Option[Grouping] = g match {
+    case SuccE(g, foreach: Foreach) => // AllSuccE
+    case _ => None
+  }
+  */
   def foreachGrouping(fo: Foreach): Option[Foreach] = {
     def processExpression(schema: Option[Schema], e: GeneratorExpr): GeneratorExpr = {
       var res = e
