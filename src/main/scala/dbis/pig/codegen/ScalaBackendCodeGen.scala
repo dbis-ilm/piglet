@@ -100,7 +100,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",  
-    Types.ByteArrayType -> "String", //TODO: check this
+    Types.ByteArrayType -> "Any", //TODO: check this
     Types.AnyType -> "String") //TODO: check this
 
   /**
