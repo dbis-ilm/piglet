@@ -154,7 +154,7 @@ streamOp(out, in, op, params, class, in_fields, out_fields) ::=<<
 
 // ----------------------- FS commands ----------------------------------------
 fs(cmd,params) ::=<<
-    HDFSService.process(<cmd>, <params>)
+    HDFSService.process("<cmd>", <params>)
 >>
 
 // ------------------ RSCRIPT operators ----------------------------------------

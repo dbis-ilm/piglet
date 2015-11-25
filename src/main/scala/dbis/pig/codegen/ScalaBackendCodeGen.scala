@@ -754,7 +754,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
       case sOp@StreamOp(out, in, op, params, schema) => emitStreamThrough(sOp)
       // case MacroOp(out, name, params) => callST("call_macro", Map("out"->node.outPipeName,"macro_name"->name,"params"->emitMacroParamList(node.schema, params)))
-      case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
+      case hOp@HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd,
+        "params"-> s"List(${hOp.paramString})"))
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case ConstructBag(in, ref) => "" // used only inside macros
       case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again
