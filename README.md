@@ -73,15 +73,30 @@ sbt clean package assembly
 docker build -t dbis/piglet .
 ```
 
-Currently, the Docker image supports the Spark backend only. To start the container, run:
+Currently, the Docker image supports the Spark backend only. 
+
+To start the container, run:
 ```
-docker run -it --rm --name piglet dbis/piglet /piglet/piglet --help
+docker run -it --rm --name piglet dbis/piglet 
 ```
 
-You can start the interactive mode, using `-i` option and enter your script. Alternatively, you can add
-your existing files into the container by [mounting volumes](https://docs.docker.com/engine/userguide/dockervolumes/#mount-a-host-file-as-a-data-volume):
+This uses the container's entrypoint which runs piglet. The above command will print the help message.
+
+You can start the interactive mode, using `-i` option and enter your script. 
+
 ```
-docker run -it --rm --name piglet -v /tmp/test.pig:/test.pig dbis/piglet /piglet/piglet -b spark /test.pig
+docker run -it --rm --name piglet dbis/piglet -b spark -i
+```
+
+Alternatively, you can add your existing files into the container by [mounting volumes](https://docs.docker.com/engine/userguide/dockervolumes/#mount-a-host-file-as-a-data-volume) and run the script in batch mode:
+```
+docker run -it --rm --name piglet -v /tmp/test.pig:/test.pig dbis/piglet -b spark /test.pig
+```
+
+As mentioned before, the container provides an entrypoint that executes piglet. In case you need a bash for that container, 
+you need to overwrite the entrypoint:
+```
+docker run -it --rm --name piglet --entrypoint /bin/bash dbis/piglet 
 ```
 
 ### Testing ###
