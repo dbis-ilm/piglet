@@ -498,7 +498,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           * @return the expression code
           */
         def genCmpExpr(col: Int): String = {
-          val cast = genImplicitCast(col)
+          val cast = genImplicitCast(col - 1)
           val cmpStr = if (orderSpec(col - 1).dir == OrderByDirection.AscendingOrder)
             s"this.c$col$cast compare that.c$col$cast"
           else s"that.c$col$cast compare this.c$col$cast"
