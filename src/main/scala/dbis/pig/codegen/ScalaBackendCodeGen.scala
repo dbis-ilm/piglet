@@ -475,9 +475,22 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     * @return a string representing the helper code
     */
   def emitHelperClass(node: PigOperator): String = {
+    /**
+      * Bytearray fields need special handling: they are mapped to Any which is not comparable.
+      * Thus we add ".toString" in this case.
+      *
+      * @param col the column used in comparison
+      * @return ".toString" or ""
+      */
+    def genImplicitCast(col: Int): String = node.schema match {
+      case Some(s) => if (s.field(col).fType == Types.ByteArrayType) ".toString" else ""
+      case None => ".toString"
+    }
+
     node match {
       case OrderBy(out, in, orderSpec, _) => {
         val num = orderSpec.length
+
         /**
           * Emit the comparison expression used in in the orderHelper class
           *
@@ -485,9 +498,10 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           * @return the expression code
           */
         def genCmpExpr(col: Int): String = {
+          val cast = genImplicitCast(col)
           val cmpStr = if (orderSpec(col - 1).dir == OrderByDirection.AscendingOrder)
-            s"this.c$col compare that.c$col"
-          else s"that.c$col compare this.c$col"
+            s"this.c$col$cast compare that.c$col$cast"
+          else s"that.c$col$cast compare this.c$col$cast"
           if (col == num) s"{ $cmpStr }"
           else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col + 1)} else $cmpStr }"
         }
@@ -536,18 +550,19 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
             secondGetter += "get"
           }
 
+          val cast = genImplicitCast(col)
           if (hasSchema) {
             if (col == (size - 1))
-              s"{ ${firstGetter}_$col compare ${secondGetter}_$col }"
+              s"{ ${firstGetter}_$col$cast compare ${secondGetter}_$col$cast }"
             else
-              s"{ if (${firstGetter}_$col == ${secondGetter}_$col) ${genCmpExpr(col + 1)} else ${firstGetter}_$col compare " +
-                s"${secondGetter}_$col }"
+              s"{ if (${firstGetter}_$col == ${secondGetter}_$col) ${genCmpExpr(col + 1)} else ${firstGetter}_$col$cast compare " +
+                s"${secondGetter}_$col$cast }"
           } else {
             if (col == (size - 1))
-              s"{ $firstGetter($col) compare $secondGetter($col) }"
+              s"{ $firstGetter($col)$cast compare $secondGetter($col)$cast }"
             else
-              s"{ if ($firstGetter($col) == $secondGetter($col)) ${genCmpExpr(col + 1)} else $firstGetter($col) compare " +
-                s"$secondGetter($col) }"
+              s"{ if ($firstGetter($col) == $secondGetter($col)) ${genCmpExpr(col + 1)} else $firstGetter($col)$cast compare " +
+                s"$secondGetter($col)$cast }"
           }
         }
 
