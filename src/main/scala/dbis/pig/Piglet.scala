@@ -106,7 +106,6 @@ object Piglet extends PigletLogging {
       arg[File]("<file>...") unbounded() required() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
     }
 
-
     // parser.parse returns Option[C]
     parser.parse(args, CompilerConfig()) match {
       case Some(config) => {
@@ -197,7 +196,10 @@ object Piglet extends PigletLogging {
       }
 
     } catch {
-      case e: Exception => logger.error(s"An error occured: ${e.getMessage}", e)
+      // don't print full stack trace to error
+      case e: Exception =>
+        logger.error(s"An error occured: ${e.getMessage}"/*, e*/)
+        logger.debug(e.toString)
 
     } finally {
 
