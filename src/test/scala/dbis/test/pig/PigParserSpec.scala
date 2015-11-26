@@ -795,6 +795,36 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   it should "parse a statement invoking a macro" in {
     assert(parseScript("a = my_macro(in, 42);") == List(MacroOp(Pipe("a"), "my_macro", Some(List(NamedField("in"), Value(42))))))
-
   }
+
+
+  it should "parse a load statement with schema and timestamp specification" in {
+    val uri = new URI("file.csv")
+    val schema = Schema(Array(Field("a", Types.IntType),
+      Field("b", Types.CharArrayType),
+      Field("c", Types.DoubleType)))
+    schema.timestampField = 0
+    assert(parseScript("""a = load 'file.csv' as (a:int, b:chararray, c:double) timestamp(a);""") ==
+      List(Load(Pipe("a"), uri, Some(schema))))
+  }
+
+  it should "parse a load statement with schema and positional timestamp specification" in {
+    val uri = new URI("file.csv")
+    val schema = Schema(Array(Field("a", Types.IntType),
+      Field("b", Types.CharArrayType),
+      Field("c", Types.LongType)))
+    schema.timestampField = 2
+    assert(parseScript("""a = load 'file.csv' as (a:int, b:chararray, c:long) timestamp($2);""") ==
+      List(Load(Pipe("a"), uri, Some(schema))))
+  }
+
+  it should "parse a socket_read statement with schema and timestamp" in {
+    val schema = Schema(Array(Field("f1", Types.LongType),
+      Field("f2", Types.CharArrayType)))
+    schema.timestampField = 0
+    assert(parseScript("a = SOCKET_READ 'localhost:5555' AS (f1: long, f2: chararray) TIMESTAMP(f1);", LanguageFeature.StreamingPig)
+      == List(SocketRead(Pipe("a"), SocketAddress("","localhost","5555"), "", Some(schema))))
+  }
+
+
 }

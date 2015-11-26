@@ -180,9 +180,6 @@ case class Foreach(out: Pipe,
 
 
   override def constructSchema: Option[Schema] = {
-    if (inputSchema.isDefined)
-      inputSchema.get.setBagName(inPipeName)
-
     generator match {
       case gen@GeneratorList(expr) => {
         val fields = gen.constructFieldList(inputSchema)

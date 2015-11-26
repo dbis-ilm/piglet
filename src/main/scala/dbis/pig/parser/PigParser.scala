@@ -253,7 +253,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   lazy val setKeyword = "set".ignoreCase
   lazy val returnsKeyword = "returns".ignoreCase
   lazy val accumulateKeyword = "accumulate".ignoreCase
-  lazy val delayKeyword = "delay".ignoreCase
+  lazy val timestampKeyword = "timestamp".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -299,7 +299,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     }
   }
   /*
-   * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>) [ AS (<Schema>) ]
+   * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>) [ AS (<Schema>) ] [ TIMESTAMP(<field>) ]
    */
   def loadSchemaClause: Parser[Schema] = asKeyword ~ "(" ~ repsep(fieldSchema, ",") ~ ")" ^^{
     case _ ~ _ ~ fieldList ~ _ => Schema(BagType(TupleType(fieldList.toArray)))
@@ -309,11 +309,17 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     case _ ~ loader ~ _ ~ params ~ _ => (loader, params)
   }
 
-  def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
-    case b ~ _ ~ _ ~ f ~ u ~ s => 
-      
+  def fieldRef: Parser[Ref] = posField | namedFieldWithoutLineage
+  def timestampClause: Parser[Ref] = timestampKeyword ~ "(" ~ fieldRef ~ ")" ^^ { case _ ~ _ ~ f ~ _ => f }
+
+  def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ~ (timestampClause?) ^^ {
+    case b ~ _ ~ _ ~ f ~ u ~ s ~ ts =>
       val uri = new URI(f)
-      
+      if (s.isDefined && ts.isDefined) ts.get match {
+        case NamedField(n, _) => s.get.timestampField = s.get.indexOfField(n)
+        case PositionalField(p) => s.get.timestampField = p
+        case _ => {}
+      }
       u match {
         case Some(p) => new Load(Pipe(b), uri, s, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
         case None => new Load(Pipe(b), uri, s)
@@ -432,13 +438,6 @@ class PigParser extends JavaTokenParsers with PigletLogging {
    * <A> = LIMIT <B> <Num>
    */
   def limitStmt: Parser[PigOperator] = bag ~ "=" ~ limitKeyword ~ bag ~ num ^^ { case out ~ _ ~ _ ~ in ~ num => new Limit(Pipe(out), Pipe(in), num) }
-
-  /*
-   * <A> = DELAY <B> <Size> , <Wait>
-   */
-  def delayStmt: Parser[PigOperator] = bag ~ "=" ~ delayKeyword ~ bag ~ floatingPointNumber ~ "," ~ num ^^ {
-    case out ~ _ ~ _ ~ in ~ size ~ _ ~ wait => new Delay(Pipe(out), Pipe(in), size.toDouble, wait.toInt)
-  }
 
   /*
    * <A> = JOIN <B> BY <Ref>, <C> BY <Ref>, ...
@@ -635,7 +634,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt | delayStmt) ~ ";" ^^ {
+    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
 
@@ -681,20 +680,32 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   def zmqAddress: Parser[SocketAddress] = "'" ~ (tcpSocket | ipcSocket | inprocSocket | pgmSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
 
   /*
-   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] USING <StreamFunc> [ AS <schema> ]
+   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] USING <StreamFunc> [ AS <schema> ] [ TIMESTAMP (<field>) ]
    *
    * Maybe other modes later
    */
   def socketReadStmt: Parser[PigOperator] =
-    bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
-      case out ~ _ ~ _ ~ addr ~ u ~ schema => u match {
-        case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
-              case None =>  SocketRead(Pipe(out), addr, "", schema)
+    bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ~ (timestampClause?) ^^ {
+      case out ~ _ ~ _ ~ addr ~ u ~ schema ~ ts =>
+        if (schema.isDefined && ts.isDefined) ts.get match {
+          case NamedField(n, _) => schema.get.timestampField = schema.get.indexOfField(n)
+          case PositionalField(p) => schema.get.timestampField = p
+          case _ => {}
+        }
+        u match {
+          case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+          case None =>  SocketRead(Pipe(out), addr, "", schema)
       }
 
     } |
-      bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
-        case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema => u match {
+      bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ~ (timestampClause?) ^^ {
+        case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema ~ ts =>
+          if (schema.isDefined && ts.isDefined) ts.get match {
+            case NamedField(n, _) => schema.get.timestampField = schema.get.indexOfField(n)
+            case PositionalField(p) => schema.get.timestampField = p
+            case _ => {}
+          }
+          u match {
           case Some(p) => SocketRead(Pipe(out), addr, mode, schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
           case None => SocketRead(Pipe(out), addr, mode, schema)
         }

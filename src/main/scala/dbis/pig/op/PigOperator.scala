@@ -172,11 +172,6 @@ trait PigOperator extends Rewritable with Serializable {
   def constructSchema: Option[Schema] = {
     if (inputs.nonEmpty) {
       schema = inputs.head.producer.schema
-      // the bag should be named with the output pipe
-      schema match {
-        case Some(s) => if (! outPipeName.isEmpty) s.setBagName(outPipeName)
-        case None =>
-      }
     }
     schema
   }
