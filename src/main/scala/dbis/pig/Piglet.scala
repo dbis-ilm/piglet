@@ -198,7 +198,7 @@ object Piglet extends PigletLogging {
     } catch {
       // don't print full stack trace to error
       case e: Exception =>
-        logger.error(s"An error occured: ${e.getMessage}", e)
+        logger.error(s"An error occured: ${e.getMessage}")
         logger.debug(e.toString)
 
     } finally {
