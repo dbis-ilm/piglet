@@ -7,6 +7,7 @@ import java.nio.file.Path
 import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.parser.PigParser
 import dbis.pig.plan.rewriting.Rewriter._
+import scala.collection.mutable
 import scala.io.Source
 import scala.collection.mutable.ListBuffer
 import dbis.pig.parser.PigParser
@@ -61,7 +62,7 @@ object PigletCompiler extends PigletLogging {
     */
   def createDataflowPlan(input: String, params: Map[String,String], backend: String,
                          langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
-    // 1. we prepare a soure from the string
+    // 1. we prepare a source from the string
     val source = Source.fromString(input.stripMargin)
     // 2. then we parse it and construct a dataflow plan
     val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeature))
@@ -95,24 +96,44 @@ object PigletCompiler extends PigletLogging {
    * @param lines the original script
    * @return the script where IMPORTs are replaced
    */
-   def resolveImports(lines: Iterator[String]): Iterator[String] = {
+   def resolveImports(lines: Iterator[String]): (Iterator[String], Map[String,String]) = {
+    var params = Map[String,String]()
     val buf = ListBuffer.empty[String]
     for (l <- lines) {
       if (l.matches("""[ \t]*[iI][mM][pP][oO][rR][tT][ \t]*'([^'\p{Cntrl}\\]|\\[\\"bfnrt]|\\u[a-fA-F0-9]{4})*'[ \t\n]*;""")) {
         val s = l.split(" ")(1)
         val name = s.substring(1, s.length - 2)
         val path = Paths.get(name)
-        val resolvedLine = resolveImports(loadScript(path))
+        val (resolvedLine, newParams) = resolveImports(loadScript(path))
         buf ++= resolvedLine
+        params ++= newParams
+      }
+      else if (l.trim.toLowerCase.startsWith("%declare")) {
+        val res = l.split(" ")
+        if (res.length >= 2)
+          params += (res(1) -> res(2).stripSuffix(";"))
       }
       else
-        buf += l
+          buf += l
     }
-    buf.toIterator
+    (buf.toIterator, params)
   }
 
+  /*
+  private def getDeclareStatements(lines: Iterator[String]): Map[String,String] = {
+    for (l <- lines) {
+      if (l.trim.toLowerCase.startsWith("%declare")) {
+        val res = l.split(" ")
+        if (res.length >= 2)
+          params += (res(1) -> res(2))
+      }
+    }
+    params
+  }
+*/
 
-/**
+
+  /**
  * Create Scala code for the given backend from the source string.
  * This method is provided mainly for Zeppelin.
  *
@@ -240,7 +261,7 @@ def createCodeFromInput(source: String, backend: String): String = {
     */
   private def loadScript(inputFile: Path): Iterator[String] = Source.fromFile(inputFile.toFile).getLines()
 
-  /**
+ /**
     * Invokes the PigParser to process the given source. In addition, parameters specified by the --param flag
     * are resolved.
     *
@@ -251,12 +272,14 @@ def createCodeFromInput(source: String, backend: String): String = {
     */
   private def parseScriptFromSource(source: Source, params: Map[String,String],
                                     langFeature: LanguageFeature.LanguageFeature): List[PigOperator] = {
-    // Handle IMPORT statements.
-	  val sourceLines = resolveImports(source.getLines())
-	  
-	  if (params.nonEmpty) {
+    // Handle IMPORT and %DECLARE statements.
+	  val (sourceLines, declareParams) = resolveImports(source.getLines())
+    logger.info("declared parameters: " + declareParams.mkString(", "))
+    val allParams = params ++ declareParams
+
+	  if (allParams.nonEmpty) {
 	    // Replace placeholders by parameters.
-		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"), langFeature)
+		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, allParams)).mkString("\n"), langFeature)
 	  }
 	  else {
 		  PigParser.parseScript(sourceLines.mkString("\n"), langFeature)

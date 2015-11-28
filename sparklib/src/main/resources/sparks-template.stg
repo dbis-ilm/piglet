@@ -3,6 +3,7 @@ init_code(includes) ::= <<
 import org.apache.spark._
 import org.apache.spark.streaming._
 import dbis.pig.backends.{SchemaClass, Record}
+import dbis.pig.tools._
 import dbis.pig.backends.spark._
 
 object SECONDS {
@@ -32,11 +33,11 @@ object <name> {
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
-        val conf = new SparkConf().setAppName("<name>_App")
-        val ssc = new StreamingContext(conf, Seconds(1))
+        SparkStream.setAppName("<name>_App")
+        val ssc = SparkStream.ssc
         <if (profiling)>
         val perfMon = new PerfMonitor("<name>_App")
-        sc.sparkContext.addSparkListener(perfMon)
+        ssc.sparkContext.addSparkListener(perfMon)
         <endif>
 >>
 
@@ -189,8 +190,6 @@ rscript(out,in,script) ::=<<
 
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
-        val listen = new GracefullyStopListener(ssc)
-        ssc.addStreamingListener(listen)
         ssc.start()             
         ssc.awaitTermination()
     }

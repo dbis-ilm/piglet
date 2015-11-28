@@ -35,20 +35,13 @@ import scala.collection.mutable.Map
 case class Load(out: Pipe, 
                 var file: URI,
                 var loadSchema: Option[Schema] = None,
-                loaderFunc: Option[String] = None, //BackendManager.backend.defaultConnector,
+                loaderFunc: Option[String] = None,
                 loaderParams: List[String] = null) extends PigOperator {
   _outputs = List(out)
   _inputs = List()
   schema = loadSchema
 
-  override def constructSchema: Option[Schema] = {
-    /*
-     * Either the schema was defined or it is None.
-     */
-    if (schema.isDefined)
-      schema.get.setBagName(outPipeName)
-    schema
-  }
+  override def constructSchema: Option[Schema] = schema
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

@@ -5,6 +5,7 @@ import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd._
 import dbis.pig.backends.{SchemaClass, Record}
+import dbis.pig.tools._
 import dbis.pig.backends.spark._
 
 <\n>
@@ -154,7 +155,7 @@ streamOp(out, in, op, params, class, in_fields, out_fields) ::=<<
 
 // ----------------------- FS commands ----------------------------------------
 fs(cmd,params) ::=<<
-    HDFSService.process(<cmd>, <params>)
+    HDFSService.process("<cmd>", <params>)
 >>
 
 // ------------------ RSCRIPT operators ----------------------------------------

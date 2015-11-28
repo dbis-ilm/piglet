@@ -24,6 +24,7 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.PrettyPrinter._
 import dbis.pig.schema.SchemaException
+import dbis.pig.tools.logging.LogLevel
 import dbis.pig.tools.{HDFSService, FileTools, Conf}
 import dbis.pig.backends.{BackendConf, BackendManager}
 import dbis.pig.plan.MaterializationManager
@@ -63,7 +64,8 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
                         language: String = "pig",
                         interactive: Boolean = true,
                         profiling: Boolean = false,
-                        backendArgs: Map[String, String] = Map())
+                        backendArgs: Map[String, String] = Map(),
+                        loglevel: Option[String] = None)
 
 
   val profiling = false
@@ -238,9 +240,8 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     * Prints the usage string.
     */
   def usage: Unit = {
-    consoleReader.println(
-      """
-        |Commands:
+    println(
+      """Commands:
         |<pig latin statement>; - See the PigLatin manual for details: http://hadoop.apache.org/pig
         |Diagnostic commands:
         |    describe <alias> - Show the schema for the alias.
@@ -373,7 +374,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     catch {
       case e: Throwable =>
         Console.err.println(s"error while executing: ${e.getMessage}")
-        e.printStackTrace(Console.err)
+        // e.printStackTrace(Console.err)
         cleanupResult(scriptName)
     }
 
@@ -427,8 +428,9 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     var outDir: Path = null
     var interactive: Boolean = true
     var profiling = false
-    val parser = new OptionParser[REPLConfig]("PigShell") {
-      head("PigShell", "0.3")
+    var logLevel: Option[String] = None
+    val parser = new OptionParser[REPLConfig]("PigREPL") {
+      head("PigletREPL", BuildInfo.version)
       opt[Unit]('i', "interactive") hidden() action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x) } text ("output directory for generated code")
@@ -436,6 +438,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
       opt[Boolean]("profiling") optional() action { (x, c) => c.copy(profiling = x) } text ("Switch on profiling")
       opt[String]('l', "language") optional() action { (x, c) => c.copy(language = x) } text ("Accepted language (pig = default, sparql, streaming)")
+      opt[String]('g', "log-level") optional() action { (x,c) => c.copy(loglevel = Some(x.toUpperCase()))} text ("Set the log level: DEBUG, INFO, WARN, ERROR")
       opt[Map[String, String]]("<backend-arguments>...") optional() action { (x, c) => c.copy(backendArgs = x) } text ("Pig script files to execute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
@@ -455,12 +458,22 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
           case _ => LanguageFeature.PlainPig
         }
         backendArgs = config.backendArgs
+        logLevel = config.loglevel
       }
       case None =>
         // arguments are bad, error message will have been displayed
         return
     }
 
+    println(s"Welcome to PigREPL ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
+    if(logLevel.isDefined) {
+      try {
+        logger.setLevel(LogLevel.withName(logLevel.get))
+      } catch {
+        case e: NoSuchElementException => println(s"ERROR: invalid log level ${logLevel} - continue with default")
+      }
+    }
+    
     logger debug s"""Running REPL with backend "$backend" """
 
     backendConf = BackendManager.backend(backend)

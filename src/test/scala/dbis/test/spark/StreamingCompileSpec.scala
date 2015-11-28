@@ -57,6 +57,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
         |import org.apache.spark._
         |import org.apache.spark.streaming._
         |import dbis.pig.backends.{SchemaClass, Record}
+        |import dbis.pig.tools._
         |import dbis.pig.backends.spark._
         |
         |object SECONDS {
@@ -68,10 +69,8 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
         |
         |object test {
         |    def main(args: Array[String]) {
-        |      val conf = new SparkConf().setAppName("test_App")
-        |      val ssc = new StreamingContext(conf, Seconds(1))
-        |      val listen = new GracefullyStopListener(ssc)
-        |      ssc.addStreamingListener(listen)
+        |      SparkStream.setAppName("test_App")
+        |      val ssc = SparkStream.ssc
         |      ssc.start()
         |      ssc.awaitTermination()
         |   }

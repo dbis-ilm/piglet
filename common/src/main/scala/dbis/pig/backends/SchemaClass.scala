@@ -34,6 +34,15 @@ trait SchemaClass {
     * @return a string representation
     */
   override def toString() = "(" + mkString() + ")"
+
+  /**
+    * Returns the timestamp of the tuple - either application or system time.
+    * The default implementation returns always 0 and has to be overwritten
+    * in subclasses.
+    *
+    * @return the timestamp of the tuple
+    */
+  def timestamp(): Long = 0
 }
 
 /**
@@ -44,5 +53,11 @@ trait SchemaClass {
 case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = fields.mkString(delim)
 
+  /**
+    * Returns the value for field at position idx
+    *
+    * @param idx the field position
+    * @return the value of the field
+    */
   def get(idx: Int) = fields(idx)
 }

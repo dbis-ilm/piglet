@@ -100,7 +100,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",  
-    Types.ByteArrayType -> "String", //TODO: check this
+    Types.ByteArrayType -> "Any", //TODO: check this
     Types.AnyType -> "String") //TODO: check this
 
   /**
@@ -475,9 +475,22 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     * @return a string representing the helper code
     */
   def emitHelperClass(node: PigOperator): String = {
+    /**
+      * Bytearray fields need special handling: they are mapped to Any which is not comparable.
+      * Thus we add ".toString" in this case.
+      *
+      * @param col the column used in comparison
+      * @return ".toString" or ""
+      */
+    def genImplicitCast(col: Int): String = node.schema match {
+      case Some(s) => if (s.field(col).fType == Types.ByteArrayType) ".toString" else ""
+      case None => ".toString"
+    }
+
     node match {
       case OrderBy(out, in, orderSpec, _) => {
         val num = orderSpec.length
+
         /**
           * Emit the comparison expression used in in the orderHelper class
           *
@@ -485,9 +498,10 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           * @return the expression code
           */
         def genCmpExpr(col: Int): String = {
+          val cast = genImplicitCast(col - 1)
           val cmpStr = if (orderSpec(col - 1).dir == OrderByDirection.AscendingOrder)
-            s"this.c$col compare that.c$col"
-          else s"that.c$col compare this.c$col"
+            s"this.c$col$cast compare that.c$col$cast"
+          else s"that.c$col$cast compare this.c$col$cast"
           if (col == num) s"{ $cmpStr }"
           else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col + 1)} else $cmpStr }"
         }
@@ -522,6 +536,16 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
 
         params += "schemaclass" -> schemaClass
 
+        def emitRefAccessor(schema: Option[Schema], ref: Ref) = ref match {
+          case NamedField(f, _) if schema.isEmpty =>
+            throw new TemplateException(s"invalid field name $f")
+          case nf @ NamedField(f, _) if schema.get.indexOfField(nf) == -1 =>
+            throw new TemplateException(s"invalid field name $f")
+          case nf: NamedField => schema.get.indexOfField(nf)
+          case p @ PositionalField(pos) => pos
+          case _ => throw new TemplateException(s"invalid ordering field $ref")
+        }
+
         def genCmpExpr(col: Int): String = {
           var firstGetter = "first."
           var secondGetter = "second."
@@ -536,18 +560,21 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
             secondGetter += "get"
           }
 
+          val colname = emitRefAccessor(node.inputSchema, orderSpec(col).field)
+
+          val cast = genImplicitCast(col)
           if (hasSchema) {
             if (col == (size - 1))
-              s"{ ${firstGetter}_$col compare ${secondGetter}_$col }"
+              s"{ ${firstGetter}_${colname}$cast compare ${secondGetter}_${colname}$cast }"
             else
-              s"{ if (${firstGetter}_$col == ${secondGetter}_$col) ${genCmpExpr(col + 1)} else ${firstGetter}_$col compare " +
-                s"${secondGetter}_$col }"
+              s"{ if (${firstGetter}_${colname} == ${secondGetter}_${colname}) ${genCmpExpr(col + 1)} else ${firstGetter}_${colname}$cast compare " +
+                s"${secondGetter}_${colname}$cast }"
           } else {
-            if (col == (size - 1))
-              s"{ $firstGetter($col) compare $secondGetter($col) }"
+            if ({colname} == (size - 1))
+              s"{ $firstGetter(${colname})$cast compare $secondGetter(${colname})$cast }"
             else
-              s"{ if ($firstGetter($col) == $secondGetter($col)) ${genCmpExpr(col + 1)} else $firstGetter($col) compare " +
-                s"$secondGetter($col) }"
+              s"{ if ($firstGetter(${colname}) == $secondGetter(${colname})) ${genCmpExpr(col + 1)} else $firstGetter(${colname})$cast compare " +
+                s"$secondGetter(${colname})$cast }"
           }
         }
 
@@ -754,7 +781,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
       case sOp@StreamOp(out, in, op, params, schema) => emitStreamThrough(sOp)
       // case MacroOp(out, name, params) => callST("call_macro", Map("out"->node.outPipeName,"macro_name"->name,"params"->emitMacroParamList(node.schema, params)))
-      case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
+      case hOp@HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd,
+        "params"-> s"List(${hOp.paramString})"))
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case ConstructBag(in, ref) => "" // used only inside macros
       case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again

@@ -17,6 +17,7 @@
 package dbis.pig.plan.rewriting.rulesets
 
 import dbis.pig.op._
+import dbis.pig.op.cmd.HdfsCmd
 import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.{Rewriter, RewriterException}
@@ -128,6 +129,7 @@ object GeneralRuleset extends Ruleset {
   def removeNonStorageSinks(node: Any): Option[PigOperator] = node match {
     // Store and Dump are ok
     case Store(_, _, _, _) => None
+    case HdfsCmd(_, _) => None
     case Dump(_) => None
     // To prevent recursion, empty is ok as well
     case Empty(_) => None
@@ -228,6 +230,12 @@ object GeneralRuleset extends Ruleset {
       None
   }
 
+  /*
+  def f(g: Grouping): Option[Grouping] = g match {
+    case SuccE(g, foreach: Foreach) => // AllSuccE
+    case _ => None
+  }
+  */
   def foreachGrouping(fo: Foreach): Option[Foreach] = {
     def processExpression(schema: Option[Schema], e: GeneratorExpr): GeneratorExpr = {
       var res = e

@@ -64,6 +64,41 @@ where Pig statements can be entered at the prompt and are executed as soon as
 a `DUMP` or `STORE` statement is entered. Furthermore, the schema can be printed using `DESCRIBE`.
 With the `-b` option you can specify which backend (spark, flink) will be used.
 
+#### Docker ####
+
+Piglet can also be run as a [Docker](https://www.docker.com/) container. However, the image is not 
+yet on DockerHub, so it has to be built manually:
+```
+sbt clean package assembly
+docker build -t dbis/piglet .
+```
+
+Currently, the Docker image supports the Spark backend only. 
+
+To start the container, run:
+```
+docker run -it --rm --name piglet dbis/piglet 
+```
+
+This uses the container's entrypoint which runs piglet. The above command will print the help message.
+
+You can start the interactive mode, using `-i` option and enter your script. 
+
+```
+docker run -it --rm --name piglet dbis/piglet -b spark -i
+```
+
+Alternatively, you can add your existing files into the container by [mounting volumes](https://docs.docker.com/engine/userguide/dockervolumes/#mount-a-host-file-as-a-data-volume) and run the script in batch mode:
+```
+docker run -it --rm --name piglet -v /tmp/test.pig:/test.pig dbis/piglet -b spark /test.pig
+```
+
+As mentioned before, the container provides an entrypoint that executes piglet. In case you need a bash for that container, 
+you need to overwrite the entrypoint:
+```
+docker run -it --rm --name piglet --entrypoint /bin/bash dbis/piglet 
+```
+
 ### Testing ###
 
 We use the Scala testing framework as well as the scoverage tool for test coverage. You can produce
@@ -122,6 +157,13 @@ In addition to the standard Pig Latin statements we provide the following extens
 ```
 MATERIALIZE bag;
 ``` 
+ * MATCH_EVENT - implements complex event processing. The statement supports the following clauses
+    * PATTERN - defines the sequence of events, e.g. SEQ for a sequence, OR for alternative occurence, AND for mandatory occurence of both events, and NEG
+      for the absence of an event
+    * WITH - describes the different events, e.g. (A: x == 0) means that the current tuple is detected as event A if x == 0
+    * MODE - ???
+    * WITHIN - specifies the time frame for considering the sequence as a single event sequence
+
  * embedded code - allows to embed Scala code for implementing user-defined functions and operators directly into the script. The code has to be enclosed by `<%` and `%>`. Usage:
 
 ```
@@ -136,12 +178,5 @@ Furthermore, Piglet adds two statements simplifying the processing of RDF data:
  
 Finally, for processing streaming data using streaming backends (Flink Streaming, Spark Streaming, Storm, PipeFabric) we have added the following statements:
  * WINDOW
- * MATCH_EVENT - implements complex event processing. The statement supports the following clauses
-    * PATTERN - defines the sequence of events, e.g. SEQ for a sequence, OR for alternative occurence, AND for mandatory occurence of both events, and NEG
-      for the absence of an event 
-    * WITH - describes the diffent events, e.g. (A: x == 0) means that the current tuple is detected as event A if x == 0
-    * MODE
-    * WITHIN - specifies the time frame for considering the sequence as a single event sequence
-     
  * SOCKET_READ
  * SOCKET_WRITE

@@ -12,7 +12,7 @@ interactive=false
 # @params: $1 = spark | flink |shell
 ##############################################################
 function printLogo {
-    if [ "$1" == "spark" ]; then
+    if [ "$1" == "spark" ] || [ "$1" == "sparks" ]; then
 	echo '
  ____  _         _          ____                   _
 |  _ \(_) __ _  | |_ ___   / ___| _ __   __ _ _ __| | __
@@ -191,7 +191,9 @@ else
 fi
 
 # TODO: we should find our jar file the same way we do for spark
-PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
+if [ -z "$PIG_LIB" ]; then
+    PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
+fi
 
 CP=$PIG_LIB:$CLASSPATH
 
