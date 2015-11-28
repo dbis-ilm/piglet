@@ -536,6 +536,15 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
 
         params += "schemaclass" -> schemaClass
 
+        def emitRefAccessor(schema: Option[Schema], ref: Ref) = ref match {
+          case NamedField(f, _) if schema.isEmpty =>
+            throw new TemplateException(s"invalid field name $f")
+          case nf @ NamedField(f, _) if schema.get.indexOfField(nf) == -1 =>
+            throw new TemplateException(s"invalid field name $f")
+          case nf: NamedField => schema.get.indexOfField(nf)
+          case p @ PositionalField(pos) => pos
+        }
+
         def genCmpExpr(col: Int): String = {
           var firstGetter = "first."
           var secondGetter = "second."
@@ -550,19 +559,21 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
             secondGetter += "get"
           }
 
+          val colname = emitRefAccessor(node.inputSchema, orderSpec(col).field)
+
           val cast = genImplicitCast(col)
           if (hasSchema) {
             if (col == (size - 1))
-              s"{ ${firstGetter}_$col$cast compare ${secondGetter}_$col$cast }"
+              s"{ ${firstGetter}_${colname}$cast compare ${secondGetter}_${colname}$cast }"
             else
-              s"{ if (${firstGetter}_$col == ${secondGetter}_$col) ${genCmpExpr(col + 1)} else ${firstGetter}_$col$cast compare " +
-                s"${secondGetter}_$col$cast }"
+              s"{ if (${firstGetter}_${colname} == ${secondGetter}_${colname}) ${genCmpExpr(col + 1)} else ${firstGetter}_${colname}$cast compare " +
+                s"${secondGetter}_${colname}$cast }"
           } else {
-            if (col == (size - 1))
-              s"{ $firstGetter($col)$cast compare $secondGetter($col)$cast }"
+            if ({colname} == (size - 1))
+              s"{ $firstGetter(${colname})$cast compare $secondGetter(${colname})$cast }"
             else
-              s"{ if ($firstGetter($col) == $secondGetter($col)) ${genCmpExpr(col + 1)} else $firstGetter($col)$cast compare " +
-                s"$secondGetter($col)$cast }"
+              s"{ if ($firstGetter(${colname}) == $secondGetter(${colname})) ${genCmpExpr(col + 1)} else $firstGetter(${colname})$cast compare " +
+                s"$secondGetter(${colname})$cast }"
           }
         }
 
