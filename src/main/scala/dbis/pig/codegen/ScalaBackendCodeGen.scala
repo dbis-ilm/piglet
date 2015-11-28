@@ -543,6 +543,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
             throw new TemplateException(s"invalid field name $f")
           case nf: NamedField => schema.get.indexOfField(nf)
           case p @ PositionalField(pos) => pos
+          case _ => throw new TemplateException(s"invalid ordering field $ref")
         }
 
         def genCmpExpr(col: Int): String = {
