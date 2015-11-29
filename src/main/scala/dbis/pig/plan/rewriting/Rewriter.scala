@@ -146,7 +146,7 @@ object Rewriter extends PigletLogging
     * @return
     */
   private def processPigOperator(sink: PigOperator, strategy: Strategy): Any = {
-    val rewriter = downup(attempt(strategy))
+    val rewriter = manybu(strategy)
     kiamarewrite(rewriter)(sink)
   }
 
