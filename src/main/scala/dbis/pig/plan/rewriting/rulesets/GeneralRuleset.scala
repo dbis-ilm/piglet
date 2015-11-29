@@ -77,14 +77,12 @@ object GeneralRuleset extends Ruleset {
   //noinspection MutatorLikeMethodIsParameterless
   def removeDuplicateFilters = rulefs[Filter] {
     case op@Filter(_, _, pred, _) =>
-      topdown(
-        attempt(
-          op.outputs.flatMap(_.consumer).
+       val strat = op.outputs.flatMap(_.consumer).
             filter(_.isInstanceOf[Filter]).
-            filter { f: PigOperator => extractPredicate(f.asInstanceOf[Filter].pred) == extractPredicate(pred) }.
-            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, buildRemovalStrategy(pigOp)
-            )
-            }))
+            filter { f: PigOperator => extractPredicate(f.asInstanceOf[Filter].pred) == extractPredicate(pred)}.
+            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) =>
+              ior(s, buildRemovalStrategy(pigOp))}
+      manybu(strat)
   }
 
   def splitIntoToFilters(node: Any): Option[List[Filter]] = node match {
