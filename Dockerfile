@@ -16,8 +16,8 @@ ENV BACKEND_DIR /sparklib/target/scala-2.11/*
 ENV SPARK_JAR /piglet/spark-assembly-1.5.1-hadoop2.4.0.jar 
 
 
-RUN wget -q http://cloud01.prakinf.tu-ilmenau.de/spark-assembly-1.5.1-hadoop2.4.0.jar 
-RUN mv spark-assembly-1.5.1-hadoop2.4.0.jar /piglet/
+RUN wget -q -P /piglet http://moria.prakinf.tu-ilmenau.de/spark-assembly-1.5.1-hadoop2.4.0.jar 
+#RUN mv spark-assembly-1.5.1-hadoop2.4.0.jar /piglet/
 
 
 ENTRYPOINT ["/piglet/piglet"]
