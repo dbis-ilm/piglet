@@ -72,9 +72,12 @@ Furthermore, Piglet adds two statements simplifying the processing of RDF data:
  * TUPLIFY
  * BGP_FILTER
  
+Using the SPARQL statements requires to run `piglet` with the `--language sparql` option.
+
 ### Stream Processing ###
  
-Finally, for processing streaming data using streaming backends (Flink Streaming, Spark Streaming, Storm, PipeFabric) we have added the following statements:
+Finally, for processing streaming data using streaming backends (Flink Streaming, Spark Streaming, Storm, PipeFabric) 
+we have added the following statements which can we used if you start `piglet` with the `--language streaming` option.
 
 #### Window ####
 

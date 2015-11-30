@@ -110,12 +110,6 @@ you need to overwrite the entrypoint:
 docker run -it --rm --name piglet --entrypoint /bin/bash dbis/piglet 
 ```
 
-### Testing ###
-
-We use the Scala testing framework as well as the scoverage tool for test coverage. You can produce
-a coverage report by running `sbt clean coverage test`. The results can be found in
-`target/scala-2.11/scoverage-report/index.html`.
-
 ### Configuration ###
 
 To configure the program, we ship a configuration file. When starting the program for the first time, we will create our program home directory in your home directory and also copy the configuration file into this directory.
@@ -134,4 +128,7 @@ More detailed information on how to create backends can be found in [backends.md
 
 ### Further Information ###
 
-Details on the supported language features (statements, functions, etc.) are described [here](Language.md).
+ * Details on the supported language features (statements, functions, etc.) are described [here](Language.md).
+ * We use the [Scala testing framework](http://www.scalatest.org/) as well as the [scoverage tool](http://scoverage.org/) 
+   for test coverage. You can produce a coverage report by running `sbt clean coverage test`. The results can be found in
+   `target/scala-2.11/scoverage-report/index.html`.
