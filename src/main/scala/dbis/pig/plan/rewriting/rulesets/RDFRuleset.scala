@@ -674,11 +674,13 @@ object RDFRuleset extends Ruleset {
       f.constructSchema
     }
 
-    val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
-      GeneratorExpr(
-        RefExpr(
-          NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
-        Some(Field(nf.name, Types.CharArrayType)))
+    val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map {
+      case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+        GeneratorExpr(
+          RefExpr(
+            NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
+          Some(Field(nf.name, Types.CharArrayType)))
+      case _ => throw new IllegalArgumentException("Can't build generators from " + namedFieldToPipeName)
     } toList
 
     val foreach = Foreach(out, Pipe(joinOutPipeName, join),
@@ -804,11 +806,13 @@ object RDFRuleset extends Ruleset {
       }
 
       // TODO this is duplicated from J1
-      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
-        GeneratorExpr(
-          RefExpr(
-            NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
-          Some(Field(nf.name, Types.CharArrayType)))
+      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map {
+        case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+          GeneratorExpr(
+            RefExpr(
+              NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
+            Some(Field(nf.name, Types.CharArrayType)))
+        case _ => throw new IllegalArgumentException("Can't build generators from " + namedFieldToPipeName)
       } toList
 
       val foreach = Foreach(out, Pipe(joinOutPipeName, join),
@@ -911,11 +915,13 @@ object RDFRuleset extends Ruleset {
       }
 
       // TODO this is duplicated from J1
-      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map { case (nf, (firstSourceName, firstSourceColumn) :: _) =>
-        GeneratorExpr(
-          RefExpr(
-            NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
-          Some(Field(nf.name, Types.CharArrayType)))
+      val generators = namedFieldToPipeName.toSeq.sortBy(_._1.name).map {
+        case (nf, (firstSourceName, firstSourceColumn) :: _) =>
+          GeneratorExpr(
+            RefExpr(
+              NamedField(Column.columnToNamedField(firstSourceColumn).name, List(firstSourceName))),
+            Some(Field(nf.name, Types.CharArrayType)))
+        case _ => throw new IllegalArgumentException("Can't build generators from " + namedFieldToPipeName)
       } toList
 
       val foreach = Foreach(out, Pipe(joinOutPipeName, join),
