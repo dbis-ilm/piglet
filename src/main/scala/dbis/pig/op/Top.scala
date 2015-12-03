@@ -14,23 +14,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting.dsl.builders
+package dbis.pig.op
 
-import dbis.pig.op.PigOperator
-import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.plan.rewriting.dsl.traits.{PigOperatorBuilderT, BuilderT}
-
-import org.kiama.rewriting.Rewriter.strategyf
-import scala.reflect.{ClassTag, classTag}
-
-/** Wraps strategy data, such as the rewriting function and pre-checks and adds strategies from them.
+/** An operator for top-k queries.
   *
-  * @tparam FROM
-  * @tparam TO
+  * It can also be used for bottom-k by changing the orderSpec
+  *
+  * @param out
+  * @param in
+  * @param orderSpec
+  * @param num
   */
-class Builder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends PigOperatorBuilderT[FROM, TO] {
-  def addAsStrategy(func: (FROM => Option[TO])) = {
-    val typeWrapped = Rewriter.buildTypedCaseWrapper(func)
-    Rewriter.addStrategy(strategyf(t => typeWrapped(t)))
-  }
+case class Top(out: Pipe, in: Pipe, orderSpec: List[OrderBySpec], num: Int) extends PigOperator{
+  outputs = List(out)
+  inputs = List(in)
+
+  override def lineageString: String = s"""TOP${num}""" + super.lineageString
 }

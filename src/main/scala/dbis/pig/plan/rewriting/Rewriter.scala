@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.op.{PigOperator, _}
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rules.registerAllRules
@@ -94,7 +94,7 @@ case class RewriterException(msg: String) extends Exception(msg)
   * @todo Not all links in this documentation link to the correct methods, most notably links to overloaded ones.
   *
   */
-object Rewriter extends LazyLogging
+object Rewriter extends PigletLogging
                 with StrategyBuilders
                 with DFPSupport
                 with WindowSupport

@@ -1,14 +1,14 @@
 package dbis.pig.backends
 
 import dbis.pig.tools.Conf
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import java.net.URLClassLoader
 
 
 /**
  * Manages the available backends. 
  */
-object BackendManager extends LazyLogging {
+object BackendManager extends PigletLogging {
  
   /**
    * Loaded backend

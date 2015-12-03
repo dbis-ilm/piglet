@@ -1,10 +1,13 @@
 package dbis.pig.codegen
 
+import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.parser.LanguageFeature
 import java.nio.file.Path
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.parser.PigParser
+import dbis.pig.plan.rewriting.Rewriter._
+import scala.collection.mutable
 import scala.io.Source
 import scala.collection.mutable.ListBuffer
 import dbis.pig.parser.PigParser
@@ -19,7 +22,7 @@ import dbis.pig.tools.CppCompiler
 import dbis.pig.tools.CppCompilerConf
 import dbis.pig.tools.Conf
 
-object PigletCompiler extends LazyLogging {
+object PigletCompiler extends PigletLogging {
   
   /**
    * Helper method to parse the given file into a dataflow plan
@@ -27,28 +30,53 @@ object PigletCompiler extends LazyLogging {
    * @param inputFile The file to parse
    * @param params Key value pairs to replace placeholders in the script
    * @param backend The name of the backend
+   * @param langFeature the Pig dialect used for parsing
    */
-  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String, langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
-      // 1. we read the Pig file
-      val source = Source.fromFile(inputFile.toFile())
-      
-      logger.debug(s"""loaded pig script from "$inputFile" """)
-  
-      // 2. then we parse it and construct a dataflow plan
-      val plan = new DataflowPlan(parseScriptFromSource(source, params, backend, langFeature))
-      
+  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String,
+                         langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
+    // 1. we read the Pig file
+    val source = Source.fromFile(inputFile.toFile)
 
-      if (!plan.checkConnectivity) {
-        logger.error(s"dataflow plan not connected for $inputFile")
-        return None
-      }
+    logger.debug( s"""loaded pig script from "$inputFile" """)
 
+    // 2. then we parse it and construct a dataflow plan
+    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeature))
+
+    if (!plan.checkConnectivity) {
+      logger.error(s"dataflow plan not connected for $inputFile")
+      None
+    }
+    else {
       logger.debug(s"successfully created dataflow plan for $inputFile")
-
-      return Some(plan)
-    
+      Some(plan)
+    }
   }
-  
+
+  /**
+    * Helper method to parse the given Piglet script from a string into a dataflow plan
+    *
+    * @param input The file to parse
+    * @param params Key value pairs to replace placeholders in the script
+    * @param backend The name of the backend
+    * @param langFeature the Pig dialect used for parsing
+    */
+  def createDataflowPlan(input: String, params: Map[String,String], backend: String,
+                         langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
+    // 1. we prepare a source from the string
+    val source = Source.fromString(input.stripMargin)
+    // 2. then we parse it and construct a dataflow plan
+    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeature))
+
+    if (!plan.checkConnectivity) {
+      logger.error("dataflow plan not connected")
+      None
+    }
+    else {
+      logger.debug("successfully created dataflow plan from input")
+      Some(plan)
+    }
+  }
+
   /**
    * Replace placeholders in the script with values provided by the given map
    * 
@@ -68,22 +96,63 @@ object PigletCompiler extends LazyLogging {
    * @param lines the original script
    * @return the script where IMPORTs are replaced
    */
-   def resolveImports(lines: Iterator[String]): Iterator[String] = {
+   def resolveImports(lines: Iterator[String]): (Iterator[String], Map[String,String]) = {
+    var params = Map[String,String]()
     val buf = ListBuffer.empty[String]
     for (l <- lines) {
       if (l.matches("""[ \t]*[iI][mM][pP][oO][rR][tT][ \t]*'([^'\p{Cntrl}\\]|\\[\\"bfnrt]|\\u[a-fA-F0-9]{4})*'[ \t\n]*;""")) {
         val s = l.split(" ")(1)
         val name = s.substring(1, s.length - 2)
         val path = Paths.get(name)
-        val resolvedLine = resolveImports(loadScript(path))
+        val (resolvedLine, newParams) = resolveImports(loadScript(path))
         buf ++= resolvedLine
+        params ++= newParams
+      }
+      else if (l.trim.toLowerCase.startsWith("%declare")) {
+        val res = l.split(" ")
+        if (res.length >= 2)
+          params += (res(1) -> res(2).stripSuffix(";"))
       }
       else
-        buf += l
+          buf += l
     }
-    buf.toIterator
+    (buf.toIterator, params)
   }
-  
+
+  /**
+ * Create Scala code for the given backend from the source string.
+ * This method is provided mainly for Zeppelin.
+ *
+ * @param source the Piglet script
+ * @param backend the backend used to compile and execute
+ * @return the generated Scala code
+ */
+def createCodeFromInput(source: String, backend: String): String = {
+  var plan = new DataflowPlan(PigParser.parseScript(source, LanguageFeature.PlainPig))
+
+  if (!plan.checkConnectivity) {
+    logger.error(s"dataflow plan not connected")
+    return ""
+  }
+
+  logger.debug(s"successfully created dataflow plan")
+  // plan = processPlan(plan)
+
+  // compile it into Scala code for Spark
+  val generatorClass = Conf.backendGenerator(backend)
+  val extension = Conf.backendExtension(backend)
+  val backendConf = BackendManager.backend(backend)
+  val templateFile = backendConf.templateFile
+  val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
+  val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
+
+  // 5. generate the Scala code
+  val code = compiler.compile("blubs", plan, profiling = false, forREPL = true)
+  logger.debug("successfully generated scala program")
+  code
+}
+
+
   /**
    * Compile the given plan into a executable program.
    * 
@@ -98,7 +167,7 @@ object PigletCompiler extends LazyLogging {
   def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, backendJar: Path, 
       templateFile: String, backend: String, profiling: Boolean): Option[Path] = {
     
-    // 4. compile it into Scala code for Spark
+    // compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)
     logger.debug(s"using generator class: $generatorClass")
     val extension = Conf.backendExtension(backend)
@@ -109,12 +178,12 @@ object PigletCompiler extends LazyLogging {
     val codeGenerator = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
     logger.debug(s"successfully created code generator class $codeGenerator")
 
-    // 5. generate the Scala code
+    // generate the Scala code
     val code = codeGenerator.compile(scriptName, plan, profiling)
 
     logger.debug("successfully generated scala program")
 
-    // 6. write it to a file
+    // write it to a file
 
     val outputDir = outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
 
@@ -135,56 +204,84 @@ object PigletCompiler extends LazyLogging {
 
     val outputFile = outputDirectory.resolve(s"$scriptName.$extension")
     logger.debug(s"outputFile: $outputFile")
-    val writer = new FileWriter(outputFile.toFile())
+    val writer = new FileWriter(outputFile.toFile)
     writer.append(code)
     writer.close()
     if (extension.equalsIgnoreCase("scala")) {
-      // 7. extract all additional jar files to output
+      // extract all additional jar files to output
       plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
 
-      // 8. copy the sparklib library to output
-      val jobJar = backendJar.toAbsolutePath().toString()
+      // copy the sparklib library to output
+      val jobJar = backendJar.toAbsolutePath.toString
       FileTools.extractJarToDir(jobJar, outputDirectory)
 
       val sources = ListBuffer(outputFile)
       
-      // 9. compile the scala code
+      // compile the scala code
       if (!ScalaCompiler.compile(outputDirectory, sources))
         return None
 
-      // 10. build a jar file
+      // build a jar file
       logger.info(s"creating job's jar file ...")
-      val jarFile = Paths.get(outDir.toAbsolutePath().toString(), scriptName, s"$scriptName.jar") //s"$outDir${File.separator}${scriptName}${File.separator}${scriptName}.jar" //scriptName + ".jar"
-
+      val jarFile = Paths.get(outDir.toAbsolutePath.toString, scriptName, s"$scriptName.jar")
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
         logger.info(s"created job's jar file at $jarFile")
-        return Some(jarFile)
+        // remove directory $outputDirectory
+        cleanupResult(outDir.toAbsolutePath.toString + "/" + scriptName + "/out")
+        Some(jarFile)
       } else
-        return None
-    } else {
-      if (CppCompiler.compile(outputDirectory.toString(), outputFile.toString(), CppCompilerConf.cppConf(backend))) {
-        logger.info(s"created job's file at $outputFile")
-        return Some(outputFile)
-      } else
-        return None
+        None
     }
-  } 
-   
-  private def loadScript(inputFile: Path): Iterator[String] = Source.fromFile(inputFile.toFile()).getLines()
-  
-  private def parseScriptFromSource(source: Source, params: Map[String,String], backend: String, langFeature: LanguageFeature.LanguageFeature): List[PigOperator] = {
-	  
-    //Handle IMPORT statements.
-	  val sourceLines = resolveImports(source.getLines())
-	  
-	  if (params.nonEmpty) {
+    else if (CppCompiler.compile(outputDirectory.toString, outputFile.toString, CppCompilerConf.cppConf(backend))) {
+      logger.info(s"created job's file at $outputFile")
+      Some(outputFile)
+    }
+    else
+      None
+  }
 
+  /**
+    * Load a Piglet script from the given file and return it as a Iterator on line strings.
+    *
+    * @param inputFile the path to the input file
+    * @return the text lines
+    */
+  private def loadScript(inputFile: Path): Iterator[String] = Source.fromFile(inputFile.toFile).getLines()
+
+ /**
+    * Invokes the PigParser to process the given source. In addition, parameters specified by the --param flag
+    * are resolved.
+    *
+    * @param source the source refering to the Piglet script
+    * @param params a map of parameters
+    * @param langFeature the language used to parse the script
+    * @return a list of PigOperators constructed from parsing the script
+    */
+  private def parseScriptFromSource(source: Source, params: Map[String,String],
+                                    langFeature: LanguageFeature.LanguageFeature): List[PigOperator] = {
+    // Handle IMPORT and %DECLARE statements.
+	  val (sourceLines, declareParams) = resolveImports(source.getLines())
+    logger.info("declared parameters: " + declareParams.mkString(", "))
+    val allParams = params ++ declareParams
+
+	  if (allParams.nonEmpty) {
 	    // Replace placeholders by parameters.
-		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, params)).mkString("\n"), langFeature)
+		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, allParams)).mkString("\n"), langFeature)
 	  }
 	  else {
 		  PigParser.parseScript(sourceLines.mkString("\n"), langFeature)
 	  }
   }
-  
+
+  private def cleanupResult(dir: String): Unit = {
+    import scalax.file.Path
+    val path: Path = Path.fromString(dir)
+    try {
+      path.deleteRecursively(continueOnFailure = false)
+    }
+    catch {
+      case e: java.io.IOException => // some file could not be deleted
+    }
+  }
+
 }

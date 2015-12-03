@@ -92,7 +92,8 @@ case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var wind
       case None => TupleType(Array(Field("", Types.ByteArrayType)))
     }
     val groupingType = groupExpr.resultType(inputSchema)
-    val fields = Array(Field("group", groupingType),
+    // the group field gets the original grouping expression as lineage, e.g. rel.column
+    val fields = Array(Field("group", groupingType, List(s"${inPipeName}.${groupExpr.keyList.mkString}")),
       Field(inputs.head.name, BagType(inputType)))
     schema = Some(Schema(BagType(TupleType(fields))))
     schema

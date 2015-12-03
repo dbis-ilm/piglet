@@ -16,7 +16,7 @@
  */
 package dbis.pig.codegen
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 import dbis.pig.op._
 import dbis.pig.op.cmd._
@@ -43,7 +43,7 @@ import scala.collection.mutable.Set
  *
  * @param template the name of the backend-specific template fle
  */
-abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with LazyLogging {
+abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with PigletLogging {
 
   templateFile = template 
   /*------------------------------------------------------------------------------------------------- */
@@ -99,17 +99,9 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     Types.LongType -> "Long",
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
-    Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "String",
-    Types.AnyType -> "Any")
-    
-//  val javaTypeMappingTable = Map[PigType, String](
-//    Types.IntType -> "java.lang.Integer",
-//    Types.LongType -> "java.lang.Long",
-//    Types.FloatType -> "java.lang.Float",
-//    Types.DoubleType -> "java.lang.Double",
-//    Types.CharArrayType -> "java.lang.String",
-//    Types.ByteArrayType -> "java.lang.String")
+    Types.CharArrayType -> "String",  
+    Types.ByteArrayType -> "Any", //TODO: check this
+    Types.AnyType -> "String") //TODO: check this
 
   /**
    * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
@@ -172,10 +164,10 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    /**
     * Generate Scala code for a reference to a named field, a positional field or a tuple/map derefence.
     *
-    * @param schema the (optional) schema decribing the tuple structure
-    * @param ref
+    * @param schema the (optional) schema describing the tuple structure
+    * @param ref the reference object
     * @param tuplePrefix the variable name
-    * @param aggregate ??
+    * @param aggregate
     * @return the generated code
     */
   def emitRef(schema: Option[Schema],
@@ -193,12 +185,23 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           else
             f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
         }
-        case None => throw new TemplateException(s"invalid field name $f") // if we don't have a schema this is not allowed
+        case None =>
+          // if we don't have a schema this is not allowed
+          throw new TemplateException(s"invalid field name $f")
       }
     }
-    else
-        s"$tuplePrefix._${schema.get.indexOfField(nf)}" // s"$tuplePrefix.$f"
-    case PositionalField(pos) => s"$tuplePrefix._$pos"
+    else {
+      val pos = schema.get.indexOfField(nf)
+      if (pos == -1)
+        throw new TemplateException(s"invalid field name $f")
+      s"$tuplePrefix._$pos" // s"$tuplePrefix.$f"
+    }
+    case PositionalField(pos) => schema match {
+      case Some(s) => s"$tuplePrefix._$pos"
+      case None =>
+        // if we don't have a schema the Record class is used
+        s"$tuplePrefix.get($pos)"
+    }
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
@@ -256,6 +259,59 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   }
 
   /**
+    * Generate Scala code for a function call with parameters.
+    *
+    * @param f the function name
+    * @param params the list of parameters
+    * @param schema the schema
+    * @return the generated Scala code
+    */
+  def emitFuncCall(f: String, params: List[ArithmeticExpr], schema: Option[Schema], namedRef: Boolean): String = {
+    val pTypes = params.map(p => p.resultType(schema))
+    UDFTable.findUDF(f, pTypes) match {
+      case Some(udf) => {
+        // println(s"udf: $f found: " + udf)
+        if (udf.isAggregate) {
+          s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
+        }
+        else {
+          val mapStr = if (udf.resultType.isInstanceOf[ComplexType]) {
+            udf.resultType match {
+              case BagType(v) => s".map(${schemaClassName(v.className)}(_))"
+              case _ => "" // TODO: handle TupleType and MapType
+            }
+          } else ""
+          val paramExprList = params.zipWithIndex.map { case (e, i) =>
+            // if we know the expected parameter type and the expression type
+            // is a generic bytearray then we cast it to the expected type
+            val typeCast = if (udf.paramTypes.length > i && // make sure the function has enough parameters
+              e.resultType(schema) == Types.ByteArrayType &&
+              (udf.paramTypes(i) != Types.ByteArrayType && udf.paramTypes(i) != Types.AnyType)) {
+              s".asInstanceOf[${scalaTypeMappingTable(udf.paramTypes(i))}]"
+            } else ""
+            emitExpr(schema, e, namedRef = namedRef) + typeCast
+          }
+
+          s"${udf.scalaName}(${paramExprList.mkString(",")})${mapStr}"
+        }
+      }
+      case None => {
+        // println(s"udf: $f not found")
+        // check if we have have an alias in DataflowPlan
+        if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
+          val alias = udfAliases.get(f)
+          val paramList = alias._2 ::: params.map(e => emitExpr(schema, e, namedRef = namedRef))
+          s"${alias._1}(${paramList.mkString(",")})"
+        }
+        else {
+          // we don't know the function yet, let's assume there is a corresponding Scala function
+          s"$f(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+        }
+      }
+    }
+  }
+
+  /**
    *
    * @param schema
    * @param expr
@@ -277,39 +333,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     case Mult(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} * ${emitExpr(schema, e2, namedRef = namedRef)}"
     case Div(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} / ${emitExpr(schema, e2, namedRef = namedRef)}"
     case RefExpr(e) => s"${emitRef(schema, e, "t", aggregate, namedRef = namedRef)}"
-    case Func(f, params) => {
-      val pTypes = params.map(p => p.resultType(schema))
-      UDFTable.findUDF(f, pTypes) match {
-        case Some(udf) => {
-          // println(s"udf: $f found: " + udf)
-          if (udf.isAggregate) {
-            s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
-          }
-          else {
-            val mapStr = if (udf.resultType.isInstanceOf[ComplexType]) {
-              udf.resultType match {
-                case BagType(v) => s".map(${schemaClassName(v.className)}(_))"
-                case _ => "" // TODO: handle TupleType and MapType
-              }
-            } else ""
-            s"${udf.scalaName}(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})${mapStr}"
-          }
-        }
-        case None => {
-          // println(s"udf: $f not found")
-          // check if we have have an alias in DataflowPlan
-          if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
-            val alias = udfAliases.get(f)
-            val paramList = alias._2 ::: params.map(e => emitExpr(schema, e, namedRef = namedRef))
-            s"${alias._1}(${paramList.mkString(",")})"
-          }
-          else {
-            // we don't know the function yet, let's assume there is a corresponding Scala function
-            s"$f(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
-          }
-        }
-      }
-    }
+    case Func(f, params) => emitFuncCall(f, params, schema, namedRef)
     case FlattenExpr(e) => flattenExpr(schema, e)
     case ConstructTupleExpr(exprs) => {
       val exType = expr.resultType(schema).asInstanceOf[TupleType]
@@ -323,7 +347,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     }
     case ConstructMapExpr(exprs) => {
       val exType = expr.resultType(schema).asInstanceOf[MapType]
-      println("MapType = " + exType)
       val valType = exType.valueType
       val exprList = exprs.map(e => emitExpr(schema, e, namedRef = namedRef))
       // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
@@ -445,26 +468,130 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   
   val castMethods = Set.empty[String]
 
+  /**
+    * Create helper class for operators such as ORDER BY.
+    *
+    * @param node the Pig operator requiring helper code
+    * @return a string representing the helper code
+    */
   def emitHelperClass(node: PigOperator): String = {
-    def genCmpExpr(col: Int, num: Int) : String =
-      if (col == num) s"{ this.c$col compare that.c$col }"
-      else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col+1, num)} else this.c$col compare that.c$col }"
+    /**
+      * Bytearray fields need special handling: they are mapped to Any which is not comparable.
+      * Thus we add ".toString" in this case.
+      *
+      * @param col the column used in comparison
+      * @return ".toString" or ""
+      */
+    def genImplicitCast(col: Int): String = node.schema match {
+      case Some(s) => if (s.field(col).fType == Types.ByteArrayType) ".toString" else ""
+      case None => ".toString"
+    }
 
     node match {
       case OrderBy(out, in, orderSpec, _) => {
-        var params = Map[String,Any]()
+        val num = orderSpec.length
+
+        /**
+          * Emit the comparison expression used in in the orderHelper class
+          *
+          * @param col the current position of the comparison field
+          * @return the expression code
+          */
+        def genCmpExpr(col: Int): String = {
+          val cast = genImplicitCast(col - 1)
+          val cmpStr = if (orderSpec(col - 1).dir == OrderByDirection.AscendingOrder)
+            s"this.c$col$cast compare that.c$col$cast"
+          else s"that.c$col$cast compare this.c$col$cast"
+          if (col == num) s"{ $cmpStr }"
+          else s"{ if (this.c$col == that.c$col) ${genCmpExpr(col + 1)} else $cmpStr }"
+        }
+
+        var params = Map[String, Any]()
         //Spark
         params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
         var col = 0
-        params += "fields" -> orderSpec.map(o => { col += 1; s"c$col: ${scalaTypeOfField(o.field, node.schema)}" }).mkString(", ")
-        params += "cmpExpr" -> genCmpExpr(1, orderSpec.size)
+        params += "fields" -> orderSpec.map(o => {
+          col += 1;
+          s"c$col: ${scalaTypeOfField(o.field, node.schema)}"
+        }).mkString(", ")
+        params += "cmpExpr" -> genCmpExpr(1)
+
+        //Flink??
+        params += "out" -> node.outPipeName
+        params += "key" -> orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
+        if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
+
+        callST("orderHelper", Map("params" -> params))
+      }
+      case Top(_, _, orderSpec, _) => {
+        val size = orderSpec.size
+        var params = Map[String, Any]()
+        val hasSchema = node.inputSchema.isDefined
+
+        val schemaClass = if (!hasSchema) {
+          "Record"
+        } else {
+          schemaClassName(node.schema.get.className)
+        }
+
+        params += "schemaclass" -> schemaClass
+
+        def emitRefAccessor(schema: Option[Schema], ref: Ref) = ref match {
+          case NamedField(f, _) if schema.isEmpty =>
+            throw new TemplateException(s"invalid field name $f")
+          case nf @ NamedField(f, _) if schema.get.indexOfField(nf) == -1 =>
+            throw new TemplateException(s"invalid field name $f")
+          case nf: NamedField => schema.get.indexOfField(nf)
+          case p @ PositionalField(pos) => pos
+          case _ => throw new TemplateException(s"invalid ordering field $ref")
+        }
+
+        def genCmpExpr(col: Int): String = {
+          var firstGetter = "first."
+          var secondGetter = "second."
+          if (ascendingSortOrder(orderSpec(col)) == "true") {
+            // If we're not sorting ascending, reverse the getters so the ordering gets reversed
+            firstGetter = "second."
+            secondGetter = "first."
+          }
+
+          if (!hasSchema) {
+            firstGetter += "get"
+            secondGetter += "get"
+          }
+
+          val colname = emitRefAccessor(node.inputSchema, orderSpec(col).field)
+
+          val cast = genImplicitCast(col)
+          if (hasSchema) {
+            if (col == (size - 1))
+              s"{ ${firstGetter}_${colname}$cast compare ${secondGetter}_${colname}$cast }"
+            else
+              s"{ if (${firstGetter}_${colname} == ${secondGetter}_${colname}) ${genCmpExpr(col + 1)} else ${firstGetter}_${colname}$cast compare " +
+                s"${secondGetter}_${colname}$cast }"
+          } else {
+            if ({colname} == (size - 1))
+              s"{ $firstGetter(${colname})$cast compare $secondGetter(${colname})$cast }"
+            else
+              s"{ if ($firstGetter(${colname}) == $secondGetter(${colname})) ${genCmpExpr(col + 1)} else $firstGetter(${colname})$cast compare " +
+                s"$secondGetter(${colname})$cast }"
+          }
+        }
+
+        //Spark
+        params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
+        var col = 0
+        params += "fields" -> orderSpec.map(o => {
+          col += 1;
+          s"c$col: ${scalaTypeOfField(o.field, node.schema)}"
+        }).mkString(", ")
+        params += "cmpExpr" -> genCmpExpr(0)
 
         //Flink
-        params += "out"->node.outPipeName
-        params += "key"->orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
-        if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse"->true
-
-        callST("orderHelper", Map("params"->params))
+        params += "out" -> node.outPipeName
+        params += "key" -> orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
+        if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
+        callST("topHelper", Map("params" -> params))
       }
       case _ => ""
     }
@@ -481,7 +608,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   def emitExtractorFunc(node: PigOperator, loaderFunc: Option[String]): Map[String, Any] = {
     def schemaExtractor(schema: Schema): String =
       schema.fields.zipWithIndex.map{case (f, i) =>
-        s"data($i).to${scalaTypeMappingTable(f.fType)}"
+        // we cannot perform a "toAny" - therefore, we treat bytearray as String here
+        val t = scalaTypeMappingTable(f.fType); s"data($i).to${if (t == "Any") "String" else t}"
       }.mkString(", ")
 
     def jdbcSchemaExtractor(schema: Schema): String =
@@ -490,17 +618,18 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     var paramMap = Map[String, Any]()
     node.schema match {
       case Some(s) => if (loaderFunc.nonEmpty && loaderFunc.get == "JdbcStorage")
-      // JdbcStorage provides already types results, therefore we need an extractor which calls
-      // only the appropriate get functions on sql.Row
-        paramMap += ("extractor" ->
-          s"""(data: org.apache.spark.sql.Row) => ${schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
-          "class" -> schemaClassName(s.className))
-      else
-        paramMap += ("extractor" ->
-          s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
-          "class" -> schemaClassName(s.className))
-      case None => paramMap += ("extractor" -> "(data: Array[String]) => TextLine(data(0))",
-        "class" -> "TextLine")
+        // JdbcStorage provides already types results, therefore we need an extractor which calls
+        // only the appropriate get functions on sql.Row
+          paramMap += ("extractor" ->
+            s"""(data: org.apache.spark.sql.Row) => ${schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
+            "class" -> schemaClassName(s.className))
+        else
+          paramMap += ("extractor" ->
+            s"""(data: Array[String]) => ${schemaClassName(s.className)}(${schemaExtractor(s)})""",
+            "class" -> schemaClassName(s.className))
+      case None => {
+        paramMap += ("extractor" -> "(data: Array[String]) => Record(data)", "class" -> "Record")
+      }
     }
     paramMap
   }
@@ -547,7 +676,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       "func" -> storeFunc.getOrElse(BackendManager.backend.defaultConnector))
     node.schema match {
       case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
-      case None => paramMap += ("class" -> "TextLine")
+      case None => paramMap += ("class" -> "Record")
     }
 
     if (params != null && params.nonEmpty)
@@ -556,6 +685,10 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     callST("store", paramMap)
   }
 
+  def tableHeader(schema: Option[Schema]): String = schema match {
+    case Some(s) => s.fields.map(f => f.name).mkString("\t")
+    case None => ""
+  }
 
   /**
     * Generates the code for the STREAM THROUGH operator including
@@ -640,6 +773,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
          */
       case Load(out, file, schema, func, params) => emitLoad(node, file, func, params)
       case Dump(in) => callST("dump", Map("in"->node.inPipeName))
+      case Display(in) => callST("display", Map("in"->node.inPipeName, "tableHeader"->tableHeader(node.inputSchema)))
       case Store(in, file, func, params) => emitStore(node, file, func, params)
       case Describe(in) => s"""println("${node.schemaToString}")"""
       case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))
@@ -647,7 +781,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
       case sOp@StreamOp(out, in, op, params, schema) => emitStreamThrough(sOp)
       // case MacroOp(out, name, params) => callST("call_macro", Map("out"->node.outPipeName,"macro_name"->name,"params"->emitMacroParamList(node.schema, params)))
-      case HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd, "params"->params))
+      case hOp@HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd,
+        "params"-> s"List(${hOp.paramString})"))
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case ConstructBag(in, ref) => "" // used only inside macros
       case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again

@@ -12,7 +12,7 @@ the official Pig compiler for Hadoop or its extensions such as PigSpork. Instead
  * Finally, it is also a nice exercise in Scala programming resulting in a more compact code simplifying maintenance
    and extensibility.
 
-### Installation & Usage ###
+### Installation ###
 
 Simply clone the git project, change to the project directory and invoke
 
@@ -36,23 +36,35 @@ you have to build an assembly:
 sbt assembly
 ```
 
+### Usage ###
+
 We provide a simple wrapper script for processing Pig scripts. Just call it with
 
 ```
 piglet --master local[4] --backend spark your_script.pig
 ```
+To run this script you have to specify the pfull path of latform distribution jar in the environment 
+variable `SPARK_JAR` for Spark (e.g. `spark-assembly-1.5.2-hadoop2.6.0.jar`) and in `FLINK_JAR` for Flink.  
+Note, that for Flink you have to run the start script.
 
-to compile the script and execute it on your local Spark
-installation. The backend can be selected via the `--backend` option - currently
-we support the following backends 
- * `spark`: Apache Spark in batch mode
- * `sparks`: Apache Spark Streaming
- * `flink`: Apache Flink in batch mode
- * `flinks`: Apache Flink Streaming
- * `mapreduce`: Apache Hadoop (by simply passing the script to the original Pig compiler)
- * `pipefabric`: the PipeFabric data stream engine
- * `storm`: Twitter Storm
-   
+The following options are supported:
+ * `--master m` specifies the master (local, yarn)
+ * `--compile` compile and build jar, but do not execute
+ * `--profiling` 
+ * `--outdir dir` specifies the output directory for the generated code
+ * `--backend b` specifies the backend to execute the script. Currently, we support 
+    * `spark` (Apache Spark in batch mode)
+    * `sparks`: Apache Spark Streaming
+    * `flink`: Apache Flink in batch mode
+    * `flinks`: Apache Flink Streaming
+    * `mapreduce`: Apache Hadoop (by simply passing the script to the original Pig compiler)
+ * `--backend_dir dir`
+ * `--language l`
+ * `--params key=value, ...`
+ * `--update-config`
+ * `--show-plan`
+ * `--log-level l`
+ * `--backend-args key=value, ...` 
 
 In addition, you can start an interactive Pig shell similar to Grunt:
 
@@ -62,13 +74,41 @@ piglet --interactive --backend spark
 
 where Pig statements can be entered at the prompt and are executed as soon as
 a `DUMP` or `STORE` statement is entered. Furthermore, the schema can be printed using `DESCRIBE`.
-With the `-b` option you can specify which backend (spark, flink) will be used.
 
-### Testing ###
+#### Docker ####
 
-We use the Scala testing framework as well as the scoverage tool for test coverage. You can produce
-a coverage report by running `sbt clean coverage test`. The results can be found in
-`target/scala-2.11/scoverage-report/index.html`.
+Piglet can also be run as a [Docker](https://www.docker.com/) container. However, the image is not 
+yet on DockerHub, so it has to be built manually:
+```
+sbt clean package assembly
+docker build -t dbis/piglet .
+```
+
+Currently, the Docker image supports the Spark backend only. 
+
+To start the container, run:
+```
+docker run -it --rm --name piglet dbis/piglet 
+```
+
+This uses the container's entrypoint which runs piglet. The above command will print the help message.
+
+You can start the interactive mode, using `-i` option and enter your script. 
+
+```
+docker run -it --rm --name piglet dbis/piglet -b spark -i
+```
+
+Alternatively, you can add your existing files into the container by [mounting volumes](https://docs.docker.com/engine/userguide/dockervolumes/#mount-a-host-file-as-a-data-volume) and run the script in batch mode:
+```
+docker run -it --rm --name piglet -v /tmp/test.pig:/test.pig dbis/piglet -b spark /test.pig
+```
+
+As mentioned before, the container provides an entrypoint that executes piglet. In case you need a bash for that container, 
+you need to overwrite the entrypoint:
+```
+docker run -it --rm --name piglet --entrypoint /bin/bash dbis/piglet 
+```
 
 ### Configuration ###
 
@@ -86,56 +126,9 @@ classes and adding it to the classpath (e.g. using the `BACKEND_DIR` variable).
 
 More detailed information on how to create backends can be found in [backends.md](backends.md)
 
-### Supported Language Features ###
+### Further Information ###
 
-Depending on the target backend Piglet supports different language features. For batch processing in Spark and Flink we support the following standard Pig Latin statements:
- * LOAD
- * STORE
- * DUMP
- * FOREACH (including nested FOREACH)
- * GENERATE
- * FILTER
- * JOIN
- * CROSS
- * SPLIT INTO
- * DISTINCT
- * GROUP
- * UNION
- * LIMIT
- * SAMPLE
- * ORDER BY
- * STREAM
- * DEFINE (including macros)
- * REGISTER
- * SET
- 
-In addition to the standard Pig Latin statements we provide the following extensions:
- * RSCRIPT - sends data to a R script and converts the result back to a bag. Usage:
- 
- ```
- out = RSCRIPT in USING '<R code>';
- ```
- Within the R code `$_` refers to the input data (a matrix), the result which will returned to the Piglet script has to be assigned to the R variable `res`.
- * ACCUMULATE - is used for incrementally calculating aggregates on (large) bags or streams of tuples.
- * MATERIALIZE - creates a materialization point, i.e. the bag is serialized into a HDFS file. Subsequent runs of the script (or other scripts sharing the same dataflow until the materialization point) can just start from this point. Usage:
-
-```
-MATERIALIZE bag;
-``` 
- * embedded code - allows to embed Scala code for implementing user-defined functions and operators directly into the script. The code has to be enclosed by `<%` and `%>`. Usage:
-
-```
-<% def myFunc(i: Int): Int = i + 42 %>
-out = FOREACH in GENERATE myFunc($0);
-```
- 
-Furthermore, Piglet adds two statements simplifying the processing of RDF data:
- * RDFLOAD
- * TUPLIFY
- * BGP_FILTER
- 
-Finally, for processing streaming data using streaming backends (Flink Streaming, Spark Streaming, Storm, PipeFabric) we have added the following statements:
- * WINDOW
- * MATCHER
- * SOCKET_READ
- * SOCKET_WRITE
+ * Details on the supported language features (statements, functions, etc.) are described [here](Language.md).
+ * We use the [Scala testing framework](http://www.scalatest.org/) as well as the [scoverage tool](http://scoverage.org/) 
+   for test coverage. You can produce a coverage report by running `sbt clean coverage test`. The results can be found in
+   `target/scala-2.11/scoverage-report/index.html`.

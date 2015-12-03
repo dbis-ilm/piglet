@@ -38,11 +38,18 @@ case class InvalidPlanException(msg: String) extends Exception(msg)
  * to construct the graph from a list of PigOperators with their pipes as well as to check and manipulate
  * the graph.
  *
- * @param operators a list of operators used to construct the plan
+ * @param _operators a list of operators used to construct the plan
  * @param ctx an optional list of pipes representing the context, i.e. the
  *            pipes of a nesting operator (e.g. FOREACH).
  */
-class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable {
+class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable {
+  def operators_=(ops: List[PigOperator]) = {
+    ops map { _.outPipeNames map { PipeNameGenerator.addKnownName(_)}}
+    _operators = ops
+  }
+
+  def operators = _operators
+
   /**
    * A list of JAR files specified by the REGISTER statement
    */
@@ -51,7 +58,7 @@ class DataflowPlan(var operators: List[PigOperator], val ctx: Option[List[Pipe]]
   /**
    * A map for UDF aliases + constructor arguments.
    */
-  val udfAliases = Map[String,(String,  List[Value])]()
+  val udfAliases = Map[String,(String, List[Any])]()
 
   var code: String = ""
   var extraRuleCode: Seq[String] = List.empty

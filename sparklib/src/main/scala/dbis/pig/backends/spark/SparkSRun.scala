@@ -19,4 +19,5 @@ package dbis.pig.backends.spark
 
 class SparkSRun extends SparkRun {
   override def templateFile = appconf.getString("backends.sparks.template")
+  override def defaultConnector = appconf.getString("backends.sparks.connector")
 }

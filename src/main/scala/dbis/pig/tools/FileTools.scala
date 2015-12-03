@@ -22,7 +22,7 @@ import java.util.jar.JarFile
 import dbis.pig._
 import dbis.pig.codegen._
 import dbis.pig.plan.DataflowPlan
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.backends.BackendManager
 import dbis.pig.backends.BackendConf
 import java.nio.file.Path
@@ -31,7 +31,7 @@ import java.nio.file.Paths
 
 import scala.collection.mutable.ListBuffer
 
-object FileTools extends LazyLogging {
+object FileTools extends PigletLogging {
   
   def copyStream(istream: InputStream, ostream: OutputStream): Unit = {
     var bytes = new Array[Byte](1024)

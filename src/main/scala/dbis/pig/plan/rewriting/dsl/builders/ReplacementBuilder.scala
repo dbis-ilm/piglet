@@ -18,7 +18,7 @@ package dbis.pig.plan.rewriting.dsl.builders
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.plan.rewriting.dsl.traits.{PigOperatorBuilderT, BuilderT}
+import dbis.pig.plan.rewriting.dsl.traits.BuilderT
 
 import scala.reflect.ClassTag
 
@@ -28,7 +28,7 @@ import scala.reflect.ClassTag
  * @tparam TO
  */
 class ReplacementBuilder[FROM <: PigOperator : ClassTag, TO <: PigOperator : ClassTag] extends
-  PigOperatorBuilderT[FROM, TO] {
+  PigOperatorBuilder[FROM, TO] {
   override def wrapInFixer(func: (FROM => Option[TO])): (FROM => Option[TO]) = func
 
   override def addAsStrategy(func: (FROM => Option[TO])) = {

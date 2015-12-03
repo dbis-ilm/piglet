@@ -40,12 +40,11 @@ case class AmbiguousFieldnameException(private val msg: String) extends  Excepti
  * @param element the type definition - in most cases a bag of tuples
  * @param className a unique name for the schema which is used to generate classes
  *                  representing tuples. The className is assigned later.
- *
+ * @param timestampField the position of the field used for representing the timestamp of the tuple,
+ *                       if a value = -1 is given the system arrival time is used otherwise
+ *                       we use application time.
  */
-case class Schema(var element: BagType, var className: String = "") {
-
-  def setBagName(s: String): Unit =  {} // element.name = s
-
+case class Schema(var element: BagType, var className: String = "", var timestampField: Int = -1) {
   /**
    * Returns a compact representation of the schema which is used to compare two
    * schemas for equality.
@@ -68,7 +67,7 @@ case class Schema(var element: BagType, var className: String = "") {
   /**
    * Returns the index of the field in the schema.
    *
-   * @param nf A [[dbis.pig.op.NamedField]] object describing the field
+   * @param nf A [[dbis.pig.expr.NamedField]] object describing the field
    * @return the position in the field list
    */
   @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
@@ -138,7 +137,7 @@ case class Schema(var element: BagType, var className: String = "") {
   }
 
   /**
-   * Returns the field corresponding to the given [[dbis.pig.op.NamedField]]
+   * Returns the field corresponding to the given [[dbis.pig.expr.NamedField]]
    * @param nf
    * @return
    */
@@ -170,16 +169,35 @@ case class Schema(var element: BagType, var className: String = "") {
    *
    * @return the string representation
    */
-  override def toString = element.descriptionString
+  override def toString = element.descriptionString + (if (timestampField >= 0) s", ts = $timestampField" else "")
 
   /**
    * Check if the schema is valid, i.e. all fields have defined types (at least bytearray).
    *
    * @return true if valid
    */
-  def isValid(): Boolean = {
-    fields.filter(_.fType.tc == TypeCode.AnyType).isEmpty
+  def isValid: Boolean = !fields.exists(_.fType.tc == TypeCode.AnyType)
+
+  /**
+    * Returns true if we can compare with a, i.e. a is also a schema instance
+    *
+    * @param a the other object
+    * @return true if comparable
+    */
+  def canEqual(a: Any) = a.isInstanceOf[Schema]
+
+  /**
+    * Checks if two schema objects are equal. We need our own implementation here because we don't
+    * want to consider the class name into account.
+    *
+    * @param that the other schema
+    * @return true if both schema objects are equal
+    */
+  override def equals(that: Any): Boolean = that match {
+    case that: Schema => that.canEqual(this) && this.element == that.element && this.timestampField == that.timestampField
+    case _ => false
   }
+
 }
 
 /**
@@ -230,18 +248,23 @@ object Schema {
    *         the same structure
    */
   def registerSchema(schema: Schema): Schema = {
-    val code = schema.schemaCode
+    val code = schema.schemaCode()
     if (schemaSet.contains(code))
       schemaSet(code)
     else {
       if (schema.isValid) {
         // we do not register invalid schemas - they will be replaced later anyway
-        schema.className = s"t${nextCounter}"
+        schema.className = s"t${nextCounter()}"
         schemaSet += code -> schema
       }
       schema
     }
   }
 
+  /**
+    * Returns a lexicographically sorted list of all registered schemas.
+    *
+    * @return the list of schemas
+    */
   def schemaList(): List[Schema] = schemaSet.values.toList.sortWith(_.schemaCode() < _.schemaCode())
 }

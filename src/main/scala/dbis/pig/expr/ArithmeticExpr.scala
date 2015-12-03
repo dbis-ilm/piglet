@@ -42,8 +42,24 @@ case class RefExpr(var r: Ref) extends ArithmeticExpr {
                       else if (v.isInstanceOf[Int]) Types.IntType
                       else if (v.isInstanceOf[Double]) Types.DoubleType
                       else Types.ByteArrayType
-      // TODO: handle deref of tuple, bag
-      //case DerefTuple(t, c) =>
+      case DerefTuple(t, c) => {
+        // in case of tuple.NamedField or tuple.PositionalField, we need
+        // to detemine the field type
+        val bagField = t match {
+          case NamedField(n, _) => s.field(n)
+          case PositionalField(p) =>  s.field(p)
+          case _ => throw new SchemaException(s"unknown bag in the schema")
+        }
+        val tupleType = if (bagField.fType.isInstanceOf[TupleType])
+          bagField.fType.asInstanceOf[TupleType]
+        else bagField.fType.asInstanceOf[BagType].valueType
+        val fieldType: PigType = c match {
+          case NamedField(n, _) => tupleType.fields.filter { p => p.name == n}.head.fType
+          case PositionalField(p) => tupleType.fields(p).fType 
+          case _ => null
+        }
+        if (fieldType != null) fieldType else Types.ByteArrayType
+      }
       //case DerefMap(m, k) =>
       case _ => Types.ByteArrayType
     }

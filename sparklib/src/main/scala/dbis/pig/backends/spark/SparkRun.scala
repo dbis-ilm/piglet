@@ -17,6 +17,8 @@
 
 package dbis.pig.backends.spark
 
+import java.io.BufferedReader
+
 import org.apache.spark.deploy.SparkSubmit
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
@@ -33,7 +35,7 @@ class SparkRun extends PigletBackend with BackendConf {
   // loads the default configuration file in resources/sparkbackend.conf
   protected val appconf = ConfigFactory.load() 
   
-  override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]) {
+  override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]) = {
 
     val ba = backendArgs.flatMap{case (k,v) => Seq(k,v)}.toArray
     
@@ -41,7 +43,7 @@ class SparkRun extends PigletBackend with BackendConf {
         
     SparkSubmit.main(args.toArray)
   }
-  
+
   override def executeRaw(file: Path, master: String, backendArgs: Map[String,String]) = ???
   
   /**
@@ -60,7 +62,7 @@ class SparkRun extends PigletBackend with BackendConf {
   
   override def templateFile = appconf.getString("backends.spark.template")
 
-  override def defaultConnector = appconf.getString("backends.connector")
+  override def defaultConnector = appconf.getString("backends.spark.connector")
   
   override def raw = false
 }

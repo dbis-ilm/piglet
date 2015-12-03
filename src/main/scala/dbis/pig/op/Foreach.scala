@@ -163,7 +163,6 @@ case class Foreach(out: Pipe,
             result = false
           }
           */
-          println("plan size = " + plan.length)
           if (!op.inputs.forall(p => p.producer != null)) {
             println("op: " + op + " : invalid input pipes: " + op.inputs.mkString(","))
             result = false
@@ -181,13 +180,9 @@ case class Foreach(out: Pipe,
 
 
   override def constructSchema: Option[Schema] = {
-    if (inputSchema.isDefined)
-      inputSchema.get.setBagName(inPipeName)
-
     generator match {
       case gen@GeneratorList(expr) => {
         val fields = gen.constructFieldList(inputSchema)
-
         schema = Some(Schema(BagType(TupleType(fields))))
       }
       case GeneratorPlan(_) => {

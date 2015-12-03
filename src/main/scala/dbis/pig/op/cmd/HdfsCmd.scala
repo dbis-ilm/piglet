@@ -29,6 +29,11 @@ case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator
   if (!isValid)
     throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
 
+  _outputs = List()
+  _inputs = List()
+
+  override def outPipeNames: List[String] = List()
+
   def isValid: Boolean = cmd match {
     case "copyFromLocal" => true
     case "copyToRemote" => true
@@ -38,5 +43,13 @@ case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator
     case "mkdir" => true
     case _ => false
   }
+
+  def paramString(): String = params.map(p => s""""$p"""").mkString(",")
+
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"HDFS (cmd = ${cmd}, params = ${params.mkString(" ")})")
+  }
+
 }
 

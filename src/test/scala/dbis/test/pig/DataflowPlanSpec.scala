@@ -16,17 +16,19 @@
  */
 package dbis.test.pig
 
-import dbis.test.TestTools._
-import dbis.pig.parser.PigParser.parseScript
-import dbis.pig.op._
 import dbis.pig.expr._
-import dbis.pig.plan.{DataflowPlan, InvalidPlanException}
-import dbis.pig.schema._
-import org.scalatest.OptionValues._
-import org.scalatest.{FlatSpec, Matchers}
+import dbis.pig.op._
 import dbis.pig.op.cmd.RegisterCmd
+import dbis.pig.parser.PigParser.parseScript
+import dbis.pig.plan.{DataflowPlan, InvalidPlanException, PipeNameGenerator}
+import dbis.pig.schema._
+import dbis.test.TestTools._
+import org.scalatest.OptionValues._
+import org.scalatest.{FlatSpec, Matchers, PrivateMethodTester}
 
-class DataflowPlanSpec extends FlatSpec with Matchers {
+import scala.collection.mutable.{Set => MutableSet}
+
+class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
   /*
   "The plan" should "contain all pipes" in {
     val op1 = Load("a", "file.csv")
@@ -201,7 +203,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.IntType))
+        s.field(0).name should equal("group")
+        s.field(0).fType should equal(Types.IntType)
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.IntType),
                                                                       Field("f2", Types.DoubleType),
                                                                       Field("f3", MapType(Types.ByteArrayType))
@@ -220,7 +223,9 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.CharArrayType))
+        s.field(0).name should equal ("group")
+        s.field(0).lineage should be (List("a.f1"))
+        s.field(0).fType should be (Types.CharArrayType)
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.CharArrayType),
           Field("f2", Types.DoubleType),
           Field("f3", MapType(Types.ByteArrayType))
@@ -239,7 +244,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.IntType)))))
+        s.field(0).name should be ("group")
+        s.field(0).fType should be (TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.IntType))))
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.CharArrayType),
           Field("f2", Types.IntType),
           Field("f3", MapType(Types.ByteArrayType))
@@ -258,7 +264,8 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     schema match {
       case Some(s) => {
         s.fields.length should equal (2)
-        s.field(0) should equal(Field("group", Types.CharArrayType))
+        s.field(0).name should be ("group")
+        s.field(0).fType should be (Types.CharArrayType)
         s.field(1) should equal(Field("a", BagType(TupleType(Array(Field("f1", Types.IntType),
           Field("f2", Types.DoubleType),
           Field("f3", MapType(Types.ByteArrayType))
@@ -629,4 +636,28 @@ class DataflowPlanSpec extends FlatSpec with Matchers {
     an [SchemaException] should be thrownBy plan.checkSchemaConformance
   }
 
+  it should "allow to use group names in GROUP BY" in {
+    val plan = new DataflowPlan(parseScript(
+      """
+        |A = LOAD 'file' AS (name, value: double);
+        |B = GROUP A BY name;
+        |C = FOREACH B GENERATE A.name, AVG(A.value);
+        |DUMP C;
+      """.stripMargin))
+    plan.checkSchemaConformance
+  }
+
+  "Setting operators" should "add all their relation names to the PipeNameGenerator as known names" in {
+    PipeNameGenerator.clearGenerated
+    val op0 = Load(Pipe("a"), "input/file.csv")
+    val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op2 = OrderBy(Pipe("c"), Pipe("b"), List())
+    val op3 = OrderBy(Pipe("d"), Pipe("b"), List())
+    val plan = new DataflowPlan(List(op0, op1, op2, op3))
+
+    val generatedMethod = PrivateMethod[MutableSet[String]]('generated)
+    val generatedSet = PipeNameGenerator invokePrivate generatedMethod()
+
+    generatedSet should contain only ("a", "b", "c", "d")
+  }
 }

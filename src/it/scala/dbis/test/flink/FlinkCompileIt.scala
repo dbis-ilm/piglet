@@ -14,77 +14,49 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package dbis.test.flink
 
-import dbis.pig.Piglet
-import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.prop.TableDrivenPropertyChecks._
-import scalax.file.Path
-import scala.io.Source
-import com.typesafe.scalalogging.LazyLogging
+import dbis.test.CompileIt
+import org.scalatest.FlatSpec
 
-class FlinkCompileIt extends FlatSpec with Matchers with LazyLogging {
+class FlinkCompileIt extends FlatSpec with CompileIt {
+
   val scripts = Table(
-    ("script", "result", "truth", "inOrder"), // only the header of the table
-    ("load.pig", "result1.out", "truth/result1.data", true),
-    ("load2.pig", "result2.out", "truth/result2.data", true),
-    ("selfjoin.pig", "joined.out", "truth/joined.data", false),
-    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", true),
-//    ("sort.pig", "sorted.out", "sorted.data", true),
-    ("foreach1.pig", "distances.out", "truth/distances.data", true),
-//    ("nforeach.pig", "nested.out", "nested.data", true),
-//    ("grouping.pig", "grouping.out", "grouping.data", false),
-//    ("wordcount.pig", "marycounts.out", "marycount.data", false),
-    ("construct.pig", "result3.out", "truth/construct.data", true)
+    ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
+
+    //flink
+    ("load.pig", "result1.out", "truth/result1.data", true, "pig", "flink"),
+    ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "flink"),
+    ("load3.pig", "result3.out", "truth/result3.data", true, "pig", "flink"),
+    ("selfjoin.pig", "joined.out", "truth/joined.data", false, "pig", "flink"),
+    ("selfjoin_ambiguous_fieldnames.pig", "joined_ambiguous_fieldnames.out", "truth/joined_ambiguous_fieldnames.data",
+      //Pigs OrderBy is not a stable sort
+      false, "pig", "flink"),
+    ("selfjoin_filtered.pig", "joined_filtered.out", "truth/joined_filtered.data", false, "pig", "flink"),
+    ("sort.pig", "sorted.out", "truth/sorted.data", true, "pig", "flink"),
+    ("sort_multiple_directions.pig", "sorted_multiple_directions.out",
+      "truth/sorted_multiple_directions.data", true, "pig", "flink"),
+    ("filter.pig", "filtered.out", "truth/filtered.data", true, "pig", "flink"),
+    ("foreach1.pig", "distances.out", "truth/distances.data", true, "pig", "flink"),
+    ("nforeach.pig", "nested.out", "truth/nested.data", false, "pig", "flink"), 
+    //("groupforeach.pig", "groupedrdf.out", "truth/groupedrdf.data", true, "sparql", "spark"), //  the order in flink including the groupBy operator is not preserved ?? but the result is similar to spark
+    //("nforeach2.pig", "rdf.out", "truth/rdf.data", true, "sparql", "flink"),  //  the same thing here
+    ("grouping.pig", "grouping.out", "truth/grouping.data", false, "pig", "flink"),
+    ("grouping2.pig", "grouping2.out", "truth/grouping2.data", false, "pig", "flink"),
+    ("groupall.pig", "groupall.out", "truth/groupall.data", false, "pig", "flink"),
+    ("wordcount.pig", "marycounts.out", "truth/marycount.data", false, "pig", "flink"),
+    ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "flink"),
+    ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "flink"),
+    ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
+    ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "flink"),
+    ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "flink"),
+    ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "flink"),
+    ("macro1.pig", "macro1.out", "truth/macro1.data", true, "pig", "flink")
   )
-
-  def cleanupResult(dir: String): Unit = {
-//    logger.debug(s"cleaning up: $dir")
-    val path: Path = Path.fromString(dir)
-    try {
-      path.deleteRecursively(continueOnFailure = false)
-    }
-    catch {
-      case e: java.io.IOException => // some file could not be deleted
-    }
-
-  }
-
-  "The Pig compiler" should "compile and execute the script" in {
-    forAll(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean) =>
-      val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
-      // 1. make sure the output directory is empty
-      cleanupResult(resultPath.path)
-      cleanupResult(script.replace(".pig",""))
-  
-      // 2. compile and execute Pig script
-      val resourcePath = getClass.getResource("").getPath + "../../../"
-    
-//      logger.debug(s"resource path: $resourcePath")
-//      logger.debug(s"result path: $resultPath")
-    
-      println("execute: " + script)
-      Piglet.main(Array("--backend", "flink", "--outdir", resultPath.parent.get.path, "--params", s"inbase=$resourcePath,outfile=${resultPath.path}" ,resourcePath + script))
-
-      // 3. load the output file[s] and the truth file
-      var result = Iterator[String]()
-      val resultFile = new java.io.File(resultPath.path)
-      if(resultFile.isFile)
-        result ++= Source.fromFile(resultFile).getLines
-      else 
-        for (file <- resultFile.listFiles) 
-          result++=Source.fromFile(file).getLines
-        
-      val truth = Source.fromFile(resourcePath + truthFile).getLines
-      // 4. compare both files
-      if (inOrder)
-        result.toSeq should contain theSameElementsInOrderAs (truth.toTraversable)
-      else
-        result.toSeq should contain theSameElementsAs (truth.toTraversable)
-
-      // 5. delete the output directory
-      cleanupResult(resultPath.path)
-      cleanupResult(script.replace(".pig",""))
-    }
-  }
+  //Note: checking the flink jobmanager, whether it is running or not, is done in the piglet script
+  //Note: checking the flink jar inclusion is done also in the piglet
+  it should behave like checkMatch(scripts)
 }
+

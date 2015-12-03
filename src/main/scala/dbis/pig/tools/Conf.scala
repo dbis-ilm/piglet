@@ -3,7 +3,7 @@ package dbis.pig.tools
 import com.typesafe.config.ConfigFactory
 import java.io.File
 import java.net.URI
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 import java.nio.file.Paths
 import com.typesafe.config.Config
 import java.nio.file.Files
@@ -13,7 +13,7 @@ import java.nio.file.Path
 /**
  * This is the global configuration object that contains all user-defined values
  */
-object Conf extends LazyLogging {
+object Conf extends PigletLogging {
   
 	val programHome = Paths.get(System.getProperty("user.home"), ".piglet")
   
