@@ -326,6 +326,7 @@ object Piglet extends PigletLogging {
       logger.debug("finished optimizations")
 
       if (showPlan) {
+        println(s"$path")
         println("final plan = {")
         newPlan.printPlan()
         println("}")
