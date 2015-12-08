@@ -43,9 +43,17 @@ We provide a simple wrapper script for processing Pig scripts. Just call it with
 ```
 piglet --master local[4] --backend spark your_script.pig
 ```
-To run this script you have to specify the pfull path of latform distribution jar in the environment 
-variable `SPARK_JAR` for Spark (e.g. `spark-assembly-1.5.2-hadoop2.6.0.jar`) and in `FLINK_JAR` for Flink.  
-Note, that for Flink you have to run the start script.
+To run this script you have to specify the full path of platform distribution jar in the environment 
+variable `SPARK_JAR` for Spark (e.g. `spark-assembly-1.5.2-hadoop2.6.0.jar`) and in `FLINK_JAR` for Flink,  
+e.g.
+
+```
+export SPARK_JAR=/opt/spark-1.5.2/assembly/target/scala-2.11/spark-assembly-1.5.2-hadoop2.6.0.jar
+piglet --master local[4] --backend spark your_script.pig
+```
+Note, that both for Spark and Flink you need a version built for Scala 2.11 (see e.g. 
+[Spark doc](http://spark.apache.org/docs/latest/building-spark.html#building-for-scala-211))
+and for Flink you have to run the start script found in the bin directory (e.g. start-local.sh).
 
 The following options are supported:
  * `--master m` specifies the master (local, yarn)
