@@ -186,14 +186,6 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     }
   }
 
-  /*
-  def logicalTerm: Parser[Predicate] = (
-    // TODO: literal - true or false
-    comparisonExpr ^^ { e => e }
-      | "(" ~ logicalExpr ~ ")" ^^ { case _ ~ e ~ _ => PPredicate(e) }
-      | func ^^ { f => Eq(f,RefExpr(Value(true))) }
-    )
-*/
   def boolLiteral: Parser[Predicate] = boolean ^^ { b => BoolLiteral(b)}
 
   def boolFactor: Parser[Predicate] = (
@@ -218,14 +210,6 @@ class PigParser extends JavaTokenParsers with PigletLogging {
       case (p1, orKeyword ~ p2) => Or (p1, p2)
     }
   }
-
-/*
-      logicalTerm ~ andKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => And(a, b) }
-      | logicalTerm ~ orKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => Or(a, b) }
-      | notKeyword ~ logicalTerm ^^ { case _ ~ e => Not(e) }
-      | logicalTerm ^^ { e => e }
-      */
-
 
   /*
    * The list of case-insensitive keywords we want to accept.
