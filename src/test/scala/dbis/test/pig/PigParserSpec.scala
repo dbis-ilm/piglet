@@ -33,6 +33,7 @@ import org.scalatest.{Matchers, OptionValues, FlatSpec}
 import scala.util.Random
 
 class PigParserSpec extends FlatSpec with OptionValues with Matchers {
+  /* -------------------- LOAD -------------------- */
   "The parser" should "parse a simple load statement" in  {
     val uri = new URI("file.csv")
     assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), uri)))
@@ -103,6 +104,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       List(Load(Pipe("a"), uri, Some(Schema(schema)))))
   }
 
+  /* -------------------- Comments -------------------- */
   it should "ignore comments" in {
     assert(parseScript("dump b; -- A comment") == List(Dump(Pipe("b"))))
   }
@@ -115,15 +117,18 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       |dump c;""".stripMargin) == List(Dump(Pipe("b")), Dump(Pipe("c"))))
   }
 
+  /* -------------------- DUMP -------------------- */
   it should "parse the dump statement" in {
     assert(parseScript("dump b;") == List(Dump(Pipe("b"))))
   }
 
+  /* -------------------- STORE -------------------- */
   it should "parse the store statement" in {
     val uri = new URI("file.csv")
     assert(parseScript("""store b into 'file.csv';""") == List(Store(Pipe("b"), uri)))
   }
 
+  /* -------------------- FILTER -------------------- */
   it should "parse a simple filter with a eq expression on named fields" in {
     assert(parseScript("a = filter b by x == y;") ==
       List(Filter(Pipe("a"), Pipe("b"), Eq(RefExpr(NamedField("x")), RefExpr(NamedField("y"))))))
@@ -156,6 +161,24 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       List(Filter(Pipe("a"), Pipe("b"), And(Gt(RefExpr(NamedField("x")), RefExpr(Value(0))),
       PPredicate(Or(Lt(RefExpr(NamedField("y")), RefExpr(Value(0))),
         PPredicate(Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))))))))))
+  }
+
+  it should "parse a filter with another complex logical expression" in {
+    assert(parseScript("a = FILTER b BY x > 0 AND y < 0 OR NOT a == b;") ==
+      List(Filter(Pipe("a"), Pipe("b"), Or(
+        And(Gt(RefExpr(NamedField("x")), RefExpr(Value(0))),
+          Lt(RefExpr(NamedField("y")), RefExpr(Value(0)))),
+          Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b"))))
+      ))))
+  }
+
+  it should "parse a filter with yet another complex logical expression" in {
+    assert(parseScript("a = FILTER b BY x > 0 OR y < 0 OR a == b;") ==
+      List(Filter(Pipe("a"), Pipe("b"), Or(Or(
+          Gt(RefExpr(NamedField("x")), RefExpr(Value(0))),
+          Lt(RefExpr(NamedField("y")), RefExpr(Value(0)))),
+          Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))
+      ))))
   }
 
   it should "parse a filter with a function expression" in {
@@ -192,11 +215,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
             Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),false))) 
   }
 
-  it should "parse a filter with a string value" in {
-    assert(parseScript("b = FILTER a BY  x == 'xyz';") ==
-      List(Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("x")), RefExpr(Value("xyz"))))))
-  }
-
+  /* -------------------- FOREACH -------------------- */
   it should "parse a simple foreach statement" in {
     assert(parseScript("a = foreach b generate x, y, z;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
@@ -292,15 +311,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       ))))))
   }
 
-  it should "parse a simple accumulate statement" in {
-    assert(parseScript("a = ACCUMULATE b GENERATE COUNT($0), AVG($1), SUM($2);") ==
-      List(Accumulate(Pipe("a"), Pipe("b"), GeneratorList(List(
-        GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(0))))),
-        GeneratorExpr(Func("AVG", List(RefExpr(PositionalField(1))))),
-        GeneratorExpr(Func("SUM", List(RefExpr(PositionalField(2)))))
-      )))))
-  }
-
+  /* -------------------- nested FOREACH -------------------- */
   it should "parse a simple nested FOREACH statement" in {
     assert(parseScript(
       """a = FOREACH b {
@@ -327,6 +338,17 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     )))))
   }
 
+  /* -------------------- ACCUMULATE -------------------- */
+  it should "parse a simple accumulate statement" in {
+    assert(parseScript("a = ACCUMULATE b GENERATE COUNT($0), AVG($1), SUM($2);") ==
+      List(Accumulate(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(0))))),
+        GeneratorExpr(Func("AVG", List(RefExpr(PositionalField(1))))),
+        GeneratorExpr(Func("SUM", List(RefExpr(PositionalField(2)))))
+      )))))
+  }
+
+  /* -------------------- invalid statements -------------------- */
   it should "detect an invalid statement" in {
     intercept[java.lang.IllegalArgumentException] {
       parseScript("a = invalid b by x=y;")
