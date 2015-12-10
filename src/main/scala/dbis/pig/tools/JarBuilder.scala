@@ -41,7 +41,7 @@ object JarBuilder extends PigletLogging {
     *         ControlFunctionFactory.class
     *         util/XY.class
     *
-    * @param inputDirectoryPath the input directory from which to (recursively) read .class files
+    * @param rootDirectory the input directory from which to (recursively) read .class files
     * @param jarFilePath the output file name of the .jar to generate
     * @param verbose if true, prints verbose debug messages
     * @return true if the .jar file was successfully created, false if not
