@@ -28,6 +28,10 @@ sbt> package
 by adding `dbis.piglet.PigletInterpreter` to the property value
 `zeppelin.interpreters`.
 
+1. In Zeppelin, go to `INTERPRETER` and click `+Create`. Enter a name (piglet) 
+and select the Piglet interpreter from the drop down menu. Currently, no 
+additional properties have to be set.
+
 1. Create a new notebook, go to "Interpreter binding", and activate
    `piglet %piglet`.
 
