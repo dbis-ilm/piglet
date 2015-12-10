@@ -4,7 +4,7 @@ We provide an integration with Apache Zeppelin - a web-bases notebook
 for data analytics. It allows to write and execute Piglet scripts in
 notebooks and visualize the results directly. For installation you
 need
-* the Zeppelin project from [[https://zeppelin.incubator.apache.org/]]
+* the Zeppelin project from [here](https://zeppelin.incubator.apache.org/)
 * Spark 1.5 built with Scala 2.11
 * the zeppelin branch of Piglet
 

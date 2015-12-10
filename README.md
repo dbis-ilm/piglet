@@ -137,7 +137,7 @@ More detailed information on how to create backends can be found in [backends.md
 ### Further Information ###
 
  * Details on the supported language features (statements, functions, etc.) are described [here](Language.md).
- * Documentation on [how to setup](Zeppelin.md) [Zeppelin](https://zeppelin.incubator.apache.org/) integration.
+ * Documentation on [how to setup](Zeppelin.md) integration with [Zeppelin](https://zeppelin.incubator.apache.org/).
  * We use the [Scala testing framework](http://www.scalatest.org/) as well as the [scoverage tool](http://scoverage.org/) 
    for test coverage. You can produce a coverage report by running `sbt clean coverage test`. The results can be found in
    `target/scala-2.11/scoverage-report/index.html`.
