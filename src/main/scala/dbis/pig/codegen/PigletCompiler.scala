@@ -139,9 +139,10 @@ def createCodeFromInput(source: String, backend: String): String = {
   // plan = processPlan(plan)
 
   // compile it into Scala code for Spark
-  val generatorClass = Conf.backendGenerator(backend)
+    val generatorClass = Conf.backendGenerator(backend)
   val extension = Conf.backendExtension(backend)
   val backendConf = BackendManager.backend(backend)
+    BackendManager.backend = backendConf
   val templateFile = backendConf.templateFile
   val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
   val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
