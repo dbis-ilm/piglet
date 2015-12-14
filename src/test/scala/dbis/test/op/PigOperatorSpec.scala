@@ -125,6 +125,19 @@ class PigOperatorSpec extends FlatSpec with Matchers {
     val udf2 = udfs(1)
     udf2 should be (UDF("FUNC2", "func2", List(), Types.CharArrayType, false))
     val udf3 = udfs(2)
-    udf3 should be (UDF("FUNC3", "func3", List(Types.AnyType), Types.DoubleType, false))
+    udf3 should be (UDF("FUNC3", "func3", List(Types.IntType), Types.DoubleType, false))
+  }
+
+  it should "extract complex UDF signatures" in {
+    val cmd = EmbedCmd(
+      s"""
+         |def myFunc(a: Double, b: Any): (Double, Double) = AnObject.myMethod(a, b.toInt)
+       """.stripMargin, None)
+    val udfs = cmd.extractUDFs()
+    udfs.length should be (1)
+    val udf = udfs(0)
+    udf should be (UDF("MYFUNC", "myFunc",
+      List(Types.DoubleType, Types.AnyType),
+      TupleType(Array(Field("_1", Types.DoubleType), Field("_2", Types.DoubleType))), false))
   }
 }

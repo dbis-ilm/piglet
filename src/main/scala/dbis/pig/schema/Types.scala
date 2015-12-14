@@ -111,6 +111,8 @@ object Types {
   def typeCompatibility(t1: PigType, t2: PigType): Boolean = {
     if (t1 == t2)
       true
+    else if (t1.tc == TypeCode.AnyType || t2.tc == TypeCode.AnyType)
+      true
     // numeric types are compatible
     else if (isNumericType(t1) && isNumericType(t2))
       true

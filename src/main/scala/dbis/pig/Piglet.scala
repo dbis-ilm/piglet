@@ -103,7 +103,7 @@ object Piglet extends PigletLogging {
       opt[Map[String, String]]("backend-args") valueName ("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to subsitute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
-      arg[File]("<file>...") unbounded() required() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
+      arg[File]("<file>...") unbounded() optional() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
     }
 
     // parser.parse returns Option[C]
@@ -135,14 +135,23 @@ object Piglet extends PigletLogging {
         return
     }
 
-    val files = inputFiles.takeWhile { p => !p.startsWith("-") }
     //    val backendArgs = inputFiles.drop(files.size).map { p => p.toString() }.toArray
 
     /* IMPORTANT: This must be the first call to Conf
      * Otherwise, the config file was already loaded before we could copy the new one
      */
-    if (updateConfig)
+    if (updateConfig) {
+      // in case of --update we just copy the config file and exit
       Conf.copyConfigFile()
+      sys.exit()
+    }
+
+    val files = inputFiles.takeWhile { p => !p.startsWith("-") }
+    if (files.isEmpty) {
+      // because the file argument was optional we have to check it here
+      println("Error: Missing argument <file>...\nTry --help for more information.")
+      sys.exit(-1)
+    }
 
     if (logLevel.isDefined) {
       try {

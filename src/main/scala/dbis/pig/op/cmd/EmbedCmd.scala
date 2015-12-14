@@ -18,9 +18,11 @@
 package dbis.pig.op.cmd
 
 import dbis.pig.schema.{Types, PigType}
-import dbis.pig.udf.{UDFTable, UDF}
+import dbis.pig.udf.{ScalaUDFParser, UDFTable, UDF}
 import scala.collection.mutable.ListBuffer
 import dbis.pig.op.PigOperator
+
+import scala.util.parsing.input.CharSequenceReader
 
 
 /** Wraps code that is to be embedded in the compiled Scala application.
@@ -37,38 +39,12 @@ case class EmbedCmd(code: String, ruleCode: Option[String]) extends PigOperator 
    * @return the list of identified UDFs
    */
   def extractUDFs(): List[UDF] = {
-    def stringToPigType(s: String): PigType = s match {
-      case "String" => Types.CharArrayType
-      case "Int" => Types.IntType
-      case "Double" => Types.DoubleType
-      case "Float" => Types.FloatType
-      case "Long" => Types.LongType
-      case "Boolean" => Types.BooleanType
-      case _ => Types.ByteArrayType
-    }
-
     val udfs = ListBuffer[UDF]()
-    val pattern = "def\\s*\\w*\\s*\\(([^\\)]*)\\)\\s*:\\s*\\w*\\s*=".r
-    val namePattern = "def\\s*\\w*\\s*".r
-    val typePattern = "\\)\\s*:\\s*\\w*\\s*=$".r
-    val paramPattern = "\\(.*\\)".r
-    val nonParamPattern = "\\(\\s*\\)".r
+    val pattern = "def\\s*\\w*\\s*\\(([^\\)]*)\\)\\s*:\\s*[^=]*\\s*=".r
     val funcs = pattern.findAllIn(code.replaceAll("(\r\n)|\r|\n", ""))
     funcs.foreach(s => {
-      val nameStr = namePattern.findFirstIn(s).get.split(" ")(1)
-      val s2 = typePattern.findFirstIn(s).get
-      val p1 = s2.indexOf(":")
-      val p2 = s2.lastIndexOf("=")
-      val typeStr = s2.substring(p1 + 1, p2 - p1).trim
-      // TODO: handle more complex parameter types such as tuple, bag, and map
-      val paramStr = paramPattern.findFirstIn(s).get
-      val nonParamStr = nonParamPattern.findFirstIn(paramStr)
-      val numParams = if (nonParamStr.isDefined) 0 else paramStr.count(c => c == ',') + 1
-      // println("name = '" + nameStr + "', typeStr = '" + typeStr + "', numParams = " + numParams)
-      val params = ListBuffer[PigType]()
-      for (i <- 1 to numParams) params += Types.AnyType
-      val udf = UDF(nameStr.toUpperCase, nameStr, params.toList, stringToPigType(typeStr), false)
-      // println("add udf: " + udf)
+      val parser = new ScalaUDFParser()
+      val udf = parser.parseDef(new CharSequenceReader(s))
       udfs += udf
       UDFTable.addUDF(udf)
     })
