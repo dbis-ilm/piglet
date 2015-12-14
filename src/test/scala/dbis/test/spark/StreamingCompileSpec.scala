@@ -69,10 +69,8 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
         |
         |object test {
         |    def main(args: Array[String]) {
-        |      val conf = new SparkConf().setAppName("test_App")
-        |      val ssc = new StreamingContext(conf, Seconds(1))
-        |      val listen = new GracefullyStopListener(ssc)
-        |      ssc.addStreamingListener(listen)
+        |      SparkStream.setAppName("test_App")
+        |      val ssc = SparkStream.ssc
         |      ssc.start()
         |      ssc.awaitTermination()
         |   }

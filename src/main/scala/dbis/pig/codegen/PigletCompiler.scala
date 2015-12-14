@@ -119,20 +119,6 @@ object PigletCompiler extends PigletLogging {
     (buf.toIterator, params)
   }
 
-  /*
-  private def getDeclareStatements(lines: Iterator[String]): Map[String,String] = {
-    for (l <- lines) {
-      if (l.trim.toLowerCase.startsWith("%declare")) {
-        val res = l.split(" ")
-        if (res.length >= 2)
-          params += (res(1) -> res(2))
-      }
-    }
-    params
-  }
-*/
-
-
   /**
  * Create Scala code for the given backend from the source string.
  * This method is provided mainly for Zeppelin.
@@ -153,9 +139,10 @@ def createCodeFromInput(source: String, backend: String): String = {
   // plan = processPlan(plan)
 
   // compile it into Scala code for Spark
-  val generatorClass = Conf.backendGenerator(backend)
+    val generatorClass = Conf.backendGenerator(backend)
   val extension = Conf.backendExtension(backend)
   val backendConf = BackendManager.backend(backend)
+    BackendManager.backend = backendConf
   val templateFile = backendConf.templateFile
   val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
   val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
@@ -238,9 +225,10 @@ def createCodeFromInput(source: String, backend: String): String = {
       // build a jar file
       logger.info(s"creating job's jar file ...")
       val jarFile = Paths.get(outDir.toAbsolutePath.toString, scriptName, s"$scriptName.jar")
-
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
         logger.info(s"created job's jar file at $jarFile")
+        // remove directory $outputDirectory
+        cleanupResult(outDir.toAbsolutePath.toString + "/" + scriptName + "/out")
         Some(jarFile)
       } else
         None
@@ -285,5 +273,16 @@ def createCodeFromInput(source: String, backend: String): String = {
 		  PigParser.parseScript(sourceLines.mkString("\n"), langFeature)
 	  }
   }
-  
+
+  private def cleanupResult(dir: String): Unit = {
+    import scalax.file.Path
+    val path: Path = Path.fromString(dir)
+    try {
+      path.deleteRecursively(continueOnFailure = false)
+    }
+    catch {
+      case e: java.io.IOException => // some file could not be deleted
+    }
+  }
+
 }

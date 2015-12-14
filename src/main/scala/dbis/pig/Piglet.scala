@@ -100,12 +100,11 @@ object Piglet extends PigletLogging {
       opt[Unit]('u', "update-config") optional() action { (_, c) => c.copy(updateConfig = true) } text (s"update config file in program home (see config file)")
       opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text (s"show the execution plan")
       opt[String]('g', "log-level") optional() action { (x, c) => c.copy(loglevel = Some(x.toUpperCase())) } text ("Set the log level: DEBUG, INFO, WARN, ERROR")
-      opt[Map[String, String]]("backend-args") valueName ("key1==value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to subsitute")
+      opt[Map[String, String]]("backend-args") valueName ("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to subsitute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
-      arg[File]("<file>...") unbounded() required() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
+      arg[File]("<file>...") unbounded() optional() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
     }
-
 
     // parser.parse returns Option[C]
     parser.parse(args, CompilerConfig()) match {
@@ -136,14 +135,23 @@ object Piglet extends PigletLogging {
         return
     }
 
-    val files = inputFiles.takeWhile { p => !p.startsWith("-") }
     //    val backendArgs = inputFiles.drop(files.size).map { p => p.toString() }.toArray
 
     /* IMPORTANT: This must be the first call to Conf
      * Otherwise, the config file was already loaded before we could copy the new one
      */
-    if (updateConfig)
+    if (updateConfig) {
+      // in case of --update we just copy the config file and exit
       Conf.copyConfigFile()
+      sys.exit()
+    }
+
+    val files = inputFiles.takeWhile { p => !p.startsWith("-") }
+    if (files.isEmpty) {
+      // because the file argument was optional we have to check it here
+      println("Error: Missing argument <file>...\nTry --help for more information.")
+      sys.exit(-1)
+    }
 
     if (logLevel.isDefined) {
       try {
@@ -197,7 +205,10 @@ object Piglet extends PigletLogging {
       }
 
     } catch {
-      case e: Exception => logger.error(s"An error occured: ${e.getMessage}", e)
+      // don't print full stack trace to error
+      case e: Exception =>
+        logger.error(s"An error occured: ${e.getMessage}")
+        logger.debug(e.toString)
 
     } finally {
 

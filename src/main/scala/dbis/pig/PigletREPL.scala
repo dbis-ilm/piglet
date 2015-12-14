@@ -18,7 +18,7 @@
 package dbis.pig
 
 import java.io.File
-import dbis.pig.op.{PigOperator, Dump}
+import dbis.pig.op.{Display, PigOperator, Dump}
 import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
@@ -142,7 +142,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     * @return true if the string is a command
     */
   private def isCommand(s: String): Boolean = {
-    val cmdList = List("help", "describe", "dump", "prettyprint", "rewrite", "quit", "fs")
+    val cmdList = List("help", "describe", "dump", "display", "prettyprint", "rewrite", "quit", "fs")
     val line = s.toLowerCase
     cmdList.exists(cmd => line.startsWith(cmd))
   }
@@ -350,6 +350,12 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         dumps.foreach(d => d.inputs.head.removeConsumer(d))
         buf --= dumps
       }
+      // the same for DISPLAY
+      if (s.toLowerCase.startsWith("display ")) {
+        val displays = buf.filter(p => p.isInstanceOf[Display])
+        displays.foreach(d => d.inputs.head.removeConsumer(d))
+        buf --= displays
+      }
 
       buf ++= PigParser.parseScript(s, languageFeature)
       var plan = new DataflowPlan(buf.toList)
@@ -497,6 +503,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => handleRewrite(buf)
         case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf)
         case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
+          s.toLowerCase.startsWith(s"display ") ||
           s.toLowerCase.startsWith(s"store ") ||
           s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf)
         case Line(s, buf) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)

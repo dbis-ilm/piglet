@@ -27,6 +27,8 @@ import java.io.FileInputStream
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import java.io.FileOutputStream
+import scala.tools.nsc.io._
+import FileStreamReader.customFileStreamReader
 
 import scala.reflect.ClassTag
 
@@ -54,9 +56,10 @@ class PigStream[T <: SchemaClass :ClassTag] extends java.io.Serializable {
     ssc.socketTextStream(hostname, port).map(line => extract(line.split(delim, -1)))
 
   def loadStream(ssc: StreamingContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
-    ssc.receiverStream(new FileStreamReader(path)).map(line => extract(line.split(delim, -1)))
+    ssc.readFile(path).map(line => extract(line.split(delim, -1)))
 
-  def writeStream(path: String, dstream: DStream[T], delim: String = ",") = dstream.map(_.mkString(delim)).saveAsTextFiles(path)
+  def writeStream(path: String, dstream: DStream[T], delim: String = ",") = 
+    dstream.foreachRDD( rdd => rdd.foreach { t => Path(path).createFile().appendAll(t.mkString(delim) + "\r\n") })
 
 }
 

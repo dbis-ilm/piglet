@@ -114,6 +114,7 @@ object Dependencies {
   val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val h2Database = "com.h2database" % "h2" % "1.4.190"
   val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
+  val log4j= "log4j" % "log4j" % "1.2.17"
 
   // Projects
   val rootDeps = Seq(

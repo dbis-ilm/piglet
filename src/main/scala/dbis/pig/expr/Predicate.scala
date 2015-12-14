@@ -22,6 +22,16 @@ import scala.collection.mutable.Map
 
 trait Predicate extends Expr
 
+case class BoolLiteral(val b: Boolean) extends Predicate {
+  override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
+
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = {}
+}
+
 case class Eq(override val left: ArithmeticExpr, override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
   
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
