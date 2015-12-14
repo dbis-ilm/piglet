@@ -1946,7 +1946,7 @@ class RewriterSpec extends FlatSpec
     
     val ops = PigParser.parseScript(
       """
-        |<! def myFunc(s: String): String = {
+        |<% def myFunc(s: String): String = {
         |   s
         | }
         | rules:
@@ -1960,7 +1960,7 @@ class RewriterSpec extends FlatSpec
         | }
         | }
         | applyRule (rule _)
-        |!>
+        |%>
         |a = LOAD 'file.csv';
         |b = FOREACH a GENERATE myFunc($0);
         |dump b;
