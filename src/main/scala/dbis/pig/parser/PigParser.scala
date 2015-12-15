@@ -278,6 +278,14 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   def tupleTypeSpec: Parser[TupleType] =
     ("tuple"?) ~ "(" ~repsep(fieldSchema, ",") ~ ")" ^^{ case _ ~ _ ~ fieldList ~ _ => TupleType(fieldList.toArray) }
 
+  def matrixTypeName: Parser[String] = "[sd][id]matrix".r
+  def matrixTypeSpec: Parser[PigType] = matrixTypeName ~ "(" ~ num ~ "," ~ num ~ ")" ^^{
+    case n ~ _ ~ rows ~ _ ~ cols ~ _ =>
+      val t = if (n.charAt(1) == 'i') Types.IntType else Types.DoubleType
+      val rep = if (n.charAt(0) == 's') MatrixRep.SparseMatrix else MatrixRep.DenseMatrix
+      MatrixType(t, rows, cols, rep)
+  }
+
   def typeSpec: Parser[PigType] = (
     "int" ^^ { _ => Types.IntType }
     | "long" ^^ { _ => Types.LongType }
@@ -298,6 +306,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
         case Some(t) => MapType(t)
         case None => MapType(Types.ByteArrayType)
     }}
+    | matrixTypeSpec
     )
 
   /*

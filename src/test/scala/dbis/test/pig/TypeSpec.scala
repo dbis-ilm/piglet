@@ -136,4 +136,19 @@ class TypeSpec extends FlatSpec with Matchers {
       Field("f2", tup0)))
     BagType(tup).encode should be ("{(f1:if2:(t1:at2:a))}")
   }
+
+  it should "support matrix types" in {
+    val m1 = MatrixType(Types.IntType, 3, 3,  MatrixRep.DenseMatrix)
+    m1.valueType should be (Types.IntType)
+    m1.typeOfComponent(0) should be (Types.IntType)
+    val m2 = MatrixType(Types.DoubleType, 3, 3,  MatrixRep.DenseMatrix)
+    m2.valueType should be (Types.DoubleType)
+    val m3 = MatrixType(Types.DoubleType, 3, 3,  MatrixRep.SparseMatrix)
+    m3.descriptionString should be ("sdmatrix(3,3)")
+
+    // we don't allow to construct matrices of strings
+    intercept[IllegalArgumentException] {
+      val m4 = MatrixType(Types.CharArrayType, 4, 1, MatrixRep.DenseMatrix)
+    }
+  }
 }

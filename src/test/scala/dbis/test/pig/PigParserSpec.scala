@@ -848,5 +848,17 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       == List(SocketRead(Pipe("a"), SocketAddress("","localhost","5555"), "", Some(schema))))
   }
 
+  it should "parse a LOAD statement with matrix types" in {
+    val uri = new URI("file.csv")
+    val schema = Schema(Array(Field("m1", MatrixType(Types.IntType, 4, 4, MatrixRep.DenseMatrix))))
+    assert(parseScript("""a = load 'file.csv' as (m1: dimatrix(4,4));""") ==
+      List(Load(Pipe("a"), uri, Some(schema))))
+  }
 
+  it should "parse a FOREACH statement with a matrix constructor" in {
+    assert(parseScript("o = FOREACH in GENERATE simatrix(3, 5, $1);") ==
+      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(RefExpr(NamedField("x")))
+      )))))
+  }
 }
