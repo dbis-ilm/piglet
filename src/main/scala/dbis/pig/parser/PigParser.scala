@@ -598,20 +598,14 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
   def code = ("""(?s)(.*?)""")
 
-  def embeddedCodeNoRules: Parser[EmbedCmd] = "<%" ~ (code+"%>").r ^^ { case _ ~ code => new EmbedCmd(code
-    .substring
-    (0, code .length - 2))
+  def embeddedCode: Parser[EmbedCmd] = "<%" ~ (code + "%>").r ^^ {
+    case _ ~ code if code.split("rules:").length != 2 => new EmbedCmd(code.substring(0, code.length - 2))
+    case _ ~ code =>
+      val ctuple = code.substring(0, code.length -2 ).split("rules:")
+      new EmbedCmd(ctuple(0), Some(ctuple(1)))
   }
 
-  def codeWithRulesInit = (code + "rules:").r
-
-  def ruleCode: Parser[String] = (code + "!>").r
-
-  def embeddedCodeWithRules: Parser[EmbedCmd] = "<!" ~ codeWithRulesInit ~ ruleCode ^^ {
-    case _ ~ code ~ rules => EmbedCmd(code.substring(0, code.length - 6), Some(rules.substring(0, rules.length - 2)))
-  }
-
-  def embedStmt: Parser[PigOperator] = embeddedCodeNoRules | embeddedCodeWithRules
+  def embedStmt: Parser[PigOperator] = embeddedCode
 
   /*
    * A statement can be one of the above delimited by a semicolon.

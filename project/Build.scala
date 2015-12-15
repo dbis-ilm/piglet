@@ -31,8 +31,8 @@ object PigBuild extends Build {
     dependsOn(common).
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
-    dependsOn(mapreduce % "test;it").
-    aggregate(common, sparklib, flinklib, mapreduce) // remove this if you don't want to automatically build these projects when building piglet 
+    dependsOn(mapreducelib % "test;it").
+    aggregate(common, sparklib, flinklib, mapreducelib) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
     settings(commonSettings: _*)
@@ -45,7 +45,7 @@ object PigBuild extends Build {
     settings(commonSettings: _*).
     dependsOn(common)
 
-  lazy val mapreduce = (project in file("mapreduce")).
+  lazy val mapreducelib = (project in file("mapreducelib")).
     settings(commonSettings: _*).
     dependsOn(common)
         
