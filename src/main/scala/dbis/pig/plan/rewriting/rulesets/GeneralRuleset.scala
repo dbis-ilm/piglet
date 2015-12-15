@@ -72,6 +72,17 @@ object GeneralRuleset extends Ruleset {
     }
   }
 
+  /** Merges two [[dbis.pig.op.Limit]] operations if one is the only input of the other.
+    *
+    * @param parent The parent limit.
+    * @param child The child limit.
+    * @return On success, an Option containing a new [[dbis.pig.op.Limit]] operator with the lowest of both limits.
+    */
+  def mergeLimits(parent: Limit, child: Limit): Option[Limit] = {
+    val newlimit = Math.min(parent.num, child.num)
+    Some(Limit(child.outputs.head, parent.inputs.head, newlimit))
+  }
+
   /** Removes a [[dbis.pig.op.Filter]] object that's a successor of a Filter with the same Predicate
     */
   //noinspection MutatorLikeMethodIsParameterless
@@ -315,6 +326,7 @@ object GeneralRuleset extends Ruleset {
     addStrategy(removeDuplicateFilters)
     merge(mergeFilters)
     merge(mergeWithEmpty)
+    merge(mergeLimits)
     reorder[OrderBy, Filter]
     addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
     addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))

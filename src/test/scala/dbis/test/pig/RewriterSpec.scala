@@ -25,6 +25,7 @@ import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules._
+import dbis.pig.plan.rewriting.rulesets.GeneralRuleset
 import dbis.pig.plan.rewriting.rulesets.GeneralRuleset._
 import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
 import dbis.pig.plan.rewriting.{Functions, Rewriter}
@@ -82,7 +83,7 @@ class RewriterSpec extends FlatSpec
     op4.inputs.map(_.producer) should contain only op2
   }
 
-  private def performMergeTest() = {
+  private def performFilterMergeTest() = {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Neq(RefExpr(PositionalField(1)), RefExpr(Value("21")))
@@ -118,6 +119,27 @@ class RewriterSpec extends FlatSpec
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be(op3)
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
+  }
+
+  private def performLimitMergeTest() = {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val op2 = Limit(Pipe("b"), Pipe("a"), 10)
+    val op3 = Limit(Pipe("c"), Pipe("b"), 20)
+    val op4 = Dump(Pipe("c"))
+    val op4_2 = op4.copy()
+    val opMerged = Limit(Pipe("c"), Pipe("a"), 10)
+
+    val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
+    val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
+    val source = planUnmerged.sourceNodes.head
+    val sourceMerged = planMerged.sourceNodes.head
+
+    val rewrittenSink = processPigOperator(source)
+    rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
+
+    val pPlan = processPlan(planUnmerged)
+    pPlan.findOperatorForAlias("c").value should be(opMerged)
+    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
   }
 
   private def performRemovalTest() = {
@@ -171,7 +193,7 @@ class RewriterSpec extends FlatSpec
 
     addStrategy(strategy _)
 
-    performMergeTest()
+    performFilterMergeTest()
     performNotMergeTest()
   }
 
@@ -197,7 +219,7 @@ class RewriterSpec extends FlatSpec
 
     addTypedStrategy(strategy _)
 
-    performMergeTest()
+    performFilterMergeTest()
     performNotMergeTest()
   }
 
@@ -214,7 +236,7 @@ class RewriterSpec extends FlatSpec
 
     addStrategy(strategy _)
 
-    performMergeTest()
+    performFilterMergeTest()
     performNotMergeTest()
   }
 
@@ -231,7 +253,7 @@ class RewriterSpec extends FlatSpec
 
     addBinaryPigOperatorStrategy(strategy)
 
-    performMergeTest()
+    performFilterMergeTest()
     performNotMergeTest()
   }
 
@@ -1785,7 +1807,7 @@ class RewriterSpec extends FlatSpec
     } applyRule {
       case (f1, f2) => mergeFilters(f1, f2)
     }
-    performMergeTest()
+    performFilterMergeTest()
     performNotMergeTest()
   }
 
@@ -1866,7 +1888,7 @@ class RewriterSpec extends FlatSpec
       def merger(f1: Filter, f2: Filter) = Filter(f2.outputs.head, f1.inputs.head, And(f1.pred, f2.pred))
       Some(Functions.merge(t1, t2, merger))
     }
-    performMergeTest()
+    performFilterMergeTest()
     performNotMergeTest()
   }
 
