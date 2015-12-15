@@ -25,7 +25,7 @@ import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules._
-import dbis.pig.plan.rewriting.rulesets.GeneralRuleset
+import dbis.pig.plan.rewriting.rulesets.{RDFRuleset, GeneralRuleset}
 import dbis.pig.plan.rewriting.rulesets.GeneralRuleset._
 import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
 import dbis.pig.plan.rewriting.{Functions, Rewriter}
@@ -483,7 +483,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule R1" in {
-    Rewriter toReplace (classOf[RDFLoad]) applyRule R1
+    RDFRuleset.registerRules()
     val URLs = Table(
       ("url"),
       ("http://www.example.com"),
@@ -540,7 +540,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule L2" in {
-    Rewriter toReplace (classOf[RDFLoad]) applyRule L2
+    RDFRuleset.registerRules()
     val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
     forAll (possibleGroupers) { (g: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
@@ -552,7 +552,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F1" in {
-    Rewriter applyRule F1
+    RDFRuleset.registerRules()
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
     // Add something between op1 and op3 to prevent R2 from being applied
     val op2 = Distinct(Pipe("b"), Pipe("a"))
