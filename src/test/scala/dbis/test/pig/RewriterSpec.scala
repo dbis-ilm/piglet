@@ -164,9 +164,8 @@ class RewriterSpec extends FlatSpec
 
   // THESIS
   "The rewriter" should "merge two Filter operations" in {
-    merge(mergeFilters)
-    performMergeTest()
-    performNotMergeTest()
+    GeneralRuleset.registerRules()
+    performFilterMergeTest()
   }
 
   // THESIS
@@ -267,12 +266,12 @@ class RewriterSpec extends FlatSpec
                                      None
                                    }})
 
-    performMergeTest()
+    performFilterMergeTest()
     performNotMergeTest()
   }
 
   it should "remove Filter operation if it has the same predicate as an earlier one" in {
-    addStrategy(removeDuplicateFilters)
+    GeneralRuleset.registerRules()
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -409,6 +408,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
+    GeneralRuleset.registerRules()
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val op2 = Filter(Pipe("b"), Pipe("a"), predicate)
