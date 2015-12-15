@@ -856,9 +856,11 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a FOREACH statement with a matrix constructor" in {
-    assert(parseScript("o = FOREACH in GENERATE simatrix(3, 5, $1);") ==
-      List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
-        GeneratorExpr(RefExpr(NamedField("x")))
+    assert(parseScript("o = FOREACH in GENERATE simatrix(3, 5, $1) as myMat;") ==
+      List(Foreach(Pipe("o"), Pipe("in"), GeneratorList(List(
+          GeneratorExpr(ConstructMatrixExpr("si",
+            3, 5, List(RefExpr(PositionalField(1)))),
+            Some(Field("myMat", Types.ByteArrayType)))
       )))))
   }
 }
