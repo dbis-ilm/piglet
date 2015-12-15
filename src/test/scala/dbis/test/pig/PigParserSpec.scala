@@ -752,13 +752,13 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   it should "parse a script with embedded code and rules" in {
     val ops = parseScript(
       """
-        |<! def someFunc(s: String): String = {
+        |<% def someFunc(s: String): String = {
         |   s
         | }
-        | rules:
-        | def rule(term: Any): Option[PigOperator] = None
-        | def rule2(term: Any): Option[PigOperator] = None
-        |!>
+        |rules:
+        |def rule(term: Any): Option[PigOperator] = None
+        |def rule2(term: Any): Option[PigOperator] = None
+        |%>
         |A = LOAD 'file.csv';
       """.stripMargin)
     assert(ops(0).isInstanceOf[EmbedCmd])
@@ -766,11 +766,12 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(op.code.stripLineEnd ==
        """def someFunc(s: String): String = {
           |   s
-          | }
-          | """.stripMargin)
-    assert(op.ruleCode.headOption.value.stripLineEnd ==
-      """def rule(term: Any): Option[PigOperator] = None
-        | def rule2(term: Any): Option[PigOperator] = None""".stripMargin.stripLineEnd)
+          | }""".stripMargin)
+    assert(op.ruleCode.headOption.value ==
+      """
+        |def rule(term: Any): Option[PigOperator] = None
+        |def rule2(term: Any): Option[PigOperator] = None
+        |""".stripMargin)
   }
 
 
