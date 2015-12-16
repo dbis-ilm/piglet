@@ -145,12 +145,12 @@ object GeneralRuleset extends Ruleset {
     case Empty(_) => None
     case Generate(_) => None
     case op: PigOperator =>
-      op.outputs match {
-        case Pipe(_, _, Nil) :: Nil | Nil =>
-          val newNode = Empty(Pipe(""))
-          newNode.inputs = op.inputs
-          Some(newNode)
-        case _ => None
+      if (op.outputs.map(_.consumer.length == 0).fold(true)(_ && _)) {
+        val newNode = Empty(Pipe(""))
+        newNode.inputs = op.inputs
+        Some(newNode)
+      } else {
+        None
       }
     case _ => None
   }
