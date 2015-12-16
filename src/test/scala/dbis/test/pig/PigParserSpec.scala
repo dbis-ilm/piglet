@@ -860,7 +860,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("o = FOREACH in GENERATE simatrix(3, 5, $1) as myMat;") ==
       List(Foreach(Pipe("o"), Pipe("in"), GeneratorList(List(
           GeneratorExpr(ConstructMatrixExpr("si",
-            3, 5, List(RefExpr(PositionalField(1)))),
+            3, 5, RefExpr(PositionalField(1))),
             Some(Field("myMat", Types.ByteArrayType)))
       )))))
   }

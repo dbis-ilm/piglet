@@ -355,6 +355,10 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       }.map{case (p, i) => s"${p._1} -> ${p._2}"}.mkString(",")
       s"Map[String,${scalaTypeMappingTable(valType)}](${mapStr})"
     }
+    case ConstructMatrixExpr(ty, rows, cols, expr) => {
+      val mType = if (ty.charAt(1) == 'i') "Int" else "Double"
+      s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(schema, expr, namedRef = namedRef)}.map(v => v._0).toArray)"
+    }
     case _ => println("unsupported expression: " + expr); ""
   }
 
@@ -733,6 +737,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         case BagType(v) => s"Iterable[_${v.className}_Tuple]"
         case TupleType(f, c) => schemaClassName(c)
         case MapType(v) => s"Map[String,${scalaTypeMappingTable(v)}]"
+        case MatrixType(v, rows, cols, rep) => s"DenseMatrix[${if (v.tc == TypeCode.IntType) "Int" else "Double"}]"
         case _ => f.descriptionString
       }
     }

@@ -536,7 +536,6 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     println("schema = " + foreachOp.schema)
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(foreachOp))
-
     val expectedCode = cleanString(
       """val uniqcnt = grpd.map(t => {
         |val sym = t._1.map(l => l._1).toList
@@ -989,5 +988,43 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |val C = B.map(t => _t$1_Tuple(t._0, PigFuncs.average(t._1.map(e => e._1))))
       """.stripMargin)
     generatedCode should matchSnippet(expectedCode)
+  }
+
+  it should "generate code for matrix construction" in {
+    val plan = new DataflowPlan(parseScript(
+      """
+        |A = LOAD 'file' AS (v11: double, v12: double, v21: double, v22: double, v31: double, v32: double);
+        |B = FOREACH A GENERATE ddmatrix(2, 3, {v11, v12, v21, v22, v31, v32});
+        |DUMP B;
+      """.stripMargin))
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new BatchCodeGen(templateFile)
+    val op = rewrittenPlan.findOperatorForAlias("B").get
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """
+        |val B = A.map(t => _t$1_Tuple(new DenseMatrix[Double](2, 3, List(_t$2_Tuple(t._0),_t$2_Tuple(t._1),_t$2_Tuple(t._2),_t$2_Tuple(t._3),_t$2_Tuple(t._4),_t$2_Tuple(t._5)).map(v => v._0).toArray)))
+        |""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
+  }
+
+  it should "generate code for constructing a matrix from a bag" in {
+    val plan = new DataflowPlan(parseScript(
+      """
+        |A = LOAD 'file' AS (v11: double, v12: double, v21: double, v22: double, v31: double, v32: double);
+        |B = FOREACH A GENERATE {v11, v12, v21, v22, v31, v32} as myBag;
+        |C = FOREACH B GENERATE ddmatrix(2, 3, myBag);
+        |DUMP C;
+      """.stripMargin))
+    val rewrittenPlan = processPlan(plan)
+    val codeGenerator = new BatchCodeGen(templateFile)
+    val op = rewrittenPlan.findOperatorForAlias("C").get
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """
+        |val C = B.map(t => _t$1_Tuple(new DenseMatrix[Double](2, 3, t._0.map(v => v._0).toArray)))
+      """.stripMargin)
+    generatedCode should matchSnippet(expectedCode)
+
   }
 }
