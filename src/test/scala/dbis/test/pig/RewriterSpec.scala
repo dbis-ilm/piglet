@@ -25,7 +25,7 @@ import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules._
-import dbis.pig.plan.rewriting.rulesets.{RDFRuleset, GeneralRuleset}
+import dbis.pig.plan.rewriting.rulesets.{SparkRuleset, RDFRuleset, GeneralRuleset}
 import dbis.pig.plan.rewriting.rulesets.GeneralRuleset._
 import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
 import dbis.pig.plan.rewriting.{Functions, Rewriter}
@@ -1616,6 +1616,25 @@ class RewriterSpec extends FlatSpec
     rewrittenPlan.checkSchemaConformance
   }
 
+  "The SparkRuleset" should "merge OrderBy and Limit operators to Top" in {
+    SparkRuleset.registerRules()
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Limit(Pipe("c"), Pipe("b"), 42)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    pPlan.findOperatorForAlias("b") shouldBe empty
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    op4.inputs.map(_.producer).size shouldBe 1
+    op4.inputs.map(_.producer).headOption.value should matchPattern {
+      case Top(Pipe("c", _, _), Pipe("a", _, _), List(), 42) =>}
+  }
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
