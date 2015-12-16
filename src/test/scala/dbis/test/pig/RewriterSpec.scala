@@ -1619,8 +1619,6 @@ class RewriterSpec extends FlatSpec
   "The SparkRuleset" should "merge OrderBy and Limit operators to Top" in {
     SparkRuleset.registerRules()
     val op1 = Load(Pipe("a"), "input/file.csv")
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
     val op3 = Limit(Pipe("c"), Pipe("b"), 42)
     val op4 = Dump(Pipe("c"))
@@ -1635,6 +1633,53 @@ class RewriterSpec extends FlatSpec
     op4.inputs.map(_.producer).headOption.value should matchPattern {
       case Top(Pipe("c", _, _), Pipe("a", _, _), List(), 42) =>}
   }
+
+  it should "remove OrderBy operators that are at some point followed by Grouping ones" in {
+    SparkRuleset.registerRules()
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Grouping(Pipe("c"), Pipe("b"), GroupingExpression(List(PositionalField(1))))
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    pPlan.findOperatorForAlias("b") shouldBe empty
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    op1.outputs.flatMap(_.consumer) should contain only op3
+    op4.inputs.map(_.producer).size shouldBe 1
+    op4.inputs.map(_.producer) should contain only op3
+  }
+
+  it should "not remove OrderBy operators that are at some point followed by Grouping ones" in {
+    addStrategy(SparkRuleset.removeOrderByFollowedByGroupBy)
+
+    val betweenOps = Table(
+      "op",
+      Limit(Pipe("c"), Pipe("b"), 42),
+      // Foreach(Pipe("c"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(PositionalField(0))))), false),
+      StreamOp(Pipe("c"), Pipe("b"), "foo")
+    )
+
+    forAll(betweenOps) { bo =>
+      val op1 = Load(Pipe("a"), "input/file.csv")
+      val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+      val op3 = Grouping(Pipe("d"), Pipe("c"), GroupingExpression(List(PositionalField(1))))
+      val op4 = Dump(Pipe("d"))
+
+      val plan = new DataflowPlan(List(op1, op2, bo, op3, op4))
+      val pPlan = processPlan(plan)
+      val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+      pPlan.findOperatorForAlias("b").value shouldBe op2
+      pPlan.sinkNodes.headOption.value shouldBe op4
+      op1.outputs.flatMap(_.consumer) should contain only op2
+      op4.inputs.map(_.producer).size shouldBe 1
+      op4.inputs.map(_.producer) should contain only op3
+    }
+  }
+
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))

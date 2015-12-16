@@ -16,13 +16,41 @@
  */
 package dbis.pig.plan.rewriting.rulesets
 
-import dbis.pig.op.{Top, Limit, OrderBy}
+import dbis.pig.op._
 import dbis.pig.plan.rewriting.Rewriter._
+import org.kiama.rewriting.Rewriter._
 
 object SparkRuleset extends Ruleset {
+  val isGrouping: PartialFunction[Any, Option[Boolean]] = {
+    case _ : Foreach | _ : Limit | _ : StreamOp => None
+    case op => Some(op.isInstanceOf[Grouping])
+  }
+
+  /** Remove [[dbis.pig.op.OrderBy]] operators that are at some point followed by a [[dbis.pig.op.Grouping]].
+    *
+    * groupBy operations in spark are explicitly documented to not preserve order
+    */
+  def removeOrderByFollowedByGroupBy = rulefs[OrderBy] {
+    case orderby: OrderBy =>
+      val canRemove = everything("findGroupBy", Some(false): Option[Boolean]) { (old: Option[Boolean], new_ :
+    Option[Boolean]) =>
+        new_ match {
+          case None => None
+          case Some(v) => old.map(_ || v)
+        }
+      } (isGrouping) (orderby)
+      if (canRemove.isDefined && canRemove.get) {
+        manybu(buildRemovalStrategy(orderby))
+      } else {
+        fail
+      }
+  }
+
   override def registerRules(): Unit = {
     toMerge(classOf[OrderBy], classOf[Limit]) applyPattern {
       case (o @ OrderBy(_, in, spec, _), l @ Limit(out, _, num)) => Top(out, in, spec, num)
     }
+
+    addStrategy(removeOrderByFollowedByGroupBy)
   }
 }
