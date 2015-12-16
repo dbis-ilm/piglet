@@ -347,7 +347,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "order Filter operations before Joins if only NamedFields are used" in {
-    addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
+    addBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp)
     val load_1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
     ))))
     val load_2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
@@ -379,7 +379,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "order Filter operations before Cross operators if only NamedFields are used" in {
-    addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
+    addBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp)
     val load_1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
     ))))
     val load_2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field

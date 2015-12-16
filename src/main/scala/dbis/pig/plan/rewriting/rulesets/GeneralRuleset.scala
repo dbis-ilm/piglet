@@ -328,8 +328,8 @@ object GeneralRuleset extends Ruleset {
     merge(mergeWithEmpty)
     merge(mergeLimits)
     reorder[OrderBy, Filter]
-    addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
-    addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
+    addBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp)
+    addBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp)
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     applyRule(foreachRecursively _)
     addStrategy(removeNonStorageSinks _)

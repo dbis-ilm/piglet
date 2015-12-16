@@ -109,10 +109,10 @@ trait FastStrategyAdder {
   /** Add a strategy that applies a function to two operators.
     *
     * @param f The function to apply.
-    * @tparam T2 The second operators type.
     * @tparam T The first operators type.
+    * @tparam T2 The second operators type.
     */
-  def addBinaryPigOperatorStrategy[T2 <: PigOperator : ClassTag, T <: PigOperator : ClassTag](f: (T, T2)
+  def addBinaryPigOperatorStrategy[T <: PigOperator : ClassTag, T2 <: PigOperator : ClassTag](f: (T, T2)
     => Option[PigOperator]): Unit = {
     val strategy = buildBinaryPigOperatorStrategy(f)
     addStrategy(strategy)
