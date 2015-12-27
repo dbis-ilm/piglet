@@ -67,7 +67,7 @@ trait MergeSupport extends PigletLogging {
 			        if(prod.isDefined)
 			          pipe.name = prod.get.outPipeName
 			        else
-			          logger.warn("No producer found for $op -- this shouldn't happen?!")
+			          logger.warn(s"No producer found for $op -- this shouldn't happen?!")
 			      }
 			      
 			      // add op to the list but do not create plan now 
