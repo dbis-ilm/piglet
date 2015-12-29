@@ -240,18 +240,6 @@ object RDFRuleset extends Ruleset {
     false
   }
 
-  def plainSchemaJoinEarlyAbort(op: BGPFilter): Boolean = {
-    if (op.inputSchema != RDFLoad.plainSchema) {
-      return true
-    }
-
-    if (op.patterns.length < 2) {
-      return true
-    }
-
-    false
-  }
-
   /** Applies rewriting rule F4 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
     * @param op
