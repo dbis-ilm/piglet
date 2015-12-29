@@ -145,7 +145,7 @@ object GeneralRuleset extends Ruleset {
     case Empty(_) => None
     case Generate(_) => None
     case op: PigOperator =>
-      if (op.outputs.map(_.consumer.length == 0).fold(true)(_ && _)) {
+      if (op.outputs.map(_.consumer.isEmpty).fold(true)(_ && _)) {
         val newNode = Empty(Pipe(""))
         newNode.inputs = op.inputs
         Some(newNode)
@@ -331,7 +331,7 @@ object GeneralRuleset extends Ruleset {
     addBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp)
     addBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp)
     addStrategy(strategyf(t => splitIntoToFilters(t)))
-    applyRule(foreachRecursively _)
+    applyRule(foreachRecursively)
     addStrategy(removeNonStorageSinks _)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     addOperatorReplacementStrategy(foreachGrouping)
