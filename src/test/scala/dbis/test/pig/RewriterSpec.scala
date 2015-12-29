@@ -36,6 +36,7 @@ import org.kiama.rewriting.Rewriter.strategyf
 import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers, PrivateMethodTester}
+import dbis.pig.plan.rewriting.internals.{Column, RDF}
 
 import scala.util.Random
 
@@ -1086,7 +1087,9 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J1" in {
-    Rewriter unless plainSchemaJoinEarlyAbort applyRule J1
+    Rewriter when { op: BGPFilter => RDF.isStarJoin(op.patterns) } and {
+      _.inputSchema == RDFLoad.plainSchema
+    } applyRule J1
     val patterns = Table(
       ("patterns", "filters", "join", "foreach", "expected schema"),
       (List(
@@ -1189,7 +1192,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J2" in {
-    Rewriter unless groupedSchemaJoinEarlyAbort applyRule J2
+    Rewriter unless groupedSchemaJoinEarlyAbort and {op => RDF.isStarJoin(op.patterns)} applyRule J2
     val patterns = Table(
       ("Patterns", "ForEach", "Filter"),
       (List(
@@ -1291,7 +1294,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J3" in {
-    Rewriter unless plainSchemaJoinEarlyAbort applyRule J3
+    Rewriter when {op: BGPFilter => RDF.isPathJoin(op.patterns)} and {_.inputSchema == RDFLoad.plainSchema} applyRule J3
     val patterns = Table(
       ("patterns", "filters", "join", "foreach", "expected schema"),
       (List(
@@ -1395,7 +1398,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J4" in {
-    Rewriter unless groupedSchemaJoinEarlyAbort applyRule J4
+    Rewriter unless groupedSchemaJoinEarlyAbort and {op => RDF.isPathJoin(op.patterns)} applyRule J4
     val patterns = Table(
       ("patterns", "filters", "flattenning foreachs", "join", "foreach", "expected schema"),
       (List(

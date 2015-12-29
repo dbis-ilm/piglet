@@ -635,10 +635,6 @@ object RDFRuleset extends Ruleset {
       return None
     }
 
-    if (!RDF.isStarJoin(patterns)) {
-      return None
-    }
-
     // We'll reuse in later on, so we need to remove `op` from its consumers
     in.removeConsumer(op)
 
@@ -701,9 +697,6 @@ object RDFRuleset extends Ruleset {
     */
   def J2(op: BGPFilter): Option[(Foreach, Filter)] = {
     val patterns = op.patterns
-    if (!RDF.isStarJoin(patterns)) {
-      return None
-    }
 
     val out = op.outputs.head
     val in = op.inputs.head
@@ -752,9 +745,6 @@ object RDFRuleset extends Ruleset {
       val out = op.outputs.head
       val in = op.inputs.head
       val patterns = op.patterns
-      if (!RDF.isPathJoin(patterns)) {
-        return None
-      }
 
       // We'll reuse in later on, so we need to remove `op` from its consumers
       in.removeConsumer(op)
@@ -838,10 +828,6 @@ object RDFRuleset extends Ruleset {
       val out = op.outputs.head
       val in = op.inputs.head
       val patterns = op.patterns
-
-      if (!RDF.isPathJoin(patterns)) {
-        return None
-      }
 
       // We'll reuse in later on, so we need to remove `op` from its consumers
       in.removeConsumer(op)
@@ -950,9 +936,9 @@ object RDFRuleset extends Ruleset {
     Rewriter applyRule F6
     Rewriter applyRule F7
     Rewriter applyRule F8
-    Rewriter unless plainSchemaJoinEarlyAbort  applyRule J1
-    Rewriter unless groupedSchemaJoinEarlyAbort applyRule J2
-    Rewriter unless plainSchemaJoinEarlyAbort applyRule J3
-    Rewriter unless groupedSchemaJoinEarlyAbort applyRule J4
+    Rewriter when {op: BGPFilter => RDF.isStarJoin(op.patterns)} and {_.inputSchema == RDFLoad.plainSchema} applyRule J1
+    Rewriter unless groupedSchemaJoinEarlyAbort and {op => RDF.isStarJoin(op.patterns)} applyRule J2
+    Rewriter when {op: BGPFilter => RDF.isPathJoin(op.patterns)} and {_.inputSchema == RDFLoad.plainSchema} applyRule J3
+    Rewriter unless groupedSchemaJoinEarlyAbort and {op => RDF.isPathJoin(op.patterns)} applyRule J4
   }
 }
