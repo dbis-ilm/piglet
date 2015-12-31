@@ -122,6 +122,24 @@ class RewriterSpec extends FlatSpec
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
   }
 
+  private def performFilterRemovalTest() = {
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
+    val op2_after = Filter(Pipe("c"), Pipe("a"), predicate1)
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+
+    val pPlan = processPlan(plan)
+    pPlan.findOperatorForAlias("b").value should be(op2)
+    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
+    op2.outputs.flatMap(_.consumer) should contain only op4
+    op4.inputs.map(_.producer) should contain only op2
+  }
+
   private def performLimitMergeTest() = {
     val limitops = Table(
       ("op2", "op3"),
@@ -285,21 +303,13 @@ class RewriterSpec extends FlatSpec
 
   it should "remove Filter operation if it has the same predicate as an earlier one" in {
     GeneralRuleset.registerRules()
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
-    val op2_after = Filter(Pipe("c"), Pipe("a"), predicate1)
-    val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
-    val op4 = Dump(Pipe("c"))
+    performFilterRemovalTest()
+  }
 
-    val plan = new DataflowPlan(List(op1, op2, op3, op4))
-
-    val pPlan = processPlan(plan)
-    pPlan.findOperatorForAlias("b").value should be(op2)
-    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
-    op2.outputs.flatMap(_.consumer) should contain only op4
-    op4.inputs.map(_.producer) should contain only op2
+  it should "merge Filter operations with different predicates when both the merge and remove rules are registered" in {
+    GeneralRuleset.registerRules()
+    performFilterMergeTest()
+    performFilterRemovalTest()
   }
 
   // THESIS
