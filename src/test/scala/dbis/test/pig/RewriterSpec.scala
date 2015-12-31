@@ -123,24 +123,31 @@ class RewriterSpec extends FlatSpec
   }
 
   private def performLimitMergeTest() = {
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val op2 = Limit(Pipe("b"), Pipe("a"), 10)
-    val op3 = Limit(Pipe("c"), Pipe("b"), 20)
-    val op4 = Dump(Pipe("c"))
-    val op4_2 = op4.copy()
-    val opMerged = Limit(Pipe("c"), Pipe("a"), 10)
+    val limitops = Table(
+      ("op2", "op3"),
+      (Limit(Pipe("b"), Pipe("a"), 10), Limit(Pipe("c"), Pipe("b"), 20)),
+      (Limit(Pipe("b"), Pipe("a"), 20), Limit(Pipe("c"), Pipe("b"), 10)),
+      (Limit(Pipe("b"), Pipe("a"), 10), Limit(Pipe("c"), Pipe("b"), 10))
+    )
+    forAll(limitops) {
+      (op2: Limit, op3: Limit) =>
+        val op1 = Load(Pipe("a"), "input/file.csv")
+        val op4 = Dump(Pipe("c"))
+        val op4_2 = op4.copy()
+        val opMerged = Limit(Pipe("c"), Pipe("a"), 10)
 
-    val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
-    val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
-    val source = planUnmerged.sourceNodes.head
-    val sourceMerged = planMerged.sourceNodes.head
+        val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
+        val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
+        val source = planUnmerged.sourceNodes.head
+        val sourceMerged = planMerged.sourceNodes.head
 
-    val rewrittenSink = processPigOperator(source)
-    rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
+        val rewrittenSink = processPigOperator(source)
+        rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
 
-    val pPlan = processPlan(planUnmerged)
-    pPlan.findOperatorForAlias("c").value should be(opMerged)
-    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+        val pPlan = processPlan(planUnmerged)
+        pPlan.findOperatorForAlias("c").value should be(opMerged)
+        pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+    }
   }
 
   private def performRemovalTest() = {
@@ -165,8 +172,9 @@ class RewriterSpec extends FlatSpec
 
   // THESIS
   "The rewriter" should "merge two Filter operations" in {
-    GeneralRuleset.registerRules()
+    merge(mergeFilters)
     performFilterMergeTest()
+    performNotMergeTest()
   }
 
   // THESIS
@@ -257,6 +265,10 @@ class RewriterSpec extends FlatSpec
     performNotMergeTest()
   }
 
+  it should "merge Limit operations" in {
+    merge(mergeLimits)
+    performLimitMergeTest()
+  }
   // THESIS
   it should "merge Filter operations via binary strategies and anonymous functions" in {
     addBinaryPigOperatorStrategy({ (filter1: Filter, filter2: Filter) =>
