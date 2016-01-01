@@ -47,7 +47,7 @@ object SparkRuleset extends Ruleset {
   }
 
   override def registerRules(): Unit = {
-    toMerge(classOf[OrderBy], classOf[Limit]) applyPattern {
+    toMerge[OrderBy, Limit]() applyPattern {
       case (o @ OrderBy(_, in, spec, _), l @ Limit(out, _, num)) => Top(out, in, spec, num)
     }
 

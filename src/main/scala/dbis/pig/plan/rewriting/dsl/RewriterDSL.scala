@@ -54,7 +54,7 @@ trait RewriterDSL {
     * @return
     */
   def toMerge[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : ClassTag]
-    (cls1: Class[FROM1], cls2: Class[FROM2]): MergeWord[FROM1, FROM2] = {
+    (): MergeWord[FROM1, FROM2] = {
     val b = new MergeBuilder[FROM1, FROM2]
     new MergeWord[FROM1, FROM2](b)
   }

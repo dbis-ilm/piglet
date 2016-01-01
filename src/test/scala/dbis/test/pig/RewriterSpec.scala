@@ -1891,7 +1891,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "allow merging operators" in {
-    Rewriter toMerge(classOf[Filter], classOf[Filter]) whenMatches {
+    Rewriter toMerge[Filter, Filter]() whenMatches {
       case (f1 @ Filter(_, _, pred1, _), f2 @ Filter(_, _, pred2, _)) if pred1 != pred2 =>
     } applyRule {
       case (f1, f2) => mergeFilters(f1, f2)
@@ -1972,7 +1972,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "allow merging operators" in {
-    Rewriter toMerge(classOf[Filter], classOf[Filter]) when { tup => tup._1.pred != tup._2.pred } applyRule {
+    Rewriter toMerge[Filter, Filter]() when { tup => tup._1.pred != tup._2.pred } applyRule {
       case (t1: Filter, t2: Filter) =>
       def merger(f1: Filter, f2: Filter) = Filter(f2.outputs.head, f1.inputs.head, And(f1.pred, f2.pred))
       Some(Functions.merge(t1, t2, merger))
