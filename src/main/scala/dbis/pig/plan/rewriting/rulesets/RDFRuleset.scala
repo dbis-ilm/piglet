@@ -913,13 +913,13 @@ object RDFRuleset extends Ruleset {
   }
 
   def registerRules() = {
-    Rewriter toReplace (classOf[RDFLoad]) applyRule R1
+    Rewriter toReplace () applyRule R1
     Rewriter applyRule R2
-    Rewriter toReplace (classOf[RDFLoad]) applyRule L2
+    Rewriter toReplace () applyRule L2
     Rewriter applyRule F1
-    Rewriter toReplace (classOf[BGPFilter]) applyRule F2
-    Rewriter toReplace (classOf[BGPFilter]) applyRule F3
-    Rewriter toReplace (classOf[BGPFilter]) applyRule F4
+    Rewriter toReplace () applyRule F2
+    Rewriter toReplace () applyRule F3
+    Rewriter toReplace () applyRule F4
     Rewriter applyRule F5
     Rewriter applyRule F6
     Rewriter applyRule F7
