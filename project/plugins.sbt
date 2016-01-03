@@ -6,7 +6,7 @@ resolvers += Resolver.url(
     Resolver.ivyStylePatterns)
 addSbtPlugin("me.lessis" % "bintray-sbt" % "0.1.1")
 
-addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.1.0")
+addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.3.3")
 
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.7.0")
 

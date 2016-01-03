@@ -199,7 +199,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = FILTER b BY x == 'aString';") ==
       List(Filter(Pipe("a"), Pipe("b"), Eq(
         RefExpr(NamedField("x")),
-        RefExpr(Value("aString"))))))
+        RefExpr(Value("\"aString\""))))))
   }
 
   it should "parse a filter with a boolean function expression" in {

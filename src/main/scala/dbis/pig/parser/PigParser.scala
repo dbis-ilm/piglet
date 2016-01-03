@@ -174,7 +174,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
       case ">=" => Geq(a, b)
     }
     case a ~ op ~ (b: String) => {
-      val b_val = RefExpr(Value(unquote(b)))
+      val b_val = RefExpr(Value(s""""${unquote(b)}""""))
       op match {
         case "==" => Eq(a, b_val)
         case "!=" => Neq(a, b_val)
