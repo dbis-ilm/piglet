@@ -818,8 +818,9 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
 object PigParser {
    
-   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
-    Schema.init()
+   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig, resetSchema: Boolean = true): List[PigOperator] = {
+    if (resetSchema)
+      Schema.init()
     val parser = new PigParser
     parser.parseScript(new CharSequenceReader(s), feature)
   }
