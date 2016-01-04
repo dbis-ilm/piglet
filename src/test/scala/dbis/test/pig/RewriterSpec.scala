@@ -25,7 +25,7 @@ import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules._
-import dbis.pig.plan.rewriting.rulesets.{RDFRuleset, GeneralRuleset}
+import dbis.pig.plan.rewriting.rulesets.{SparkRuleset, RDFRuleset, GeneralRuleset}
 import dbis.pig.plan.rewriting.rulesets.GeneralRuleset._
 import dbis.pig.plan.rewriting.rulesets.RDFRuleset._
 import dbis.pig.plan.rewriting.{Functions, Rewriter}
@@ -36,6 +36,7 @@ import org.kiama.rewriting.Rewriter.strategyf
 import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers, PrivateMethodTester}
+import dbis.pig.plan.rewriting.internals.{Column, RDF}
 
 import scala.util.Random
 
@@ -121,25 +122,50 @@ class RewriterSpec extends FlatSpec
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
   }
 
-  private def performLimitMergeTest() = {
+  private def performFilterRemovalTest() = {
     val op1 = Load(Pipe("a"), "input/file.csv")
-    val op2 = Limit(Pipe("b"), Pipe("a"), 10)
-    val op3 = Limit(Pipe("c"), Pipe("b"), 20)
+    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
+    val op2_after = Filter(Pipe("c"), Pipe("a"), predicate1)
+    val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
     val op4 = Dump(Pipe("c"))
-    val op4_2 = op4.copy()
-    val opMerged = Limit(Pipe("c"), Pipe("a"), 10)
 
-    val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
-    val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
-    val source = planUnmerged.sourceNodes.head
-    val sourceMerged = planMerged.sourceNodes.head
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
 
-    val rewrittenSink = processPigOperator(source)
-    rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
+    val pPlan = processPlan(plan)
+    pPlan.findOperatorForAlias("b").value should be(op2)
+    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
+    op2.outputs.flatMap(_.consumer) should contain only op4
+    op4.inputs.map(_.producer) should contain only op2
+  }
 
-    val pPlan = processPlan(planUnmerged)
-    pPlan.findOperatorForAlias("c").value should be(opMerged)
-    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+  private def performLimitMergeTest() = {
+    val limitops = Table(
+      ("op2", "op3"),
+      (Limit(Pipe("b"), Pipe("a"), 10), Limit(Pipe("c"), Pipe("b"), 20)),
+      (Limit(Pipe("b"), Pipe("a"), 20), Limit(Pipe("c"), Pipe("b"), 10)),
+      (Limit(Pipe("b"), Pipe("a"), 10), Limit(Pipe("c"), Pipe("b"), 10))
+    )
+    forAll(limitops) {
+      (op2: Limit, op3: Limit) =>
+        val op1 = Load(Pipe("a"), "input/file.csv")
+        val op4 = Dump(Pipe("c"))
+        val op4_2 = op4.copy()
+        val opMerged = Limit(Pipe("c"), Pipe("a"), 10)
+
+        val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
+        val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
+        val source = planUnmerged.sourceNodes.head
+        val sourceMerged = planMerged.sourceNodes.head
+
+        val rewrittenSink = processPigOperator(source)
+        rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
+
+        val pPlan = processPlan(planUnmerged)
+        pPlan.findOperatorForAlias("c").value should be(opMerged)
+        pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+    }
   }
 
   private def performRemovalTest() = {
@@ -164,8 +190,9 @@ class RewriterSpec extends FlatSpec
 
   // THESIS
   "The rewriter" should "merge two Filter operations" in {
-    GeneralRuleset.registerRules()
+    merge(mergeFilters)
     performFilterMergeTest()
+    performNotMergeTest()
   }
 
   // THESIS
@@ -256,6 +283,10 @@ class RewriterSpec extends FlatSpec
     performNotMergeTest()
   }
 
+  it should "merge Limit operations" in {
+    merge(mergeLimits)
+    performLimitMergeTest()
+  }
   // THESIS
   it should "merge Filter operations via binary strategies and anonymous functions" in {
     addBinaryPigOperatorStrategy({ (filter1: Filter, filter2: Filter) =>
@@ -272,21 +303,13 @@ class RewriterSpec extends FlatSpec
 
   it should "remove Filter operation if it has the same predicate as an earlier one" in {
     GeneralRuleset.registerRules()
-    val op1 = Load(Pipe("a"), "input/file.csv")
-    val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
-    val op2_after = Filter(Pipe("c"), Pipe("a"), predicate1)
-    val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
-    val op4 = Dump(Pipe("c"))
+    performFilterRemovalTest()
+  }
 
-    val plan = new DataflowPlan(List(op1, op2, op3, op4))
-
-    val pPlan = processPlan(plan)
-    pPlan.findOperatorForAlias("b").value should be(op2)
-    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
-    op2.outputs.flatMap(_.consumer) should contain only op4
-    op4.inputs.map(_.producer) should contain only op2
+  it should "merge Filter operations with different predicates when both the merge and remove rules are registered" in {
+    GeneralRuleset.registerRules()
+    performFilterMergeTest()
+    performFilterRemovalTest()
   }
 
   // THESIS
@@ -347,7 +370,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "order Filter operations before Joins if only NamedFields are used" in {
-    addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
+    addBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp)
     val load_1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
     ))))
     val load_2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
@@ -379,7 +402,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "order Filter operations before Cross operators if only NamedFields are used" in {
-    addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
+    addBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp)
     val load_1 = Load(Pipe("a"), "input/file.csv", Some(Schema(BagType(TupleType(Array(Field("a", Types.IntType), Field("aid", Types.IntType)))
     ))))
     val load_2 = Load(Pipe("b"), "file2.csv", Some(Schema(BagType(TupleType(Array(Field("b", Types.CharArrayType), Field
@@ -573,7 +596,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F2" in {
-    Rewriter toReplace (classOf[BGPFilter]) applyRule F2
+    Rewriter toReplace () applyRule F2
     val patterns = Table(
       ("Pattern"),
       (TriplePattern(Value("subjectv"), PositionalField(1), PositionalField(2)),
@@ -606,7 +629,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F3" in {
-    Rewriter toReplace (classOf[BGPFilter]) applyRule F3
+    Rewriter toReplace () applyRule F3
     val patterns = Table(
       ("Pattern"),
       // s p o bound
@@ -658,7 +681,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule F4" in {
-    Rewriter toReplace (classOf[BGPFilter]) applyRule F4
+    Rewriter toReplace () applyRule F4
     val patterns = Table(
       ("Pattern", "grouping column", "Filter"),
       (TriplePattern(Value("subject"), PositionalField(1), PositionalField(2)),
@@ -1086,7 +1109,9 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J1" in {
-    Rewriter unless plainSchemaJoinEarlyAbort applyRule J1
+    Rewriter when { op: BGPFilter => RDF.isStarJoin(op.patterns) } and {
+      _.inputSchema == RDFLoad.plainSchema
+    } applyRule J1
     val patterns = Table(
       ("patterns", "filters", "join", "foreach", "expected schema"),
       (List(
@@ -1189,7 +1214,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J2" in {
-    Rewriter unless groupedSchemaJoinEarlyAbort applyRule J2
+    Rewriter unless groupedSchemaJoinEarlyAbort and {op => RDF.isStarJoin(op.patterns)} applyRule J2
     val patterns = Table(
       ("Patterns", "ForEach", "Filter"),
       (List(
@@ -1291,7 +1316,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J3" in {
-    Rewriter unless plainSchemaJoinEarlyAbort applyRule J3
+    Rewriter when {op: BGPFilter => RDF.isPathJoin(op.patterns)} and {_.inputSchema == RDFLoad.plainSchema} applyRule J3
     val patterns = Table(
       ("patterns", "filters", "join", "foreach", "expected schema"),
       (List(
@@ -1395,7 +1420,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule J4" in {
-    Rewriter unless groupedSchemaJoinEarlyAbort applyRule J4
+    Rewriter unless groupedSchemaJoinEarlyAbort and {op => RDF.isPathJoin(op.patterns)} applyRule J4
     val patterns = Table(
       ("patterns", "filters", "flattenning foreachs", "join", "foreach", "expected schema"),
       (List(
@@ -1616,6 +1641,70 @@ class RewriterSpec extends FlatSpec
     rewrittenPlan.checkSchemaConformance
   }
 
+  "The SparkRuleset" should "merge OrderBy and Limit operators to Top" in {
+    SparkRuleset.registerRules()
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Limit(Pipe("c"), Pipe("b"), 42)
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    pPlan.findOperatorForAlias("b") shouldBe empty
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    op4.inputs.map(_.producer).size shouldBe 1
+    op4.inputs.map(_.producer).headOption.value should matchPattern {
+      case Top(Pipe("c", _, _), Pipe("a", _, _), List(), 42) =>}
+  }
+
+  it should "remove OrderBy operators that are at some point followed by Grouping ones" in {
+    SparkRuleset.registerRules()
+    val op1 = Load(Pipe("a"), "input/file.csv")
+    val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op3 = Grouping(Pipe("c"), Pipe("b"), GroupingExpression(List(PositionalField(1))))
+    val op4 = Dump(Pipe("c"))
+
+    val plan = new DataflowPlan(List(op1, op2, op3, op4))
+    val pPlan = processPlan(plan)
+    val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+    pPlan.findOperatorForAlias("b") shouldBe empty
+    pPlan.sinkNodes.headOption.value shouldBe op4
+    op1.outputs.flatMap(_.consumer) should contain only op3
+    op4.inputs.map(_.producer).size shouldBe 1
+    op4.inputs.map(_.producer) should contain only op3
+  }
+
+  it should "not remove OrderBy operators that are at some point followed by Grouping ones" in {
+    addStrategy(SparkRuleset.removeOrderByFollowedByGroupBy)
+
+    val betweenOps = Table(
+      "op",
+      Limit(Pipe("c"), Pipe("b"), 42),
+      // Foreach(Pipe("c"), Pipe("b"), GeneratorList(List(GeneratorExpr(RefExpr(PositionalField(0))))), false),
+      StreamOp(Pipe("c"), Pipe("b"), "foo")
+    )
+
+    forAll(betweenOps) { bo =>
+      val op1 = Load(Pipe("a"), "input/file.csv")
+      val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
+      val op3 = Grouping(Pipe("d"), Pipe("c"), GroupingExpression(List(PositionalField(1))))
+      val op4 = Dump(Pipe("d"))
+
+      val plan = new DataflowPlan(List(op1, op2, bo, op3, op4))
+      val pPlan = processPlan(plan)
+      val rewrittenSource = pPlan.sourceNodes.headOption.value
+
+      pPlan.findOperatorForAlias("b").value shouldBe op2
+      pPlan.sinkNodes.headOption.value shouldBe op4
+      op1.outputs.flatMap(_.consumer) should contain only op2
+      op4.inputs.map(_.producer).size shouldBe 1
+      op4.inputs.map(_.producer) should contain only op3
+    }
+  }
+
   "pullOpAcrossMultipleInputOp" should "throw an exception if toBePulled is not a consumer of multipleInputOp" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
@@ -1802,7 +1891,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "allow merging operators" in {
-    Rewriter toMerge(classOf[Filter], classOf[Filter]) whenMatches {
+    Rewriter toMerge[Filter, Filter]() whenMatches {
       case (f1 @ Filter(_, _, pred1, _), f2 @ Filter(_, _, pred2, _)) if pred1 != pred2 =>
     } applyRule {
       case (f1, f2) => mergeFilters(f1, f2)
@@ -1883,7 +1972,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "allow merging operators" in {
-    Rewriter toMerge(classOf[Filter], classOf[Filter]) when { tup => tup._1.pred != tup._2.pred } applyRule {
+    Rewriter toMerge[Filter, Filter]() when { tup => tup._1.pred != tup._2.pred } applyRule {
       case (t1: Filter, t2: Filter) =>
       def merger(f1: Filter, f2: Filter) = Filter(f2.outputs.head, f1.inputs.head, And(f1.pred, f2.pred))
       Some(Functions.merge(t1, t2, merger))

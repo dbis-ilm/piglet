@@ -145,12 +145,12 @@ object GeneralRuleset extends Ruleset {
     case Empty(_) => None
     case Generate(_) => None
     case op: PigOperator =>
-      op.outputs match {
-        case Pipe(_, _, Nil) :: Nil | Nil =>
-          val newNode = Empty(Pipe(""))
-          newNode.inputs = op.inputs
-          Some(newNode)
-        case _ => None
+      if (op.outputs.map(_.consumer.isEmpty).fold(true)(_ && _)) {
+        val newNode = Empty(Pipe(""))
+        newNode.inputs = op.inputs
+        Some(newNode)
+      } else {
+        None
       }
     case _ => None
   }
@@ -328,10 +328,10 @@ object GeneralRuleset extends Ruleset {
     merge(mergeWithEmpty)
     merge(mergeLimits)
     reorder[OrderBy, Filter]
-    addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
-    addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
+    addBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp)
+    addBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp)
     addStrategy(strategyf(t => splitIntoToFilters(t)))
-    applyRule(foreachRecursively _)
+    applyRule(foreachRecursively)
     addStrategy(removeNonStorageSinks _)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     addOperatorReplacementStrategy(foreachGrouping)

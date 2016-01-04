@@ -45,7 +45,7 @@ case class InvalidPlanException(msg: String) extends Exception(msg)
  */
 class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable {
   def operators_=(ops: List[PigOperator]) = {
-    ops map { _.outPipeNames map { PipeNameGenerator.addKnownName(_)}}
+    ops map { _.outPipeNames map { PipeNameGenerator.addKnownName}}
     _operators = ops
   }
 

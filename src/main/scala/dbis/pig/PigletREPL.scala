@@ -357,7 +357,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         buf --= displays
       }
 
-      buf ++= PigParser.parseScript(s, languageFeature)
+      buf ++= PigParser.parseScript(s, languageFeature, resetSchema = false)
       var plan = new DataflowPlan(buf.toList)
 
       val mm = new MaterializationManager

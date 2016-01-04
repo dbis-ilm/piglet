@@ -177,7 +177,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
       case ">=" => Geq(a, b)
     }
     case a ~ op ~ (b: String) => {
-      val b_val = RefExpr(Value(unquote(b)))
+      val b_val = RefExpr(Value(s""""${unquote(b)}""""))
       op match {
         case "==" => Eq(a, b_val)
         case "!=" => Neq(a, b_val)
@@ -830,8 +830,9 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
 object PigParser {
    
-   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
-    Schema.init()
+   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig, resetSchema: Boolean = true): List[PigOperator] = {
+    if (resetSchema)
+      Schema.init()
     val parser = new PigParser
     parser.parseScript(new CharSequenceReader(s), feature)
   }

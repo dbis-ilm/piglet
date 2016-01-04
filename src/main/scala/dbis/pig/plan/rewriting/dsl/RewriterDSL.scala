@@ -33,7 +33,7 @@ trait RewriterDSL {
     * @tparam FROM
     * @return
     */
-  def toReplace[FROM <: PigOperator : ClassTag](cls: Class[FROM]): ReplaceWord[FROM] = {
+  def toReplace[FROM <: PigOperator : ClassTag](): ReplaceWord[FROM] = {
     val b = new ReplacementBuilder[FROM, PigOperator]
     new ReplaceWord[FROM](b)
   }
@@ -54,7 +54,7 @@ trait RewriterDSL {
     * @return
     */
   def toMerge[FROM1 <: PigOperator : ClassTag, FROM2 <: PigOperator : ClassTag]
-    (cls1: Class[FROM1], cls2: Class[FROM2]): MergeWord[FROM1, FROM2] = {
+    (): MergeWord[FROM1, FROM2] = {
     val b = new MergeBuilder[FROM1, FROM2]
     new MergeWord[FROM1, FROM2](b)
   }
