@@ -42,6 +42,8 @@ case class Eq(override val left: ArithmeticExpr, override val right: ArithmeticE
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
+
+  override def toString = s"${left.toString} == ${right.toString}"
 }
 
 case class Neq(override val left: ArithmeticExpr, override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
@@ -53,6 +55,8 @@ case class Neq(override val left: ArithmeticExpr, override val right: Arithmetic
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
+
+  override def toString = s"${left.toString} != ${right.toString}"
 }
 
 case class Geq(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
@@ -64,6 +68,9 @@ case class Geq(override val left: ArithmeticExpr,  override val right: Arithmeti
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
+
+  override def toString = s"${left.toString} >= ${right.toString}"
+
 }
 
 case class Leq(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
@@ -75,6 +82,9 @@ case class Leq(override val left: ArithmeticExpr,  override val right: Arithmeti
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
+
+  override def toString = s"${left.toString} <= ${right.toString}"
+
 }
 
 case class Gt(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
@@ -86,6 +96,9 @@ case class Gt(override val left: ArithmeticExpr,  override val right: Arithmetic
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
+
+  override def toString = s"${left.toString} > ${right.toString}"
+
 }
 
 case class Lt(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
@@ -97,6 +110,9 @@ case class Lt(override val left: ArithmeticExpr,  override val right: Arithmetic
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
     traverser(schema, this) || left.traverseAnd(schema, traverser) || right.traverseAnd(schema, traverser)
+
+  override def toString = s"${left.toString} < ${right.toString}"
+
 }
 
 case class And(a: Predicate, b: Predicate) extends Predicate {
@@ -113,6 +129,8 @@ case class And(a: Predicate, b: Predicate) extends Predicate {
     a.resolveReferences(mapping)
     b.resolveReferences(mapping)
   }
+
+  override def toString = s"${a.toString} AND ${b.toString}"
 }
 
 case class Or(a: Predicate, b: Predicate) extends Predicate {
@@ -129,6 +147,8 @@ case class Or(a: Predicate, b: Predicate) extends Predicate {
     a.resolveReferences(mapping)
     b.resolveReferences(mapping)
   }
+
+  override def toString = s"${a.toString} OR ${b.toString}"
 }
 
 case class Not(a: Predicate) extends Predicate {
@@ -142,6 +162,8 @@ case class Not(a: Predicate) extends Predicate {
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
 
   override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
+
+  override def toString = s"NOT ${a.toString}"
 }
 
 /**
@@ -160,4 +182,7 @@ case class PPredicate(a: Predicate) extends Predicate {
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
 
   override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
+
+  override def toString = s"(${a.toString})"
+
 }
