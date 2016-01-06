@@ -49,7 +49,7 @@ class FlinkCompileIt extends FlatSpec with CompileIt {
     ("wordcount.pig", "marycounts.out", "truth/marycount.data", false, "pig", "flink"),
     ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "flink"),
     ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "flink"),
-    ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
+    ("union.pig", "united.out", "truth/united.data", true, "pig", "flink"),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "flink"),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "flink"),
     ("embedded.pig", "embedded.out", "truth/embedded.data", true, "pig", "flink"),
