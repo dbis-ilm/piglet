@@ -52,7 +52,7 @@ class RewriterSpec extends FlatSpec
 
   private def performConnectTest(op1: PigOperator, op2: PigOperator, overwrite: Boolean = false) = {
     Rewriter.connect(op1, op2, overwrite)
-    op1.outputs.flatMap(_.consumer) should contain only op2
+    op1 should matchPattern { case SuccE(`op1`, `op2`) => }
     op2.inputs.map(_.producer) should contain only op1
     op1.outPipeName shouldBe op2.inPipeName
   }
@@ -74,13 +74,12 @@ class RewriterSpec extends FlatSpec
 
     val plan = new DataflowPlan(List(op1, op2, op3, op4))
     val pPlan = processPlan(plan)
-    val rewrittenSource = pPlan.sourceNodes.headOption.value
+    pPlan.sourceNodes.headOption.value should matchPattern { case SuccE(`op1`, `op3`) => }
 
-    rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
     pPlan.findOperatorForAlias("b").value shouldBe op3
     pPlan.sinkNodes.headOption.value shouldBe op4
     pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
-    op2.outputs.flatMap(_.consumer) should contain only op4
+    pPlan.findOperatorForAlias("c").value should matchPattern { case SuccE(`op2`, `op4`) => }
     op4.inputs.map(_.producer) should contain only op2
   }
 
@@ -95,16 +94,9 @@ class RewriterSpec extends FlatSpec
     val opMerged = Filter(Pipe("c"), Pipe("a"), And(predicate1, predicate2))
 
     val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
-    val planMerged = new DataflowPlan(List(op1, opMerged, op4_2))
-    val source = planUnmerged.sourceNodes.head
-    val sourceMerged = planMerged.sourceNodes.head
-
-    val rewrittenSink = processPigOperator(source)
-    rewrittenSink.asInstanceOf[PigOperator].outputs should equal(sourceMerged.outputs)
-
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be(opMerged)
-    pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only opMerged
+    pPlan.findOperatorForAlias("a").value should matchPattern{ case SuccE(`op1`, `opMerged`) => }
   }
 
   private def performNotMergeTest() = {
@@ -136,7 +128,7 @@ class RewriterSpec extends FlatSpec
     val pPlan = processPlan(plan)
     pPlan.findOperatorForAlias("b").value should be(op2)
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
-    op2.outputs.flatMap(_.consumer) should contain only op4
+    op2 should matchPattern { case SuccE(`op2`, `op4`) => }
     op4.inputs.map(_.producer) should contain only op2
   }
 
@@ -398,7 +390,7 @@ class RewriterSpec extends FlatSpec
     join.outputs should have length 1
     filter.outputs should have length 1
 
-    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(filter, load_2)
+    plan.findOperatorForAlias("c").value.inputs.map(_.producer) should contain only(filter, load_2)
   }
 
   it should "order Filter operations before Cross operators if only NamedFields are used" in {
@@ -427,7 +419,7 @@ class RewriterSpec extends FlatSpec
     cross.outputs should have length 1
     filter.outputs should have length 1
 
-    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(filter, load_2)
+    plan.findOperatorForAlias("c").value.inputs.map(_.producer) should contain only(filter, load_2)
   }
 
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
@@ -623,7 +615,7 @@ class RewriterSpec extends FlatSpec
         val op3 = Dump(Pipe("b"))
         val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
-        plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+        plan.findOperatorForAlias("b").value should matchPattern { case SuccE(_, `op3`) => }
       }
     }
   }
@@ -675,7 +667,7 @@ class RewriterSpec extends FlatSpec
         val op4 = Dump(Pipe("c"))
         val plan = processPlan(new DataflowPlan(List(op1, op2, op3, op4)))
 
-        plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+        plan.findOperatorForAlias("b").value should matchPattern { case SuccE(_, `op3`) => }
       }
     }
   }
@@ -714,7 +706,7 @@ class RewriterSpec extends FlatSpec
           val op3 = Dump(Pipe("b"))
           val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
-          plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+          plan.findOperatorForAlias("b").value should matchPattern { case SuccE(_, `op3`) => }
           plan.operators should contain only(op1, op2, op3)
         }
       }
@@ -780,7 +772,7 @@ class RewriterSpec extends FlatSpec
           val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
           plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only fo
-          plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+          plan.findOperatorForAlias("b").value should matchPattern { case SuccE(_, `op3`) => }
           plan.findOperatorForAlias("b").value shouldBe fi
           plan.operators should contain only(op1, fo, fi, op3)
         }
@@ -792,7 +784,7 @@ class RewriterSpec extends FlatSpec
            val op3 = Dump(Pipe("b"))
            val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
-           plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+           plan.findOperatorForAlias("b").value should matchPattern { case SuccE(_, `op3`) => }
            plan.operators should contain only(op1, op2, op3)
          }
       }
@@ -865,7 +857,7 @@ class RewriterSpec extends FlatSpec
           val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
           plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only fo
-          plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+          plan.findOperatorForAlias("b").value should matchPattern { case SuccE(_, `op3`) => }
           plan.findOperatorForAlias("b").value shouldBe fi
           plan.operators should contain only(op1, fo, fi, op3)
         }
@@ -877,7 +869,7 @@ class RewriterSpec extends FlatSpec
           val op3 = Dump(Pipe("b"))
           val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
-          plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+          plan.findOperatorForAlias("b").value should matchPattern { case SuccE(_, `op3`) => }
           plan.operators should contain only(op1, op2, op3)
         }
       }
@@ -992,7 +984,7 @@ class RewriterSpec extends FlatSpec
           val op3 = Dump(Pipe("b"))
           val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
-          plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
+          plan.findOperatorForAlias("b").value should matchPattern { case SuccE(_, `op3`) => }
           plan.operators should contain only(op1, op2, op3)
         }
       }
@@ -1187,9 +1179,8 @@ class RewriterSpec extends FlatSpec
       val rewrittenPlan = processPlan(plan)
       rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
       rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
-      rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
-      sc shouldBe rewrittenPlan.findOperatorForAlias("b")
-        .headOption.value.schema
+      rewrittenPlan.findOperatorForAlias("b").value.inputs.map(_.producer) should contain only j
+      sc shouldBe rewrittenPlan.findOperatorForAlias("b").value.schema
     }
 
     // Don't apply J1 if there's only one pattern
@@ -1308,8 +1299,7 @@ class RewriterSpec extends FlatSpec
         val plan = processPlan(new DataflowPlan(List(op1, op2, op3)))
 
         plan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain only fo
-        plan.findOperatorForAlias("b").value.outputs.flatMap(_.consumer) should contain only op3
-        plan.findOperatorForAlias("b").value shouldBe fi
+        plan.findOperatorForAlias("b").value should matchPattern { case SuccE(`fi`, `op3`) => }
         plan.operators should contain only(op1, fo, fi, op3)
       }
     }
@@ -1392,9 +1382,8 @@ class RewriterSpec extends FlatSpec
       val rewrittenPlan = processPlan(plan)
       rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
       rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
-      rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
-      sc shouldBe rewrittenPlan.findOperatorForAlias("b")
-        .headOption.value.schema
+      rewrittenPlan.findOperatorForAlias("b").value.inputs.map(_.producer) should contain only j
+      sc shouldBe rewrittenPlan.findOperatorForAlias("b").value.schema
     }
 
 
@@ -1563,10 +1552,9 @@ class RewriterSpec extends FlatSpec
       val rewrittenPlan = processPlan(plan)
       rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
       rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
-      rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
-      rewrittenPlan.findOperatorForAlias("pipeUxwEkfQHGx").headOption.value.inputs.map(_.producer) should contain theSameElementsAs f_fo
-      sc shouldBe rewrittenPlan.findOperatorForAlias("b")
-        .headOption.value.schema
+      rewrittenPlan.findOperatorForAlias("b").value.inputs.map(_.producer) should contain only j
+      rewrittenPlan.findOperatorForAlias("pipeUxwEkfQHGx").value.inputs.map(_.producer) should contain theSameElementsAs f_fo
+      sc shouldBe rewrittenPlan.findOperatorForAlias("b").value.schema
     }
 
 
@@ -1672,7 +1660,7 @@ class RewriterSpec extends FlatSpec
 
     pPlan.findOperatorForAlias("b") shouldBe empty
     pPlan.sinkNodes.headOption.value shouldBe op4
-    op1.outputs.flatMap(_.consumer) should contain only op3
+    op1 should matchPattern { case SuccE(`op1`, `op3`) => }
     op4.inputs.map(_.producer).size shouldBe 1
     op4.inputs.map(_.producer) should contain only op3
   }
@@ -1699,7 +1687,7 @@ class RewriterSpec extends FlatSpec
 
       pPlan.findOperatorForAlias("b").value shouldBe op2
       pPlan.sinkNodes.headOption.value shouldBe op4
-      op1.outputs.flatMap(_.consumer) should contain only op2
+      op1 should matchPattern { case SuccE(`op1`, `op2`) => }
       op4.inputs.map(_.producer).size shouldBe 1
       op4.inputs.map(_.producer) should contain only op3
     }
@@ -1738,14 +1726,14 @@ class RewriterSpec extends FlatSpec
     val indexOfPipeFromLoadToFilter = op2.inputs.indexWhere(_.producer == op3)
 
     // A -> C, from both sides
-    op1.outputs.flatMap(_.consumer) should contain only op3
+    op1 should matchPattern { case SuccE(`op1`, `op3`) => }
     op3.inputs.map(_.producer) should contain only op1
     // C -> X, from both sides ...
-    op3.outputs.flatMap(_.consumer) should contain only op2
+    op3 should matchPattern { case SuccE(`op3`, `op2`) => }
     // ... and B -> X
     op2.inputs.map(_.producer) should contain only (op3, op1_2)
     // X -> DUMP, from both sides
-    op2.outputs.flatMap(_.consumer) should contain only op4
+    op2 should matchPattern { case SuccE(`op2`, `op4`) => }
     op4.inputs.map(_.producer) should contain only op2
 
     // The pipe from the (now pulled up) filter operation should be at the same position as the one from op1 was
@@ -1778,7 +1766,7 @@ class RewriterSpec extends FlatSpec
     new DataflowPlan(ops)
 
     load should matchPattern {
-      case SuccE(load, dump) =>
+      case SuccE(`load`, `dump`) =>
     }
 
     dump should not matchPattern {
@@ -1801,11 +1789,11 @@ class RewriterSpec extends FlatSpec
     new DataflowPlan(ops)
 
     load should matchPattern {
-      case AllSuccE(load, b :: dump) =>
+      case AllSuccE(`load`, List(`b`, `dump`)) =>
     }
 
     dump should matchPattern {
-      case AllSuccE(dump, Nil) =>
+      case AllSuccE(`dump`, Nil) =>
     }
   }
 
