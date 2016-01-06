@@ -390,7 +390,7 @@ class RewriterSpec extends FlatSpec
     join.outputs should have length 1
     filter.outputs should have length 1
 
-    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(filter, load_2)
+    plan.findOperatorForAlias("c").value.inputs.map(_.producer) should contain only(filter, load_2)
   }
 
   it should "order Filter operations before Cross operators if only NamedFields are used" in {
@@ -419,7 +419,7 @@ class RewriterSpec extends FlatSpec
     cross.outputs should have length 1
     filter.outputs should have length 1
 
-    plan.findOperatorForAlias("c").headOption.value.inputs.map(_.producer) should contain only(filter, load_2)
+    plan.findOperatorForAlias("c").value.inputs.map(_.producer) should contain only(filter, load_2)
   }
 
   it should "rewrite DataflowPlans without introducing read-before-write conflicts" in {
@@ -1179,9 +1179,8 @@ class RewriterSpec extends FlatSpec
       val rewrittenPlan = processPlan(plan)
       rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
       rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
-      rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
-      sc shouldBe rewrittenPlan.findOperatorForAlias("b")
-        .headOption.value.schema
+      rewrittenPlan.findOperatorForAlias("b").value.inputs.map(_.producer) should contain only j
+      sc shouldBe rewrittenPlan.findOperatorForAlias("b").value.schema
     }
 
     // Don't apply J1 if there's only one pattern
@@ -1383,9 +1382,8 @@ class RewriterSpec extends FlatSpec
       val rewrittenPlan = processPlan(plan)
       rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
       rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
-      rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
-      sc shouldBe rewrittenPlan.findOperatorForAlias("b")
-        .headOption.value.schema
+      rewrittenPlan.findOperatorForAlias("b").value.inputs.map(_.producer) should contain only j
+      sc shouldBe rewrittenPlan.findOperatorForAlias("b").value.schema
     }
 
 
@@ -1554,10 +1552,9 @@ class RewriterSpec extends FlatSpec
       val rewrittenPlan = processPlan(plan)
       rewrittenPlan.sourceNodes.headOption.value.outputs.flatMap(_.consumer) should contain theSameElementsAs fs
       rewrittenPlan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only fo
-      rewrittenPlan.findOperatorForAlias("b").headOption.value.inputs.map(_.producer) should contain only j
-      rewrittenPlan.findOperatorForAlias("pipeUxwEkfQHGx").headOption.value.inputs.map(_.producer) should contain theSameElementsAs f_fo
-      sc shouldBe rewrittenPlan.findOperatorForAlias("b")
-        .headOption.value.schema
+      rewrittenPlan.findOperatorForAlias("b").value.inputs.map(_.producer) should contain only j
+      rewrittenPlan.findOperatorForAlias("pipeUxwEkfQHGx").value.inputs.map(_.producer) should contain theSameElementsAs f_fo
+      sc shouldBe rewrittenPlan.findOperatorForAlias("b").value.schema
     }
 
 
