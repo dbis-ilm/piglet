@@ -90,13 +90,13 @@ class RewriterSpec extends FlatSpec
     val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
     val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
     val op4 = Dump(Pipe("c"))
-    val op4_2 = op4.copy()
     val opMerged = Filter(Pipe("c"), Pipe("a"), And(predicate1, predicate2))
 
     val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
     val pPlan = processPlan(planUnmerged)
     pPlan.findOperatorForAlias("c").value should be(opMerged)
-    pPlan.findOperatorForAlias("a").value should matchPattern{ case SuccE(`op1`, `opMerged`) => }
+    pPlan.findOperatorForAlias("a").value should matchPattern { case SuccE(`op1`, `opMerged`) => }
+    pPlan.sinkNodes.headOption.value should matchPattern { case PredE(`op4`, `opMerged`) => }
   }
 
   private def performNotMergeTest() = {
@@ -164,7 +164,6 @@ class RewriterSpec extends FlatSpec
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
 
-    // ops before removing
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
     val op3 = Filter(Pipe("c"), Pipe("b"), predicate1)
     val op4 = Dump(Pipe("c"))
@@ -176,7 +175,6 @@ class RewriterSpec extends FlatSpec
     rewrittenSource.outputs should contain only Pipe("a", rewrittenSource, List(op3))
     pPlan.findOperatorForAlias("b") shouldBe empty
     pPlan.sinkNodes.headOption.value shouldBe op4
-    pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op3
     op4 should matchPattern { case PredE(`op4`, `op3`) => }
   }
 
