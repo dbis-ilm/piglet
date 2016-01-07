@@ -1912,9 +1912,23 @@ class RewriterSpec extends FlatSpec
     performReorderingTest()
   }
 
+  it should "apply patterns via applyPattern with a condition added by whenMatches" in {
+    Rewriter whenMatches[OrderBy, Filter] { case t: OrderBy if t.outputs.length > 0 => } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
   // THESIS
   it should "apply patterns via applyPattern with a condition added by unless" in {
     Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by unlessMatches" in {
+    Rewriter unlessMatches[OrderBy, Filter] { case t: OrderBy if t.outputs.length == 0 => } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
