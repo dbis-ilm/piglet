@@ -53,7 +53,7 @@ class RewriterSpec extends FlatSpec
   private def performConnectTest(op1: PigOperator, op2: PigOperator, overwrite: Boolean = false) = {
     Rewriter.connect(op1, op2, overwrite)
     op1 should matchPattern { case SuccE(`op1`, `op2`) => }
-    op2.inputs.map(_.producer) should contain only op1
+    op2 should matchPattern { case PredE(`op2`, `op1`) => }
     op1.outPipeName shouldBe op2.inPipeName
   }
 
@@ -80,7 +80,7 @@ class RewriterSpec extends FlatSpec
     pPlan.sinkNodes.headOption.value shouldBe op4
     pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op2
     pPlan.findOperatorForAlias("c").value should matchPattern { case SuccE(`op2`, `op4`) => }
-    op4.inputs.map(_.producer) should contain only op2
+    op4 should matchPattern { case PredE(`op4`, `op2`) => }
   }
 
   private def performFilterMergeTest() = {
@@ -129,7 +129,7 @@ class RewriterSpec extends FlatSpec
     pPlan.findOperatorForAlias("b").value should be(op2)
     pPlan.findOperatorForAlias("a").value.outputs.head.consumer should contain only op2
     op2 should matchPattern { case SuccE(`op2`, `op4`) => }
-    op4.inputs.map(_.producer) should contain only op2
+    op4 should matchPattern { case PredE(`op4`, `op2`) => }
   }
 
   private def performLimitMergeTest() = {
@@ -177,7 +177,7 @@ class RewriterSpec extends FlatSpec
     pPlan.findOperatorForAlias("b") shouldBe empty
     pPlan.sinkNodes.headOption.value shouldBe op4
     pPlan.sinkNodes.headOption.value.inputs.headOption.value.producer shouldBe op3
-    op4.inputs.map(_.producer) should contain only op3
+    op4 should matchPattern { case PredE(`op4`, `op3`) => }
   }
 
   // THESIS
@@ -1097,7 +1097,7 @@ class RewriterSpec extends FlatSpec
     second_filter.patterns should contain only p2
 
     first_filter.outputs.flatMap(_.consumer) should contain only second_filter
-    second_filter.inputs.map(_.producer) should contain only first_filter
+    second_filter should matchPattern { case PredE(`second_filter`, `first_filter`) => }
   }
 
   it should "apply rewriting rule J1" in {
@@ -1662,7 +1662,7 @@ class RewriterSpec extends FlatSpec
     pPlan.sinkNodes.headOption.value shouldBe op4
     op1 should matchPattern { case SuccE(`op1`, `op3`) => }
     op4.inputs.map(_.producer).size shouldBe 1
-    op4.inputs.map(_.producer) should contain only op3
+    op4 should matchPattern { case PredE(`op4`, `op3`) => }
   }
 
   it should "not remove OrderBy operators that are at some point followed by Grouping ones" in {
@@ -1689,7 +1689,7 @@ class RewriterSpec extends FlatSpec
       pPlan.sinkNodes.headOption.value shouldBe op4
       op1 should matchPattern { case SuccE(`op1`, `op2`) => }
       op4.inputs.map(_.producer).size shouldBe 1
-      op4.inputs.map(_.producer) should contain only op3
+      op4 should matchPattern { case PredE(`op4`, `op3`) => }
     }
   }
 
@@ -1727,14 +1727,14 @@ class RewriterSpec extends FlatSpec
 
     // A -> C, from both sides
     op1 should matchPattern { case SuccE(`op1`, `op3`) => }
-    op3.inputs.map(_.producer) should contain only op1
+    op3 should matchPattern { case PredE(`op3`, `op1`) => }
     // C -> X, from both sides ...
     op3 should matchPattern { case SuccE(`op3`, `op2`) => }
     // ... and B -> X
-    op2.inputs.map(_.producer) should contain only (op3, op1_2)
+    op2 should matchPattern { case AllPredE(`op2`, List(`op3`, `op1_2`)) => }
     // X -> DUMP, from both sides
     op2 should matchPattern { case SuccE(`op2`, `op4`) => }
-    op4.inputs.map(_.producer) should contain only op2
+    op4 should matchPattern { case PredE(`op4`, `op2`) => }
 
     // The pipe from the (now pulled up) filter operation should be at the same position as the one from op1 was
     indexOfPipeFromLoadToFilter shouldBe indexOfPipeFromLoadToJoin
