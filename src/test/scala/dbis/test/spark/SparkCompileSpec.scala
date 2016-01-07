@@ -181,7 +181,22 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       |""".stripMargin)
     assert(generatedCode == expectedCode)
   }
-  
+
+  it should "contain code a filter with an expression on a string literal" in {
+    val ops = parseScript("""b = LOAD 'file'; a = FILTER b BY $0 == 'aString';""")
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("a").get
+
+    val codeGenerator = new BatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+
+    val expectedCode = cleanString("""
+                                     |val a = b.filter(t => {t.get(0) == "aString"})
+                                     |""".stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+
   it should "contain code for DUMP" in {
     val op = Dump(Pipe("a"))
     val codeGenerator = new BatchCodeGen(templateFile)
