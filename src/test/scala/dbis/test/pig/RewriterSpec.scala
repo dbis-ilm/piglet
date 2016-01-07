@@ -22,7 +22,7 @@ import dbis.pig.parser.PigParser.parseScript
 import dbis.pig.op._
 import dbis.pig.expr._
 import dbis.pig.parser.{LanguageFeature, PigParser}
-import dbis.pig.plan.rewriting.Extractors.{AllSuccE, ForEachCallingFunctionE, SuccE}
+import dbis.pig.plan.rewriting.Extractors._
 import dbis.pig.plan.rewriting.Rewriter._
 import dbis.pig.plan.rewriting.Rules._
 import dbis.pig.plan.rewriting.rulesets.{SparkRuleset, RDFRuleset, GeneralRuleset}
@@ -1770,7 +1770,7 @@ class RewriterSpec extends FlatSpec
     }
 
     dump should not matchPattern {
-      case SuccE(_) =>
+      case SuccE(_, _) =>
     }
   }
 
@@ -1794,6 +1794,50 @@ class RewriterSpec extends FlatSpec
 
     dump should matchPattern {
       case AllSuccE(`dump`, Nil) =>
+    }
+  }
+
+  "PredE" should "extract the single predecessor of a PigOperator" in {
+    val ops = PigParser.parseScript(
+      """
+        | a = load 'foo' using PigStorage(':');
+        | dump a;
+      """.stripMargin)
+    val load = ops.headOption.value
+    val dump = ops.last
+
+    new DataflowPlan(ops)
+
+    dump should matchPattern {
+      case PredE(`dump`, `load`) =>
+    }
+
+    load should not matchPattern {
+      case PredE(_, _) =>
+    }
+  }
+
+  "AllSuccE" should "extract all predecessors of a PigOperator" in {
+    val ops = PigParser.parseScript(
+      """
+        | a = load 'foo' using PigStorage(':');
+        | b = load 'bar' using PigStorage(':');
+        | c = join a by $0, b by $0;
+        | dump c;
+      """.stripMargin)
+    val load = ops.headOption.value
+    val b = ops(1)
+    val join = ops(2)
+    val dump = ops(3)
+
+    new DataflowPlan(ops)
+
+    join should matchPattern {
+      case AllPredE(`join`, List(`load`, `b`)) =>
+    }
+
+    dump should matchPattern {
+      case AllPredE(`dump`, List(`join`)) =>
     }
   }
 
