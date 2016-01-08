@@ -94,9 +94,12 @@ class RewriterSpec extends FlatSpec
 
     val planUnmerged = new DataflowPlan(List(op1, op2, op3, op4))
     val pPlan = processPlan(planUnmerged)
-    pPlan.findOperatorForAlias("c").value should be(opMerged)
+    val opc = pPlan.findOperatorForAlias("c").value
+    opc should matchPattern { case SuccE(`opMerged`, `op4`) => }
+    opc should matchPattern { case PredE(`opMerged`, `op1`) => }
     pPlan.findOperatorForAlias("a").value should matchPattern { case SuccE(`op1`, `opMerged`) => }
     pPlan.sinkNodes.headOption.value should matchPattern { case PredE(`op4`, `opMerged`) => }
+    pPlan.operators should contain only(op1, opMerged, op4)
   }
 
   private def performNotMergeTest() = {
@@ -1815,7 +1818,7 @@ class RewriterSpec extends FlatSpec
     }
   }
 
-  "AllSuccE" should "extract all predecessors of a PigOperator" in {
+  "AllPredE" should "extract all predecessors of a PigOperator" in {
     val ops = PigParser.parseScript(
       """
         | a = load 'foo' using PigStorage(':');
