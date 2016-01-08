@@ -1937,6 +1937,34 @@ class RewriterSpec extends FlatSpec
     performReorderingTest()
   }
 
+  it should "apply patterns via applyPattern with a condition added by and" in {
+    Rewriter when[OrderBy, Filter] { _ => true} and { t: OrderBy => t.outputs.length > 0 } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by or" in {
+    Rewriter when[OrderBy, Filter] { _ => false} or { t: OrderBy => t.outputs.length > 0 } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by andMatches" in {
+    Rewriter when[OrderBy, Filter] { _ => true} andMatches { case t: OrderBy if t.outputs.length > 0 => } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by orMatches" in {
+    Rewriter when[OrderBy, Filter] { _ => false } orMatches { case t: OrderBy if t.outputs.length > 0 => } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
   it should "allow merging operators" in {
     Rewriter toMerge[Filter, Filter]() whenMatches {
       case (f1 @ Filter(_, _, pred1, _), f2 @ Filter(_, _, pred2, _)) if pred1 != pred2 =>
