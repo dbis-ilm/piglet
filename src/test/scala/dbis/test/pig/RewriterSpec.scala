@@ -465,7 +465,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "remove sink nodes that don't store a relation" in {
-    addStrategy(removeNonStorageSinks _)
+    addTypedStrategy(removeNonStorageSinks)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
     val newPlan = processPlan(plan)
@@ -474,7 +474,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "remove sink nodes that don't store a relation and have an empty outputs list" in {
-    addStrategy(removeNonStorageSinks _)
+    addTypedStrategy(removeNonStorageSinks)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
 
@@ -485,7 +485,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "pull up Empty nodes" in {
-    addStrategy(removeNonStorageSinks _)
+    addTypedStrategy(removeNonStorageSinks)
     merge(mergeWithEmpty)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
@@ -1614,7 +1614,7 @@ class RewriterSpec extends FlatSpec
   it should "replace GENERATE * in a nested FOREACH" in {
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     applyRule (foreachRecursively _)
-    addStrategy(removeNonStorageSinks _)
+    addTypedStrategy(removeNonStorageSinks)
     val plan = new DataflowPlan(parseScript(
       """triples = LOAD 'file' AS (sub, pred, obj);
          |stmts = GROUP triples BY sub;
