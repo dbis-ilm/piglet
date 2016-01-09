@@ -311,6 +311,17 @@ class RewriterSpec extends FlatSpec
     performReorderingTest()
   }
 
+  it should "order Filter operations before Order By ones with an extra function" in {
+    var x = 0
+    def f(o: OrderBy, f: Filter): Option[Tuple2[Filter,OrderBy]] = {
+      x += 1
+      Some(f, o)
+    }
+    reorder[OrderBy, Filter](f _)
+    performReorderingTest()
+    x shouldBe 1
+  }
+
   // THESIS
   it should "order Filter operations before Order By ones manually" in {
     def strategy(op: Any): Option[Filter] = op match {
