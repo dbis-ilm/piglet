@@ -2119,6 +2119,12 @@ class RewriterSpec extends FlatSpec
     val op2 = OrderBy(Pipe("b"), Pipe("d"), List())
     val op3 = OrderBy(Pipe("d"), Pipe("b", op2), List())
     performFailingConnectTest(op1, op3)
+
+    val op4 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op5 = OrderBy(Pipe("b"), Pipe("d"), List())
+    val op6 = OrderBy(Pipe("d"), Pipe("c", op5), List())
+    op6.inputs = op6.inputs :+ Pipe("e")
+    performFailingConnectTest(op4, op6)
   }
 
   it should "ignore all precautions if overwrite is set" in {
