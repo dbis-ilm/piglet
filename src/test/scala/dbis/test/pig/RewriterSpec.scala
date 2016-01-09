@@ -120,7 +120,7 @@ class RewriterSpec extends FlatSpec
   private def performFilterRemovalTest() = {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val predicate2 = PPredicate(Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
     val op2_after = Filter(Pipe("c"), Pipe("a"), predicate1)
     val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
