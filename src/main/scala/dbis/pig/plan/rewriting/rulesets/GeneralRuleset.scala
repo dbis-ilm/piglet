@@ -137,13 +137,8 @@ object GeneralRuleset extends Ruleset {
   //noinspection ScalaDocMissingParameterDescription
   def removeNonStorageSinks(node: PigOperator): Option[PigOperator] = node match {
     // Store and Dump are ok
-    case Store(_, _, _, _) => None
-    case HdfsCmd(_, _) => None
-    case Dump(_) => None
-    case Display(_) => None
     // To prevent recursion, empty is ok as well
-    case Empty(_) => None
-    case Generate(_) => None
+    case _ : Store | _ : HdfsCmd | _ : Dump | _ : Display | _ : Empty | _ : Generate => None
     case op: PigOperator =>
       if (op.outputs.map(_.consumer.isEmpty).fold(true)(_ && _)) {
         val newNode = Empty(Pipe(""))
