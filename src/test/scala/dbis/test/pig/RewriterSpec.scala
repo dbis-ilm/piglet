@@ -527,6 +527,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule R2" in {
+    Rewriter applyRule R1
     Rewriter applyRule R2
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List(OrderBySpec(NamedField("subject"), OrderByDirection.DescendingOrder)))
