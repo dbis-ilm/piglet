@@ -68,7 +68,8 @@ object Piglet extends PigletLogging {
                             showPlan: Boolean = false,
                             backendArgs: Map[String, String] = Map(),
                             profiling: Boolean = false,
-                            loglevel: Option[String] = None
+                            loglevel: Option[String] = None,
+                            sequential: Boolean = false
                            )
 
   var master: String = "local"
@@ -86,6 +87,7 @@ object Piglet extends PigletLogging {
     var showPlan = false
     var backendArgs: Map[String, String] = null
     var profiling = false
+    var sequential = false
 
     val parser = new OptionParser[CompilerConfig]("PigletCompiler") {
       head("PigletCompiler", s"ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
@@ -99,6 +101,7 @@ object Piglet extends PigletLogging {
       opt[Map[String, String]]('p', "params") valueName ("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text ("parameter(s) to subsitute")
       opt[Unit]('u', "update-config") optional() action { (_, c) => c.copy(updateConfig = true) } text (s"update config file in program home (see config file)")
       opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text (s"show the execution plan")
+      opt[Boolean]("sequential") optional() action{ (_,c) => c.copy(sequential = true) } text ("sequential execution (do not merge plans)")
       opt[String]('g', "log-level") optional() action { (x, c) => c.copy(loglevel = Some(x.toUpperCase())) } text ("Set the log level: DEBUG, INFO, WARN, ERROR")
       opt[Map[String, String]]("backend-args") valueName ("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to subsitute")
       help("help") text ("prints this usage text")
@@ -129,6 +132,7 @@ object Piglet extends PigletLogging {
         // note: for some backends we could determine the language automatically
         profiling = config.profiling
         logLevel = config.loglevel
+        sequential = config.sequential
       }
       case None =>
         // arguments are bad, error message will have been displayed
@@ -162,21 +166,21 @@ object Piglet extends PigletLogging {
     }
 
     // start processing
-    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendPath, backendArgs, profiling, showPlan)
+    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendPath, backendArgs, profiling, showPlan, sequential)
   }
 
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeature: LanguageFeature.LanguageFeature, params: Map[String, String], backendPath: String,
-          backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean): Unit = {
-    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendPath, backendArgs, profiling, showPlan)
+          backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean, sequential: Boolean): Unit = {
+    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendPath, backendArgs, profiling, showPlan, sequential)
   }
 
   /**
     * Start compiling the Pig script into a the desired program
     */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
-          langFeature: LanguageFeature.LanguageFeature, params: Map[String, String],
-          backendPath: String, backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean): Unit = {
+          langFeature: LanguageFeature.LanguageFeature, params: Map[String, String], backendPath: String, 
+          backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean, sequential: Boolean): Unit = {
 
     try {
       // initialize database driver and connection pool
@@ -201,7 +205,7 @@ object Piglet extends PigletLogging {
 
       } else {
         runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeature, params, backendPath,
-          backendConf, backendArgs, profiling, showPlan)
+          backendConf, backendArgs, profiling, showPlan, sequential)
       }
 
     } catch {
@@ -234,7 +238,7 @@ object Piglet extends PigletLogging {
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
                             langFeature: LanguageFeature.LanguageFeature, params: Map[String, String],
                             backendPath: String, backendConf: BackendConf, backendArgs: Map[String, String],
-                            profiling: Boolean, showPlan: Boolean) {
+                            profiling: Boolean, showPlan: Boolean, sequential: Boolean = false) {
     logger.debug("start parsing input files")
     
     var schedule = ListBuffer.empty[(DataflowPlan,Path)]
@@ -248,9 +252,7 @@ object Piglet extends PigletLogging {
       }
     }
 
-    // TODO: make cmdline arg
-    val merge = true
-    if(merge) {
+    if(schedule.size > 1 && !sequential) {
       logger.debug("Start merging plans")
       
       val mergedPlan = mergePlans(schedule.map{case (plan, _) => plan })

@@ -1,23 +1,20 @@
-package dbis.pig.plan.rewriting.internals
+package dbis.pig.plan.rewriting
 
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.op.PigOperator
 import dbis.pig.tools.BreadthFirstTopDownWalker
-import org.kiama.rewriting.Rewriter._
 import dbis.pig.op.Join
 import dbis.pig.op.Cross
 import dbis.pig.op.Load
 import dbis.pig.tools.logging.PigletLogging
 
-trait MergeSupport extends PigletLogging {
+trait PlanMerger extends PigletLogging {
 
   
 	def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = {
 	  
 	  schedule.zipWithIndex.foreach { case (plan,idx) =>  
 	    plan.operators.foreach { op => op.outputs.foreach { pipe => pipe.name += s"_$idx" } }  
-	    
-	    plan.printPlan()
 	  }
 	  
 	  
@@ -82,8 +79,8 @@ trait MergeSupport extends PigletLogging {
 		if(needPlanConstruction && deferrPlanConstruction) 
 			mergedPlan.constructPlan(mergedPlan.operators)
 		
-		println("merged plan:")
-		mergedPlan.printPlan(2)
+//		println("merged plan:")
+//		mergedPlan.printPlan(2)
 		
 		// return the merged plan
 		mergedPlan
