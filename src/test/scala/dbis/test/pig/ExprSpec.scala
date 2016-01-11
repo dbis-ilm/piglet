@@ -20,6 +20,7 @@ package dbis.test.pig
 import dbis.pig.op._
 import dbis.pig.expr._
 import dbis.pig.schema._
+import dbis.pig.udf.UDFTable
 import org.scalatest.{FlatSpec, Matchers}
 
 class ExprSpec extends FlatSpec with Matchers {
@@ -66,6 +67,15 @@ class ExprSpec extends FlatSpec with Matchers {
     e1.resultType(Some(schema)) should be (Types.DoubleType)
   }
 
+  "An expression" should "return the correct result type for *" in {
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.DoubleType),
+      Field("f2", Types.IntType),
+      Field("f3", Types.ByteArrayType)
+    ))))
+
+    val e1 = Mult(RefExpr(NamedField("f1")), RefExpr(NamedField("f2")))
+    e1.resultType(Some(schema)) should be (Types.DoubleType)
+  }
   it should "return the correct result type for casts" in {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.DoubleType),
       Field("f2", Types.IntType),
@@ -101,4 +111,22 @@ class ExprSpec extends FlatSpec with Matchers {
 
   }
 
+  "The UDFTable" should "contain corresponding entries" in {
+    val schema = Some(Schema(Array(Field("x", Types.DoubleType), Field("y", Types.IntType))))
+    val f1 = Func("count", List(RefExpr(NamedField("x"))))
+    val params1 = f1.params.map(e => e.resultType(schema))
+    val res1 = UDFTable.findUDF(f1.f, params1)
+    res1 shouldNot be (empty)
+    res1.get.name should be ("COUNT")
+    res1.get.resultType should be (Types.LongType)
+    res1.get.isAggregate should be (true)
+
+    val f2 = Func("sum", List(RefExpr(NamedField("x"))))
+    val params2 = f2.params.map(e => e.resultType(schema))
+    val res2 = UDFTable.findUDF(f2.f, params2)
+    res2 shouldNot be (empty)
+    res2.get.name should be ("SUM")
+    res2.get.resultType should be (Types.DoubleType)
+    res2.get.isAggregate should be (true)
+  }
 }

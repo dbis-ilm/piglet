@@ -16,7 +16,7 @@
  */
 package dbis.pig.plan.rewriting
 
-import dbis.pig.plan.rewriting.rulesets.{GeneralRuleset, RDFRuleset}
+import dbis.pig.plan.rewriting.rulesets.{SparkRuleset, GeneralRuleset, RDFRuleset}
 
 
 
@@ -30,5 +30,10 @@ object Rules {
     // IMPORTANT: If you change one of the rule registration calls in here, please also change the call in the
     // corresponding test methods!
     rulesets foreach { _.registerRules() }
+  }
+
+  def registerBackendRules(backend: String) = backend match {
+    case "spark" => SparkRuleset.registerRules()
+    case _ =>
   }
 }

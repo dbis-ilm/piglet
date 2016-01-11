@@ -17,6 +17,7 @@
 package dbis.pig.expr
 
 import dbis.pig.schema._
+import dbis.pig.udf.UDFTable
 
 import scala.collection.mutable.Map
 
@@ -157,6 +158,35 @@ object Expr {
     */
   def containsAverageFunc(schema: Schema, ex: Expr): Boolean = ex match {
     case Func(f, _) => f.toUpperCase == "AVG"
+    case _ => false
+  }
+
+  /**
+    * This function is a traverser function to check whether the expression contains
+    * a call to the COUNT aggregate function.
+    *
+    * @param schema the schema of the operator
+    * @param ex the expression
+    * @return true if the expression contains COUNT.
+    */
+  def containsCountFunc(schema: Schema, ex: Expr): Boolean = ex match {
+    case Func(f, _) => f.toUpperCase == "COUNT"
+    case _ => false
+  }
+
+  /**
+    * This function is a traverser function to check whether the expression contains
+    * a call to an aggregate function.
+    *
+    * @param schema the schema of the operator
+    * @param ex the expression
+    * @return true if the expression contains COUNT.
+    */
+  def containsAggregateFunc(schema: Schema, ex: Expr): Boolean = ex match {
+    case Func(f, _) => UDFTable.findFirstUDF(f) match {
+      case Some(func) => func.isAggregate
+      case None => false
+    }
     case _ => false
   }
 }

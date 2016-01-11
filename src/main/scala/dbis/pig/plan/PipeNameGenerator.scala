@@ -77,4 +77,6 @@ object PipeNameGenerator {
     * @return
     */
   def generate(): String = generate(length)
+
+  def addKnownName(name: String) = generated += name
 }

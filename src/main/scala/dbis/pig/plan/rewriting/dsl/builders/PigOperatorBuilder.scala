@@ -14,17 +14,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan.rewriting.dsl.traits
+package dbis.pig.plan.rewriting.dsl.builders
 
 import dbis.pig.op.PigOperator
 import dbis.pig.plan.rewriting.Rewriter
+import dbis.pig.plan.rewriting.dsl.traits.BuilderT
+import org.kiama.rewriting.Rewriter.strategyf
 
-/** A builder for applying a rewriting operation to a [[dbis.pig.op.PigOperator]].
+import scala.reflect.ClassTag
+
+/** Wraps strategy data, such as the rewriting function and pre-checks and adds strategies from them.
   *
   * @tparam FROM
   * @tparam TO
   */
-abstract class PigOperatorBuilderT[FROM <: PigOperator, TO] extends BuilderT[FROM, TO] {
+class PigOperatorBuilder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends BuilderT[FROM, TO] {
   override def wrapInCheck(func: FROM => Option[TO]) = {
     def f(term: FROM): Option[TO] = {
       if (check.isEmpty) {
@@ -38,7 +42,7 @@ abstract class PigOperatorBuilderT[FROM <: PigOperator, TO] extends BuilderT[FRO
       }
     }
 
-    f _
+    f
   }
 
   override def wrapInFixer(func: FROM => Option[TO]): FROM => Option[TO] = {
@@ -56,15 +60,18 @@ abstract class PigOperatorBuilderT[FROM <: PigOperator, TO] extends BuilderT[FRO
       }}
     }
 
-    f _
+    f
   }
 
-  def addAsStrategy(func: (FROM => Option[TO]))
+  def addAsStrategy(func: (FROM => Option[TO])) = {
+    val wrapped = Rewriter.buildTypedCaseWrapper(func)
+    Rewriter.addStrategy(strategyf(t => wrapped(t)))
+  }
 
   /** Add the data wrapped by this object as a strategy.
     *
     */
-  override def apply(): Unit = {
+  override def build(): Unit = {
     val wrapped = wrapInFixer(wrapInCheck(func.get))
     addAsStrategy(wrapped)
   }

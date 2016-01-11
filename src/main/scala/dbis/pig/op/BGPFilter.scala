@@ -25,12 +25,9 @@ import dbis.pig.expr.Ref
 case class TriplePattern(subj: Ref, pred: Ref, obj: Ref)
 /**
  *
- * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
- *                           can be changed later.
- * @param initialInPipeName
- * @param opName
- * @param params
- * @param loadSchema
+ * @param out
+ * @param in
+ * @param patterns
  */
 case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends PigOperator {
   _outputs = List(out)
@@ -43,7 +40,8 @@ case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends
       return false
     }
 
-    if (inputSchema == RDFLoad.plainSchema) {
+//    if (inputSchema == RDFLoad.plainSchema) {
+    if(inputSchema.get.fields.sameElements(RDFLoad.plainSchema.get.fields)) {
       return true
     }
     if (RDFLoad.groupedSchemas.values.toList contains inputSchema.get) {

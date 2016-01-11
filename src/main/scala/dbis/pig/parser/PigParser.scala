@@ -24,7 +24,7 @@ import dbis.pig.schema._
 
 import java.net.URI
 
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.input.CharSequenceReader
@@ -49,7 +49,7 @@ import dbis.pig.parser.LanguageFeature._
 /**
  * A parser for the (extended) Pig language.
  */
-class PigParser extends JavaTokenParsers with LazyLogging {
+class PigParser extends JavaTokenParsers with PigletLogging {
   override protected val whiteSpace = """(\s|--.*)+""".r
 
   /**
@@ -87,11 +87,12 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def namedFieldWithLineage: Parser[NamedField] = rep1sep(bag, Field.lineageSeparator) ^^
     { case l  => NamedField.fromStringList(l) }
 
-  def literalField: Parser[Ref] = (
+  def literalField: Parser[Ref] =
     decimalNumber ^^ { i => if (i.contains('.')) Value(i.toDouble) else Value(i.toInt) } |
     // floatingPointNumber ^^ { n => Value(n.toDouble) } |
     stringLiteral ^^ { s => Value(s) } |
-    boolean ^^ { b => Value(b) })
+    boolean ^^ { b => Value(b) }
+
   def fieldSpec: Parser[Ref] = (namedField | posField | literalField)
   /*
    * A reference can be also a dereference operator for tuples, bags or maps.
@@ -173,7 +174,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
       case ">=" => Geq(a, b)
     }
     case a ~ op ~ (b: String) => {
-      val b_val = RefExpr(Value(unquote(b)))
+      val b_val = RefExpr(Value(s""""${unquote(b)}""""))
       op match {
         case "==" => Eq(a, b_val)
         case "!=" => Neq(a, b_val)
@@ -185,25 +186,37 @@ class PigParser extends JavaTokenParsers with LazyLogging {
     }
   }
 
-  def logicalTerm: Parser[Predicate] = (
-    comparisonExpr ^^ { e => e }
-     | "(" ~ logicalExpr ~ ")" ^^ { case _ ~ e ~ _ => PPredicate(e) }
-          | func ^^ { f => Eq(f,RefExpr(Value(true))) }
+  def boolLiteral: Parser[Predicate] = boolean ^^ { b => BoolLiteral(b)}
+
+  def boolFactor: Parser[Predicate] = (
+    boolLiteral
+      | comparisonExpr ^^ { e => e }
+      | "(" ~ boolExpr ~ ")" ^^ { case _ ~ e ~ _ => PPredicate(e) }
+      | func ^^ { f => Eq(f,RefExpr(Value(true))) }
     )
 
-  def logicalExpr: Parser[Predicate] = (
-      
-      logicalTerm ~ andKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => And(a, b) }
-      | logicalTerm ~ orKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => Or(a, b) }
-      | notKeyword ~ logicalTerm ^^ { case _ ~ e => Not(e) }
-      | logicalTerm ^^ { e => e }
-     )
+  def boolNotFactor: Parser[Predicate] = opt(notKeyword) ~ boolFactor ^^ {
+    case Some(n) ~ f => Not(f); case None ~ f => f
+  }
+
+  def boolTerm: Parser[Predicate] = boolNotFactor ~ rep(andKeyword ~ boolNotFactor) ^^{
+    case f ~ list => list.foldLeft(f) {
+        case (p1, andKeyword ~ p2) => And(p1, p2)
+      }
+  }
+
+  def boolExpr: Parser[Predicate] = boolTerm ~ rep(orKeyword ~ boolTerm) ^^{
+    case f ~ list => list.foldLeft(f) {
+      case (p1, orKeyword ~ p2) => Or (p1, p2)
+    }
+  }
 
   /*
    * The list of case-insensitive keywords we want to accept.
    */
   lazy val loadKeyword = "load".ignoreCase
   lazy val dumpKeyword = "dump".ignoreCase
+  lazy val displayKeyword = "display".ignoreCase
   lazy val storeKeyword = "store".ignoreCase
   lazy val intoKeyword = "into".ignoreCase
   lazy val filterKeyword = "filter".ignoreCase
@@ -252,7 +265,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   lazy val setKeyword = "set".ignoreCase
   lazy val returnsKeyword = "returns".ignoreCase
   lazy val accumulateKeyword = "accumulate".ignoreCase
-  lazy val delayKeyword = "delay".ignoreCase
+  lazy val timestampKeyword = "timestamp".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -298,7 +311,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
     }
   }
   /*
-   * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>) [ AS (<Schema>) ]
+   * <A> = LOAD <B> "<FileName>" USING <StorageFunc> (<OptParameters>) [ AS (<Schema>) ] [ TIMESTAMP(<field>) ]
    */
   def loadSchemaClause: Parser[Schema] = asKeyword ~ "(" ~ repsep(fieldSchema, ",") ~ ")" ^^{
     case _ ~ _ ~ fieldList ~ _ => Schema(BagType(TupleType(fieldList.toArray)))
@@ -308,11 +321,17 @@ class PigParser extends JavaTokenParsers with LazyLogging {
     case _ ~ loader ~ _ ~ params ~ _ => (loader, params)
   }
 
-  def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
-    case b ~ _ ~ _ ~ f ~ u ~ s => 
-      
+  def fieldRef: Parser[Ref] = posField | namedFieldWithoutLineage
+  def timestampClause: Parser[Ref] = timestampKeyword ~ "(" ~ fieldRef ~ ")" ^^ { case _ ~ _ ~ f ~ _ => f }
+
+  def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ~ (timestampClause?) ^^ {
+    case b ~ _ ~ _ ~ f ~ u ~ s ~ ts =>
       val uri = new URI(f)
-      
+      if (s.isDefined && ts.isDefined) ts.get match {
+        case NamedField(n, _) => s.get.timestampField = s.get.indexOfField(n)
+        case PositionalField(p) => s.get.timestampField = p
+        case _ => {}
+      }
       u match {
         case Some(p) => new Load(Pipe(b), uri, s, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
         case None => new Load(Pipe(b), uri, s)
@@ -339,13 +358,18 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def dumpStmt: Parser[PigOperator] = dumpKeyword ~ bag ^^ { case _ ~ b => new Dump(Pipe(b)) }
 
   /*
+   * DISPLAY <A>
+   */
+  def displayStmt: Parser[PigOperator] = displayKeyword ~ bag ^^ { case _ ~ b => new Display(Pipe(b)) }
+
+  /*
    * STORE <A> INTO "<FileName>"
    */
   def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ~ (usingClause?) ^^ { 
     case _ ~ b ~  _ ~ f ~ u => 
       val uri = new URI(f)
       u match {
-        case Some(p) => new Store(Pipe(b), uri, Some(p._1), if(p._2.isEmpty) null else p._2)
+        case Some(p) => new Store(Pipe(b), uri, Some(p._1), if(p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
         case None => new Store(Pipe(b), uri)
       }
   }
@@ -397,7 +421,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * <A> = FILTER <B> BY <Predicate>
    */
-  def filterStmt: Parser[PigOperator] = bag ~ "=" ~ filterKeyword ~ bag ~ byKeyword ~ logicalExpr ^^ {
+  def filterStmt: Parser[PigOperator] = bag ~ "=" ~ filterKeyword ~ bag ~ byKeyword ~ boolExpr ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pred => new Filter(Pipe(out), Pipe(in), pred)
   }
 
@@ -426,13 +450,6 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * <A> = LIMIT <B> <Num>
    */
   def limitStmt: Parser[PigOperator] = bag ~ "=" ~ limitKeyword ~ bag ~ num ^^ { case out ~ _ ~ _ ~ in ~ num => new Limit(Pipe(out), Pipe(in), num) }
-
-  /*
-   * <A> = DELAY <B> <Size> , <Wait>
-   */
-  def delayStmt: Parser[PigOperator] = bag ~ "=" ~ delayKeyword ~ bag ~ floatingPointNumber ~ "," ~ num ^^ {
-    case out ~ _ ~ _ ~ in ~ size ~ _ ~ wait => new Delay(Pipe(out), Pipe(in), size.toDouble, wait.toInt)
-  }
 
   /*
    * <A> = JOIN <B> BY <Ref>, <C> BY <Ref>, ...
@@ -544,7 +561,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * SPLIT <A> INTO <B> IF <Cond>, <C> IF <Cond> ...
    */
-  def splitBranch: Parser[SplitBranch] = bag ~ ifKeyword ~ logicalExpr ^^ { case out ~ _ ~ expr => new SplitBranch(Pipe(out), expr)}
+  def splitBranch: Parser[SplitBranch] = bag ~ ifKeyword ~ boolExpr ^^ { case out ~ _ ~ expr => new SplitBranch(Pipe(out), expr)}
 
   def splitStmt: Parser[PigOperator] = splitKeyword ~ bag ~ intoKeyword ~ repsep(splitBranch, ",") ^^ {
     case _ ~ in ~ _ ~ splitList => new SplitInto(Pipe(in), splitList)
@@ -569,27 +586,21 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def code = ("""(?s)(.*?)""")
 
-  def embeddedCodeNoRules: Parser[EmbedCmd] = "<%" ~ (code+"%>").r ^^ { case _ ~ code => new EmbedCmd(code
-    .substring
-    (0, code .length - 2))
+  def embeddedCode: Parser[EmbedCmd] = "<%" ~ (code + "%>").r ^^ {
+    case _ ~ code if code.split("rules:").length != 2 => new EmbedCmd(code.substring(0, code.length - 2))
+    case _ ~ code =>
+      val ctuple = code.substring(0, code.length -2 ).split("rules:")
+      new EmbedCmd(ctuple(0), Some(ctuple(1)))
   }
 
-  def codeWithRulesInit = (code + "rules:").r
-
-  def ruleCode: Parser[String] = (code + "!>").r
-
-  def embeddedCodeWithRules: Parser[EmbedCmd] = "<!" ~ codeWithRulesInit ~ ruleCode ^^ {
-    case _ ~ code ~ rules => EmbedCmd(code.substring(0, code.length - 6), Some(rules.substring(0, rules.length - 2)))
-  }
-
-  def embedStmt: Parser[PigOperator] = embeddedCodeNoRules | embeddedCodeWithRules
+  def embedStmt: Parser[PigOperator] = embeddedCode
 
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | delayStmt) ~ ";" ^^ {
+    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt) ~ rep(";") ^^ {
     case op ~ _  => op }
 
   def undelimStmt: Parser[PigOperator] = embedStmt
@@ -599,7 +610,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   /*
    * defineMacroStmt contains other statements but not other macro definitions
    */
-  def plainStmt: Parser[PigOperator] = stmt | defineMacroStmt
+  def plainStmt: Parser[PigOperator] = defineMacroStmt | stmt
   /*
    * A plain Pig script is a list of statements.
    */
@@ -629,7 +640,7 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
   def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt | delayStmt) ~ ";" ^^ {
+    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
     case op ~ _  => op }
 
 
@@ -675,20 +686,32 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def zmqAddress: Parser[SocketAddress] = "'" ~ (tcpSocket | ipcSocket | inprocSocket | pgmSocket) ~ "'" ^^ { case _ ~ addr ~ _ => addr}
 
   /*
-   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] USING <StreamFunc> [ AS <schema> ]
+   * <A> = SOCKET_READ '<address>' [ MODE ZMQ ] USING <StreamFunc> [ AS <schema> ] [ TIMESTAMP (<field>) ]
    *
    * Maybe other modes later
    */
   def socketReadStmt: Parser[PigOperator] =
-    bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
-      case out ~ _ ~ _ ~ addr ~ u ~ schema => u match {
-        case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
-              case None =>  SocketRead(Pipe(out), addr, "", schema)
+    bag ~ "=" ~ socketReadKeyword ~ inetAddress ~ (usingClause?) ~ (loadSchemaClause?) ~ (timestampClause?) ^^ {
+      case out ~ _ ~ _ ~ addr ~ u ~ schema ~ ts =>
+        if (schema.isDefined && ts.isDefined) ts.get match {
+          case NamedField(n, _) => schema.get.timestampField = schema.get.indexOfField(n)
+          case PositionalField(p) => schema.get.timestampField = p
+          case _ => {}
+        }
+        u match {
+          case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+          case None =>  SocketRead(Pipe(out), addr, "", schema)
       }
 
     } |
-      bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ^^ {
-        case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema => u match {
+      bag ~ "=" ~ socketReadKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ~ (loadSchemaClause?) ~ (timestampClause?) ^^ {
+        case out ~ _ ~ _ ~ addr ~ _ ~ mode ~ u ~ schema ~ ts =>
+          if (schema.isDefined && ts.isDefined) ts.get match {
+            case NamedField(n, _) => schema.get.timestampField = schema.get.indexOfField(n)
+            case PositionalField(p) => schema.get.timestampField = p
+            case _ => {}
+          }
+          u match {
           case Some(p) => SocketRead(Pipe(out), addr, mode, schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
           case None => SocketRead(Pipe(out), addr, mode, schema)
         }
@@ -719,22 +742,22 @@ class PigParser extends JavaTokenParsers with LazyLogging {
    * ------------------------------------------------------------
    */
   lazy val skipNext = "skip_till_next_match"
-  lazy val matcherKeyword = "matcher".ignoreCase
+  lazy val matchEventKeyword = "match_event".ignoreCase
   lazy val patternKeyword = "pattern".ignoreCase
-  lazy val eventsKeyword = "events".ignoreCase
+  lazy val withKeyword = "with".ignoreCase
   lazy val withinKeyword = "within".ignoreCase
   lazy val negKeyword = "neg".ignoreCase
-  lazy val conjKeyword = "conj".ignoreCase
-  lazy val disjKeyword = "disj".ignoreCase
+  lazy val conjKeyword = "and".ignoreCase
+  lazy val disjKeyword = "or".ignoreCase
   lazy val seqKeyword = "seq".ignoreCase
   lazy val skipNextKeyword = skipNext.ignoreCase
   lazy val skipAnyKeyword = "skip_till_any_match".ignoreCase
   lazy val firstMatchKeyword = "first_match".ignoreCase
   lazy val recentMatchKeyword = "recent_match".ignoreCase
-  lazy val congnitiveMatchKeyword = "cognitive_match".ignoreCase
+  lazy val cognitiveMatchKeyword = "cognitive_match".ignoreCase
 
-  def eventExpr: Parser[Predicate] = logicalExpr
-  def simpleEvent: Parser[SimpleEvent] = simplePattern ~ "=" ~ eventExpr ^^ { case s ~ _ ~ e => SimpleEvent(s, e) }
+  def eventExpr: Parser[Predicate] = boolExpr
+  def simpleEvent: Parser[SimpleEvent] = simplePattern ~ ":" ~ eventExpr ^^ { case s ~ _ ~ e => SimpleEvent(s, e) }
   def eventParam: Parser[CompEvent] = "(" ~ simpleEvent ~ rep( "," ~> simpleEvent) ~ ")" ^^ { case _ ~ s ~ c ~ _ => CompEvent(s :: c) }
   
   def repeatPattern: Parser[List[Pattern]] = rep("," ~> patternParam)
@@ -753,9 +776,9 @@ class PigParser extends JavaTokenParsers with LazyLogging {
   def patternParam: Parser[Pattern] = (seqPattern | negPattern | conjPattern | disjPattern | simplePattern)
   
   def withinParam: Parser[Tuple2[Int, String]] = withinKeyword ~ num ~ timeUnit ^^ { case _ ~ n ~ u => (n, u) }
-  def modes: Parser[String] = (skipNextKeyword | skipAnyKeyword | firstMatchKeyword | recentMatchKeyword | congnitiveMatchKeyword)
+  def modes: Parser[String] = (skipNextKeyword | skipAnyKeyword | firstMatchKeyword | recentMatchKeyword | cognitiveMatchKeyword)
   def modeParam: Parser[String] = modeKeyword ~ modes ^^ { case _ ~ n => n }
-  def matcherStmt: Parser[PigOperator] = bag ~ "=" ~ matcherKeyword ~ bag ~ patternKeyword ~ patternParam ~ eventsKeyword ~ eventParam ~ (modeParam?) ~ (withinParam?) ^^ {
+  def matcherStmt: Parser[PigOperator] = bag ~ "=" ~ matchEventKeyword ~ bag ~ patternKeyword ~ patternParam ~ withKeyword ~ eventParam ~ (modeParam?) ~ (withinParam?) ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pattern ~ _ ~ e ~ mode ~ within => mode match {
       case Some(m) => within match {
         case Some(w) => Matcher(Pipe(out), Pipe(in), pattern, e, m, w)
@@ -795,8 +818,9 @@ class PigParser extends JavaTokenParsers with LazyLogging {
 
 object PigParser {
    
-   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
-    Schema.init()
+   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig, resetSchema: Boolean = true): List[PigOperator] = {
+    if (resetSchema)
+      Schema.init()
     val parser = new PigParser
     parser.parseScript(new CharSequenceReader(s), feature)
   }

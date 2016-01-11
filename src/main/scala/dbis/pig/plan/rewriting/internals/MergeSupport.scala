@@ -4,11 +4,12 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.op.PigOperator
 import dbis.pig.tools.BreadthFirstTopDownWalker
 import org.kiama.rewriting.Rewriter._
-import com.typesafe.scalalogging.LazyLogging
 import dbis.pig.op.Join
 import dbis.pig.op.Cross
 import dbis.pig.op.Load
-trait MergeSupport extends LazyLogging {
+import dbis.pig.tools.logging.PigletLogging
+
+trait MergeSupport extends PigletLogging {
 
   
 	def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = {

@@ -11,7 +11,7 @@ import java.io.{BufferedInputStream, File, FileInputStream, FileOutputStream}
 import java.util.jar.{JarEntry, JarOutputStream}
 import java.nio.file.Path
 import java.nio.file.Files
-import com.typesafe.scalalogging.LazyLogging
+import dbis.pig.tools.logging.PigletLogging
 
 
 /** Utility class for building a .jar file from a directory of .class files.
@@ -21,7 +21,7 @@ import com.typesafe.scalalogging.LazyLogging
   * CBB: turn this into a function that uses more of a classical Builder wrapping a JarOutputStream
   * to construct the .jar file.
   */
-object JarBuilder extends LazyLogging {
+object JarBuilder extends PigletLogging {
   /** Given an input directory containing other directories which may include Java .class
     * files and a .jar output file name, this routine builds a jar file at the given location
     * by adding all the .class files into it and attaching a manifest.
@@ -41,7 +41,7 @@ object JarBuilder extends LazyLogging {
     *         ControlFunctionFactory.class
     *         util/XY.class
     *
-    * @param inputDirectoryPath the input directory from which to (recursively) read .class files
+    * @param rootDirectory the input directory from which to (recursively) read .class files
     * @param jarFilePath the output file name of the .jar to generate
     * @param verbose if true, prints verbose debug messages
     * @return true if the .jar file was successfully created, false if not

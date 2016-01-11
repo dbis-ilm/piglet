@@ -33,6 +33,7 @@ import org.scalatest.{Matchers, OptionValues, FlatSpec}
 import scala.util.Random
 
 class PigParserSpec extends FlatSpec with OptionValues with Matchers {
+  /* -------------------- LOAD -------------------- */
   "The parser" should "parse a simple load statement" in  {
     val uri = new URI("file.csv")
     assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), uri)))
@@ -103,6 +104,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       List(Load(Pipe("a"), uri, Some(Schema(schema)))))
   }
 
+  /* -------------------- Comments -------------------- */
   it should "ignore comments" in {
     assert(parseScript("dump b; -- A comment") == List(Dump(Pipe("b"))))
   }
@@ -115,15 +117,18 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       |dump c;""".stripMargin) == List(Dump(Pipe("b")), Dump(Pipe("c"))))
   }
 
+  /* -------------------- DUMP -------------------- */
   it should "parse the dump statement" in {
     assert(parseScript("dump b;") == List(Dump(Pipe("b"))))
   }
 
+  /* -------------------- STORE -------------------- */
   it should "parse the store statement" in {
     val uri = new URI("file.csv")
     assert(parseScript("""store b into 'file.csv';""") == List(Store(Pipe("b"), uri)))
   }
 
+  /* -------------------- FILTER -------------------- */
   it should "parse a simple filter with a eq expression on named fields" in {
     assert(parseScript("a = filter b by x == y;") ==
       List(Filter(Pipe("a"), Pipe("b"), Eq(RefExpr(NamedField("x")), RefExpr(NamedField("y"))))))
@@ -158,6 +163,24 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         PPredicate(Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))))))))))
   }
 
+  it should "parse a filter with another complex logical expression" in {
+    assert(parseScript("a = FILTER b BY x > 0 AND y < 0 OR NOT a == b;") ==
+      List(Filter(Pipe("a"), Pipe("b"), Or(
+        And(Gt(RefExpr(NamedField("x")), RefExpr(Value(0))),
+          Lt(RefExpr(NamedField("y")), RefExpr(Value(0)))),
+          Not(Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b"))))
+      ))))
+  }
+
+  it should "parse a filter with yet another complex logical expression" in {
+    assert(parseScript("a = FILTER b BY x > 0 OR y < 0 OR a == b;") ==
+      List(Filter(Pipe("a"), Pipe("b"), Or(Or(
+          Gt(RefExpr(NamedField("x")), RefExpr(Value(0))),
+          Lt(RefExpr(NamedField("y")), RefExpr(Value(0)))),
+          Eq(RefExpr(NamedField("a")), RefExpr(NamedField("b")))
+      ))))
+  }
+
   it should "parse a filter with a function expression" in {
     assert(parseScript("a = FILTER b BY STARTSWITH($0,\"test\") == true;") ==
       List(Filter(Pipe("a"), Pipe("b"), Eq(
@@ -176,7 +199,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = FILTER b BY x == 'aString';") ==
       List(Filter(Pipe("a"), Pipe("b"), Eq(
         RefExpr(NamedField("x")),
-        RefExpr(Value("aString"))))))
+        RefExpr(Value("\"aString\""))))))
   }
 
   it should "parse a filter with a boolean function expression" in {
@@ -192,11 +215,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
             Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),false))) 
   }
 
-  it should "parse a filter with a string value" in {
-    assert(parseScript("b = FILTER a BY  x == 'xyz';") ==
-      List(Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("x")), RefExpr(Value("xyz"))))))
-  }
-
+  /* -------------------- FOREACH -------------------- */
   it should "parse a simple foreach statement" in {
     assert(parseScript("a = foreach b generate x, y, z;") ==
       List(Foreach(Pipe("a"), Pipe("b"), GeneratorList(List(
@@ -292,15 +311,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       ))))))
   }
 
-  it should "parse a simple accumulate statement" in {
-    assert(parseScript("a = ACCUMULATE b GENERATE COUNT($0), AVG($1), SUM($2);") ==
-      List(Accumulate(Pipe("a"), Pipe("b"), GeneratorList(List(
-        GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(0))))),
-        GeneratorExpr(Func("AVG", List(RefExpr(PositionalField(1))))),
-        GeneratorExpr(Func("SUM", List(RefExpr(PositionalField(2)))))
-      )))))
-  }
-
+  /* -------------------- nested FOREACH -------------------- */
   it should "parse a simple nested FOREACH statement" in {
     assert(parseScript(
       """a = FOREACH b {
@@ -327,6 +338,17 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     )))))
   }
 
+  /* -------------------- ACCUMULATE -------------------- */
+  it should "parse a simple accumulate statement" in {
+    assert(parseScript("a = ACCUMULATE b GENERATE COUNT($0), AVG($1), SUM($2);") ==
+      List(Accumulate(Pipe("a"), Pipe("b"), GeneratorList(List(
+        GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(0))))),
+        GeneratorExpr(Func("AVG", List(RefExpr(PositionalField(1))))),
+        GeneratorExpr(Func("SUM", List(RefExpr(PositionalField(2)))))
+      )))))
+  }
+
+  /* -------------------- invalid statements -------------------- */
   it should "detect an invalid statement" in {
     intercept[java.lang.IllegalArgumentException] {
       parseScript("a = invalid b by x=y;")
@@ -617,8 +639,8 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     }
   }
 
-  it should "parse a matcher  statement using only mode" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_next_match;", LanguageFeature.ComplexEventPig)
+  it should "parse a matcher statement using only mode" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0) MODE skip_till_next_match;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -626,8 +648,8 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         (0, "SECONDS"))))
   }
 
-  it should "parse a matcher  statement using skip_till_any_match mode" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) MODE skip_till_any_match;", LanguageFeature.ComplexEventPig)
+  it should "parse a matcher statement using skip_till_any_match mode" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0) MODE skip_till_any_match;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -635,8 +657,8 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         (0, "SECONDS"))))
   }
 
-  it should "parse a matcher  statement using only window" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B) EVENTS (A = x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+  it should "parse a matcher statement using only window" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -644,24 +666,24 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         (30, "SECONDS"))))
   }
 
-  it should "parse a matcher  statement using a simple event" in {
-    assert(parseScript("a = Matcher b PATTERN A EVENTS (A = x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+  it should "parse a matcher statement using a simple event" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN A WITH (A: x == 0) WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SimplePattern("A"),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
-  it should "parse a matcher  statement using a sequence and  three events" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, B, C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+  it should "parse a matcher statement using a sequence and three events" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B, C) WITH (A: x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"), SimplePattern("C"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
-  it should "parse a matcher  statement using a sequence event with negation" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+  it should "parse a matcher statement using a sequence event with negation" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, neg(B), C) WITH (A: x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -669,8 +691,8 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         (30, "SECONDS"))))
   }
 
-  it should "parse a matcher  statement using more simple event definitions" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, neg(B), C) EVENTS (A = x == 0, C = x == 1) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+  it should "parse a matcher statement using simple event definitions" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, neg(B), C) WITH (A: x == 0, C: x == 1) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))),
@@ -678,8 +700,8 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
-  it should "parse a matcher  statement using composite sequence pattern" in {
-    assert(parseScript("a = Matcher b PATTERN seq (A, seq(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+  it should "parse a matcher statement using composite sequence pattern" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, seq(B, D), C) WITH (A: x == 0, C: x == 1, D: y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"),
           SeqPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
@@ -690,8 +712,8 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         (30, "SECONDS"))))
   }
 
-  it should "parse a matcher  statement using conjunction and disjunction" in {
-    assert(parseScript("a = Matcher b PATTERN conj (A, disj(B, D), C) EVENTS (A = x == 0, C = x == 1, D = y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
+  it should "parse a matcher statement using conjunction and disjunction" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN AND (A, OR(B, D), C) WITH (A: x == 0, C: x == 1, D: y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;", LanguageFeature.ComplexEventPig)
       == List(Matcher(Pipe("a"), Pipe("b"),
         ConjPattern(List(SimplePattern("A"),
           DisjPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
@@ -730,13 +752,13 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   it should "parse a script with embedded code and rules" in {
     val ops = parseScript(
       """
-        |<! def someFunc(s: String): String = {
+        |<% def someFunc(s: String): String = {
         |   s
         | }
-        | rules:
-        | def rule(term: Any): Option[PigOperator] = None
-        | def rule2(term: Any): Option[PigOperator] = None
-        |!>
+        |rules:
+        |def rule(term: Any): Option[PigOperator] = None
+        |def rule2(term: Any): Option[PigOperator] = None
+        |%>
         |A = LOAD 'file.csv';
       """.stripMargin)
     assert(ops(0).isInstanceOf[EmbedCmd])
@@ -744,11 +766,12 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(op.code.stripLineEnd ==
        """def someFunc(s: String): String = {
           |   s
-          | }
-          | """.stripMargin)
-    assert(op.ruleCode.headOption.value.stripLineEnd ==
-      """def rule(term: Any): Option[PigOperator] = None
-        | def rule2(term: Any): Option[PigOperator] = None""".stripMargin.stripLineEnd)
+          | }""".stripMargin)
+    assert(op.ruleCode.headOption.value ==
+      """
+        |def rule(term: Any): Option[PigOperator] = None
+        |def rule2(term: Any): Option[PigOperator] = None
+        |""".stripMargin)
   }
 
 
@@ -781,8 +804,50 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     )))
   }
 
+  it should "parse a DEFINE macro statement without parameters" in {
+    val ops = parseScript(
+      """DEFINE my_macro() RETURNS out_alias {
+        |$out_alias = LOAD 'file' USING PigStorage(':');
+        |};
+      """.stripMargin
+    )
+    assert(ops == List(DefineMacroCmd(Pipe("out_alias"), "my_macro", Some(List()),
+      List(Load(Pipe("$out_alias"), new URI("file"), None, Some("PigStorage"), List("""":"""")))
+    )))
+  }
+
   it should "parse a statement invoking a macro" in {
     assert(parseScript("a = my_macro(in, 42);") == List(MacroOp(Pipe("a"), "my_macro", Some(List(NamedField("in"), Value(42))))))
-
   }
+
+
+  it should "parse a load statement with schema and timestamp specification" in {
+    val uri = new URI("file.csv")
+    val schema = Schema(Array(Field("a", Types.IntType),
+      Field("b", Types.CharArrayType),
+      Field("c", Types.DoubleType)))
+    schema.timestampField = 0
+    assert(parseScript("""a = load 'file.csv' as (a:int, b:chararray, c:double) timestamp(a);""") ==
+      List(Load(Pipe("a"), uri, Some(schema))))
+  }
+
+  it should "parse a load statement with schema and positional timestamp specification" in {
+    val uri = new URI("file.csv")
+    val schema = Schema(Array(Field("a", Types.IntType),
+      Field("b", Types.CharArrayType),
+      Field("c", Types.LongType)))
+    schema.timestampField = 2
+    assert(parseScript("""a = load 'file.csv' as (a:int, b:chararray, c:long) timestamp($2);""") ==
+      List(Load(Pipe("a"), uri, Some(schema))))
+  }
+
+  it should "parse a socket_read statement with schema and timestamp" in {
+    val schema = Schema(Array(Field("f1", Types.LongType),
+      Field("f2", Types.CharArrayType)))
+    schema.timestampField = 0
+    assert(parseScript("a = SOCKET_READ 'localhost:5555' AS (f1: long, f2: chararray) TIMESTAMP(f1);", LanguageFeature.StreamingPig)
+      == List(SocketRead(Pipe("a"), SocketAddress("","localhost","5555"), "", Some(schema))))
+  }
+
+
 }

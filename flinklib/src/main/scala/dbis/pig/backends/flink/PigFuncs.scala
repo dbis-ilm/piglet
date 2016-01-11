@@ -19,6 +19,25 @@ package dbis.pig.backends.flink
 
 import scala.Numeric.Implicits._
 import scala.collection.mutable.ListBuffer
+import scala.reflect.ClassTag
+import java.util.Random
+import org.apache.flink.api.scala._
+import dbis.pig.backends._
+import org.apache.flink.api.java.functions._
+import org.apache.flink.api.common.typeinfo.TypeInformation
+
+class CustomSampler[T <: SchemaClass: ClassTag: TypeInformation](dataSet: DataSet[T]) {
+  def sample(withReplacement: Boolean,fraction: Double, seed: Long = new Random().nextLong() )  = {
+    dataSet.mapPartition(new SampleWithFraction[T](withReplacement, fraction, seed))
+  }
+
+}
+
+object Sampler {
+  implicit def addSampler[T <: SchemaClass: ClassTag: TypeInformation](dataSet: DataSet[T]) = {
+    new CustomSampler(dataSet)
+  }
+}
 
 object PigFuncs {
   def average[T: Numeric](bag: Iterable[T]) : Double = sum(bag).toDouble / count(bag).toDouble
@@ -33,30 +52,10 @@ object PigFuncs {
 
   def tokenize(s: String, delim: String = """[, "]""") = s.split(delim)
 
-  def toMap(pList: Any*): Map[String, Any] = {
-    var m = Map[String, Any]()
-    for (i <- 0 to pList.length-1 by 2) { m += (pList(i).toString -> pList(i+1)) }
-    m
-  }
-
-  def toTuple(pList: Any*): List[Any] = pList.toList
-
-  def toBag(pList: Any*): List[Any] = {
-    val buf = ListBuffer[List[Any]]()
-    for (i <- 0 to pList.length-1) {
-      if (pList(i).isInstanceOf[List[Any]])
-        buf += pList(i).asInstanceOf[List[Any]]
-      else
-        buf += List(pList(i))
-    }
-    buf.toList
-  }
-
-  def flatTuple(tup: List[Any]): List[Any] = tup flatten {
-    case tup: List[Any] =>  flatTuple(tup)
-    case c => List(c)
-  }
-
+  def startswith(haystack: String, prefix: String) = haystack.startsWith(prefix)
+  
+  def strlen(s: String) = s.length()
+  
   def streamCount(field: Int) = (in:List[Any], state: Option[Long]) => {
     val currentState = state.getOrElse(0L)
     val count = currentState+1

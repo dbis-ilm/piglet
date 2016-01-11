@@ -33,7 +33,7 @@ trait PigletBackend {
    * @param backendArgs Argument list passed to the job executor
    */
   def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]): Unit
-  
+
   /**
    * Execute the raw Pig script. Use this function if your engine does not rely on
    * code generation by Piglet but rather needs to process the Pig script directly
