@@ -72,19 +72,28 @@ object GeneralRuleset extends Ruleset {
     }
   }
 
+  /** Merges two [[dbis.pig.op.Limit]] operations if one is the only input of the other.
+    *
+    * @param parent The parent limit.
+    * @param child The child limit.
+    * @return On success, an Option containing a new [[dbis.pig.op.Limit]] operator with the lowest of both limits.
+    */
+  def mergeLimits(parent: Limit, child: Limit): Option[Limit] = {
+    val newlimit = Math.min(parent.num, child.num)
+    Some(Limit(child.outputs.head, parent.inputs.head, newlimit))
+  }
+
   /** Removes a [[dbis.pig.op.Filter]] object that's a successor of a Filter with the same Predicate
     */
   //noinspection MutatorLikeMethodIsParameterless
   def removeDuplicateFilters = rulefs[Filter] {
     case op@Filter(_, _, pred, _) =>
-      topdown(
-        attempt(
-          op.outputs.flatMap(_.consumer).
+       val strat = op.outputs.flatMap(_.consumer).
             filter(_.isInstanceOf[Filter]).
-            filter { f: PigOperator => extractPredicate(f.asInstanceOf[Filter].pred) == extractPredicate(pred) }.
-            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) => ior(s, buildRemovalStrategy(pigOp)
-            )
-            }))
+            filter { f: PigOperator => extractPredicate(f.asInstanceOf[Filter].pred) == extractPredicate(pred)}.
+            foldLeft(fail) { (s: Strategy, pigOp: PigOperator) =>
+              ior(s, buildRemovalStrategy(pigOp))}
+      manybu(strat)
   }
 
   def splitIntoToFilters(node: Any): Option[List[Filter]] = node match {
@@ -126,23 +135,23 @@ object GeneralRuleset extends Ruleset {
     * @return
     */
   //noinspection ScalaDocMissingParameterDescription
-  def removeNonStorageSinks(node: Any): Option[PigOperator] = node match {
+  def removeNonStorageSinks(node: PigOperator): Option[PigOperator] = node match {
     // Store and Dump are ok
     case Store(_, _, _, _) => None
     case HdfsCmd(_, _) => None
     case Dump(_) => None
+    case Display(_) => None
     // To prevent recursion, empty is ok as well
     case Empty(_) => None
     case Generate(_) => None
     case op: PigOperator =>
-      op.outputs match {
-        case Pipe(_, _, Nil) :: Nil | Nil =>
-          val newNode = Empty(Pipe(""))
-          newNode.inputs = op.inputs
-          Some(newNode)
-        case _ => None
+      if (op.outputs.map(_.consumer.isEmpty).fold(true)(_ && _)) {
+        val newNode = Empty(Pipe(""))
+        newNode.inputs = op.inputs
+        Some(newNode)
+      } else {
+        None
       }
-    case _ => None
   }
 
   /** If an operator is followed by an Empty node, replace it with the Empty node
@@ -316,12 +325,13 @@ object GeneralRuleset extends Ruleset {
     addStrategy(removeDuplicateFilters)
     merge(mergeFilters)
     merge(mergeWithEmpty)
+    merge(mergeLimits)
     reorder[OrderBy, Filter]
-    addStrategy(buildBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp))
-    addStrategy(buildBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp))
+    addBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp)
+    addBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp)
     addStrategy(strategyf(t => splitIntoToFilters(t)))
-    applyRule(foreachRecursively _)
-    addStrategy(removeNonStorageSinks _)
+    applyRule(foreachRecursively)
+    addTypedStrategy(removeNonStorageSinks)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     addOperatorReplacementStrategy(foreachGrouping)
   }

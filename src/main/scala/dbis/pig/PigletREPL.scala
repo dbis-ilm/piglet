@@ -18,7 +18,8 @@
 package dbis.pig
 
 import java.io.File
-import dbis.pig.op.{PigOperator, Dump}
+import dbis.pig.Piglet._
+import dbis.pig.op.{Display, PigOperator, Dump}
 import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rewriter._
@@ -142,7 +143,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     * @return true if the string is a command
     */
   private def isCommand(s: String): Boolean = {
-    val cmdList = List("help", "describe", "dump", "prettyprint", "rewrite", "quit", "fs")
+    val cmdList = List("help", "describe", "dump", "display", "prettyprint", "rewrite", "quit", "fs")
     val line = s.toLowerCase
     cmdList.exists(cmd => line.startsWith(cmd))
   }
@@ -350,13 +351,29 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         dumps.foreach(d => d.inputs.head.removeConsumer(d))
         buf --= dumps
       }
+      // the same for DISPLAY
+      if (s.toLowerCase.startsWith("display ")) {
+        val displays = buf.filter(p => p.isInstanceOf[Display])
+        displays.foreach(d => d.inputs.head.removeConsumer(d))
+        buf --= displays
+      }
 
-      buf ++= PigParser.parseScript(s, languageFeature)
+      buf ++= PigParser.parseScript(s, languageFeature, resetSchema = false)
       var plan = new DataflowPlan(buf.toList)
 
       val mm = new MaterializationManager
       plan = processMaterializations(plan, mm)
       plan = processPlan(plan)
+
+      try {
+        // if this does _not_ throw an exception, the schema is ok
+        plan.checkSchemaConformance
+      } catch {
+        case e: SchemaException => {
+          logger.error(s"schema conformance error in ${e.getMessage} for plan")
+          return false
+        }
+      }
 
       val templateFile = backendConf.templateFile
       val jobJar = Paths.get(s"$backendPath/${Conf.backendJar(backend).toString}")
@@ -374,7 +391,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     catch {
       case e: Throwable =>
         Console.err.println(s"error while executing: ${e.getMessage}")
-        // e.printStackTrace(Console.err)
+        e.printStackTrace(Console.err)
         cleanupResult(scriptName)
     }
 
@@ -497,6 +514,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => handleRewrite(buf)
         case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf)
         case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
+          s.toLowerCase.startsWith(s"display ") ||
           s.toLowerCase.startsWith(s"store ") ||
           s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf)
         case Line(s, buf) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)

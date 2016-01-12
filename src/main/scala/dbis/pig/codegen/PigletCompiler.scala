@@ -139,9 +139,10 @@ def createCodeFromInput(source: String, backend: String): String = {
   // plan = processPlan(plan)
 
   // compile it into Scala code for Spark
-  val generatorClass = Conf.backendGenerator(backend)
+    val generatorClass = Conf.backendGenerator(backend)
   val extension = Conf.backendExtension(backend)
   val backendConf = BackendManager.backend(backend)
+    BackendManager.backend = backendConf
   val templateFile = backendConf.templateFile
   val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
   val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
@@ -211,9 +212,15 @@ def createCodeFromInput(source: String, backend: String): String = {
       // extract all additional jar files to output
       plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
 
-      // copy the sparklib library to output
+      // copy the backend-specific library to output
       val jobJar = backendJar.toAbsolutePath.toString
+      logger.info(s"add backend jar '${jobJar}' to job's jar file ...")
       FileTools.extractJarToDir(jobJar, outputDirectory)
+
+      // copy the common library to output
+      var commonJar = jobJar.replace(s"${backend}lib", "common")
+      logger.info(s"add common jar '${commonJar}' to job's jar file ...")
+      FileTools.extractJarToDir(commonJar, outputDirectory)
 
       val sources = ListBuffer(outputFile)
       

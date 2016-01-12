@@ -36,5 +36,7 @@ testOptions in IntegrationTest := Seq(
 	Tests.Argument("-oDF")
 )
 
+coverageExcludedPackages := "<empty>;dbis.pig.Piglet;dbis.pig.plan.rewriting.internals.MaterializationSupport;dbis.pig.plan.rewriting.internals.WindowSupport"
+
 sourcesInBase := false
 EclipseKeys.skipParents in ThisBuild := false  // to enable piglet (parent not only children) eclispe import

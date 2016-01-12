@@ -519,6 +519,23 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     output.consumer should contain only(b, d)
   }
 
+  it should "be consistent after adding a new operator using insertBetween" in {
+    val plan = new DataflowPlan(parseScript("""
+                                              |a = load 'file.csv';
+                                              |b = filter a by $0 > 0;
+                                              |""".stripMargin))
+    var op = plan.findOperatorForAlias("a").value
+    val b = plan.findOperatorForAlias("b").value
+    val d = Distinct(Pipe("d"),Pipe("a"))
+    val newPlan = plan.insertBetween(op, b, d)
+
+    op = newPlan.findOperatorForAlias("a").value
+    op.outputs should have size 1
+
+    val output = op.outputs.headOption.value
+    output.consumer should contain only(d)
+  }
+
   it should "be consistent after exchanging two operators" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val spec1 = OrderBySpec(PositionalField(1), OrderByDirection.AscendingOrder)

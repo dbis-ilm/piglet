@@ -25,9 +25,9 @@ import dbis.pig.plan.rewriting.internals._
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Rewriter.{rewrite => kiamarewrite}
 import org.kiama.rewriting.Strategy
-
 import scala.collection.mutable
 import scala.reflect.ClassTag
+import dbis.pig.plan.rewriting.PlanMerger
 
 case class RewriterException(msg: String) extends Exception(msg)
 
@@ -100,7 +100,7 @@ object Rewriter extends PigletLogging
                 with WindowSupport
                 with EmbedSupport
                 with MaterializationSupport
-                with MergeSupport
+                with PlanMerger
                 with Fixers
                 with FastStrategyAdder
                 with RewriterDSL {
@@ -133,22 +133,22 @@ object Rewriter extends PigletLogging
   /** Rewrites a given sink node with several [[org.kiama.rewriting.Strategy]]s that were added via
     * [[dbis.pig.plan.rewriting.Rewriter.addStrategy]].
     *
-    * @param sink The sink node to rewrite.
+    * @param op The sink node to rewrite.
     * @return The rewritten sink node.
     */
-  def processPigOperator(sink: PigOperator): Any = {
-    processPigOperator(sink, ourStrategy)
+  def processPigOperator(op: PigOperator): Any = {
+    processPigOperator(op, ourStrategy)
   }
 
   /** Process a sink with a specified strategy
     *
-    * @param sink The sink to process.
+    * @param op The sink to process.
     * @param strategy The strategy to apply.
     * @return
     */
-  private def processPigOperator(sink: PigOperator, strategy: Strategy): Any = {
-    val rewriter = downup(attempt(strategy))
-    kiamarewrite(rewriter)(sink)
+  private def processPigOperator(op: PigOperator, strategy: Strategy): Any = {
+    val rewriter = manybu(strategy)
+    kiamarewrite(rewriter)(op)
   }
 
   /** Apply all rewriting rules of this Rewriter to a [[dbis.pig.plan.DataflowPlan]].

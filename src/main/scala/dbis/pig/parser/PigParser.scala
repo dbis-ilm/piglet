@@ -87,11 +87,12 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   def namedFieldWithLineage: Parser[NamedField] = rep1sep(bag, Field.lineageSeparator) ^^
     { case l  => NamedField.fromStringList(l) }
 
-  def literalField: Parser[Ref] = (
+  def literalField: Parser[Ref] =
     decimalNumber ^^ { i => if (i.contains('.')) Value(i.toDouble) else Value(i.toInt) } |
     // floatingPointNumber ^^ { n => Value(n.toDouble) } |
     stringLiteral ^^ { s => Value(s) } |
-    boolean ^^ { b => Value(b) })
+    boolean ^^ { b => Value(b) }
+
   def fieldSpec: Parser[Ref] = (namedField | posField | literalField)
   /*
    * A reference can be also a dereference operator for tuples, bags or maps.
@@ -173,7 +174,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
       case ">=" => Geq(a, b)
     }
     case a ~ op ~ (b: String) => {
-      val b_val = RefExpr(Value(unquote(b)))
+      val b_val = RefExpr(Value(s""""${unquote(b)}""""))
       op match {
         case "==" => Eq(a, b_val)
         case "!=" => Neq(a, b_val)
@@ -185,19 +186,30 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     }
   }
 
-  def logicalTerm: Parser[Predicate] = (
-    comparisonExpr ^^ { e => e }
-     | "(" ~ logicalExpr ~ ")" ^^ { case _ ~ e ~ _ => PPredicate(e) }
-          | func ^^ { f => Eq(f,RefExpr(Value(true))) }
+  def boolLiteral: Parser[Predicate] = boolean ^^ { b => BoolLiteral(b)}
+
+  def boolFactor: Parser[Predicate] = (
+    boolLiteral
+      | comparisonExpr ^^ { e => e }
+      | "(" ~ boolExpr ~ ")" ^^ { case _ ~ e ~ _ => PPredicate(e) }
+      | func ^^ { f => Eq(f,RefExpr(Value(true))) }
     )
 
-  def logicalExpr: Parser[Predicate] = (
-      
-      logicalTerm ~ andKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => And(a, b) }
-      | logicalTerm ~ orKeyword ~ logicalTerm ^^ { case a ~ _ ~ b => Or(a, b) }
-      | notKeyword ~ logicalTerm ^^ { case _ ~ e => Not(e) }
-      | logicalTerm ^^ { e => e }
-     )
+  def boolNotFactor: Parser[Predicate] = opt(notKeyword) ~ boolFactor ^^ {
+    case Some(n) ~ f => Not(f); case None ~ f => f
+  }
+
+  def boolTerm: Parser[Predicate] = boolNotFactor ~ rep(andKeyword ~ boolNotFactor) ^^{
+    case f ~ list => list.foldLeft(f) {
+        case (p1, andKeyword ~ p2) => And(p1, p2)
+      }
+  }
+
+  def boolExpr: Parser[Predicate] = boolTerm ~ rep(orKeyword ~ boolTerm) ^^{
+    case f ~ list => list.foldLeft(f) {
+      case (p1, orKeyword ~ p2) => Or (p1, p2)
+    }
+  }
 
   /*
    * The list of case-insensitive keywords we want to accept.
@@ -409,7 +421,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   /*
    * <A> = FILTER <B> BY <Predicate>
    */
-  def filterStmt: Parser[PigOperator] = bag ~ "=" ~ filterKeyword ~ bag ~ byKeyword ~ logicalExpr ^^ {
+  def filterStmt: Parser[PigOperator] = bag ~ "=" ~ filterKeyword ~ bag ~ byKeyword ~ boolExpr ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pred => new Filter(Pipe(out), Pipe(in), pred)
   }
 
@@ -549,7 +561,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   /*
    * SPLIT <A> INTO <B> IF <Cond>, <C> IF <Cond> ...
    */
-  def splitBranch: Parser[SplitBranch] = bag ~ ifKeyword ~ logicalExpr ^^ { case out ~ _ ~ expr => new SplitBranch(Pipe(out), expr)}
+  def splitBranch: Parser[SplitBranch] = bag ~ ifKeyword ~ boolExpr ^^ { case out ~ _ ~ expr => new SplitBranch(Pipe(out), expr)}
 
   def splitStmt: Parser[PigOperator] = splitKeyword ~ bag ~ intoKeyword ~ repsep(splitBranch, ",") ^^ {
     case _ ~ in ~ _ ~ splitList => new SplitInto(Pipe(in), splitList)
@@ -574,20 +586,14 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
   def code = ("""(?s)(.*?)""")
 
-  def embeddedCodeNoRules: Parser[EmbedCmd] = "<%" ~ (code+"%>").r ^^ { case _ ~ code => new EmbedCmd(code
-    .substring
-    (0, code .length - 2))
+  def embeddedCode: Parser[EmbedCmd] = "<%" ~ (code + "%>").r ^^ {
+    case _ ~ code if code.split("rules:").length != 2 => new EmbedCmd(code.substring(0, code.length - 2))
+    case _ ~ code =>
+      val ctuple = code.substring(0, code.length -2 ).split("rules:")
+      new EmbedCmd(ctuple(0), Some(ctuple(1)))
   }
 
-  def codeWithRulesInit = (code + "rules:").r
-
-  def ruleCode: Parser[String] = (code + "!>").r
-
-  def embeddedCodeWithRules: Parser[EmbedCmd] = "<!" ~ codeWithRulesInit ~ ruleCode ^^ {
-    case _ ~ code ~ rules => EmbedCmd(code.substring(0, code.length - 6), Some(rules.substring(0, rules.length - 2)))
-  }
-
-  def embedStmt: Parser[PigOperator] = embeddedCodeNoRules | embeddedCodeWithRules
+  def embedStmt: Parser[PigOperator] = embeddedCode
 
   /*
    * A statement can be one of the above delimited by a semicolon.
@@ -748,9 +754,9 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   lazy val skipAnyKeyword = "skip_till_any_match".ignoreCase
   lazy val firstMatchKeyword = "first_match".ignoreCase
   lazy val recentMatchKeyword = "recent_match".ignoreCase
-  lazy val congnitiveMatchKeyword = "cognitive_match".ignoreCase
+  lazy val cognitiveMatchKeyword = "cognitive_match".ignoreCase
 
-  def eventExpr: Parser[Predicate] = logicalExpr
+  def eventExpr: Parser[Predicate] = boolExpr
   def simpleEvent: Parser[SimpleEvent] = simplePattern ~ ":" ~ eventExpr ^^ { case s ~ _ ~ e => SimpleEvent(s, e) }
   def eventParam: Parser[CompEvent] = "(" ~ simpleEvent ~ rep( "," ~> simpleEvent) ~ ")" ^^ { case _ ~ s ~ c ~ _ => CompEvent(s :: c) }
   
@@ -770,7 +776,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   def patternParam: Parser[Pattern] = (seqPattern | negPattern | conjPattern | disjPattern | simplePattern)
   
   def withinParam: Parser[Tuple2[Int, String]] = withinKeyword ~ num ~ timeUnit ^^ { case _ ~ n ~ u => (n, u) }
-  def modes: Parser[String] = (skipNextKeyword | skipAnyKeyword | firstMatchKeyword | recentMatchKeyword | congnitiveMatchKeyword)
+  def modes: Parser[String] = (skipNextKeyword | skipAnyKeyword | firstMatchKeyword | recentMatchKeyword | cognitiveMatchKeyword)
   def modeParam: Parser[String] = modeKeyword ~ modes ^^ { case _ ~ n => n }
   def matcherStmt: Parser[PigOperator] = bag ~ "=" ~ matchEventKeyword ~ bag ~ patternKeyword ~ patternParam ~ withKeyword ~ eventParam ~ (modeParam?) ~ (withinParam?) ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pattern ~ _ ~ e ~ mode ~ within => mode match {
@@ -812,8 +818,9 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
 object PigParser {
    
-   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig): List[PigOperator] = {
-    Schema.init()
+   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig, resetSchema: Boolean = true): List[PigOperator] = {
+    if (resetSchema)
+      Schema.init()
     val parser = new PigParser
     parser.parseScript(new CharSequenceReader(s), feature)
   }

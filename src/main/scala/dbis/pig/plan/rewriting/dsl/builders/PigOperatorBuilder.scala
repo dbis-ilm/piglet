@@ -42,7 +42,7 @@ class PigOperatorBuilder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends B
       }
     }
 
-    f _
+    f
   }
 
   override def wrapInFixer(func: FROM => Option[TO]): FROM => Option[TO] = {
@@ -60,7 +60,7 @@ class PigOperatorBuilder[FROM <: PigOperator : ClassTag, TO: ClassTag] extends B
       }}
     }
 
-    f _
+    f
   }
 
   def addAsStrategy(func: (FROM => Option[TO])) = {

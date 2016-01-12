@@ -83,7 +83,7 @@ trait DFPSupport {
     */
   def insertBetween(plan: DataflowPlan, inOp: PigOperator, outOp: PigOperator, newOp: PigOperator): DataflowPlan = {
     require(!newOp.isInstanceOf[Load], "Can't insert a Load operator after another operator")
-    require(inOp.outputs.map(_.consumer).flatten.contains(outOp), "The input Operator must be directly connected to the output Operator")
+    require(inOp.outputs.flatMap(_.consumer).contains(outOp), "The input Operator must be directly connected to the output Operator")
     require(outOp.inputs.map(_.producer).contains(inOp), "The output Operator must be directly connected to the input Operator")
 
     //TODO:Outsource DISCONNECT, difficult since processPlan deletes Nodes with no output Pipe

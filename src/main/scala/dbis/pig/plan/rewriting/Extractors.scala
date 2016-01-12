@@ -100,4 +100,52 @@ object Extractors {
       Some((op, succ))
     }
   }
+
+  /** Extracts the predecessor of ``op`` if there is only one.
+    *
+    * The pattern
+    *
+    * {{{
+    *   case PredE(op, pred) =>
+    * }}}
+    *
+    * will bind ``op`` to a [[dbis.pig.op.PigOperator]] object and ``pred`` to its successor.
+    *
+    */
+  object PredE {
+    def unapply(op: PigOperator): Option[(PigOperator, PigOperator)] = {
+      val preds = op.inputs.map(_.producer)
+      if (preds.length == 1) {
+        Some((op, preds.head))
+      } else {
+        None
+      }
+    }
+  }
+
+  /** Extracts all predecessors of ``op``.
+    *
+    * The pattern
+    *
+    * {{{
+    *  case AllPredE(op, preds) =>
+    * }}}
+    *
+    * will bind ``op`` to a [[dbis.pig.op.PigOperator]] object and ``preds`` to its predecessors.
+    *
+    * Of course, this can be combined with other patterns like
+    *
+    * {{{
+    *  case AllPredE(op, first :: second) =>
+    * }}}
+    *
+    * to only match and bind ``op`` if it has only two successors, namely ``first`` and ``second``.
+    *
+    */
+  object AllPredE {
+    def unapply(op: PigOperator): Option[(PigOperator, Seq[PigOperator])] = {
+      val preds = op.inputs.map(_.producer)
+      Some((op, preds))
+    }
+  }
 }
