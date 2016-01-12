@@ -23,6 +23,7 @@ import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.schema.{Types, PigType, Schema, SchemaException}
 import dbis.pig.udf.{UDFTable, UDF}
 import scala.collection.mutable.{ListBuffer, Map}
+import dbis.pig.tools.logging.PigletLogging
 
 
 
@@ -42,7 +43,7 @@ case class InvalidPlanException(msg: String) extends Exception(msg)
  * @param ctx an optional list of pipes representing the context, i.e. the
  *            pipes of a nesting operator (e.g. FOREACH).
  */
-class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable {
+class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable with PigletLogging {
   def operators_=(ops: List[PigOperator]) = {
     ops map { _.outPipeNames map { PipeNameGenerator.addKnownName}}
     _operators = ops
@@ -68,8 +69,11 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
   def addOperator(ops: List[PigOperator], deferrConstruct: Boolean = false) {
     operators ++= ops
     
-    if(!deferrConstruct)
+    if(!deferrConstruct) {
+      logger.debug(s"""construct plan on insertion of ${ops.mkString(" & ")}""")
     	constructPlan(operators)
+    } else
+      logger.debug(s"""deferred plan constructing after adding ${ops.mkString(" & ")}""")
   }
   
   /**

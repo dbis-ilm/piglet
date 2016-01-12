@@ -13,8 +13,10 @@ trait PlanMerger extends PigletLogging {
   
 	def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = {
 	  
-	  schedule.zipWithIndex.foreach { case (plan,idx) =>  
-	    plan.operators.foreach { op => op.outputs.foreach { pipe => pipe.name += s"_$idx" } }  
+	  val indexedSchedule = schedule.zipWithIndex
+	  
+	  indexedSchedule.foreach { case (plan,idx) =>  
+	    plan.operators.foreach { _.outputs.foreach { pipe => pipe.name += s"_$idx" } }    
 	  }
 	  
 	  
@@ -22,13 +24,14 @@ trait PlanMerger extends PigletLogging {
 
 		val walker = new BreadthFirstTopDownWalker
 
-		val deferrPlanConstruction = false
+		val deferrPlanConstruction = true
 		var needPlanConstruction = false
 		
 		/* the visitor to process all operators and add them to the merged
 		 * plan if necessary
 		 */
 		def visitor(op: PigOperator): Unit = {
+		  logger.debug("")
 	    logger.debug(s"processing op: $op")
 	    
 	    val mergedOps = mergedPlan.findOperator { o => o.lineageSignature == op.lineageSignature} 
@@ -53,7 +56,9 @@ trait PlanMerger extends PigletLogging {
 			          logger.warn("No producer found for $op -- this shouldn't happen?!")
 			      }
 			      
+			      logger.debug(s"try to add $op with deferr=$deferrPlanConstruction")
 			      mergedPlan.addOperator(List(op), deferrPlanConstruction)
+			      logger.debug("added")
 			      needPlanConstruction = true
 			    } 
 			    case _ =>
@@ -64,7 +69,8 @@ trait PlanMerger extends PigletLogging {
     			      
     			      op.inputs.head.name = producer.outPipeName
     			      
-      					mergedPlan = mergedPlan.insertAfter(producer, op)
+//      					mergedPlan = mergedPlan.insertAfter(producer, op)
+    			      mergedPlan.addOperator(List(op), deferrPlanConstruction)
       					logger.debug(s"inserted $op after $producer")
     				}
 			  }
@@ -73,8 +79,12 @@ trait PlanMerger extends PigletLogging {
 			}
 		}
 
-		schedule.drop(1) // skip first plan as we already copied it into mergedPlan
-		  .foreach { plan => walker.walk(plan)(visitor) }  // for all remaining: visit each op and add to merged plan    
+		indexedSchedule.drop(1) // skip first plan as we already copied it into mergedPlan
+		  .foreach {  case (plan,idx) => 
+		    // for all remaining: visit each op and add to merged plan 
+		    logger.debug(s"processing plan no. #$idx")
+		    walker.walk(plan)(visitor) 
+	    }      
 
 		if(needPlanConstruction && deferrPlanConstruction) 
 			mergedPlan.constructPlan(mergedPlan.operators)
