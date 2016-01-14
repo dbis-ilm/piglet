@@ -120,7 +120,7 @@ class RewriterSpec extends FlatSpec
   private def performFilterRemovalTest() = {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
-    val predicate2 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
+    val predicate2 = PPredicate(Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
     val op2_after = Filter(Pipe("c"), Pipe("a"), predicate1)
     val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
@@ -311,6 +311,17 @@ class RewriterSpec extends FlatSpec
     performReorderingTest()
   }
 
+  it should "order Filter operations before Order By ones with an extra function" in {
+    var x = 0
+    def f(o: OrderBy, f: Filter): Option[Tuple2[Filter,OrderBy]] = {
+      x += 1
+      Some(f, o)
+    }
+    reorder[OrderBy, Filter](f _)
+    performReorderingTest()
+    x shouldBe 1
+  }
+
   // THESIS
   it should "order Filter operations before Order By ones manually" in {
     def strategy(op: Any): Option[Filter] = op match {
@@ -465,7 +476,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "remove sink nodes that don't store a relation" in {
-    addStrategy(removeNonStorageSinks _)
+    addTypedStrategy(removeNonStorageSinks)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
     val newPlan = processPlan(plan)
@@ -474,7 +485,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "remove sink nodes that don't store a relation and have an empty outputs list" in {
-    addStrategy(removeNonStorageSinks _)
+    addTypedStrategy(removeNonStorageSinks)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val plan = new DataflowPlan(List(op1))
 
@@ -485,7 +496,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "pull up Empty nodes" in {
-    addStrategy(removeNonStorageSinks _)
+    addTypedStrategy(removeNonStorageSinks)
     merge(mergeWithEmpty)
     val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List())
@@ -516,6 +527,7 @@ class RewriterSpec extends FlatSpec
   }
 
   it should "apply rewriting rule R2" in {
+    Rewriter applyRule R1
     Rewriter applyRule R2
     val op1 = RDFLoad(Pipe("a"), new URI("http://example.com"), None)
     val op2 = OrderBy(Pipe("b"), Pipe("a"), List(OrderBySpec(NamedField("subject"), OrderByDirection.DescendingOrder)))
@@ -1614,7 +1626,7 @@ class RewriterSpec extends FlatSpec
   it should "replace GENERATE * in a nested FOREACH" in {
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     applyRule (foreachRecursively _)
-    addStrategy(removeNonStorageSinks _)
+    addTypedStrategy(removeNonStorageSinks)
     val plan = new DataflowPlan(parseScript(
       """triples = LOAD 'file' AS (sub, pred, obj);
          |stmts = GROUP triples BY sub;
@@ -1937,6 +1949,34 @@ class RewriterSpec extends FlatSpec
     performReorderingTest()
   }
 
+  it should "apply patterns via applyPattern with a condition added by and" in {
+    Rewriter when[OrderBy, Filter] { _ => true} and { t: OrderBy => t.outputs.length > 0 } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by or" in {
+    Rewriter when[OrderBy, Filter] { _ => false} or { t: OrderBy => t.outputs.length > 0 } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by andMatches" in {
+    Rewriter when[OrderBy, Filter] { _ => true} andMatches { case t: OrderBy if t.outputs.length > 0 => } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
+  it should "apply patterns via applyPattern with a condition added by orMatches" in {
+    Rewriter when[OrderBy, Filter] { _ => false } orMatches { case t: OrderBy if t.outputs.length > 0 => } applyPattern {
+      case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
+    }
+    performReorderingTest()
+  }
+
   it should "allow merging operators" in {
     Rewriter toMerge[Filter, Filter]() whenMatches {
       case (f1 @ Filter(_, _, pred1, _), f2 @ Filter(_, _, pred2, _)) if pred1 != pred2 =>
@@ -2080,6 +2120,12 @@ class RewriterSpec extends FlatSpec
     val op2 = OrderBy(Pipe("b"), Pipe("d"), List())
     val op3 = OrderBy(Pipe("d"), Pipe("b", op2), List())
     performFailingConnectTest(op1, op3)
+
+    val op4 = OrderBy(Pipe("b"), Pipe("a"), List())
+    val op5 = OrderBy(Pipe("b"), Pipe("d"), List())
+    val op6 = OrderBy(Pipe("d"), Pipe("c", op5), List())
+    op6.inputs = op6.inputs :+ Pipe("e")
+    performFailingConnectTest(op4, op6)
   }
 
   it should "ignore all precautions if overwrite is set" in {

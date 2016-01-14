@@ -135,15 +135,10 @@ object GeneralRuleset extends Ruleset {
     * @return
     */
   //noinspection ScalaDocMissingParameterDescription
-  def removeNonStorageSinks(node: Any): Option[PigOperator] = node match {
+  def removeNonStorageSinks(node: PigOperator): Option[PigOperator] = node match {
     // Store and Dump are ok
-    case Store(_, _, _, _) => None
-    case HdfsCmd(_, _) => None
-    case Dump(_) => None
-    case Display(_) => None
     // To prevent recursion, empty is ok as well
-    case Empty(_) => None
-    case Generate(_) => None
+    case _ : Store | _ : HdfsCmd | _ : Dump | _ : Display | _ : Empty | _ : Generate => None
     case op: PigOperator =>
       if (op.outputs.map(_.consumer.isEmpty).fold(true)(_ && _)) {
         val newNode = Empty(Pipe(""))
@@ -152,7 +147,6 @@ object GeneralRuleset extends Ruleset {
       } else {
         None
       }
-    case _ => None
   }
 
   /** If an operator is followed by an Empty node, replace it with the Empty node
@@ -332,7 +326,7 @@ object GeneralRuleset extends Ruleset {
     addBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp)
     addStrategy(strategyf(t => splitIntoToFilters(t)))
     applyRule(foreachRecursively)
-    addStrategy(removeNonStorageSinks _)
+    addTypedStrategy(removeNonStorageSinks)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     addOperatorReplacementStrategy(foreachGrouping)
   }
