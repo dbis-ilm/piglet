@@ -35,9 +35,20 @@ import scala.collection.mutable.ListBuffer
 
 class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
 
+  
   /*------------------------------------------------------------------------------------------------- */
   /*                                  Scala-specific code generators                                  */
   /*------------------------------------------------------------------------------------------------- */
+  
+  // override the scala type mapping of the parent since there is no support for "any" type in flink in case of specifying the keys  
+  override val scalaTypeMappingTable = Map[PigType, String](
+    Types.IntType -> "Int",
+    Types.LongType -> "Long",
+    Types.FloatType -> "Float",
+    Types.DoubleType -> "Double",
+    Types.CharArrayType -> "String",
+    Types.ByteArrayType -> "String",
+    Types.AnyType -> "String") 
 
   /**
    * Generates code for the GROUPING Operator

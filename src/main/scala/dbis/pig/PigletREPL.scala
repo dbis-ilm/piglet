@@ -18,6 +18,7 @@
 package dbis.pig
 
 import java.io.File
+import dbis.pig.Piglet._
 import dbis.pig.op.{Display, PigOperator, Dump}
 import dbis.pig.parser.{LanguageFeature, PigParser}
 import dbis.pig.plan.DataflowPlan
@@ -364,6 +365,16 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       plan = processMaterializations(plan, mm)
       plan = processPlan(plan)
 
+      try {
+        // if this does _not_ throw an exception, the schema is ok
+        plan.checkSchemaConformance
+      } catch {
+        case e: SchemaException => {
+          logger.error(s"schema conformance error in ${e.getMessage} for plan")
+          return false
+        }
+      }
+
       val templateFile = backendConf.templateFile
       val jobJar = Paths.get(s"$backendPath/${Conf.backendJar(backend).toString}")
 
@@ -380,7 +391,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     catch {
       case e: Throwable =>
         Console.err.println(s"error while executing: ${e.getMessage}")
-        // e.printStackTrace(Console.err)
+        e.printStackTrace(Console.err)
         cleanupResult(scriptName)
     }
 

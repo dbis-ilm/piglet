@@ -26,19 +26,19 @@ class FlinksCompileIt extends FlatSpec with CompileIt {
     ("stream_load.pig",  "result1.out",   "truth/result1.data",   false, "pig", "flinks"),
     ("stream_load2.pig", "result2.out",   "truth/result2.data",   false, "pig", "flinks"),
     ("stream_foreach1.pig", "distances.out", "truth/distances.data", false, "pig", "flinks"),
-    ("stream_filter.pig", "filtered.out",  "truth/filtered.data",  false, "pig", "flinks")
+    ("stream_filter.pig", "filtered.out",  "truth/filtered.data",  false, "pig", "flinks"),
     /*("construct.pig",     "result3.out", "truth/construct.data",   false),
     ("union.pig",         "united.out",    "truth/united.data",    false),
     ("aggregate.pig",     "aggregate.out", "truth/aggregate2.data",false),
-    ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false),
-    ("windowJoin.pig",    "joinedW.out",   "truth/joined.data",    false),
-    ("windowCross.pig",   "crossedW.out",  "truth/crossed.data",   false),
-    ("windowGrouping.pig","grouping.out",  "truth/grouping.data",  false),
-    ("windowNforeach.pig","nested.out",    "truth/nested.data",    false),
-    ("windowFilter.pig",  "filtered.out",  "truth/filtered.data",  false),
-    ("windowCount.pig",   "marycounts.out","truth/marycount.data", false),
-    ("windowDistinct.pig","unique.out",    "truth/unique.data",    false),
-    ("windowSort.pig",    "sorted.out",    "truth/sorted.data",    true)*/
+    ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false),*/
+    ("windowJoin.pig",    "joinedW.out",   "truth/joined.data",    false, "streaming", "flinks"),
+    ("windowCross.pig",   "crossedW.out",  "truth/crossed.data",   false, "streaming", "flinks"),
+    ("windowGrouping.pig","grouping.out",  "truth/grouping.data",  false, "streaming", "flinks"),
+    ("windowNforeach.pig","nested.out",    "truth/nested.data",    false, "streaming", "flinks"),
+    ("windowFilter.pig",  "filtered.out",  "truth/filtered.data",  false, "streaming", "flinks"),
+    ("windowCount.pig",   "marycounts.out","truth/marycount.data", false, "streaming", "flinks"),
+    ("windowDistinct.pig","unique.out",    "truth/unique.data",    false, "streaming", "flinks"),
+    ("windowSort.pig",    "sorted.out",    "truth/sorted.data",    true, "streaming", "flinks")
     //TODO: Sample, Split, Stream-Through, Hybrid-Operators
  ) 
  it should behave like checkMatch(scripts)
