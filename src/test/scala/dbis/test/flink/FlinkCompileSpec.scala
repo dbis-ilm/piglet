@@ -46,7 +46,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   "The compiler output" should "contain the Flink header & footer" in {
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitImport
+    val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test")
       + codeGenerator.emitFooter)

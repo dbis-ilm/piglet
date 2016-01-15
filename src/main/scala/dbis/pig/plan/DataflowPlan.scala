@@ -473,4 +473,22 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
 
   def resolveParameters(mapping: Map[String, Ref]): Unit = operators.foreach(p => p.resolveParameters(mapping))
 
+  /**
+    * Check all statements using the given expression traverser if any of the expressions
+    * satisfies the predicate.
+    *
+    * @param f an expression traverser
+    * @return true if any expression was found satisfying the predicate of the traverser
+    */
+  def checkExpressions(f: (Schema, Expr) => Boolean): Boolean = {
+    val res = operators.map(_ match {
+      case op@Foreach(_, _, gen, _) => gen match {
+        case GeneratorList(exprs) => exprs.exists(g => f(op.schema.orNull, g.expr))
+        case GeneratorPlan(p) => false
+      }
+      case op@Filter(_, _, pred, _) => pred.traverseOr(op.schema.orNull, f)
+      case _ => false
+    })
+    res.contains(true)
+  }
 }

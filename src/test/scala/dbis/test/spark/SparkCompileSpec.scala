@@ -44,7 +44,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   "The compiler output" should "contain the Spark header & footer" in {
     val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitImport
+    val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test",true)
       + codeGenerator.emitFooter)
@@ -68,6 +68,36 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    }
         |}
       """.stripMargin)
+    assert(generatedCode == expectedCode)
+  }
+
+  it should "contain the Spark header with additional imports" in {
+    val codeGenerator = new BatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitImport(Some("import breeze.linalg._"))
+      + codeGenerator.emitHeader1("test")
+      + codeGenerator.emitHeader2("test",true)
+      + codeGenerator.emitFooter)
+    val expectedCode = cleanString("""
+                                     |import org.apache.spark.SparkContext
+                                     |import org.apache.spark.SparkContext._
+                                     |import org.apache.spark.SparkConf
+                                     |import org.apache.spark.rdd._
+                                     |import dbis.pig.backends.{SchemaClass, Record}
+                                     |import dbis.pig.tools._
+                                     |import dbis.pig.backends.spark._
+                                     |import breeze.linalg._
+                                     |
+                                     |object test {
+                                     |    def main(args: Array[String]) {
+                                     |      val conf = new SparkConf().setAppName("test_App")
+                                     |      val sc = new SparkContext(conf)
+                                     |      val perfMon = new PerfMonitor("test_App")
+                                     |      sc.addSparkListener(perfMon)
+                                     |      sc.stop()
+                                     |
+                                     |    }
+                                     |}
+                                   """.stripMargin)
     assert(generatedCode == expectedCode)
   }
 

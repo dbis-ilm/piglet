@@ -505,7 +505,7 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
    *
    * @return a string representing the import code
    */
-  def emitImport: String = callST("init_code")
+  def emitImport(additionalImports: Option[String]): String = callST("init_code")
 
   /**
    * Generate code for the header of the script outside the main class/object,

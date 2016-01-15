@@ -48,7 +48,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
 
   "The compiler output" should "contain the Spark Streaming header & footer" in {
     val codeGenerator = new StreamingCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitImport
+    val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test")
       + codeGenerator.emitFooter)

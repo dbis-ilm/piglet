@@ -22,7 +22,7 @@ import dbis.pig.schema.Schema
 import scala.collection.immutable.Map
 import scala.collection.mutable.Set
 import org.clapper.scalasti.STGroupFile
-import dbis.pig.expr.Value
+import dbis.pig.expr.{Expr, Value}
 
 /**
  * An exception representing an error in handling the templates for code generation.
@@ -71,7 +71,7 @@ trait CodeGeneratorBase {
    *
    * @return a string representing the import code
    */
-  def emitImport: String
+  def emitImport(additionalImports: Option[String] = None): String
 
   /**
    * Generate code for the header of the script outside the main class/object,
@@ -174,8 +174,14 @@ trait CodeGenerator {
       codeGen.udfAliases = Some(plan.udfAliases.toMap)
     }
 
+    var additionalImports: Option[String] = None
+    if (plan.checkExpressions(Expr.containsMatrixType)) {
+      println("------------------- MATRIX contained ---------------")
+      additionalImports = Some("import breeze.linalg._")
+    }
+
     // generate import statements
-    var code = codeGen.emitImport
+    var code = codeGen.emitImport(additionalImports)
 
     // generate schema classes for all registered types and schemas
     for (schema <- Schema.schemaList) {

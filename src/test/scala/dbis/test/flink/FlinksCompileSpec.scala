@@ -43,7 +43,7 @@ class FlinksCompileSpec extends FlatSpec with PigletLogging {
   /**************************************/
   "The compiler output" should "contain the Flink header & footer" in {
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitImport 
+    val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test") 
       + codeGenerator.emitHeader2("test") 
       + codeGenerator.emitFooter)

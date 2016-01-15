@@ -802,7 +802,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    *
    * @return a string representing the import code
    */
-  def emitImport: String = callST("init_code")
+  def emitImport(additionalImports: Option[String] = None): String = callST("init_code",
+     Map("additional_imports" -> additionalImports.getOrElse("")))
 
   /**
    * Generate code for the header of the script outside the main class/object,
