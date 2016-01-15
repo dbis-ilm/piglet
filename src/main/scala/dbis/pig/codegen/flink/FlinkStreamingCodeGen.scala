@@ -366,13 +366,32 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
     * @param streamParams an optional list of parameters to a stream function (e.g. separators)
     * @return the Scala code implementing the SOCKET_READ operator
     */
-  def emitSocketRead(out: String, addr: SocketAddress, mode: String, streamFunc: Option[String], streamParams: List[String]): String ={
+  def emitSocketRead(node: PigOperator, addr: SocketAddress, mode: String, streamFunc: Option[String], streamParams: List[String]): String ={
+    var paramMap = super.emitExtractorFunc(node, streamFunc)
+
+    node.schema match {
+      case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
+      case None => paramMap += ("class" -> "Record")
+    }
+
+    val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
+    val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
+    paramMap ++= Map("out" -> node.outPipeName, "addr_hostname" -> addr.hostname,
+      "addr_port" -> addr.port,
+      "func" -> func, "params" -> params)
+    if (mode != "")
+      paramMap += ("mode" -> mode)
+    println("paramMap = " + paramMap)
+    callST("socketRead", paramMap)
+
+    /*
     val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
     val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
     if(mode!="")
       callST("socketRead", Map("out"->out,"addr"->addr,"mode"->mode,"func"->func,"params"->params))
     else
       callST("socketRead", Map("out"->out,"addr"->addr,"func"->func,"params"->params))
+      */
   }
 
   /**
@@ -436,7 +455,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
       case Grouping(out, in, groupExpr, windowMode) => emitGrouping(node, groupExpr, windowMode)
       case Join(out, rels, exprs, window) => emitJoin(node, node.outPipeName, node.inputs, exprs, window)
       case OrderBy(out, in, orderSpec, windowMode) => emitOrderBy(node, orderSpec, windowMode)
-      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node.outPipeName, address, mode, func, params)
+      case SocketRead(out, address, mode, schema, func, params) => emitSocketRead(node, address, mode, func, params)
       case SocketWrite(in, address, mode, func) => emitSocketWrite(node.inPipeName, address, mode, func)
       case Window(out, in, window, slide) => emitWindow(node.outPipeName,node.inPipeName,window,slide)
       case WindowFlatten(out, in) => callST("windowFlatten", Map("out"->node.outPipeName,"in"->node.inPipeName))

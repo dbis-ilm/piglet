@@ -355,7 +355,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     }
   }
 
-  it should "parse a list of statements" in {
+   it should "parse a list of statements" in {
     val uri = new URI("file.csv")
     assert(parseScript("a = load 'file.csv';\ndump b;") == List(Load(Pipe("a"), uri), Dump(Pipe("b"))))
   }

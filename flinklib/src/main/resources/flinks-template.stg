@@ -205,11 +205,11 @@ streamOp(out,in,op,params) ::=<<
 >>
 
 // ------------------ Reads from a SOCKET -------------------------------------
-socketRead(out,addr,mode,func,params) ::=<<
+socketRead(out,addr,mode,class,func,params) ::=<<
 <if (mode)>
-    val <out> = <func>().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
+    val <out> = <func>[<class>]().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
 <else>
-    val <out> = <func>().connect(env, "<addr.hostname>", <addr.port><params>)
+    val <out> = <func>[<class>]().connect(env, "<addr.hostname>", <addr.port><params>)
 <endif>
 >>
 
