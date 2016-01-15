@@ -924,6 +924,7 @@ object RDFRuleset extends Ruleset {
     Rewriter applyRule F6
     Rewriter applyRule F7
     Rewriter applyRule F8
+    Rewriter applyRule F9
     Rewriter when {op: BGPFilter => RDF.isStarJoin(op.patterns)} and {_.inputSchema == RDFLoad.plainSchema} applyRule J1
     Rewriter unless groupedSchemaJoinEarlyAbort and {op => RDF.isStarJoin(op.patterns)} applyRule J2
     Rewriter when {op: BGPFilter => RDF.isPathJoin(op.patterns)} and {_.inputSchema == RDFLoad.plainSchema} applyRule J3
