@@ -20,6 +20,7 @@ import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.op.{PigOperator, _}
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.plan.rewriting.Rules.registerAllRules
+import dbis.pig.plan.rewriting.rulesets.GeneralRuleset._
 import dbis.pig.plan.rewriting.dsl.RewriterDSL
 import dbis.pig.plan.rewriting.internals._
 import org.kiama.rewriting.Rewriter._
@@ -146,8 +147,12 @@ object Rewriter extends PigletLogging
     * @return
     */
   private def processPigOperator(op: PigOperator, strategy: Strategy): Any = {
-    val rewriter = repeat(manybu(strategy))
-    kiamarewrite(rewriter)(op)
+    // TODO: We apply foreachRecursively separately because it always succeeds,
+    // so we'd otherwise run into an infinite loop
+    val forewriter = buildTypedCaseWrapper(foreachRecursively)
+    val rewriter = outermost(strategy)
+    val newop = kiamarewrite(rewriter)(op)
+    kiamarewrite(manybu(strategyf(t => forewriter(t))))(newop)
   }
 
   /** Apply all rewriting rules of this Rewriter to a [[dbis.pig.plan.DataflowPlan]].

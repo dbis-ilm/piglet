@@ -325,7 +325,6 @@ object GeneralRuleset extends Ruleset {
     addBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp)
     addBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp)
     addStrategy(strategyf(t => splitIntoToFilters(t)))
-    applyRule(foreachRecursively)
     addTypedStrategy(removeNonStorageSinks)
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
     addOperatorReplacementStrategy(foreachGrouping)

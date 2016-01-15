@@ -1625,7 +1625,7 @@ class RewriterSpec extends FlatSpec
 
   it should "replace GENERATE * in a nested FOREACH" in {
     addOperatorReplacementStrategy(foreachGenerateWithAsterisk)
-    applyRule (foreachRecursively _)
+    /*applyRule (foreachRecursively _)*/
     addTypedStrategy(removeNonStorageSinks)
     val plan = new DataflowPlan(parseScript(
       """triples = LOAD 'file' AS (sub, pred, obj);
