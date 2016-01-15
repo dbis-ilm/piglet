@@ -23,6 +23,23 @@ Depending on the target backend Piglet supports different language features. For
  
 In addition to the standard Pig Latin statements we provide several extensions described in the following.
 
+### Matrix data types ###
+
+Piglet supports matrices as builtin data type. For Scala-based backends the [Breeze library](https://github.com/scalanlp/breeze) 
+is used to implement this feature. A matrix field is specified by `[sd][di]matrix(rows, cols)` where the first
+letter defines the representation (sparse or dense) and the second letter the element type (`double` or `int`), e.g.
+
+```
+m: dimatrix(10, 10)
+```
+for a dense 10x10 matrix of integer elements. In addition to this data type, a matrix constructor is provided that allows
+to create a matrix from a bag of numbers. The constructor has the same notation as the matrix data type (prefix [sd][di]).
+The following example creates a 2x2 matrix from 4 values:
+
+```
+out = FOREACH in GENERATE dimatrix(2, 2, $0, $1, $2, $3);
+```
+
 ### R Integration ###
 
  * RSCRIPT - sends data to a R script and converts the result back to a bag. Usage:
@@ -34,6 +51,7 @@ In addition to the standard Pig Latin statements we provide several extensions d
  script has to be assigned to the R variable `res`.
  
 ### ACCUMULATE ###
+
  * ACCUMULATE - is used for incrementally calculating aggregates on (large) bags or streams of tuples.
  
 ### MATERIALIZE ###

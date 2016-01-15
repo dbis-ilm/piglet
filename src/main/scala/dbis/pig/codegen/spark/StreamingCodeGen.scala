@@ -56,6 +56,11 @@ class StreamingCodeGen(template: String) extends BatchCodeGen(template) {
   def emitSocketRead(node: PigOperator, addr: SocketAddress, mode: String, streamFunc: Option[String], streamParams: List[String]): String ={
     var paramMap = super.emitExtractorFunc(node, streamFunc)
 
+    node.schema match {
+      case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
+      case None => paramMap += ("class" -> "Record")
+    }
+
     val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
     val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
     paramMap ++= Map("out" -> node.outPipeName, "addr_hostname" -> addr.hostname,
