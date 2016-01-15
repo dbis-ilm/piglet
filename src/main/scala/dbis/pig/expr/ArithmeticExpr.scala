@@ -277,3 +277,17 @@ case class ConstructMapExpr(ex: List[ArithmeticExpr]) extends ConstructExpr {
     MapType(exprs(1).resultType(schema))
   }
 }
+
+case class ConstructMatrixExpr(typeString: String, rows: Int, cols: Int, ex: ArithmeticExpr) extends ConstructExpr {
+  exprs = List(ex)
+
+  require (typeString.matches("[sd][di]"))
+
+  override def resultType(schema: Option[Schema]): PigType = {
+    val t = if (typeString.charAt(1) == 'i') Types.IntType else Types.DoubleType
+    val k = if (typeString.charAt(0) == 's') MatrixRep.SparseMatrix else MatrixRep.DenseMatrix
+    if (ex.resultType(schema).tc != TypeCode.BagType )
+      throw new SchemaException(s"matrix construction requires a bag parameter")
+    MatrixType(t, rows, cols, k)
+  }
+}

@@ -143,3 +143,24 @@ case class MapType(var valueType: PigType) extends ComplexType {
   override def typeOfComponent(name: String): PigType = valueType
   override def typeOfComponent(pos: Int): PigType = valueType
 }
+
+object MatrixRep extends Enumeration {
+  type MatrixRep = Value
+  val DenseMatrix, SparseMatrix = Value
+}
+
+import dbis.pig.schema.MatrixRep._
+
+case class MatrixType(valueType: PigType, rows: Int, cols: Int, rep: MatrixRep = DenseMatrix) extends ComplexType {
+  require(valueType.tc == TypeCode.IntType || valueType.tc == TypeCode.DoubleType)
+
+  override def tc = TypeCode.MatrixType
+  override def name = s"${if (rep == DenseMatrix) "d" else "s"}${if (valueType.tc == TypeCode.IntType) "i" else "d"}matrix($rows,$cols)"
+
+  override def typeOfComponent(name: String): PigType = valueType
+  override def typeOfComponent(pos: Int): PigType = { require(pos == 0); valueType }
+
+  override def encode: String = s"m[${valueType.encode}$rows,$cols]"
+
+  override def descriptionString = name
+}

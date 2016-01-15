@@ -189,4 +189,9 @@ object Expr {
     }
     case _ => false
   }
+
+  def containsMatrixType(schema: Schema, ex: Expr): Boolean = ex match {
+    case ConstructMatrixExpr(_, _, _, _) => true
+    case _ => false
+  }
 }

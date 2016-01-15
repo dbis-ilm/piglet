@@ -30,7 +30,7 @@ object TypeCode extends Enumeration {
   type TypeCode = Value
   val AnyType, IntType, LongType, FloatType, BooleanType, DoubleType,
   ByteArrayType, CharArrayType,
-  TupleType, MapType, BagType = Value
+  TupleType, MapType, BagType, MatrixType = Value
 }
 
 import dbis.pig.schema.TypeCode._

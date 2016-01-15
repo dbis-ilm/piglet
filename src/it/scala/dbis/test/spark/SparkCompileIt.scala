@@ -63,8 +63,10 @@ class SparkCompileIt extends FlatSpec with CompileIt{
     ("json.pig", "json.out", "json.data", true), // not working yet
     */
     /* Works, but requires a H2 database and the corresponding JDBC driver */
-    ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true, "pig", "spark")
-  // RDF integration tests don't work because the standard language feature is not sparqlpig
+    ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true, "pig", "spark"),
+    ("simple_matrix.pig", "simple-matrix.out", "truth/simple-matrix-res.data", true, "pig", "spark")
+
+    // RDF integration tests don't work because the standard language feature is not sparqlpig
 //    ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false),
 //    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false)
   //  ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true)

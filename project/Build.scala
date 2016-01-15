@@ -113,6 +113,7 @@ object Dependencies {
   val scalikejdbc = "org.scalikejdbc" %% "scalikejdbc" % "2.2.7"
   val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val h2Database = "com.h2database" % "h2" % "1.4.190"
+  val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
   val log4j= "log4j" % "log4j" % "1.2.17"
 
   // Projects
@@ -132,6 +133,7 @@ object Dependencies {
     commons,
     hadoop % "provided",
     twitterUtil,
-    h2Database
+    h2Database,
+    breeze
   )
 }
