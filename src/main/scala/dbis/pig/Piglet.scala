@@ -91,7 +91,7 @@ object Piglet extends PigletLogging {
       head("PigletCompiler", s"ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text ("compile only (don't execute the script)")
-      opt[Boolean]("profiling") optional() action { (x, c) => c.copy(profiling = x) } text ("Switch on profiling")
+      opt[Unit]("profiling") optional() action { (_, c) => c.copy(profiling = true) } text ("Switch on profiling")
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x) } text ("output directory for generated code")
       opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = x) } text ("Target backend (spark, flink, sparks, ...)")
       opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
