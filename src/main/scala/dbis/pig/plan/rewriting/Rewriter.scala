@@ -171,6 +171,7 @@ object Rewriter extends PigletLogging
     // This looks innocent, but this is where the rewriting happens.
     val newSources = plan.sourceNodes.flatMap(
       processPigOperator(_, strategy) match {
+        case Nil => List.empty
         case op: PigOperator => List(op)
         case ops: Seq[PigOperator] => ops
         case e => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
@@ -208,7 +209,7 @@ object Rewriter extends PigletLogging
       }
     }
 
-    val newPlan = new DataflowPlan(newPlanNodes.toList)
+    val newPlan = new DataflowPlan(newPlanNodes.toList.filterNot(_.isInstanceOf[Empty]))
     newPlan.additionalJars ++= plan.additionalJars
     newPlan.udfAliases ++= plan.udfAliases
     newPlan.code = plan.code
