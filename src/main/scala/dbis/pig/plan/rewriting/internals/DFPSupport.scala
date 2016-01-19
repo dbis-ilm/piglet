@@ -70,7 +70,7 @@ trait DFPSupport {
         None
       }
     }
-    processPlan(plan, strategyf(t => strategy(t)))
+    processPlan(plan, manybu(strategyf(t => strategy(t))))
   }
 
   /** Insert `newOp` between `in` and `out` in `plan`.
@@ -122,7 +122,7 @@ trait DFPSupport {
         None
       }
     }
-    processPlan(plan, strategyf(t => strategy(t)))
+    processPlan(plan, manybu(strategyf(t => strategy(t))))
   }
 
 
@@ -137,9 +137,18 @@ trait DFPSupport {
     */
   //noinspection ScalaDocMissingParameterDescription
   def remove(plan: DataflowPlan, rem: PigOperator, removePredecessors: Boolean = false): DataflowPlan = {
-    var strat = buildRemovalStrategy(rem)
+    var loads: List[PigOperator] = List.empty
+    var newPlan: DataflowPlan = null
 
-    var newPlan = processPlan(plan, strat)
+    if (rem.isInstanceOf[Load]) {
+      newPlan = plan
+      loads = loads :+ rem
+    } else {
+      var strat = manybu(buildRemovalStrategy(rem))
+
+      newPlan = processPlan(plan, strat)
+    }
+
     if (removePredecessors) {
       var nodes = Set[PigOperator]()
       var nodesToProcess = rem.inputs.map(_.producer).toSet
@@ -153,8 +162,13 @@ trait DFPSupport {
         }
       }
 
-      newPlan = nodes.foldLeft(newPlan)((p: DataflowPlan, op: PigOperator) => processPlan(p, buildRemovalStrategy(op)))
+      newPlan = nodes.filterNot(_.isInstanceOf[Load]).foldLeft(newPlan)((p: DataflowPlan, op: PigOperator) =>
+        processPlan(p, manybu(buildRemovalStrategy(op))))
+      loads = loads ++ nodes.filter(_.isInstanceOf[Load])
     }
+    loads.toList.asInstanceOf[List[Load]].foreach ({ l: Load =>
+      newPlan.operators = newPlan.operators.filterNot(_ == l)
+    })
     newPlan
   }
 
@@ -178,6 +192,6 @@ trait DFPSupport {
       }
     }
 
-    processPlan(plan, buildBinaryPigOperatorStrategy(strategy))
+    processPlan(plan, manybu(buildBinaryPigOperatorStrategy(strategy)))
   }
 }

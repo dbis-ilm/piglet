@@ -92,7 +92,7 @@ object Functions {
       }
       else {
         consumers foreach (_.inputs = List.empty)
-        consumers.toList
+        consumers
       }
     }
     else {
@@ -107,7 +107,11 @@ object Functions {
           out.consumer = out.consumer.filterNot(_ == op) ++ newOps
         }
       }))
-      newOps
+      if (newOps.isEmpty) {
+        List(Empty(Pipe("")))
+      } else {
+        newOps
+      }
     }
   }
 
