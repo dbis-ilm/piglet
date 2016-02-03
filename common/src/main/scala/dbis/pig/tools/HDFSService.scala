@@ -22,7 +22,7 @@ object HDFSService extends PigletLogging {
 
   if(!Files.exists(coreSite))
     logger.warn(s"HDFS core site file does not exist at: $coreSite")
-    
+
   if(!Files.exists(hdfsSite))
     logger.warn(s"HDFS hdfs site file does not exist at: $hdfsSite")
     
@@ -69,12 +69,15 @@ object HDFSService extends PigletLogging {
     true
   }
 
+  private def statusString(fs: FileStatus): String = {
+    s"${if (fs.isDirectory) "d" else "-"}${fs.getPermission.toString} ${"%2d".format(fs.getReplication)} ${fs.getOwner} ${fs.getGroup} ${"%10d".format(fs.getLen)} ${fs.getPath.getName}"
+  }
+
   def listFiles(dir: String): Unit = {
     val path = new Path(dir)
-    val iter = fileSystem.listFiles(path, false)
-    while (iter.hasNext) {
-      val f = iter.next
-      println(f)
+    val lst = fileSystem.listStatus(path)
+    lst.foreach { status =>
+      println(statusString(status))
     }
   }
 
