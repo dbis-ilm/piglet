@@ -35,23 +35,28 @@ object PigBuild extends Build {
     aggregate(common, sparklib, flinklib, mapreducelib) // remove this if you don't want to automatically build these projects when building piglet 
 
   lazy val common = (project in file("common")).
-    settings(commonSettings: _*)
+    settings(commonSettings: _*).
+    disablePlugins(sbtassembly.AssemblyPlugin)
 
   lazy val sparklib = (project in file("sparklib")).
     settings(commonSettings: _*).
-    dependsOn(common)
+    dependsOn(common).
+    disablePlugins(sbtassembly.AssemblyPlugin)
 
   lazy val flinklib = (project in file("flinklib")).
     settings(commonSettings: _*).
-    dependsOn(common)
+    dependsOn(common).
+    disablePlugins(sbtassembly.AssemblyPlugin)
 
   lazy val mapreducelib = (project in file("mapreducelib")).
     settings(commonSettings: _*).
-    dependsOn(common)
-        
+    dependsOn(common).
+    disablePlugins(sbtassembly.AssemblyPlugin)
+
   lazy val zeppelin = (project in file("zeppelin")).
     settings(commonSettings: _*).
     dependsOn(common).
+    disablePlugins(sbtassembly.AssemblyPlugin).
     dependsOn(root)
 
   /*

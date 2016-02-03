@@ -209,7 +209,7 @@ fi
 if [ -z "$BACKEND_DIR" ]; then # if BACKEND_DIR does not exist, use our default one
     # sparks and spark are supported by spark, flinks and flink by flink
     BACKEND_DIR=`dirname $0`/../${backend%s}lib/target/scala-2.11/*
-    echo "No backend direcory (BACKEND_DIR) specified, using the default directory '$BACKEND_DIR'."
+#    echo "No backend direcory (BACKEND_DIR) specified, using the default directory '$BACKEND_DIR'."
 else
     if [[ "$BACKEND_DIR" == */ ]]; then # if it ends with / it's a directory - include all files using the wildcard *
         BACKEND_DIR=$BACKEND_DIR*

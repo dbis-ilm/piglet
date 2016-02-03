@@ -70,7 +70,15 @@ object HDFSService extends PigletLogging {
   }
 
   private def statusString(fs: FileStatus): String = {
-    s"${if (fs.isDirectory) "d" else "-"}${fs.getPermission.toString} ${"%2d".format(fs.getReplication)} ${fs.getOwner} ${fs.getGroup} ${"%10d".format(fs.getLen)} ${fs.getPath.getName}"
+    def millisToDate(m: Long): String = {
+      val d = new java.util.Date(m)
+      val df = new java.text.SimpleDateFormat("dd MMM HH:mm")
+      df.format(d)
+    }
+
+    s"${if (fs.isDirectory) "d" else "-"}${fs.getPermission.toString} " +
+      s"${"%2d".format(fs.getReplication)} ${fs.getOwner} ${fs.getGroup} ${"%10d".format(fs.getLen)} " +
+      s"${millisToDate(fs.getModificationTime)} ${fs.getPath.getName}"
   }
 
   def listFiles(dir: String): Unit = {
