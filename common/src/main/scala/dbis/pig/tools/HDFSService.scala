@@ -46,6 +46,7 @@ object HDFSService extends PigletLogging {
       case "rmdir" => removeDirectory(params.head)
       case "mkdir" => createDirectory(params.head)
       case "ls" => listFiles(if (params.isEmpty) "." else params.head)
+      case "cat" => showFile(params.head)
       case _ => throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
     }
   }
@@ -104,5 +105,14 @@ object HDFSService extends PigletLogging {
   def removeDirectory(dir: String, recursively: Boolean = false): Boolean = {
     val path = new Path(dir)
     fileSystem.delete(path, recursively)
+  }
+
+  def showFile(filename: String): Unit = {
+    val path = new Path(filename)
+    if (fileSystem.isFile(path)) {
+      val is = fileSystem.open(path)
+      val in = scala.io.Source.fromInputStream(is)
+      in.getLines.foreach(println(_))
+    }
   }
 }
