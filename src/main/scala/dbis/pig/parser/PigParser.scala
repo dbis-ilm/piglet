@@ -803,15 +803,18 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     }
   }
 
+  /*
   def complexEventStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | socketReadStmt | socketWriteStmt | windowStmt | matcherStmt) ~ ";" ^^ {
       case op ~ _ => op
     }
-
+  */
   def complexEventStmt: Parser[PigOperator] = (
     streamingStmt ^^ { case op => op }
       | (matcherStmt ~ ";") ^^ { case op ~ _ => op })
+
+  def complexEventPigScript: Parser[List[PigOperator]] = rep(complexEventStmt)
 
   def parseScript(input: CharSequenceReader, feature: LanguageFeature): List[PigOperator] = {
 	  parsePhrase(input, feature) match {
