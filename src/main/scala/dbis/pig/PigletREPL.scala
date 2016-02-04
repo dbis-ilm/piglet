@@ -17,7 +17,7 @@
 
 package dbis.pig
 
-import java.io.File
+import java.io.{PrintStream, File}
 import dbis.pig.Piglet._
 import dbis.pig.op.{Display, PigOperator, Dump}
 import dbis.pig.parser.{LanguageFeature, PigParser}

@@ -9,7 +9,7 @@ libraryDependencies ++= itDeps
 
 mainClass in (Compile, packageBin) := Some("dbis.pig.PigletREPL")
 
-mainClass in (Compile, run) := Some("dbis.pig.Piglet")
+mainClass in (Compile, run) := Some("dbis.pig.PigletREPL")
 
 assemblyJarName in assembly := "PigCompiler.jar"
 
