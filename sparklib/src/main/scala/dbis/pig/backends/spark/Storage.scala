@@ -51,6 +51,19 @@ object PigStorage extends java.io.Serializable {
 
 //-----------------------------------------------------------------------------------------------------
 
+class TextLoader[T <: SchemaClass :ClassTag] extends java.io.Serializable {
+  def load(sc: SparkContext, path: String, ignored: (Array[String]) => T): RDD[Record] =
+    sc.textFile(path).map(line => Record(Array(line)))
+}
+
+object TextLoader extends java.io.Serializable {
+  def apply[T <: SchemaClass :ClassTag](): TextLoader[T] = {
+    new TextLoader[T]
+  }
+}
+
+//-----------------------------------------------------------------------------------------------------
+
 class PigStream[T <: SchemaClass :ClassTag] extends java.io.Serializable {
   def receiveStream(ssc: StreamingContext, hostname: String, port: Int, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] =
     ssc.socketTextStream(hostname, port).map(line => extract(line.split(delim, -1)))
