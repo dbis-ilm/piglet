@@ -62,7 +62,6 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
                         outDir: String = ".",
                         backend: String = Conf.defaultBackend,
                         backendPath: String = ".",
-                        language: String = "pig",
                         interactive: Boolean = true,
                         profiling: Boolean = false,
                         backendArgs: Map[String, String] = Map(),
@@ -76,7 +75,6 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
 
   var backend: String = Conf.defaultBackend
   var backendPath: String = "."
-  var languageFeature = LanguageFeature.PlainPig
   var backendArgs: Map[String, String] = null
   var backendConf: BackendConf = null
   var master: String = "local"
@@ -358,7 +356,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         buf --= displays
       }
 
-      buf ++= PigParser.parseScript(s, languageFeature, resetSchema = false)
+      buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = false)
       var plan = new DataflowPlan(buf.toList)
 
       val mm = new MaterializationManager
@@ -454,7 +452,6 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = x) } text ("Target backend (spark, flink, ...)")
       opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
       opt[Boolean]("profiling") optional() action { (x, c) => c.copy(profiling = x) } text ("Switch on profiling")
-      opt[String]('l', "language") optional() action { (x, c) => c.copy(language = x) } text ("Accepted language (pig = default, sparql, streaming)")
       opt[String]('g', "log-level") optional() action { (x,c) => c.copy(loglevel = Some(x.toUpperCase()))} text ("Set the log level: DEBUG, INFO, WARN, ERROR")
       opt[Map[String, String]]("<backend-arguments>...") optional() action { (x, c) => c.copy(backendArgs = x) } text ("Pig script files to execute")
       help("help") text ("prints this usage text")
@@ -468,12 +465,6 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         profiling = config.profiling
         backend = config.backend
         backendPath = config.backendPath
-        languageFeature = config.language match {
-          case "sparql" => LanguageFeature.SparqlPig
-          case "streaming" => LanguageFeature.StreamingPig
-          case "pig" => LanguageFeature.PlainPig
-          case _ => LanguageFeature.PlainPig
-        }
         backendArgs = config.backendArgs
         logLevel = config.loglevel
       }
@@ -519,7 +510,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
           s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf)
         case Line(s, buf) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
         case Line(s, buf) => try {
-          buf ++= PigParser.parseScript(s, languageFeature)
+          buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet))
           eliminateDuplicatePipes(buf)
           false
         } catch {

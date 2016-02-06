@@ -63,7 +63,7 @@ object Piglet extends PigletLogging {
                             params: Map[String, String] = Map(),
                             backend: String = Conf.defaultBackend,
                             backendPath: String = ".",
-                            language: String = "pig",
+                            languages: Seq[String] = Seq.empty,
                             updateConfig: Boolean = false,
                             showPlan: Boolean = false,
                             backendArgs: Map[String, String] = Map(),
@@ -74,7 +74,7 @@ object Piglet extends PigletLogging {
   var master: String = "local"
   var backend: String = null
   var backendPath: String = null
-  var languageFeature = LanguageFeature.PlainPig
+  var languageFeatures = List(LanguageFeature.PlainPig)
   var logLevel: Option[String] = None
 
   def main(args: Array[String]): Unit = {
@@ -95,7 +95,7 @@ object Piglet extends PigletLogging {
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x) } text ("output directory for generated code")
       opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = x) } text ("Target backend (spark, flink, sparks, ...)")
       opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
-      opt[String]('l', "language") optional() action { (x, c) => c.copy(language = x) } text ("Accepted language (pig = default, sparql, streaming)")
+      opt[Seq[String]]('l', "languages") optional() action { (x, c) => c.copy(languages = x) } text ("Accepted language dialects (pig = default, sparql, streaming, cep, all)")
       opt[Map[String, String]]('p', "params") valueName ("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text ("parameter(s) to subsitute")
       opt[Unit]('u', "update-config") optional() action { (_, c) => c.copy(updateConfig = true) } text (s"update config file in program home (see config file)")
       opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text (s"show the execution plan")
@@ -120,12 +120,12 @@ object Piglet extends PigletLogging {
         updateConfig = config.updateConfig
         showPlan = config.showPlan
         backendArgs = config.backendArgs
-        languageFeature = config.language match {
+        languageFeatures = config.languages.toList.map { _ match {
           case "sparql" => LanguageFeature.SparqlPig
           case "streaming" => LanguageFeature.StreamingPig
           case "pig" => LanguageFeature.PlainPig
-          case _ => LanguageFeature.PlainPig
-        }
+          case "all" => LanguageFeature.CompletePiglet
+        }}
         // note: for some backends we could determine the language automatically
         profiling = config.profiling
         logLevel = config.loglevel
@@ -162,20 +162,21 @@ object Piglet extends PigletLogging {
     }
 
     // start processing
-    run(files, outDir, compileOnly, master, backend, languageFeature, params, backendPath, backendArgs, profiling, showPlan)
+    run(files, outDir, compileOnly, master, backend, languageFeatures, params, backendPath, backendArgs, profiling, showPlan)
   }
 
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
-          langFeature: LanguageFeature.LanguageFeature, params: Map[String, String], backendPath: String,
+          langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String], backendPath: String,
           backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean): Unit = {
-    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeature, params, backendPath, backendArgs, profiling, showPlan)
+    run(Seq(inputFile), outDir, compileOnly, master, backend, langFeatures, params, backendPath,
+      backendArgs, profiling, showPlan)
   }
 
   /**
     * Start compiling the Pig script into a the desired program
     */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
-          langFeature: LanguageFeature.LanguageFeature, params: Map[String, String],
+          langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
           backendPath: String, backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean): Unit = {
 
     try {
@@ -200,7 +201,7 @@ object Piglet extends PigletLogging {
         inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
 
       } else {
-        runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeature, params, backendPath,
+        runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeatures, params, backendPath,
           backendConf, backendArgs, profiling, showPlan)
       }
 
@@ -232,7 +233,7 @@ object Piglet extends PigletLogging {
   }
 
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
-                            langFeature: LanguageFeature.LanguageFeature, params: Map[String, String],
+                            langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
                             backendPath: String, backendConf: BackendConf, backendArgs: Map[String, String],
                             profiling: Boolean, showPlan: Boolean) {
     logger.debug("start parsing input files")
@@ -240,7 +241,7 @@ object Piglet extends PigletLogging {
     val schedule = ListBuffer.empty[(DataflowPlan, Path)]
 
     for (file <- inputFiles) {
-      PigletCompiler.createDataflowPlan(file, params, backend, langFeature) match {
+      PigletCompiler.createDataflowPlan(file, params, backend, langFeatures) match {
         case Some(v) => schedule += ((v, file))
         case None =>
           logger.error(s"failed to create dataflow plan for $file - aborting")
@@ -276,7 +277,7 @@ object Piglet extends PigletLogging {
         newPlan = processMaterializations(newPlan, mm)
 
 
-      if (langFeature == LanguageFeature.StreamingPig && backend == "flinks")
+      if (langFeatures.contains(LanguageFeature.StreamingPig) && backend == "flinks")
         newPlan = processWindows(newPlan)
 
       Rules.registerBackendRules(backend)
@@ -415,12 +416,12 @@ object Piglet extends PigletLogging {
     Piglet.master = master
     Piglet.backend = backend
     Piglet.backendPath = backendDir
-    Piglet.languageFeature = language match {
+    Piglet.languageFeatures = List(language match {
       case "sparql" => LanguageFeature.SparqlPig
       case "streaming" => LanguageFeature.StreamingPig
       case "pig" => LanguageFeature.PlainPig
       case _ => LanguageFeature.PlainPig
-    }
+    })
     val backendConf = BackendManager.backend(backend)
     BackendManager.backend = backendConf
   }
@@ -432,7 +433,7 @@ object Piglet extends PigletLogging {
     */
   def compileFile(fileName: String): Unit = {
     val path = Paths.get(fileName)
-    PigletCompiler.createDataflowPlan(path, Map[String, String](), backend, languageFeature) match {
+    PigletCompiler.createDataflowPlan(path, Map[String, String](), backend, languageFeatures) match {
       case Some(p) => compileAndExecute(p)
       case None => {}
     }
@@ -444,7 +445,7 @@ object Piglet extends PigletLogging {
     * @param source a string containing the Piglet code
     */
   def compile(source: String): List[Any] = {
-    PigletCompiler.createDataflowPlan(source, Map[String, String](), backend, languageFeature) match {
+    PigletCompiler.createDataflowPlan(source, Map[String, String](), backend, languageFeatures) match {
       case Some(p) => {
         val res = compileAndExecute(p)
         res.split("\n").toList.map(_.split(","))

@@ -84,7 +84,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
       """
         |in = SOCKET_READ 'localhost:5555' USING PigStream(',') AS (s1: chararray, s2: int);
         |DUMP in;
-      """.stripMargin, LanguageFeature.StreamingPig)
+      """.stripMargin, List(LanguageFeature.StreamingPig))
 
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
@@ -104,7 +104,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
       """
         |in = LOAD 'file.csv' USING PigStream(',') AS (f1: int, f2: int);
         |DUMP in;
-      """.stripMargin, LanguageFeature.StreamingPig)
+      """.stripMargin, List(LanguageFeature.StreamingPig))
 
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)

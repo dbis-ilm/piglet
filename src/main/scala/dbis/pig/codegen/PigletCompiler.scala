@@ -2,7 +2,7 @@ package dbis.pig.codegen
 
 import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
-import dbis.pig.parser.LanguageFeature
+import dbis.pig.parser.LanguageFeature._
 import java.nio.file.Path
 import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.parser.PigParser
@@ -30,17 +30,17 @@ object PigletCompiler extends PigletLogging {
    * @param inputFile The file to parse
    * @param params Key value pairs to replace placeholders in the script
    * @param backend The name of the backend
-   * @param langFeature the Pig dialect used for parsing
+   * @param langFeatures the Pig dialects used for parsing
    */
   def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String,
-                         langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
+                         langFeatures: List[LanguageFeature]): Option[DataflowPlan] = {
     // 1. we read the Pig file
     val source = Source.fromFile(inputFile.toFile)
 
     logger.debug( s"""loaded pig script from "$inputFile" """)
 
     // 2. then we parse it and construct a dataflow plan
-    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeature))
+    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeatures))
 
     if (!plan.checkConnectivity) {
       logger.error(s"dataflow plan not connected for $inputFile")
@@ -58,14 +58,14 @@ object PigletCompiler extends PigletLogging {
     * @param input The file to parse
     * @param params Key value pairs to replace placeholders in the script
     * @param backend The name of the backend
-    * @param langFeature the Pig dialect used for parsing
+    * @param langFeatures the Pig dialects used for parsing
     */
   def createDataflowPlan(input: String, params: Map[String,String], backend: String,
-                         langFeature: LanguageFeature.LanguageFeature): Option[DataflowPlan] = {
+                         langFeatures: List[LanguageFeature]): Option[DataflowPlan] = {
     // 1. we prepare a source from the string
     val source = Source.fromString(input.stripMargin)
     // 2. then we parse it and construct a dataflow plan
-    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeature))
+    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeatures))
 
     if (!plan.checkConnectivity) {
       logger.error("dataflow plan not connected")
@@ -128,7 +128,7 @@ object PigletCompiler extends PigletLogging {
  * @return the generated Scala code
  */
 def createCodeFromInput(source: String, backend: String): String = {
-  var plan = new DataflowPlan(PigParser.parseScript(source, LanguageFeature.PlainPig))
+  var plan = new DataflowPlan(PigParser.parseScript(source))
 
   if (!plan.checkConnectivity) {
     logger.error(s"dataflow plan not connected")
@@ -261,11 +261,11 @@ def createCodeFromInput(source: String, backend: String): String = {
     *
     * @param source the source refering to the Piglet script
     * @param params a map of parameters
-    * @param langFeature the language used to parse the script
+    * @param langFeatures the language dialects used to parse the script
     * @return a list of PigOperators constructed from parsing the script
     */
   private def parseScriptFromSource(source: Source, params: Map[String,String],
-                                    langFeature: LanguageFeature.LanguageFeature): List[PigOperator] = {
+                                    langFeatures: List[LanguageFeature]): List[PigOperator] = {
     // Handle IMPORT and %DECLARE statements.
 	  val (sourceLines, declareParams) = resolveImports(source.getLines())
     logger.info("declared parameters: " + declareParams.mkString(", "))
@@ -273,10 +273,10 @@ def createCodeFromInput(source: String, backend: String): String = {
 
 	  if (allParams.nonEmpty) {
 	    // Replace placeholders by parameters.
-		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, allParams)).mkString("\n"), langFeature)
+		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, allParams)).mkString("\n"), langFeatures)
 	  }
 	  else {
-		  PigParser.parseScript(sourceLines.mkString("\n"), langFeature)
+		  PigParser.parseScript(sourceLines.mkString("\n"), langFeatures)
 	  }
   }
 

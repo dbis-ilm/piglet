@@ -53,7 +53,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       s"""A = RDFLOAD('file.rdf');
          |B = BGP_FILTER A by { ?b "firstName" "Wieland" . ?b "lastName" "Hoffmann" .  ?b "birthDate" ?a};
          |DUMP B;
-       """.stripMargin, LanguageFeature.SparqlPig))
+       """.stripMargin, List(LanguageFeature.SparqlPig)))
     val bgpfilter = plan.findOperatorForAlias("B").value
     val shouldSchema: Some[Schema] = Some(
     Schema(
@@ -70,7 +70,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       s"""A = RDFLOAD('file.rdf');
          |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
          |DUMP B;
-       """.stripMargin, LanguageFeature.SparqlPig))
+       """.stripMargin, List(LanguageFeature.SparqlPig)))
     val bgpfilter = plan.findOperatorForAlias("B").value
     bgpfilter.schema shouldBe RDFLoad.plainSchema
   }
@@ -87,7 +87,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       s"""A = RDFLOAD('file.rdf') grouped on $g;
         |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
         |DUMP B;
-      """.stripMargin, LanguageFeature.SparqlPig) )
+      """.stripMargin, List(LanguageFeature.SparqlPig)))
       val bgpfilter = plan.findOperatorForAlias("B").value
       bgpfilter.schema.value shouldBe RDFLoad.groupedSchemas(g)
     }
@@ -106,7 +106,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
         s"""A = Load 'file' $asSchema;
            |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
            |DUMP B;
-        """.stripMargin, LanguageFeature.SparqlPig) )
+        """.stripMargin, List(LanguageFeature.SparqlPig)) )
       val bgpfilter = plan.findOperatorForAlias("B").value
       bgpfilter.checkSchemaConformance shouldBe false
       }
@@ -117,7 +117,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       s"""A = Load 'file' as (subject: chararray, predicate: chararray, object: chararray);
          |B = BGP_FILTER A by { ?a "firstName" "Wieland". ?a "lastName" "Hoffmann" };
          |DUMP B;
-        """.stripMargin, LanguageFeature.SparqlPig))
+        """.stripMargin, List(LanguageFeature.SparqlPig)))
     val bgpfilter = plan.findOperatorForAlias("B").value
     bgpfilter.checkSchemaConformance shouldBe true
   }

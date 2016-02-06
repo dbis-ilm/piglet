@@ -2168,7 +2168,7 @@ class RewriterSpec extends FlatSpec
         |a = LOAD 'file.csv';
         |b = FOREACH a GENERATE myFunc($0);
         |dump b;
-      """.stripMargin, LanguageFeature.PlainPig)
+      """.stripMargin)
     val plan = new DataflowPlan(ops)
     plan.extraRuleCode should have length 1
     val newPlan = processPlan(plan)

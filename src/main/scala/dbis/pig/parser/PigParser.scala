@@ -37,10 +37,11 @@ import scala.language.postfixOps
  */
 object LanguageFeature extends Enumeration {
   type LanguageFeature = Value
-  val PlainPig, // standard Pig conforming to Apache Pig
-  SparqlPig,    // Pig + SPARQL extensions (TUPLIFY, BGP filter)
-  StreamingPig,  // Pig for data stream processing
-  ComplexEventPig // Pig for complex event processing
+  val PlainPig,    // standard Pig conforming to Apache Pig
+  SparqlPig,       // Pig + SPARQL extensions (TUPLIFY, BGP filter)
+  StreamingPig,    // Pig for data stream processing
+  ComplexEventPig, // Pig for complex event processing
+  CompletePiglet   // all dialects
     = Value
 }
 
@@ -49,7 +50,8 @@ import dbis.pig.parser.LanguageFeature._
 /**
  * A parser for the (extended) Pig language.
  */
-class PigParser extends JavaTokenParsers with PigletLogging {
+class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends JavaTokenParsers with PigletLogging {
+
   override protected val whiteSpace = """(\s|--.*)+""".r
 
   /**
@@ -505,7 +507,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
    */
   def paramNameList: Parser[List[String]] = "(" ~ repsep(ident, ",") ~ ")" ^^ { case _ ~ plist ~ _ => plist}
 
-  def defineMacroStmt: Parser[PigOperator] = defineKeyword ~ ident ~ (paramNameList?) ~ returnsKeyword ~ bag ~ "{" ~ rep(stmt) ~ "}" ~ ";" ^^{
+  def defineMacroStmt: Parser[PigOperator] = defineKeyword ~ ident ~ (paramNameList?) ~ returnsKeyword ~ bag ~ "{" ~ rep(pigStmt) ~ "}" ~ ";" ^^{
     case _ ~ macroName ~ params ~ _ ~ out ~ _ ~ stmtList ~ _  ~ _ => DefineMacroCmd(Pipe(out), macroName, params, stmtList)
   }
 
@@ -612,21 +614,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt) ~ rep(";") ^^ {
-    case op ~ _  => op }
-
-  def undelimStmt: Parser[PigOperator] = embedStmt
-
-  def stmt: Parser[PigOperator] = delimStmt | undelimStmt
-
-  /*
-   * defineMacroStmt contains other statements but not other macro definitions
-   */
-  def plainStmt: Parser[PigOperator] = defineMacroStmt | stmt
-  /*
-   * A plain Pig script is a list of statements.
-   */
-  def plainPigScript: Parser[List[PigOperator]] = rep(plainStmt)
+    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt)
 
   /* ---------------------------------------------------------------------------------------------------------------- */
   /*
@@ -650,13 +638,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     case out ~ _ ~ _ ~ in ~ _ ~ _ ~ pattern ~ _ => new BGPFilter(Pipe(out), Pipe(in), pattern)
   }
 
-  def sparqlStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | tuplifyStmt | bgpFilterStmt | rdfLoadStmt | materializeStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
-    case op ~ _  => op }
-
-
-  def sparqlPigScript: Parser[List[PigOperator]] = rep(sparqlStmt)
+  def sparqlStmt: Parser[PigOperator] = (tuplifyStmt | bgpFilterStmt | rdfLoadStmt)
 
   /* ---------------------------------------------------------------------------------------------------------------- */
   /*
@@ -740,12 +722,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
         case _ ~ b ~ _ ~ addr ~ _ ~ mode => SocketWrite(Pipe(b), addr, mode)
       }
 
-  def streamingStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | socketReadStmt | socketWriteStmt | windowStmt | fsStmt | defineStmt | setStmt) ~ ";" ^^ {
-    case op ~ _  => op }
-
-  def streamingPigScript: Parser[List[PigOperator]] = rep(streamingStmt)
+  def streamingStmt: Parser[PigOperator] =  (socketReadStmt | socketWriteStmt | windowStmt)
 
   /* ---------------------------------------------------------------------------------------------------------------- */
 
@@ -803,44 +780,68 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     }
   }
 
-  /*
-  def complexEventStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt |
-    distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | socketReadStmt | socketWriteStmt | windowStmt | matcherStmt) ~ ";" ^^ {
-      case op ~ _ => op
+  def complexEventStmt: Parser[PigOperator] = matcherStmt
+
+  /* ---------------------------------------------------------------------------------------------------------------- */
+
+  def langStmt(features: List[LanguageFeature]): Parser[PigOperator] = {
+    def parseStmt(feature: LanguageFeature) = {
+      feature match {
+        case PlainPig => delimStmt
+        case StreamingPig => streamingStmt
+        case SparqlPig => sparqlStmt
+        case ComplexEventPig => complexEventStmt
+      }
     }
-  */
-  def complexEventStmt: Parser[PigOperator] = (
-    streamingStmt ^^ { case op => op }
-      | (matcherStmt ~ ";") ^^ { case op ~ _ => op })
 
-  def complexEventPigScript: Parser[List[PigOperator]] = rep(complexEventStmt)
+    if (features.tail.isEmpty)
+      parseStmt(features.head)
+    else
+      parseStmt(features.head) | langStmt(features.tail)
+  }
 
-  def parseScript(input: CharSequenceReader, feature: LanguageFeature): List[PigOperator] = {
-	  parsePhrase(input, feature) match {
+  def pigStmt: Parser[PigOperator] = (
+    defineMacroStmt ^^{ case op => op}
+      | embedStmt ^^{ case op => op}
+      | langStmt(featureList) ~ rep(";") ^^{ case op ~ _ => op}
+    )
+
+  def pigScript: Parser[List[PigOperator]] = rep(pigStmt)
+
+  def parseScript(input: CharSequenceReader): List[PigOperator] = {
+    phrase(pigScript)(input) match {
   	  case Success(t, _) => t
   	  case NoSuccess(msg, next) => 
   	  throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
 	  }
   }
 
-  def parsePhrase(input: CharSequenceReader, feature: LanguageFeature): ParseResult[List[PigOperator]] = {
-    feature match {
-      case PlainPig => phrase(plainPigScript)(input)
-      case SparqlPig => phrase(sparqlPigScript)(input)
-      case StreamingPig => phrase(streamingPigScript)(input)
-      case ComplexEventPig => phrase(complexEventPigScript)(input)
-    }
-  }
 }
 
 object PigParser {
-   
-   def parseScript(s: CharSequence, feature: LanguageFeature = PlainPig, resetSchema: Boolean = true): List[PigOperator] = {
+  /**
+    * Processes a list of language features accepted by the parser. It ensures that
+    * always PlainPig appears at the and of the list. Furthermore, the pseudo feature
+    * CompletePiglet is replaced by the list of all features.
+    *
+    * @param features the input feature list
+    * @return a correct feature list
+    */
+  def handleFeatureSet(features: List[LanguageFeature]): List[LanguageFeature] = {
+    if (features.contains(CompletePiglet))
+      List(ComplexEventPig, StreamingPig, SparqlPig, PlainPig)
+    else if (! features.contains(PlainPig))
+      features ::: List(PlainPig)
+    else
+      features.filter(_ != PlainPig) ::: List(PlainPig)
+  }
+
+  def parseScript(s: CharSequence, featureList: List[LanguageFeature] = List(PlainPig),
+                  resetSchema: Boolean = true): List[PigOperator] = {
     if (resetSchema)
       Schema.init()
-    val parser = new PigParser
-    parser.parseScript(new CharSequenceReader(s), feature)
+    val parser = new PigParser(handleFeatureSet(featureList))
+    parser.parseScript(new CharSequenceReader(s))
   }
-  
+
 }
