@@ -47,8 +47,37 @@ object HDFSService extends PigletLogging {
       case "mkdir" => createDirectory(params.head)
       case "ls" => listFiles(if (params.isEmpty) "." else params.head)
       case "cat" => showFile(params.head)
+      case "getmerge" => mergeToLocal(params.slice(0, params.length-1), params.last)
       case _ => throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
     }
+  }
+
+  def mergeToLocal(fileList: List[String], toName: String): Boolean = {
+    def appendToFile(inPath: Path, out: BufferedWriter) = {
+      val is = fileSystem.open(inPath)
+      val in = scala.io.Source.fromInputStream(is)
+      in.getLines.foreach(l => out.write(l + "\n"))
+    }
+
+    val toPath = new Path(toName)
+    val file = new File(toPath.toString)
+    val writer = new BufferedWriter(new FileWriter(file))
+
+    fileList.foreach { f =>
+      val path = new Path(f)
+      if (fileSystem.isFile(path)) {
+        appendToFile(path, writer)
+      }
+      else {
+        val lst = fileSystem.listStatus(path)
+        lst.foreach { fStatus =>
+          if (fStatus.isFile)
+            appendToFile(fStatus.getPath, writer)
+        }
+      }
+    }
+    writer.close
+    true
   }
 
   def copyToLocal(fromName: String, toName: String): Boolean = {

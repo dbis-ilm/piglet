@@ -56,7 +56,7 @@ Note, that both for Spark and Flink you need a version built for Scala 2.11 (see
 and for Flink you have to run the start script found in the bin directory (e.g. start-local.sh).
 
 The following options are supported:
- * `--master m` specifies the master (local, yarn)
+ * `--master m` specifies the master (local, yarn-client, yarn)
  * `--compile` compile and build jar, but do not execute
  * `--profiling` 
  * `--outdir dir` specifies the output directory for the generated code
@@ -67,7 +67,8 @@ The following options are supported:
     * `flinks`: Apache Flink Streaming
     * `mapreduce`: Apache Hadoop (by simply passing the script to the original Pig compiler)
  * `--backend_dir dir`
- * `--language l`
+ * `--languages l` specifies the language dialects accepted by the parser: pig (standard Pig), sparql (pig + SPARQL extensions),
+                  streaming (Pig + data stream extensions), cep (Pig + complex event processing extensions), all (all extensions)
  * `--params key=value, ...`
  * `--update-config`
  * `--show-plan`

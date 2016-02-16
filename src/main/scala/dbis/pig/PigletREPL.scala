@@ -164,7 +164,12 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
           cmdList.slice(1, cmdList.length - 1).toList :::
             List(if (last.endsWith(";")) last.substring(0, last.length - 1) else last)
         }
-      HDFSService.process(cmdList.head.substring(1), paramList)
+      try {
+        HDFSService.process(cmdList.head.substring(1), paramList)
+      }
+      catch {
+        case ex => println(s"error while executing fs command: ${ex.getMessage}")
+      }
     }
     else
       println(s"invalid fs command '${cmdList.head}'")
