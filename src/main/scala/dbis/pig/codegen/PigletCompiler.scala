@@ -218,7 +218,13 @@ def createCodeFromInput(source: String, backend: String): String = {
       FileTools.extractJarToDir(jobJar, outputDirectory)
 
       // copy the common library to output
-      var commonJar = jobJar.replace(s"${backend}lib", "common")
+      /*
+       From the previous path the backend library part is replaced by "common". The question mark
+       is necessary in case streaming mode is chosen, which would add an 's'. Since the backend
+       libraries use the same Jar per plattform the streaming versions does not exist (e.g. there
+       is only "flinklib" and no "flinkslib").
+      */
+      var commonJar =s"""(${backend}?lib)""".r.replaceAllIn(jobJar, "common")
       logger.info(s"add common jar '${commonJar}' to job's jar file ...")
       FileTools.extractJarToDir(commonJar, outputDirectory)
 

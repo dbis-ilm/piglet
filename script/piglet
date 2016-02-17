@@ -225,5 +225,5 @@ checkJobManager
 if $interactive; then
     java -Dscala.usejavacp=true -cp $CP dbis.pig.PigletREPL --backend_dir `dirname $0`/.. $*
 else
-    java -Dscala.usejavacp=true -cp $CP:$PIG_LIB dbis.pig.Piglet --backend_dir `dirname $0`/.. $*
+    java -Dscala.usejavacp=true -cp $CP dbis.pig.Piglet --backend_dir `dirname $0`/.. $*
 fi
