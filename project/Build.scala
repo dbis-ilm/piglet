@@ -139,6 +139,7 @@ object Dependencies {
     hadoop % "provided",
     twitterUtil,
     h2Database,
-    breeze
+    breeze,
+    log4j
   )
 }
