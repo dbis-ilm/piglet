@@ -26,9 +26,9 @@ import dbis.pig.plan.rewriting.internals._
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Rewriter.{rewrite => kiamarewrite}
 import org.kiama.rewriting.Strategy
-
 import scala.collection.mutable
 import scala.reflect.ClassTag
+import dbis.pig.plan.rewriting.PlanMerger
 
 case class RewriterException(msg: String) extends Exception(msg)
 
@@ -101,6 +101,7 @@ object Rewriter extends PigletLogging
                 with WindowSupport
                 with EmbedSupport
                 with MaterializationSupport
+                with PlanMerger
                 with Fixers
                 with FastStrategyAdder
                 with RewriterDSL {

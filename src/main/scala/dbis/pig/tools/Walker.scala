@@ -117,8 +117,4 @@ class DepthFirstTopDownWalker extends Walker[PigOperator] {
       todo.pushAll(children)
     }
   }
-  
-  private def dfs(op: PigOperator, visit: (PigOperator => Unit)) = {
-    
-  }
 }

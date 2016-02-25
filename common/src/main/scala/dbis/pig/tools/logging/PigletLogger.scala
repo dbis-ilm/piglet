@@ -20,7 +20,7 @@ import LogLevel._
  * 
  * The difference is that we allow to set the log level programmatically 
  */
-object PigletLogger {
+object PigletLogger  {
   
   protected[logging] def apply(underlying: Underlying): PigletLogger = new PigletLogger(underlying)
 
@@ -44,7 +44,7 @@ object PigletLogger {
   
 }
 
-final class PigletLogger private(private[this] val underlying: Underlying) {
+final class PigletLogger private(private[this] val underlying: Underlying) extends java.io.Serializable {
   
   setLevel(PigletLogger.level)
   
