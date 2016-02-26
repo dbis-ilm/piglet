@@ -9,10 +9,17 @@ trait PigletLogging {
   /*
    * This ugly hack is used to suppress the annoying warning of multiple bindings in slf4j.
    */
-  val filterOut = new PrintStream(System.err) {
-    override def println(l: String) = if (! l.startsWith("SLF4J")) super.println(l)
+  val filteredErr = new PrintStream(System.err) {
+    override def println(l: String) = if (!l.startsWith("SLF4J") && !l.startsWith("[INFO ] [EtmMonitor]")) super.println(l)
   }
-  System.setErr(filterOut)
+  System.setErr(filteredErr)
+  
+  val filteredOut = new PrintStream(System.out) {
+    override def println(l: String) = if (!l.startsWith("SLF4J") && !l.startsWith("[INFO ] [EtmMonitor]")) super.println(l)
+  }
+  System.setOut(filteredOut)
+  
+  
 
 
   protected val logger: PigletLogger = PigletLogger(LoggerFactory.getLogger(getClass.getName).asInstanceOf[ch.qos.logback.classic.Logger])
