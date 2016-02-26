@@ -19,7 +19,6 @@ package dbis.pig
 
 
 import java.nio.file.Path
-
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.parser.LanguageFeature
@@ -39,20 +38,15 @@ import dbis.pig.codegen.PigletCompiler
 import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.tools.logging.LogLevel
 import dbis.pig.tools.logging.LogLevel._
-
 import java.io.File
-
 import scopt.OptionParser
 import scala.io.Source
-
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.collection.mutable.ListBuffer
-
 import scala.collection.mutable.{Map => MutableMap}
-
-
 import scalikejdbc._
+import dbis.pig.plan.PlanMerger
 
 object Piglet extends PigletLogging {
 
@@ -255,10 +249,18 @@ object Piglet extends PigletLogging {
       }
     }
 
+    
+    /*
+     * if we have got more than one plan and we should not execute them
+     * sequentially, then try to merge them into one plan
+     */
     if(schedule.size > 1 && !sequential) {
       logger.debug("Start merging plans")
       
-      val mergedPlan = mergePlans(schedule.map{case (plan, _) => plan })
+      // merge plans into one plan
+      val mergedPlan = PlanMerger.mergePlans( schedule.map{case (plan, _) => plan } )
+      
+      // adjust the new schedule. It now contains only the merged plan, with a new generated file name
       schedule = ListBuffer((mergedPlan, Paths.get(s"merged_${System.currentTimeMillis()}.pig")))  
     }
     

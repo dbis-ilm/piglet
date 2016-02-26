@@ -28,7 +28,6 @@ import org.kiama.rewriting.Rewriter.{rewrite => kiamarewrite}
 import org.kiama.rewriting.Strategy
 import scala.collection.mutable
 import scala.reflect.ClassTag
-import dbis.pig.plan.rewriting.PlanMerger
 
 case class RewriterException(msg: String) extends Exception(msg)
 
@@ -101,7 +100,6 @@ object Rewriter extends PigletLogging
                 with WindowSupport
                 with EmbedSupport
                 with MaterializationSupport
-                with PlanMerger
                 with Fixers
                 with FastStrategyAdder
                 with RewriterDSL {
@@ -175,9 +173,8 @@ object Rewriter extends PigletLogging
         case Nil => List.empty
         case op: PigOperator => List(op)
         case ops: Seq[PigOperator] => ops
-        case e => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
-          "PigOperator or " +
-          "Sequence of them, namely" + e)
+        case e => throw new IllegalArgumentException(s"A rewriting operation returned something other than a " +
+          "PigOperator or Sequence of them, namely $e")
       }).filterNot(_.isInstanceOf[Empty]).toList
 
     var newPlanNodes = mutable.LinkedHashSet[PigOperator]() ++= newSources

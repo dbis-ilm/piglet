@@ -1,14 +1,10 @@
-package dbis.pig.plan.rewriting
+package dbis.pig.plan
 
-import dbis.pig.plan.DataflowPlan
-import dbis.pig.op.PigOperator
-import dbis.pig.tools.BreadthFirstTopDownWalker
-import dbis.pig.op.Join
-import dbis.pig.op.Cross
-import dbis.pig.op.Load
+import dbis.pig.op.{PigOperator,Join,Cross,Load}
 import dbis.pig.tools.logging.PigletLogging
+import dbis.pig.tools.BreadthFirstTopDownWalker
 
-trait PlanMerger extends PigletLogging {
+object PlanMerger extends PigletLogging {
 
   
 	def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = {
