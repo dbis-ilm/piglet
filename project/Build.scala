@@ -18,7 +18,7 @@ object PigBuild extends Build {
   /*
    * Projects *****************************************************************
    */
-  lazy val root = (project in file(".")).
+  lazy val piglet = (project in file(".")).
     enablePlugins(BuildInfoPlugin).
     settings(
       buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, buildInfoBuildNumber),
@@ -57,7 +57,7 @@ object PigBuild extends Build {
     settings(commonSettings: _*).
     dependsOn(common).
     disablePlugins(sbtassembly.AssemblyPlugin).
-    dependsOn(root)
+    dependsOn(piglet)
 
   /*
    * define the backend for the compiler: currently we support spark and flink

@@ -1,7 +1,7 @@
 import sbt.Keys._
 import sbt._
 
-name := "Piglet"
+name := "piglet"
 
 libraryDependencies ++= Dependencies.rootDeps
 
@@ -11,7 +11,7 @@ mainClass in (Compile, packageBin) := Some("dbis.pig.PigletREPL")
 
 mainClass in (Compile, run) := Some("dbis.pig.PigletREPL")
 
-assemblyJarName in assembly := "PigCompiler.jar"
+assemblyJarName in assembly := "piglet.jar"
 
 mainClass in assembly := Some("dbis.pig.Piglet")
 
