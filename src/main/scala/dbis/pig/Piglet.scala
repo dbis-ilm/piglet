@@ -166,14 +166,14 @@ object Piglet extends PigletLogging {
     }
 
     // start processing
-    run(files, outDir, compileOnly, master, backend, languageFeatures, params, backendPath, backendArgs, profiling, showPlan)
+    run(files, outDir, compileOnly, master, backend, languageFeatures, params, backendPath, backendArgs, profiling, showPlan, sequential)
   }
 
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String], backendPath: String,
-          backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean): Unit = {
+          backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean, sequential: Boolean): Unit = {
     run(Seq(inputFile), outDir, compileOnly, master, backend, langFeatures, params, backendPath,
-      backendArgs, profiling, showPlan)
+      backendArgs, profiling, showPlan, sequential)
   }
 
   /**
@@ -181,7 +181,8 @@ object Piglet extends PigletLogging {
     */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
-          backendPath: String, backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean): Unit = {
+          backendPath: String, backendArgs: Map[String, String], profiling: Boolean, 
+          showPlan: Boolean, sequential: Boolean): Unit = {
 
     try {
       // initialize database driver and connection pool
@@ -206,7 +207,7 @@ object Piglet extends PigletLogging {
 
       } else {
         runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeatures, params, backendPath,
-          backendConf, backendArgs, profiling, showPlan)
+          backendConf, backendArgs, profiling, showPlan, sequential)
       }
 
     } catch {
@@ -240,13 +241,13 @@ object Piglet extends PigletLogging {
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
                             langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
                             backendPath: String, backendConf: BackendConf, backendArgs: Map[String, String],
-                            profiling: Boolean, showPlan: Boolean) {
+                            profiling: Boolean, showPlan: Boolean, sequential: Boolean) {
     logger.debug("start parsing input files")
     
     var schedule = ListBuffer.empty[(DataflowPlan,Path)]
     
     for(file <- inputFiles) {
-      PigletCompiler.createDataflowPlan(file, params, backend, langFeature) match {
+      PigletCompiler.createDataflowPlan(file, params, backend, langFeatures) match {
         case Some(v) => schedule += ((v, file))
         case None =>
           logger.error(s"failed to create dataflow plan for $file - aborting")
