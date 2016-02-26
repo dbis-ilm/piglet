@@ -63,7 +63,8 @@ object Piglet extends PigletLogging {
                             backendArgs: Map[String, String] = Map(),
                             profiling: Boolean = false,
                             loglevel: Option[String] = None,
-                            sequential: Boolean = false
+                            sequential: Boolean = false,
+                            keepFiles: Boolean = false
                            )
 
   var master: String = "local"
@@ -71,7 +72,8 @@ object Piglet extends PigletLogging {
   var backendPath: String = null
   var languageFeatures = List(LanguageFeature.PlainPig)
   var logLevel: Option[String] = None
-
+  var keepFiles = false
+  
   def main(args: Array[String]): Unit = {
     var inputFiles: Seq[Path] = null
     var compileOnly: Boolean = false
@@ -82,6 +84,7 @@ object Piglet extends PigletLogging {
     var backendArgs: Map[String, String] = null
     var profiling = false
     var sequential = false
+    
 
     val parser = new OptionParser[CompilerConfig]("PigletCompiler") {
       head("PigletCompiler", s"ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
@@ -97,6 +100,7 @@ object Piglet extends PigletLogging {
       opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text (s"show the execution plan")
       opt[Unit]("sequential") optional() action{ (_,c) => c.copy(sequential = true) } text ("sequential execution (do not merge plans)")
       opt[String]('g', "log-level") optional() action { (x, c) => c.copy(loglevel = Some(x.toUpperCase())) } text ("Set the log level: DEBUG, INFO, WARN, ERROR")
+      opt[Unit]('k',"keep") optional() action { (x,c) => c.copy(keepFiles = true) } text ("keep generated files")
       opt[Map[String, String]]("backend-args") valueName ("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to subsitute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
@@ -127,13 +131,12 @@ object Piglet extends PigletLogging {
         profiling = config.profiling
         logLevel = config.loglevel
         sequential = config.sequential
+        keepFiles = config.keepFiles
       }
       case None =>
         // arguments are bad, error message will have been displayed
         return
     }
-
-    //    val backendArgs = inputFiles.drop(files.size).map { p => p.toString() }.toArray
 
     /* IMPORTANT: This must be the first call to Conf
      * Otherwise, the config file was already loaded before we could copy the new one
@@ -360,8 +363,8 @@ object Piglet extends PigletLogging {
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")
 
-      PigletCompiler.compilePlan(newPlan, scriptName, outDir, Paths.get(s"$backendPath/${jarFile.toString}"),
-        templateFile, backend, profiling) match {
+      PigletCompiler.compilePlan(newPlan, scriptName, outDir, Paths.get(backendPath,jarFile.toString),
+        templateFile, backend, profiling, keepFiles) match {
         // the file was created --> execute it
         case Some(jarFile) =>
           if (!compileOnly) {
@@ -489,8 +492,8 @@ object Piglet extends PigletLogging {
     val scriptName = "__r_piglet"
     val templateFile = backendConf.templateFile
     val jarFile = Conf.backendJar(backend)
-    val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(s"$backendPath/${jarFile.toString}"),
-      templateFile, backend, false) match {
+    val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(backendPath,jarFile.toString),
+      templateFile, backend, false, false) match {
       case Some(jarFile) => {
         val runner = backendConf.runnerClass
         logger.debug(s"using runner class ${runner.getClass.toString()}")

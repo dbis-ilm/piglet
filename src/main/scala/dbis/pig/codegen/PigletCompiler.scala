@@ -164,9 +164,10 @@ def createCodeFromInput(source: String, backend: String): String = {
    * @param templateFile The template file to use for code generation
    * @param backend The name of the backend
    * @param profiling Flag indicating whether profiling code should be inserted
+   * @param keepFiles Flag indicating whether generated source files should be deleted or kept
    */
   def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, backendJar: Path, 
-      templateFile: String, backend: String, profiling: Boolean): Option[Path] = {
+      templateFile: String, backend: String, profiling: Boolean, keepFiles: Boolean): Option[Path] = {
     
     // compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)
@@ -239,8 +240,13 @@ def createCodeFromInput(source: String, backend: String): String = {
       val jarFile = Paths.get(outDir.toAbsolutePath.toString, scriptName, s"$scriptName.jar")
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
         logger.info(s"created job's jar file at $jarFile")
-        // remove directory $outputDirectory
-        cleanupResult(outDir.toAbsolutePath.toString + "/" + scriptName + "/out")
+
+        if(!keepFiles) {
+          // remove directory $outputDirectory
+          val p = Paths.get(outDir.toAbsolutePath().toString(), scriptName, "out")
+          cleanupResult(p)
+        }
+        
         Some(jarFile)
       } else
         None
@@ -265,7 +271,7 @@ def createCodeFromInput(source: String, backend: String): String = {
     * Invokes the PigParser to process the given source. In addition, parameters specified by the --param flag
     * are resolved.
     *
-    * @param source the source refering to the Piglet script
+    * @param source the source referring to the Piglet script
     * @param params a map of parameters
     * @param langFeatures the language dialects used to parse the script
     * @return a list of PigOperators constructed from parsing the script
@@ -286,14 +292,14 @@ def createCodeFromInput(source: String, backend: String): String = {
 	  }
   }
 
-  private def cleanupResult(dir: String): Unit = {
-    import scalax.file.Path
-    val path: Path = Path.fromString(dir)
+  private def cleanupResult(dir: Path): Unit = {
+    val path = scalax.file.Path.fromString(dir.toString())
     try {
       path.deleteRecursively(continueOnFailure = false)
+      logger.debug(s"removed output directory at $dir")
     }
     catch {
-      case e: java.io.IOException => // some file could not be deleted
+      case e: java.io.IOException => logger.debug(s"Could not remove result directory at ${path}: ${e.getMessage}")
     }
   }
 
