@@ -32,8 +32,13 @@ object PigBuild extends Build {
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
     dependsOn(mapreducelib % "test;it").
+    dependsOn(setm).
+//    dependsOn(ProjectRef(uri("https://github.com/sthagedorn/setm.git#master"), "setm")).
     aggregate(common, sparklib, flinklib, mapreducelib) // remove this if you don't want to automatically build these projects when building piglet 
 
+  lazy val setm = (project in file("setm"))  
+    
+    
   lazy val common = (project in file("common")).
     settings(commonSettings: _*).
     disablePlugins(sbtassembly.AssemblyPlugin)

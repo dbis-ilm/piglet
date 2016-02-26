@@ -23,6 +23,7 @@ import scala.collection.immutable.Map
 import scala.collection.mutable.Set
 import org.clapper.scalasti.STGroupFile
 import dbis.pig.expr.{Expr, Value}
+import de.tuilmenau.setm.SETM.timing
 
 /**
  * An exception representing an error in handling the templates for code generation.
@@ -167,7 +168,7 @@ trait CodeGenerator {
    *                Header2 and Footer
    * @return the string representation of the code
    */
-  def compile(scriptName: String, plan: DataflowPlan, profiling: Boolean, forREPL: Boolean = false): String = {
+  def compile(scriptName: String, plan: DataflowPlan, profiling: Boolean, forREPL: Boolean = false): String = timing("compile to code") {
     require(codeGen != null, "code generator undefined")
 
     if (plan.udfAliases != null) {

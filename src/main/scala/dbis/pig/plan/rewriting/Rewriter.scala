@@ -29,6 +29,8 @@ import org.kiama.rewriting.Strategy
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
+import de.tuilmenau.setm.SETM.timing
+
 case class RewriterException(msg: String) extends Exception(msg)
 
 /** Provides various methods for rewriting [[DataflowPlan]]s by wrapping functionality provided by
@@ -157,7 +159,7 @@ object Rewriter extends PigletLogging
     * @param plan The plan to process.
     * @return A rewritten [[dbis.pig.plan.DataflowPlan]]
     */
-  def processPlan(plan: DataflowPlan): DataflowPlan = {
+  def processPlan(plan: DataflowPlan): DataflowPlan = timing("rewriting plan") {
     evalExtraRuleCode(plan.extraRuleCode)
     val forewriter = buildTypedCaseWrapper(foreachRecursively)
     val fostrat = manybu(strategyf(t => forewriter(t)))

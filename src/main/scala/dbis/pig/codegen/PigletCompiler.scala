@@ -21,6 +21,7 @@ import dbis.pig.tools.JarBuilder
 import dbis.pig.tools.CppCompiler
 import dbis.pig.tools.CppCompilerConf
 import dbis.pig.tools.Conf
+import de.tuilmenau.setm.SETM.timing
 
 object PigletCompiler extends PigletLogging {
   
@@ -33,7 +34,7 @@ object PigletCompiler extends PigletLogging {
    * @param langFeatures the Pig dialects used for parsing
    */
   def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String,
-                         langFeatures: List[LanguageFeature]): Option[DataflowPlan] = {
+                         langFeatures: List[LanguageFeature]): Option[DataflowPlan] = timing("create DFP") {
     // 1. we read the Pig file
     val source = Source.fromFile(inputFile.toFile)
 
@@ -167,7 +168,7 @@ def createCodeFromInput(source: String, backend: String): String = {
    * @param keepFiles Flag indicating whether generated source files should be deleted or kept
    */
   def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, backendJar: Path, 
-      templateFile: String, backend: String, profiling: Boolean, keepFiles: Boolean): Option[Path] = {
+      templateFile: String, backend: String, profiling: Boolean, keepFiles: Boolean): Option[Path] = timing("compile plan") {
     
     // compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)
@@ -277,7 +278,7 @@ def createCodeFromInput(source: String, backend: String): String = {
     * @return a list of PigOperators constructed from parsing the script
     */
   private def parseScriptFromSource(source: Source, params: Map[String,String],
-                                    langFeatures: List[LanguageFeature]): List[PigOperator] = {
+                  langFeatures: List[LanguageFeature]): List[PigOperator] = timing("parse script from source") {
     // Handle IMPORT and %DECLARE statements.
 	  val (sourceLines, declareParams) = resolveImports(source.getLines())
     logger.info("declared parameters: " + declareParams.mkString(", "))

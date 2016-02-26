@@ -3,11 +3,12 @@ package dbis.pig.plan
 import dbis.pig.op.{PigOperator,Join,Cross,Load}
 import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.tools.BreadthFirstTopDownWalker
+import de.tuilmenau.setm.SETM.timing
 
 object PlanMerger extends PigletLogging {
 
   
-	def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = {
+	def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = timing("merge plans") {
 	  
 	  val indexedSchedule = schedule.zipWithIndex
 	  
