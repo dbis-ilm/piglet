@@ -17,10 +17,11 @@ object MINUTES {
 >>
 
 // ----------------- schema class -----------------
-schema_class(name, fields, string_rep) ::= <<
+schema_class(name, fieldNames, fieldTypes, fields, string_rep) ::= <<
 case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
-override def mkString(_c: String = ",") = <string_rep>
+  override def mkString(_c: String = ",") = <string_rep>
 }
+implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
 
 >>
 

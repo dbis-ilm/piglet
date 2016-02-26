@@ -5,6 +5,11 @@ import dbis.pig.backends.flink._
 import dbis.pig.backends.flink.streaming._
 import java.util.concurrent.TimeUnit
 import org.apache.flink.util.Collector
+import org.apache.flink.streaming.api.windowing.assigners._
+import org.apache.flink.streaming.api.windowing.evictors._
+import org.apache.flink.streaming.api.windowing.time._
+import org.apache.flink.streaming.api.windowing.triggers._
+import org.apache.flink.streaming.api.windowing.windows._
 import dbis.pig.backends.{SchemaClass, Record}
 <if (additional_imports)>
 <additional_imports>
@@ -14,10 +19,11 @@ import dbis.pig.backends.{SchemaClass, Record}
 >>
 
 // ----------------- schema class -----------------
-schema_class(name, fields, string_rep) ::= <<
+schema_class(name, fieldNames, fieldTypes, fields, string_rep) ::= <<
 case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
-override def mkString(_c: String = ",") = <string_rep>
+  override def mkString(_c: String = ",") = <string_rep>
 }
+implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
 
 >>
 
@@ -45,14 +51,6 @@ dump(in) ::=<<
 
 // ------------------ STORE Results on Disk -----------------------------------
 store(in, file, class, func, schema, params) ::=<<
-    /*
-    <if (schema)>
-        val <in>_storehelper = <in>.map(t => <schema>)
-    <else>
-        val <in>_storehelper = <in>
-    <endif>
-    */
-    //val <in>_helper = <in>.setParallelism(1)
     <func>[<class>]().writeStream("<file>", <in><if (params)>, <params><endif>)
 >>
 
@@ -65,10 +63,8 @@ filter(out,in,pred,windowMode, class) ::=<<
 <endif>
 >>
 
-filterHelper(params) ::=<<
-    def custom<params.out>Filter(ts: Iterable[<params.class>], out: Collector[<params.class>]) ={
-      ts.filter(t => {<params.pred>}).foreach(x => out.collect(x))
-    }
+filterHelper(pred) ::=<<
+      .filter(t => {<pred>})
 >>
 
 // ------------------ SPLIT input INTO multiple outputs -----------------------
@@ -80,7 +76,7 @@ splitInto(in,out,pred) ::=<<
 
 
 // ------------------ Executes an expression FOREACH input element ------------
-foreach(out,in,expr,aggrs,windowMode, class) ::=<<
+foreach(out,in,expr,aggrs,windowMode,class) ::=<<
 <if(windowMode)>
     val <out> = <in>.mapWindow(custom<out>Map _)
 <else>
@@ -93,98 +89,81 @@ foreach(out,in,expr,aggrs,windowMode, class) ::=<<
 >>
 
 foreachHelper(params) ::=<<
-<if(params.windowMode)>
-    def custom<params.out>Map(ts: Iterable[<params.class>], out: Collector[<params.class>]) = {
-      ts.foreach { t => out.collect(<params.class>(<params.expr>))}
-    }
-<else>    
-<endif>
+    .foreach { t => out.collect(<params.class>(<params.expr>))}
 >>
 
 // ----- Executes an expression FOREACH input element requiring a flatMap -----
-foreachFlatMap(out,in,expr,windowMode) ::=<<
-    val <out> = <in>.flatMap(t => <expr>).map(t => List(t))
+foreachFlatMap(out,in,expr,windowMode,class) ::=<<
+    val <out> = <in>.flatMap(t => <expr>)
 >>
 
 // ------------------ GROUPS elements on an expression ------------------------
 groupBy(out,in,expr,windowMode, class) ::=<<
 <if (expr)>
-  <if(windowMode)>
-    val <out> = <in>.mapWindow(custom<out>Map _).groupBy(t => t._0)
-  <else>
     val <out> = <in>.map(t => <class>((<expr>),List(t))).groupBy(t => t._0)
-  <endif>
 <else>
     val <out> = <in>.map(t => List("all", List(t))).groupBy(t => t._0)
 <endif>
 >>
 
 groupByHelper(params) ::=<<
-    def custom<params.out>Map(ts: Iterable[<params.class>], out: Collector[<params.class>]) = {
-<!      out.collect(ts.groupBy(t => <params.expr>).flatMap(x => List(x._1,x._2)).toList) !>
-      ts.groupBy(t => <params.expr>).foreach(t => out.collect(<params.class>(t._1,t._2)))
-    }
+    .groupBy(t => <params.expr>).map(t => <params.class>(t._1,t._2))
 >>
 
 // ------------------ Outputs only distinct values ----------------------------
 distinct(out,in, class) ::=<<
-    val <out> = <in>.mapWindow(distinct _)
 >>
 
-distinctHelper(params) ::=<<
-    def distinct(ts: Iterable[<params.class>], out: Collector[<params.class>]) ={
-      ts.toList.distinct.foreach{ x => out.collect(x) }
-    }
+distinctHelper() ::=<<
+    .toList.distinct
 >>
 
 // ------------------ ORDERs the input BY a key -------------------------------
 orderBy(out,in,key,asc) ::=<<
-    val <out> = <in>.mapWindow(custom<out>Order _)
 >>
 
 orderHelper(params) ::=<<
-    def custom<params.out>Order(ts: Iterable[List[Any]], out: Collector[List[Any]]) ={
-      ts.toList.asInstanceOf[List[List[String]]].sortBy(t => (<params.key>))<if (params.reverse)>(Ordering[String].reverse)<endif>.foreach { x => out.collect(x) }
-    }
+    .toList.asInstanceOf[List[<params.class>]].sortBy(t => (<params.key>))<if (params.reverse)>(Ordering[String].reverse)<endif>
 >>
 
 // ------------------ Passes Stream through a Window Operator -----------------
 window(out,in,window,wUnit,slider,sUnit) ::=<<
 <if (wUnit)>
   <if (sUnit)>
-    val <out> = <in>.window(Time.of(<window>, TimeUnit.<wUnit>)).every(Time.of(<slider>, TimeUnit.<sUnit>))
+    val <out> = <in>.windowAll(SlidingTimeWindows.of(Time.of(<window>, TimeUnit.<wUnit>), Time.of(<slider>, TimeUnit.<sUnit>)))
   <else>
-    val <out> = <in>.window(Time.of(<window>, TimeUnit.<wUnit>)).every(Count.of(<slider>))
+    val <out> = <in>.windowAll(TumblingTimeWindows.of(Time.of(<window>, TimeUnit.<wUnit>))).trigger(CountTrigger.of(<slider>))
   <endif>
 <else>
   <if (sUnit)>
-    val <out> = <in>.window(Count.of(<window>)).every(Time.of(<slider>, TimeUnit.<sUnit>))
+    val <out> = <in>.windowAll(GlobalWindows.create()).trigger(ContinuousEventTimeTrigger.of(Time.of(<slider>, TimeUnit.<sUnit>))).evictor(CountEvictor.of(<window>))
   <else>
-    val <out> = <in>.window(Count.of(<window>)).every(Count.of(<slider>))
+    val <out> = <in>.windowAll(GlobalWindows.create()).evictor(CountEvictor.of(<window>)).trigger(CountTrigger.of(<slider>))
   <endif>
 <endif>
 >>
 
-// --------- Transform Windows back to continuous Stream ----------------------
-windowFlatten(out,in) ::=<<
-    val <out> = <in>.flatten
+// --------- Applies a function to a windowed Stream --------------------------
+windowApply(out,in,func) ::=<<
+    val <out> = <in>.apply(<func> _)
 >>
 
 // ------------------ Joins two or more streams on the specified keys ---------
 join_key_map(rels,keys) ::=<<
 >>
 
-join(out,rel1,key1,rel2,key2,window,wUnit) ::=<<
+join(out,rel1,key1,rel2,key2,extractor,window,wUnit) ::=<<
     val <out> = <rel1><rel2,key2:{ r,k |<\\>
-    .join(<r>).onWindow(<window>, TimeUnit.<wUnit>).where(t => <key1>).equalTo(t => <k>)<\\>
-    .map{ t => t._1 ++ t._2 \}<\\>
+    .join(<r>).where(t => <key1>).equalTo(t => <k>).window(TumblingTimeWindows.of(Time.<wUnit>(<window>)))<\\>
+    .apply{ (t1,t2) => <extractor> \}<\\>
     }>
 >>
 
 // ------------ Computes the CROSS product of two or more relations -----------
-cross(out,rel1,rel2,window,wUnit) ::=<<
+cross(out,rel1,rel2,extractor,window,wUnit) ::=<<
     val <out> = <rel1><rel2:{ r |<\\>
-    .cross(<r>).onWindow(<window>, TimeUnit.<wUnit>).map{ t => t._1 ++ t._2 \}<\\>
+    .map(t => (1,t)).join(<r>.map(t => (1,t))).where(t => t._1).equalTo(t => t._1).window(TumblingTimeWindows.of(Time.<wUnit>(<window>)))<\\>
+    .apply{ (t1,t2) => <extractor> \}<\\>
     }>
 >>
 

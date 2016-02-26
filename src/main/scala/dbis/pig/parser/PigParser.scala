@@ -651,7 +651,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
    * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE ROWS <Num>
    * <A> = WINDOW <B> RANGE <Num> <Unit> SLIDE RANGE <Num> <Unit>
    */
-  def timeUnit: Parser[String] = ("seconds".ignoreCase | "minutes".ignoreCase) ^^ { _.toUpperCase }
+  def timeUnit: Parser[String] = ("seconds".ignoreCase | "minutes".ignoreCase) //^^ { _.toUpperCase }
   def rangeParam: Parser[Tuple2[Int,String]] = rangeKeyword ~ num ~ timeUnit ^^ {case _ ~ n ~ u => (n,u)}
   def rowsParam: Parser[Tuple2[Int,String]] = rowsKeyword ~ num ^^ {case _ ~ n => (n, "")}
   def windowParam: Parser[Tuple2[Int,String]] = (rangeParam | rowsParam)

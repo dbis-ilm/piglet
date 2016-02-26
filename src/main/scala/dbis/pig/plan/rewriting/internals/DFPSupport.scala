@@ -50,9 +50,8 @@ trait DFPSupport {
   //noinspection ScalaDocMissingParameterDescription
   def insertAfter(plan: DataflowPlan, old: PigOperator, newOp: PigOperator): DataflowPlan = {
     require(!newOp.isInstanceOf[Load], "Can't insert a Load operator after another operator")
-    require((old.outPipeName == "") || (old.outPipeName == newOp.inputs.head.name), "The new operator has to read " +
-      "from " +
-      "the old one")
+    require((old.outPipeName == "") || (old.outPipeName == newOp.inputs.head.name), 
+        "The new operator has to read from the old one")
     val strategy = (op: Any) => {
       if (op == old) {
         val outIdx = old.outputs.indexWhere(_.name == newOp.inputs.head.name)
@@ -99,6 +98,31 @@ trait DFPSupport {
     // Insert new Operator after inOp to Plan and append outOp
     var newPlan = plan.insertAfter(inOp, newOp)
     newPlan = newPlan.insertAfter(newOp, outOp)
+    newPlan
+  }
+  
+  /** Insert `newOp` as new path from `in` to `out` in `plan`.
+    *
+    * @param plan The DataflowPlan in which to insert the new operator.
+    * @param inOp The Operator being the input for the new operator.
+    * @param outOp The Operator being the output for the new operator.
+    * @param newOp The Operator getting inserted.
+    * @return The new DataflowPlan.
+    */
+  def insertConnect(plan: DataflowPlan, inOp: PigOperator, outOp: PigOperator, newOp: PigOperator): DataflowPlan = {
+    require(!newOp.isInstanceOf[Load], "Can't insert a Load operator after another operator")
+ 
+    val outIdx = inOp.outputs.indexWhere(_.name == newOp.inputs.head.name)
+    
+    // Add new Operator to inOp consumers & its output Pipe to outOp inputs
+    inOp.outputs(outIdx).consumer = inOp.outputs(outIdx).consumer :+ newOp
+    outOp.inputs = outOp.inputs.+:(newOp.outputs(outIdx))
+    
+    
+    // Insert new Operator after inOp to Plan and append outOp
+    var newPlan = plan.insertAfter(inOp, newOp)
+    newPlan = newPlan.insertAfter(newOp, outOp)
+    //outOp.inputs = outOp.inputs.tail :+ outOp.inputs.head
     newPlan
   }
 

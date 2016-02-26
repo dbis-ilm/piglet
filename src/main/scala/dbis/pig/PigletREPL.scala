@@ -168,7 +168,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         HDFSService.process(cmdList.head.substring(1), paramList)
       }
       catch {
-        case ex => println(s"error while executing fs command: ${ex.getMessage}")
+        case ex: Throwable => println(s"error while executing fs command: ${ex.getMessage}")
       }
     }
     else

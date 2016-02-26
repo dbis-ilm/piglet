@@ -80,7 +80,6 @@ trait WindowSupport extends PigletLogging {
       operator match {
         case o: Filter => {
           logger.debug(s"Rewrite Filter to WindowMode")
-          //TODO: Move before Window, not only Filter - all non-WindowOps
           o.windowMode = true
         }
         case o: Distinct => {
@@ -98,8 +97,10 @@ trait WindowSupport extends PigletLogging {
         case o: Foreach => {
           logger.debug(s"Rewrite Foreach to WindowMode")
           o.windowMode = true
-          val flatten = new WindowFlatten(Pipe("flattenNode"), o.outputs.head)
-          val newPlan = plan.insertBetween(o, o.outputs.head.consumer.head, flatten)
+          //val flatten = new WindowFlatten(Pipe("flattenNode"), o.outputs.head)
+          val apply = new WindowApply(Pipe(o.outPipeName+"Apply"), windowOp.out, "WindowFunc"+o.outPipeName)
+          val newPlan = plan.insertConnect(windowOp, o.out.consumer.head, apply)
+          apply.schema=o.schema
           return newPlan
         }
         case o: Join => {
@@ -115,12 +116,12 @@ trait WindowSupport extends PigletLogging {
       littleWalker ++= operator.outputs.flatMap(_.consumer)
       if (littleWalker.isEmpty) lastOp = operator
     }
-
     logger.debug(s"Reached End of Plan - Adding Flatten Node")
     val before = lastOp.inputs.head
-    val flatten = new WindowFlatten(Pipe("flattenNode"), before.producer.outputs.head)
-    val newPlan = plan.insertBetween(before.producer, lastOp, flatten)
-
+    val apply = new WindowApply(Pipe(before.name+"Apply"), windowOp.out, "WindowFunc"+before.name)
+    val newPlan = plan.insertConnect(windowOp, lastOp, apply)
+    apply.schema = before.producer.schema
+    lastOp.schema  = before.producer.schema
     newPlan
   }
 

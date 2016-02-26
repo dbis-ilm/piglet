@@ -50,6 +50,17 @@ class PigStream [T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Se
   }*/
 }
 
+class TextLoader[T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Serializable {
+  def loadStream(env: StreamExecutionEnvironment, path: String, extract: (Array[String]) => T): DataStream[T] =
+    env.readTextFile(path).map(line => extract(Array(line)))
+}
+
+object TextLoader extends java.io.Serializable {
+  def apply[T <: SchemaClass :ClassTag: TypeInformation](): TextLoader[T] = {
+    new TextLoader[T]
+  }
+}
+
 object PigStream {
   def apply[T <: SchemaClass :ClassTag: TypeInformation](): PigStream[T] = {
     new PigStream

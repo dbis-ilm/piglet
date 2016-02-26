@@ -437,7 +437,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       else {
         // there is no other expression: we just construct an expression for flatMap:
         // (<expr>).map(t => <class>(t))
-        s"${emitExpr(node.inputSchema, ex.a)}).map(t => ${className}(t._0))"
+        s"${emitExpr(node.inputSchema, ex.a)}.map(t => ${className}(t._0))"
       }
     }
     else
@@ -678,7 +678,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     var paramMap = Map("in" -> node.inPipeName,
       "file" -> file.toString,
       "func" -> storeFunc.getOrElse(BackendManager.backend.defaultConnector))
-    node.schema match {
+    node.inputSchema match {
       case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
       case None => paramMap += ("class" -> "Record")
     }
@@ -741,16 +741,19 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         case _ => f.descriptionString
       }
     }
-    val fields = schema.fields.toList
+    val fieldList = schema.fields.toList
     // build the list of field names (_0, ..., _n)
-    val fieldStr = fields.zipWithIndex.map{ case (f, i) =>
-           s"_$i : ${typeName(f.fType, f.name)}"}.mkString(", ")
-
+    val fieldNames = if (fieldList.size==1) "t" else fieldList.indices.map(t => "t._"+(t+1)).mkString(", ")
+    val fieldTypes = fieldList.map(f => s"${typeName(f.fType, f.name)}").mkString(", ")
+    val fields= fieldList.zipWithIndex.map{ case (f, i) =>
+           (s"_$i", s"${typeName(f.fType, f.name)}")}
+    val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
+    
     // construct the mkString method
     //   we have to handle the different types here:
     //      TupleType -> ()
     //      BagType -> {}
-    val toStr = fields.zipWithIndex.map{
+    val toStr = fieldList.zipWithIndex.map{
       case (f, i) => f.fType match {
         case BagType(_) => s""""{" + _$i.mkString(",") + "}""""
         case MapType(v) => s""""[" + _$i.map{ case (k,v) => s"$$k#$$v" }.mkString(",") + "]""""
@@ -759,7 +762,9 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     }.mkString(" + _c + ")
 
     callST("schema_class", Map("name" -> schemaClassName(schema.className),
-                              "fields" -> fieldStr,
+                              "fieldNames" -> fieldNames,
+                              "fieldTypes" -> fieldTypes,
+                              "fields"   -> fieldStr,
                               "string_rep" -> toStr))
   }
 

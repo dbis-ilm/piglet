@@ -13,10 +13,13 @@ import dbis.pig.backends.spark._
 >>
 
 // ----------------- schema class -----------------
-schema_class(name, fields, string_rep) ::= <<
+schema_class(name, fieldNames, fieldTypes, fields, string_rep) ::= <<
 case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
-override def mkString(_c: String = ",") = <string_rep>
+  override def mkString(_c: String = ",") = <string_rep>
 }
+<if (fieldNames)>
+implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
+<endif>
 
 >>
 
@@ -79,7 +82,7 @@ foreachNested(out, in, expr) ::=<<
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
 // Note, that the closing parenthesis is intentionally missing
 foreachFlatMap(out, in, expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>
+        val <out> = <in>.flatMap(t => <expr>)
 >>
 
 // ------------------ GROUPs elements on an expression ------------------------

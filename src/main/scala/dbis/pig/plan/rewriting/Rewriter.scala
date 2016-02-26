@@ -173,7 +173,7 @@ object Rewriter extends PigletLogging
       processPigOperator(_, strategy) match {
         case Nil => List.empty
         case op: PigOperator => List(op)
-        case ops: Seq[PigOperator] => ops
+        case ops: Seq[PigOperator@unchecked] => ops
         case e => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
           "PigOperator or " +
           "Sequence of them, namely" + e)
