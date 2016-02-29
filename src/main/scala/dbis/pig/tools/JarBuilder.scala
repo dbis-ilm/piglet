@@ -12,6 +12,7 @@ import java.util.jar.{JarEntry, JarOutputStream}
 import java.nio.file.Path
 import java.nio.file.Files
 import dbis.pig.tools.logging.PigletLogging
+import de.tuilmenau.setm.SETM.timing
 
 
 /** Utility class for building a .jar file from a directory of .class files.
@@ -46,7 +47,7 @@ object JarBuilder extends PigletLogging {
     * @param verbose if true, prints verbose debug messages
     * @return true if the .jar file was successfully created, false if not
     */
-  def apply(rootDirectory: Path, jarFilePath: Path, verbose: Boolean): Boolean = {
+  def apply(rootDirectory: Path, jarFilePath: Path, verbose: Boolean): Boolean = timing("generating jar") {
     // ascertain that the target directory exists
     //    val rootDirectory = new File(inputDirectoryPath)
     
