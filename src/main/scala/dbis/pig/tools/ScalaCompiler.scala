@@ -23,6 +23,7 @@ import scala.tools.nsc.reporters.ConsoleReporter
 import scala.tools.nsc.{Global, Settings}
 import java.nio.file.Path
 import dbis.pig.tools.logging.PigletLogging
+import de.tuilmenau.setm.SETM.timing
 
 trait Probe
 
@@ -43,7 +44,7 @@ object ScalaCompiler extends PigletLogging {
    * @param targetDir the target directory for the compiled code
    * @param sourceFiles the Scala files to be compiled
    */
-  def compile (targetDir: Path, sourceFiles: Seq[Path]) : Boolean = {
+  def compile (targetDir: Path, sourceFiles: Seq[Path]) : Boolean = timing("compile scala code") {
     
     logger.debug(s"""compiling source file '${sourceFiles.mkString(",")}' to target dir '$targetDir'""")
     

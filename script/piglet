@@ -192,7 +192,7 @@ fi
 
 # TODO: we should find our jar file the same way we do for spark
 if [ -z "$PIG_LIB" ]; then
-    PIG_LIB=`dirname $0`/../target/scala-2.11/PigCompiler.jar
+    PIG_LIB=`dirname $0`/../target/scala-2.11/piglet.jar
 fi
 
 CP=$PIG_LIB:$CLASSPATH

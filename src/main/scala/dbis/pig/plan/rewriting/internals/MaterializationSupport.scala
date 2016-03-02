@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 package dbis.pig.plan.rewriting.internals
+
 import java.net.URI
 
 import dbis.pig.tools.logging.PigletLogging
@@ -22,13 +23,15 @@ import dbis.pig.op.{Load, Materialize, Store}
 import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
 
+import de.tuilmenau.setm.SETM.timing
+
 import scala.collection.mutable.ListBuffer
 
 /** Provides methods to deal with Materialization in a [[dbis.pig.plan.DataflowPlan]].
   *
   */
 trait MaterializationSupport extends PigletLogging {
-  def processMaterializations(plan: DataflowPlan, mm: MaterializationManager): DataflowPlan = {
+  def processMaterializations(plan: DataflowPlan, mm: MaterializationManager): DataflowPlan = timing("process materialization") {
     require(plan != null, "Plan must not be null")
     require(mm != null, "Materialization Manager must not be null")
 

@@ -19,11 +19,11 @@ package dbis.pig.plan
 import dbis.pig.op._
 import dbis.pig.op.cmd._
 import dbis.pig.expr._
-
 import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.schema.{Types, PigType, Schema, SchemaException}
 import dbis.pig.udf.{UDFTable, UDF}
 import scala.collection.mutable.{ListBuffer, Map}
+import dbis.pig.tools.logging.PigletLogging
 
 
 
@@ -43,7 +43,7 @@ case class InvalidPlanException(msg: String) extends Exception(msg)
  * @param ctx an optional list of pipes representing the context, i.e. the
  *            pipes of a nesting operator (e.g. FOREACH).
  */
-class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable {
+class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[List[Pipe]] = None) extends Serializable /*with PigletLogging*/ {
   def operators_=(ops: List[PigOperator]) = {
     ops map { _.outPipeNames map { PipeNameGenerator.addKnownName}}
     _operators = ops
@@ -61,11 +61,30 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    */
   val udfAliases = Map[String,(String, List[Any])]()
 
+  // start with empty code
   var code: String = ""
   var extraRuleCode: Seq[String] = List.empty
 
+  // construct the plan on initialization
   constructPlan(operators)
 
+  /**
+   * Add an operator to this plan's list of operators, but decide to 
+   * construct the plan immediately, or later.<br><br>
+   * Constructing the plan later on allows to successively add operators
+   * where some of them would result in a (temporarily) invalid plan.
+   * 
+   * @param ops A set of operators to add 
+   * @param deferrConstruct Flag to indicate to build plan immediately or later 
+   */
+  def addOperator(ops: Seq[PigOperator], deferrConstruct: Boolean = false) {
+    operators ++= ops
+    
+    if(!deferrConstruct) {
+    	constructPlan(operators)
+    }
+  }
+  
   /**
    * Constructs a plan from a list of Pig operators. This means, that based on
    * the initial input and output bag names (as specified in the script) the

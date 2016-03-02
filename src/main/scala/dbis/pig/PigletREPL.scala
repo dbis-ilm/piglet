@@ -69,6 +69,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
 
 
   val profiling = false
+  val keepFiles = false
   val defaultScriptName = "__my_script"
 
   private val consoleReader = new ConsoleReader()
@@ -382,7 +383,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       val jobJar = Paths.get(s"$backendPath/${Conf.backendJar(backend).toString}")
 
       nextScriptName()
-      PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), jobJar, templateFile, backend, profiling) match {
+      PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), jobJar, templateFile, backend, profiling, keepFiles) match {
         case Some(jarFile) =>
           val runner = backendConf.runnerClass
           runner.execute(master, scriptName, jarFile, backendArgs)
@@ -409,7 +410,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     * @param buf the original list of PigOperators
     */
   def eliminateDuplicatePipes(buf: ListBuffer[PigOperator]): Unit = {
-    /**
+    /*
       * Deletes all PigOperators from the list in the range [0, pos]
       * which have a pipe with the given name.
       *

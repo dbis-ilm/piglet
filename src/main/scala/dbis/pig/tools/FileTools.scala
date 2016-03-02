@@ -28,6 +28,7 @@ import dbis.pig.backends.BackendConf
 import java.nio.file.Path
 import java.nio.file.Files
 import java.nio.file.Paths
+import de.tuilmenau.setm.SETM.timing
 
 import scala.collection.mutable.ListBuffer
 
@@ -40,7 +41,7 @@ object FileTools extends PigletLogging {
       ostream.write(bytes, 0, len)
   }
 
-  def extractJarToDir(jarName: String, outDir: Path): Unit = {
+  def extractJarToDir(jarName: String, outDir: Path): Unit = timing("extracting jar") {
 
     logger.debug(s"extracting jar $jarName to $outDir")
 

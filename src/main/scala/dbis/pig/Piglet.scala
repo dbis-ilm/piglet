@@ -19,7 +19,6 @@ package dbis.pig
 
 
 import java.nio.file.Path
-
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.parser.LanguageFeature
@@ -39,20 +38,17 @@ import dbis.pig.codegen.PigletCompiler
 import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.tools.logging.LogLevel
 import dbis.pig.tools.logging.LogLevel._
-
 import java.io.File
-
 import scopt.OptionParser
 import scala.io.Source
-
 import java.nio.file.Path
 import java.nio.file.Paths
 import scala.collection.mutable.ListBuffer
-
 import scala.collection.mutable.{Map => MutableMap}
-
-
 import scalikejdbc._
+import dbis.pig.plan.PlanMerger
+import de.tuilmenau.setm.SETM
+import de.tuilmenau.setm.SETM.timing
 
 object Piglet extends PigletLogging {
 
@@ -68,16 +64,22 @@ object Piglet extends PigletLogging {
                             showPlan: Boolean = false,
                             backendArgs: Map[String, String] = Map(),
                             profiling: Boolean = false,
-                            loglevel: Option[String] = None
+                            loglevel: Option[String] = None,
+                            sequential: Boolean = false,
+                            keepFiles: Boolean = false,
+                            stats: Boolean = false
                            )
+
 
   var master: String = "local"
   var backend: String = null
   var backendPath: String = null
   var languageFeatures = List(LanguageFeature.PlainPig)
   var logLevel: Option[String] = None
-
+  var keepFiles = false
+  
   def main(args: Array[String]): Unit = {
+    
     var inputFiles: Seq[Path] = null
     var compileOnly: Boolean = false
     var outDir: Path = null
@@ -86,6 +88,9 @@ object Piglet extends PigletLogging {
     var showPlan = false
     var backendArgs: Map[String, String] = null
     var profiling = false
+    var sequential = false
+    var showStats = false
+    
 
     val parser = new OptionParser[CompilerConfig]("PigletCompiler") {
       head("PigletCompiler", s"ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
@@ -99,7 +104,10 @@ object Piglet extends PigletLogging {
       opt[Map[String, String]]('p', "params") valueName ("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text ("parameter(s) to subsitute")
       opt[Unit]('u', "update-config") optional() action { (_, c) => c.copy(updateConfig = true) } text (s"update config file in program home (see config file)")
       opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text (s"show the execution plan")
+      opt[Unit]("sequential") optional() action{ (_,c) => c.copy(sequential = true) } text ("sequential execution (do not merge plans)")
       opt[String]('g', "log-level") optional() action { (x, c) => c.copy(loglevel = Some(x.toUpperCase())) } text ("Set the log level: DEBUG, INFO, WARN, ERROR")
+      opt[Unit]('k',"keep") optional() action { (x,c) => c.copy(keepFiles = true) } text ("keep generated files")
+      opt[Unit]("show-stats") optional() action { (_,c) => c.copy(stats = true) } text ("print detailed timing stats at the end")
       opt[Map[String, String]]("backend-args") valueName ("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to subsitute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
@@ -129,13 +137,16 @@ object Piglet extends PigletLogging {
         // note: for some backends we could determine the language automatically
         profiling = config.profiling
         logLevel = config.loglevel
+        sequential = config.sequential
+        keepFiles = config.keepFiles
+        showStats = config.stats
       }
       case None =>
         // arguments are bad, error message will have been displayed
         return
     }
 
-    //    val backendArgs = inputFiles.drop(files.size).map { p => p.toString() }.toArray
+    startCollectStats(showStats)
 
     /* IMPORTANT: This must be the first call to Conf
      * Otherwise, the config file was already loaded before we could copy the new one
@@ -161,15 +172,22 @@ object Piglet extends PigletLogging {
       }
     }
 
+    
     // start processing
-    run(files, outDir, compileOnly, master, backend, languageFeatures, params, backendPath, backendArgs, profiling, showPlan)
-  }
+    run(files, outDir, compileOnly, master, backend, languageFeatures, params, backendPath, backendArgs, profiling, showPlan, sequential)
+    
+    if(showStats) {
+      // collect and print runtime stats
+      collectStats
+    }
+    
+  } // main
 
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String], backendPath: String,
-          backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean): Unit = {
+          backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean, sequential: Boolean): Unit = timing("execution") {
     run(Seq(inputFile), outDir, compileOnly, master, backend, langFeatures, params, backendPath,
-      backendArgs, profiling, showPlan)
+      backendArgs, profiling, showPlan, sequential)
   }
 
   /**
@@ -177,7 +195,8 @@ object Piglet extends PigletLogging {
     */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
-          backendPath: String, backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean): Unit = {
+          backendPath: String, backendArgs: Map[String, String], profiling: Boolean, 
+          showPlan: Boolean, sequential: Boolean): Unit = {
 
     try {
       // initialize database driver and connection pool
@@ -202,17 +221,15 @@ object Piglet extends PigletLogging {
 
       } else {
         runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeatures, params, backendPath,
-          backendConf, backendArgs, profiling, showPlan)
+          backendConf, backendArgs, profiling, showPlan, sequential)
       }
 
     } catch {
       // don't print full stack trace to error
       case e: Exception =>
         logger.error(s"An error occured: ${e.getMessage}")
-        logger.debug("", e)//.toString)
-
+        logger.debug(e.getMessage, e)
     } finally {
-
       // close connection pool
       if (profiling)
         DBConnection.exit()
@@ -226,7 +243,7 @@ object Piglet extends PigletLogging {
     * @param backendConf
     * @param backendArgs
     */
-  def runRaw(file: Path, master: String, backendConf: BackendConf, backendArgs: Map[String, String]) {
+  def runRaw(file: Path, master: String, backendConf: BackendConf, backendArgs: Map[String, String]) = timing("execute raw") {
     logger.debug(s"executing in raw mode: $file with master $master for backend ${backendConf.name} with arguments ${backendArgs.mkString(" ")}")
     val runner = backendConf.runnerClass
     runner.executeRaw(file, master, backendArgs)
@@ -235,12 +252,12 @@ object Piglet extends PigletLogging {
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
                             langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
                             backendPath: String, backendConf: BackendConf, backendArgs: Map[String, String],
-                            profiling: Boolean, showPlan: Boolean) {
+                            profiling: Boolean, showPlan: Boolean, sequential: Boolean): Unit = timing("run with generation") {
     logger.debug("start parsing input files")
-
-    val schedule = ListBuffer.empty[(DataflowPlan, Path)]
-
-    for (file <- inputFiles) {
+    
+    var schedule = ListBuffer.empty[(DataflowPlan,Path)]
+    
+    for(file <- inputFiles) {
       PigletCompiler.createDataflowPlan(file, params, backend, langFeatures) match {
         case Some(v) => schedule += ((v, file))
         case None =>
@@ -249,18 +266,26 @@ object Piglet extends PigletLogging {
       }
     }
 
-
-    //////////////////////////////////////
+    
+    /*
+     * if we have got more than one plan and we should not execute them
+     * sequentially, then try to merge them into one plan
+     */
+    if(schedule.size > 1 && !sequential) {
+      logger.debug("Start merging plans")
+      
+      // merge plans into one plan
+      val mergedPlan = PlanMerger.mergePlans( schedule.map{case (plan, _) => plan } )
+      
+      // adjust the new schedule. It now contains only the merged plan, with a new generated file name
+      schedule = ListBuffer((mergedPlan, Paths.get(s"merged_${System.currentTimeMillis()}.pig")))  
+    }
+    
     // begin global analysis phase
-
     if (profiling)
       analyzePlans(schedule)
 
-    ///////////////////////////////////////////
-    // end analysis and continue normal processing
-
     logger.debug("start processing created dataflow plans")
-
 
     val templateFile = backendConf.templateFile
     val jarFile = Conf.backendJar(backend)
@@ -268,7 +293,7 @@ object Piglet extends PigletLogging {
 
     val profiler = new DataflowProfiler
 
-    for ((plan, path) <- schedule) {
+    for ((plan, path) <- schedule) timing("execute plan") {
 
       // 3. now, we should apply optimizations
       var newPlan = plan
@@ -346,8 +371,8 @@ object Piglet extends PigletLogging {
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")
 
-      PigletCompiler.compilePlan(newPlan, scriptName, outDir, Paths.get(s"$backendPath/${jarFile.toString}"),
-        templateFile, backend, profiling) match {
+      PigletCompiler.compilePlan(newPlan, scriptName, outDir, Paths.get(backendPath,jarFile.toString),
+        templateFile, backend, profiling, keepFiles) match {
         // the file was created --> execute it
         case Some(jarFile) =>
           if (!compileOnly) {
@@ -356,7 +381,9 @@ object Piglet extends PigletLogging {
             logger.debug(s"using runner class ${runner.getClass.toString()}")
 
             logger.info( s"""starting job at "$jarFile" using backend "$backend" """)
-            runner.execute(master, scriptName, jarFile, backendArgs)
+            timing("job execution") {
+              runner.execute(master, scriptName, jarFile, backendArgs)
+            }
           } else
             logger.info("successfully compiled program - exiting.")
 
@@ -365,7 +392,7 @@ object Piglet extends PigletLogging {
     }
   }
 
-  private def analyzePlans(schedule: Seq[(DataflowPlan, Path)]) {
+  private def analyzePlans(schedule: Seq[(DataflowPlan, Path)]) = timing("analyze plans") {
 
     logger.debug("start creating lineage counter map")
 
@@ -475,8 +502,8 @@ object Piglet extends PigletLogging {
     val scriptName = "__r_piglet"
     val templateFile = backendConf.templateFile
     val jarFile = Conf.backendJar(backend)
-    val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(s"$backendPath/${jarFile.toString}"),
-      templateFile, backend, false) match {
+    val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(backendPath,jarFile.toString),
+      templateFile, backend, false, false) match {
       case Some(jarFile) => {
         val runner = backendConf.runnerClass
         logger.debug(s"using runner class ${runner.getClass.toString()}")
@@ -492,4 +519,7 @@ object Piglet extends PigletLogging {
     res
   }
 
+  def startCollectStats(enable: Boolean) = if(enable) SETM.enable else SETM.disable
+  def collectStats = SETM.collect()
+  
 }

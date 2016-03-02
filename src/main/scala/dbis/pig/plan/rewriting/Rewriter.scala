@@ -26,9 +26,10 @@ import dbis.pig.plan.rewriting.internals._
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Rewriter.{rewrite => kiamarewrite}
 import org.kiama.rewriting.Strategy
-
 import scala.collection.mutable
 import scala.reflect.ClassTag
+
+import de.tuilmenau.setm.SETM.timing
 
 case class RewriterException(msg: String) extends Exception(msg)
 
@@ -158,7 +159,7 @@ object Rewriter extends PigletLogging
     * @param plan The plan to process.
     * @return A rewritten [[dbis.pig.plan.DataflowPlan]]
     */
-  def processPlan(plan: DataflowPlan): DataflowPlan = {
+  def processPlan(plan: DataflowPlan): DataflowPlan = timing("rewriting plan") {
     evalExtraRuleCode(plan.extraRuleCode)
     val forewriter = buildTypedCaseWrapper(foreachRecursively)
     val fostrat = manybu(strategyf(t => forewriter(t)))
@@ -174,9 +175,8 @@ object Rewriter extends PigletLogging
         case Nil => List.empty
         case op: PigOperator => List(op)
         case ops: Seq[PigOperator@unchecked] => ops
-        case e => throw new IllegalArgumentException("A rewriting operation returned something other than a " +
-          "PigOperator or " +
-          "Sequence of them, namely" + e)
+        case e => throw new IllegalArgumentException(s"A rewriting operation returned something other than a " +
+          "PigOperator or Sequence of them, namely $e")
       }).filterNot(_.isInstanceOf[Empty]).toList
 
     var newPlanNodes = mutable.LinkedHashSet[PigOperator]() ++= newSources

@@ -14,8 +14,23 @@ the official Pig compiler for Hadoop or its extensions such as PigSpork. Instead
 
 ### Installation ###
 
-Simply clone the git project, change to the project directory and invoke
+#### Clone & Update ####
+Simply clone the git project recursively to get all submodules:
 
+```
+git clone --recursive <project-url>
+```
+
+If you already have pulled the code without the `--recursive` strategy, change into
+the project directory and do:
+
+```
+git submodule init
+git submodule update
+```
+
+#### Build ####
+To build the project, in the project directory invoke
 ```
 sbt package
 ```
@@ -71,7 +86,10 @@ The following options are supported:
                   streaming (Pig + data stream extensions), cep (Pig + complex event processing extensions), all (all extensions)
  * `--params key=value, ...`
  * `--update-config`
- * `--show-plan`
+ * `--show-plan` Print the resulting dataflow plan
+ * `--show-stats` Show execution runtimes for (some) Piglet methods
+ * `--keep` Keep generated files
+ * `--sequential` If more than one input script is provided, do not merge them but execute them sequentially
  * `--log-level l`
  * `--backend-args key=value, ...` 
 

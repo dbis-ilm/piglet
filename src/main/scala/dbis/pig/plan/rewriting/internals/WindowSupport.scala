@@ -24,6 +24,8 @@ import dbis.pig.tools.{BreadthFirstBottomUpWalker, BreadthFirstTopDownWalker}
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
+import de.tuilmenau.setm.SETM.timing
+
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
@@ -33,7 +35,7 @@ import scala.collection.mutable.ListBuffer
 trait WindowSupport extends PigletLogging {
   def processPlan(newPlan: DataflowPlan, strategy: Strategy): DataflowPlan
 
-  def processWindows(plan: DataflowPlan): DataflowPlan = {
+  def processWindows(plan: DataflowPlan): DataflowPlan = timing("process windows") {
     require(plan != null, "Plan must not be null")
 
     var newPlan = plan
