@@ -240,7 +240,7 @@ def createCodeFromInput(source: String, backend: String): String = {
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
         logger.info(s"created job's jar file at $jarFile")
         // remove directory $outputDirectory
-        cleanupResult(outDir.toAbsolutePath.toString + "/" + scriptName + "/out")
+        //cleanupResult(outDir.toAbsolutePath.toString + "/" + scriptName + "/out")
         Some(jarFile)
       } else
         None

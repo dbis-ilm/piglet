@@ -23,8 +23,9 @@ schema_class(name, fieldNames, fieldTypes, fields, string_rep) ::= <<
 case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
   override def mkString(_c: String = ",") = <string_rep>
 }
+<if (fieldTypes)>
 implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
-
+<endif>
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
@@ -89,7 +90,7 @@ foreach(out,in,expr,aggrs,windowMode,class) ::=<<
 >>
 
 foreachHelper(params) ::=<<
-    .foreach { t => out.collect(<params.class>(<params.expr>))}
+    .foreach { t => out.collect(<params.class>(<params.expr>)) }
 >>
 
 // ----- Executes an expression FOREACH input element requiring a flatMap -----
@@ -97,12 +98,27 @@ foreachFlatMap(out,in,expr,windowMode,class) ::=<<
     val <out> = <in>.flatMap(t => <expr>)
 >>
 
+// ------------------- ACCUMULATE operator ------------------------------------
+accumulate_aggr(out, helper_class, class, expr, init_expr) ::=<<
+  def streamAcc_<out> = (t: <class>, state: Option[<helper_class>]) => {
+    val acc: <helper_class> = state.getOrElse(<helper_class>())
+    val v = <helper_class>(t, <init_expr>)
+    val updatedState = <helper_class>(v._t, <expr>)
+    (updatedState, Some(updatedState))
+  }
+>>
+
+accumulate(out, in, helper_class, class, aggr_expr, notKeyed) ::=<<
+    val <out>_fold = <in><if (notKeyed)>.keyBy(t => 0)<endif>.mapWithState(streamAcc_<out>)
+    val <out> = <out>_fold.map(t => <class>(<aggr_expr>))
+>>
+
 // ------------------ GROUPS elements on an expression ------------------------
 groupBy(out,in,expr,windowMode, class) ::=<<
 <if (expr)>
-    val <out> = <in>.map(t => <class>((<expr>),List(t))).groupBy(t => t._0)
+    val <out> = <in>.map(t => <class>((<expr>),List(t))).keyBy(t => t._0)
 <else>
-    val <out> = <in>.map(t => List("all", List(t))).groupBy(t => t._0)
+    val <out> = <in>.map(t => List("all", List(t))).keyBy(t => t._0)
 <endif>
 >>
 

@@ -678,7 +678,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     var paramMap = Map("in" -> node.inPipeName,
       "file" -> file.toString,
       "func" -> storeFunc.getOrElse(BackendManager.backend.defaultConnector))
-    node.inputSchema match {
+    node.schema match {
       case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
       case None => paramMap += ("class" -> "Record")
     }

@@ -22,17 +22,15 @@ import org.apache.flink.streaming.api.scala._
 import scala.reflect.ClassTag
 import dbis.pig.backends._
 
+class PigStream[T <: SchemaClass: ClassTag: TypeInformation] extends java.io.Serializable {
 
-class PigStream [T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Serializable {
- 
-  def loadStream (env: StreamExecutionEnvironment,  path: String,  extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
+  def loadStream(env: StreamExecutionEnvironment, path: String, extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
     env.readTextFile(path).setParallelism(1).map(line => extract(line.split(delim, -1)))
   }
 
   def writeStream(path: String, result: DataStream[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path).setParallelism(1)
-  
-  
-   /*
+
+  /*
   def connect(env: StreamExecutionEnvironment, host: String, port: Int, delim: Char = '\t'): DataStream[List[String]] = {
     env.socketTextStream(host,port).map(line => line.split(delim).toList)
   }
@@ -50,24 +48,24 @@ class PigStream [T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Se
   }*/
 }
 
-class TextLoader[T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Serializable {
+class TextLoader[T <: SchemaClass: ClassTag: TypeInformation] extends java.io.Serializable {
   def loadStream(env: StreamExecutionEnvironment, path: String, extract: (Array[String]) => T): DataStream[T] =
     env.readTextFile(path).map(line => extract(Array(line)))
 }
 
 object TextLoader extends java.io.Serializable {
-  def apply[T <: SchemaClass :ClassTag: TypeInformation](): TextLoader[T] = {
+  def apply[T <: SchemaClass: ClassTag: TypeInformation](): TextLoader[T] = {
     new TextLoader[T]
   }
 }
 
 object PigStream {
-  def apply[T <: SchemaClass :ClassTag: TypeInformation](): PigStream[T] = {
+  def apply[T <: SchemaClass: ClassTag: TypeInformation](): PigStream[T] = {
     new PigStream
   }
 }
-/*
-class RDFStream extends java.io.Serializable {
+
+class RDFStream[T <: SchemaClass: ClassTag: TypeInformation] extends java.io.Serializable {
 
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
@@ -76,10 +74,11 @@ class RDFStream extends java.io.Serializable {
     fields.toArray.slice(0, 3)
   }
 
-  def load(env: StreamExecutionEnvironment, path: String): DataStream[Array[String]] = {
-    env.readTextFile(path).map(line => rdfize(line))
+  def loadStream(env: StreamExecutionEnvironment, path: String, extract: (Array[String]) => T): DataStream[T] = {
+    env.readTextFile(path).map(line => extract(rdfize(line)))
   }
 
+  /*
   def connect(env: StreamExecutionEnvironment, host: String, port: Int): DataStream[Array[String]] = {
     env.socketTextStream(host,port).map(line => rdfize(line))
   }
@@ -87,10 +86,11 @@ class RDFStream extends java.io.Serializable {
  def zmqSubscribe(env: StreamExecutionEnvironment, addr: String): DataStream[Array[String]] = {
     env.addSource(new ZmqSubscriber(addr)).map(line => rdfize(line))
   }
+*/
 }
 
 object RDFStream {
-  def apply(): RDFStream = {
+  def apply[T <: SchemaClass: ClassTag: TypeInformation](): RDFStream[T] = {
     new RDFStream
   }
-}*/
+}

@@ -26,6 +26,7 @@ import dbis.pig.plan.rewriting.internals.{Column, RDF}
 import dbis.pig.schema.{Field, Schema, Types}
 import org.kiama.rewriting.Rewriter._
 import scala.collection.mutable.Map
+import scala.language.postfixOps
 
 object RDFRuleset extends Ruleset {
 

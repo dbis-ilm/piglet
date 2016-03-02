@@ -21,6 +21,7 @@ import dbis.pig.schema._
 
 import scala.util.parsing.combinator.JavaTokenParsers
 import scala.util.parsing.input.CharSequenceReader
+import scala.language.postfixOps
 
 /**
   * Created by kai on 04.12.15.
