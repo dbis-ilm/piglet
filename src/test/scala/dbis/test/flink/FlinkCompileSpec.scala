@@ -443,9 +443,10 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val schemaCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
     val expectedSchemaCode =
       cleanString("""
-         |case class _t2_Tuple (_0 : String, _1 : Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
-         |override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
+         |case class _t2_Tuple (_0: String, _1: Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
+         |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
          |}
+         |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
        """.stripMargin)
     assert(schemaCode == expectedSchemaCode)
   }
@@ -720,12 +721,14 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
     """
-      |case class _t2_Tuple (_0 : Int, _1 : String, _2 : Double, _3 : Int) extends java.io.Serializable with SchemaClass {
+      |case class _t2_Tuple (_0: Int, _1: String, _2: Double, _3: Int) extends java.io.Serializable with SchemaClass {
       |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2 + _c + _3
       |}
-      |case class _t1_Tuple (_0 : Int, _1 : String, _2 : Double) extends java.io.Serializable with SchemaClass {
+      |implicit def convert_t2_Tuple(t: (Int, String, Double, Int)): _t2_Tuple = _t2_Tuple(t._1, t._2, t._3, t._4)
+      |case class _t1_Tuple (_0: Int, _1: String, _2: Double) extends java.io.Serializable with SchemaClass {
       |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2
       |}
+      |implicit def convert_t1_Tuple(t: (Int, String, Double)): _t1_Tuple = _t1_Tuple(t._1, t._2, t._3)
       |""".stripMargin
     )
     assert(generatedCode == expectedCode)
@@ -751,12 +754,14 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
       """
-        |case class _t1_Tuple (_0 : String, _1 : String) extends java.io.Serializable with SchemaClass {
-        |override def mkString(_c: String = ",") = _0 + _c + _1
+        |case class _t1_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
+        |  override def mkString(_c: String = ",") = _0 + _c + _1
         |}
-        |case class _t2_Tuple (_0 : String, _1 : Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
-        |override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
+        |implicit def convert_t1_Tuple(t: (String, String)): _t1_Tuple = _t1_Tuple(t._1, t._2)
+        |case class _t2_Tuple (_0: String, _1: Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
+        |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
         |}
+        |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
         |""".stripMargin
     )
     assert(generatedCode == expectedCode)

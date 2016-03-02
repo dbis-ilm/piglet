@@ -149,7 +149,7 @@ class JdbcStorage[T <: SchemaClass :ClassTag]  extends java.io.Serializable {
     }
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     // TODO: DataFrame -> RDD[T]
-    sqlContext.load("jdbc", params).rdd.map(t => extract(t))
+    sqlContext.read.format("jdbc").options(params).load().rdd.map(t => extract(t))
   }
 }
 

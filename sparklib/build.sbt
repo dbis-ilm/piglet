@@ -17,4 +17,6 @@ libraryDependencies ++= Seq(
 
 test in assembly := {}
 
+scalacOptions ++= Seq("-feature","-language:implicitConversions")
+
 sourcesInBase := false
