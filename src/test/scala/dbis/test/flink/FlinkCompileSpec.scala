@@ -296,7 +296,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |};""".stripMargin)
     val plan = new DataflowPlan(ops)
     val foreachOp = plan.findOperatorForAlias("uniqcnt").get
-    println("schema = " + foreachOp.schema)
+    //println("schema = " + foreachOp.schema)
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(foreachOp))
 
@@ -320,7 +320,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
 
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    println("schema class = " + schemaClassCode)
+    //println("schema class = " + schemaClassCode)
 
     val expectedCode = cleanString(
       """val out = data.map(t => _t$1_Tuple(_t$2_Tuple(t._0,t._1), List(_t$3_Tuple(t._0),_t$3_Tuple(t._1)),

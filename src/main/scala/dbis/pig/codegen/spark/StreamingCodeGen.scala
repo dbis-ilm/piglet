@@ -68,7 +68,7 @@ class StreamingCodeGen(template: String) extends BatchCodeGen(template) {
                       "func" -> func, "params" -> params)
     if (mode != "")
       paramMap += ("mode" -> mode)
-    println("paramMap = " + paramMap)
+//    println("paramMap = " + paramMap)
     callST("socketRead", paramMap)
   }
 

@@ -22,15 +22,13 @@ import dbis.pig.udf._
 import dbis.pig.schema._
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.backends.BackendManager
-
 import scala.collection.mutable.ListBuffer
-
 import java.nio.file.Path
 import dbis.pig.codegen.ScalaBackendCodeGen
 import dbis.pig.codegen.CodeGenerator
-
 import scala.collection.mutable
 import scala.collection.mutable.{ Map => MMap }
+import scala.collection.mutable.ArrayBuffer
 
 class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(template) {
 
@@ -62,13 +60,17 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
    * @param tuplePrefix
    * @return
    */
-  override def emitRef(schema: Option[Schema], ref: Ref, tuplePrefix: String = "t",
+  override def emitRef(schema: Option[Schema], ref: Ref,
+                       tuplePrefix: String = "t",
                        aggregate: Boolean = false,
                        namedRef: Boolean = false): String = ref match {
-    case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[Seq[List[Any]]](0)${emitRef(tupleSchema(schema, r1), r2, "")}"
-    case _                  => super.emitRef(schema, ref, tuplePrefix, aggregate)
+    case DerefTuple(r1, r2) =>
+      if (aggregate)
+        s"${emitRef(schema, r1, "t")}.map(e => e${emitRef(tupleSchema(schema, r1), r2, "")})"
+      else
+        s"${emitRef(schema, r1, "t")}${emitRef(tupleSchema(schema, r1), r2, "", aggregate, namedRef)}"
+    case _ => super.emitRef(schema, ref, tuplePrefix, aggregate, namedRef)
   }
-
   override def emitHelperClass(node: PigOperator): String = {
     //require(node.schema.isDefined)
     def emitHelperAccumulate(node: PigOperator, gen: GeneratorList): String = {
@@ -159,9 +161,8 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
             case o @ OrderBy(_, _, spec, windowMode) if (windowMode) => {
               var params = Map[String, Any]()
               params += "key" -> emitSortKey(o.schema, spec, o.outPipeName, o.inPipeName)
-              params += "reverse" -> ascendingSortOrder(spec.head)
-              params += "class" -> schemaClassName(o.schema.get.className)
-              applyBody += callST("orderHelper", Map("params" -> params)) + "\n"
+              params += "ordering" -> emitOrdering(o.schema, spec)
+              applyBody += callST("orderByHelper", Map("params" -> params)) + "\n"
             }
             case o @ Grouping(_, _, groupExpr, windowMode) if (windowMode) => {
               var params = Map[String, Any]()
@@ -173,7 +174,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
               fname = "WindowFunc" + o.outPipeName
               var params = Map[String, Any]()
               params += "expr" -> emitForeachExpr(o, gen, false)
-              params += "class" -> schemaClassName(o.schema.get.className)
+              if (!gen.isNested) params += "class" -> schemaClassName(o.schema.get.className)
               applyBody += callST("foreachHelper", Map("params" -> params))
               return s"""  def ${fname}(wi: Window, ts: Iterable[${inSchema}], out: Collector[${outSchema}]) = {
                 |    ts
@@ -219,15 +220,30 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
    * @param aggr generate clause contains aggregates
    * @return the generated code
    */
-  def emitNestedPlan(schema: Option[Schema], plan: DataflowPlan, aggr: Boolean): String = {
+  def emitNestedPlan(parent: PigOperator, plan: DataflowPlan, aggr: Boolean): String = {
+    val schema = parent.inputSchema
+
+    require(parent.schema.isDefined)
+    val className = schemaClassName(parent.schema.get.className)
+
     "{\n" + plan.operators.map {
-      case n @ Generate(expr) => s"""( ${if (aggr) emitAccumulate(n, GeneratorList(expr)) else emitGenerator(schema, expr)} )"""
+      case n @ Generate(expr) => if (aggr) emitAccumulate(n, GeneratorList(expr)) else s"""${className}(${emitGenerator(schema, expr, namedRef = true)})"""
       case n @ ConstructBag(out, ref) => ref match {
         case DerefTuple(r1, r2) => {
-          val p1 = findFieldPosition(schema, r1)
-          val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
-          require(p1 >= 0 && p2 >= 0)
-          s"""val ${n.outPipeName} = t($p1).asInstanceOf[Seq[Any]].map(l => l.asInstanceOf[Seq[Any]]($p2))"""
+          // there are two options of ConstructBag
+          // 1. r1 refers to the input pipe of the outer operator (for automatically
+          //    inserted ConstructBag operators)
+          if (r1.toString == parent.inPipeName) {
+            val pos = findFieldPosition(schema, r2)
+            // println("pos = " + pos)
+            s"""val ${n.outPipeName} = t._$pos.toList"""
+          } else {
+            // 2. r1 refers to a field in the schema
+            val p1 = findFieldPosition(schema, r1)
+            val p2 = findFieldPosition(tupleSchema(schema, r1), r2)
+            // println("pos2 = " + p1 + ", " + p2)
+            s"""val ${n.outPipeName} = t._$p1.map(l => l._$p2).toList"""
+          }
         }
         case _ => "" // should not happen
       }
@@ -252,7 +268,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
       }
       case GeneratorPlan(plan) => {
         val subPlan = node.asInstanceOf[Foreach].subPlan.get
-        emitNestedPlan(node.inputSchema, subPlan, aggr)
+        emitNestedPlan(node, subPlan, aggr)
       }
     }
   }
@@ -263,24 +279,62 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
     List.range(0, schema.fields.length).map { i => s"${prefix}._$i" }.mkString(", ")
   //schema.fields.zipWithIndex.map{case (_, i) => s"${prefix}._$i"}.mkString(", ")
 
-  def emitJoinExtractor(node: PigOperator, subPrefix: String = ""): String = {
-    var extractor = ""
-    node.schema match {
-      case Some(s) => {
-        extractor = s"""${schemaClassName(s.className)}("""
-        node.inputs(0).producer.schema match {
-          case Some(s1) => extractor += s"""${schemaExtractor("t1" + subPrefix, s1)},"""
-          case None     => ???
-        }
-        node.inputs(1).producer.schema match {
-          case Some(s2) => extractor += s""" ${schemaExtractor("t2" + subPrefix, s2)})"""
-          case None     => ???
-        }
-
+  /**
+   * Determines the resulting field list and joined pairs for cross and join operators.
+   *
+   * @param node the Join or Cross node
+   * @return the pairs and fields as a Tuple2[String, String]
+   */
+  def emitJoinFieldList(node: PigOperator): (String, String) = {
+    val rels = node.inputs
+    var fields = ""
+    var pairs = "(v,w)"
+    if (rels.length == 2) {
+      val vsize = rels.head.inputSchema.get.fields.length
+      fields = node.schema.get.fields.zipWithIndex
+        .map { case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}" }.mkString(", ")
+    } else {
+      pairs = "(v1,v2)"
+      for (i <- 3 to rels.length) {
+        pairs = s"($pairs,v$i)"
       }
-      case None => ???
+      val fieldList = ArrayBuffer[String]()
+      for (i <- 1 to node.inputs.length) {
+        node.inputs(i - 1).producer.schema match {
+          case Some(s) => fieldList ++= s.fields.zipWithIndex.map { case (f, k) => s"v$i._$k" }
+          case None    => fieldList += s"v$i._0"
+        }
+      }
+      fields = fieldList.mkString(", ")
     }
-    extractor
+    (pairs, fields)
+  }
+
+  override def emitSortKey(schema: Option[Schema], orderSpec: List[OrderBySpec], out: String, in: String): String = {
+    if (orderSpec.size == 1)
+      emitRef(schema, orderSpec.head.field)
+    else
+      s"(${orderSpec.map(r => emitRef(schema, r.field)).mkString(",")})"
+  }
+
+  /**
+   * Creates the ordering definition for a given spec and schema.
+   *
+   * @param schema the schema of the order by operator
+   * @param orderSpec the order specifications
+   * @return the ordering definition
+   */
+  def emitOrdering(schema: Option[Schema], orderSpec: List[OrderBySpec]): String = {
+
+    def emitOrderSpec(spec: OrderBySpec): String = {
+      val reverse = if (spec.dir == OrderByDirection.DescendingOrder) ".reverse" else ""
+      s"Ordering.${scalaTypeOfField(spec.field, schema)}" + reverse
+    }
+
+    if (orderSpec.size == 1)
+      emitOrderSpec(orderSpec.head)
+    else
+      s"Ordering.Tuple${orderSpec.size}(" + orderSpec.map { r => emitOrderSpec(r) }.mkString(",") + ")"
   }
 
   /*------------------------------------------------------------------------------------------------- */
@@ -334,13 +388,19 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
    */
   def emitCross(node: PigOperator, window: Tuple2[Int, String]): String = {
     val rels = node.inputs
-    val extractor = emitJoinExtractor(node, "._2")
+    val className = node.schema match {
+      case Some(s) => schemaClassName(s.className)
+      case None    => schemaClassName(node.outPipeName)
+    }
+    val extractor = emitJoinFieldList(node)
     val params =
       if (window != null)
         Map("out" -> node.outPipeName,
+          "class" -> className,
           "rel1" -> rels.head.name,
           "rel2" -> rels.tail.map(_.name),
-          "extractor" -> extractor,
+          "pairs" -> extractor._1,
+          "fields" -> extractor._2,
           "window" -> window._1,
           "wUnit" -> window._2)
       else
@@ -448,13 +508,46 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
    * @return the Scala code implementing the JOIN operator
    */
   def emitJoin(node: PigOperator, out: String, rels: List[Pipe], exprs: List[List[Ref]], window: Tuple2[Int, String]): String = {
+    val className = node.schema match {
+      case Some(s) => schemaClassName(s.className)
+      case None    => schemaClassName(node.outPipeName)
+    }
     val res = node.inputs.zip(exprs)
     val keys = res.map { case (i, k) => emitJoinKey(i.producer.schema, k) }
-    val extractor = emitJoinExtractor(node)
+
+    val extractor = emitJoinFieldList(node)
+
+    // for more than 2 relations the key is nested and needs to be extracted
+    var keyLoopPairs = List("t")
+    for (k <- keys.drop(2).indices) {
+      var nesting = "(t, m0)"
+      for (i <- 1 to k) nesting = s"($nesting,m$i)"
+      keyLoopPairs :+= nesting
+    }
     if (window != null)
-      callST("join", Map("out" -> out, "rel1" -> rels.head.name, "key1" -> keys.head, "rel2" -> rels.tail.map(_.name), "key2" -> keys.tail, "extractor" -> extractor, "window" -> window._1, "wUnit" -> window._2.toLowerCase()))
+      callST("join", Map(
+        "out" -> out,
+        "class" -> className,
+        "rel1" -> rels.head.name,
+        "key1" -> keys.head,
+        "rel2" -> rels.tail.map(_.name),
+        "key2" -> keys.tail,
+        "kloop" -> keyLoopPairs,
+        "pairs" -> extractor._1,
+        "fields" -> extractor._2,
+        "window" -> window._1,
+        "wUnit" -> window._2.toLowerCase()))
     else
-      callST("join", Map("out" -> out, "rel1" -> rels.head.name, "key1" -> keys.head, "rel2" -> rels.tail.map(_.name), "key2" -> keys.tail, "extractor" -> extractor))
+      callST("join", Map(
+        "out" -> out,
+        "class" -> className,
+        "rel1" -> rels.head.name,
+        "key1" -> keys.head,
+        "rel2" -> rels.tail.map(_.name),
+        "key2" -> keys.tail,
+        "kloop" -> keyLoopPairs,
+        "pairs" -> extractor._1,
+        "fields" -> extractor._2))
   }
 
   /**
@@ -491,12 +584,12 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
 
     val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
     val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
-    paramMap ++= Map("out" -> node.outPipeName, "addr_hostname" -> addr.hostname,
-      "addr_port" -> addr.port,
-      "func" -> func, "params" -> params)
-    if (mode != "")
-      paramMap += ("mode" -> mode)
-    println("paramMap = " + paramMap)
+    paramMap ++= Map(
+      "out" -> node.outPipeName,
+      "addr" -> addr,
+      "func" -> func,
+      "params" -> params)
+    if (mode != "") paramMap += ("mode" -> mode)
     callST("socketRead", paramMap)
   }
 

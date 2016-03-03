@@ -27,7 +27,9 @@ import dbis.pig.expr.Expr
 /**
  * A trait for the GENERATE part of a FOREACH operator.
  */
-trait ForeachGenerator {}
+trait ForeachGenerator {
+  def isNested: Boolean
+}
 
 /**
  * GeneratorExpr represents a single expression of a Generator.
@@ -69,6 +71,7 @@ case class GeneratorList(var exprs: List[GeneratorExpr]) extends ForeachGenerato
       }
     }).toArray
 
+  def isNested() = false
 }
 
 /**
@@ -77,7 +80,9 @@ case class GeneratorList(var exprs: List[GeneratorExpr]) extends ForeachGenerato
  *
  * @param subPlan
  */
-case class GeneratorPlan(var subPlan: List[PigOperator]) extends ForeachGenerator
+case class GeneratorPlan(var subPlan: List[PigOperator]) extends ForeachGenerator {
+    def isNested() = true
+}
 
 /**
  * Foreach represents the FOREACH operator of Pig.

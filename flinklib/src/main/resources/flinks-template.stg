@@ -116,9 +116,9 @@ accumulate(out, in, helper_class, class, aggr_expr, notKeyed) ::=<<
 // ------------------ GROUPS elements on an expression ------------------------
 groupBy(out,in,expr,windowMode, class) ::=<<
 <if (expr)>
-    val <out> = <in>.map(t => <class>((<expr>),List(t))).keyBy(t => t._0)
+    val <out> = <in>.map(t => <class>(<expr>, List(t))).keyBy(t => t._0)
 <else>
-    val <out> = <in>.map(t => List("all", List(t))).keyBy(t => t._0)
+    val <out> = <in>.map(t => <class>("all", List(t))).keyBy(t => t._0)
 <endif>
 >>
 
@@ -139,7 +139,11 @@ orderBy(out,in,key,asc) ::=<<
 >>
 
 orderHelper(params) ::=<<
-    .toList.asInstanceOf[List[<params.class>]].sortBy(t => (<params.key>))<if (params.reverse)>(Ordering[String].reverse)<endif>
+>>
+
+
+orderByHelper(params) ::=<<
+    .toList.sortBy(t => <params.key>)(<params.ordering>)
 >>
 
 // ------------------ Passes Stream through a Window Operator -----------------
@@ -168,19 +172,21 @@ windowApply(out,in,func) ::=<<
 join_key_map(rels,keys) ::=<<
 >>
 
-join(out,rel1,key1,rel2,key2,extractor,window,wUnit) ::=<<
-    val <out> = <rel1><rel2,key2:{ r,k |<\\>
-    .join(<r>).where(t => <key1>).equalTo(t => <k>).window(TumblingTimeWindows.of(Time.<wUnit>(<window>)))<\\>
-    .apply{ (t1,t2) => <extractor> \}<\\>
+join(out,class,rel1,key1,rel2,key2,kloop,pairs,fields,window,wUnit) ::=<<
+    val <out> = <rel1><rel2,key2,kloop:{ r,k,l |<\\>
+    .join(<r>).where(k => k match {case <l> => <key1>\}).equalTo(t => <k>).window(TumblingTimeWindows.of(Time.<wUnit>(<window>)))<\\>
+    .apply{(t1,t2) => (t1, t2)\}
     }>
+      .map{ v => v match {case  <pairs> => <class>(<fields>) }}
 >>
 
 // ------------ Computes the CROSS product of two or more relations -----------
-cross(out,rel1,rel2,extractor,window,wUnit) ::=<<
+cross(out,rel1,rel2,pairs,fields,class,window,wUnit) ::=<<
     val <out> = <rel1><rel2:{ r |<\\>
     .map(t => (1,t)).join(<r>.map(t => (1,t))).where(t => t._1).equalTo(t => t._1).window(TumblingTimeWindows.of(Time.<wUnit>(<window>)))<\\>
-    .apply{ (t1,t2) => <extractor> \}<\\>
+    .apply{(t1,t2) => (t1._2, t2._2)\}
     }>
+      .map{ v => v match {case  <pairs> => <class>(<fields>) }}
 >>
 
 // ------------------ UNIONs multiple streams to one --------------------------
@@ -194,16 +200,17 @@ sample(out,in,expr) ::=<<
 >>
 
 // ------------------ STREAM operators ----------------------------------------
-streamOp(out,in,op,params) ::=<<
-    val <out> = <op>(env, <in><params>)
+streamOp(out, in, op, params, class, in_fields, out_fields) ::=<<
+        val <in>_helper = <in>.map(t => List(<in_fields>))
+        val <out> = <op>(env, <in>_helper<params>).map(t => <class>(<out_fields>))
 >>
 
 // ------------------ Reads from a SOCKET -------------------------------------
-socketRead(out,addr,mode,class,func,params) ::=<<
+socketRead(out,addr,mode,class,extractor,func,params) ::=<<
 <if (mode)>
-    val <out> = <func>[<class>]().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>"<params>)
+    val <out> = <func>[<class>]().zmqSubscribe(env, "<addr.protocol><addr.hostname>:<addr.port>", <extractor><params>)
 <else>
-    val <out> = <func>[<class>]().connect(env, "<addr.hostname>", <addr.port><params>)
+    val <out> = <func>[<class>]().connect(env, "<addr.hostname>", <addr.port>, <extractor><params>)    
 <endif>
 >>
 
