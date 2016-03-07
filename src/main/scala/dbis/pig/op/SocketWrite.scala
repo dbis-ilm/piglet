@@ -27,9 +27,9 @@ import dbis.pig.backends.BackendManager
  */
 case class SocketWrite(in: Pipe,
                        addr: SocketAddress,
-                       mode: String,
-                       func: Option[String] = None) //BackendManager.backend.defaultConnector 
-                     extends PigOperator {
+                       mode: String = "",
+                       func: Option[String] = None, //BackendManager.backend.defaultConnector
+                       params: List[String] = null) extends PigOperator {
   _outputs = List()
   _inputs = List(in)
 

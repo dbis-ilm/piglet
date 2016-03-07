@@ -34,16 +34,16 @@ class PigStream[T <: SchemaClass: ClassTag: TypeInformation] extends java.io.Ser
     env.socketTextStream(host,port).map(line => extract(line.split(delim, -1)))
   }
 
-  def bind(host: String, port: Int, result: DataStream[List[String]]) = {
-    result.writeToSocket(host, port, new UTF8StringSchema())
+  def bind(host: String, port: Int, result: DataStream[T], delim: String = ",") = {
+    result.map(_.mkString(delim)).writeToSocket(host, port, new UTF8StringSchema())
   }
 
   def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
     env.addSource(new ZmqSubscriber(addr)).map(line => extract(line.split(delim, -1)))
   }
 
-  def zmqPublish(addr: String, result: DataStream[List[String]]) = {
-    result.addSink(new ZmqPublisher(addr)).setParallelism(1)
+  def zmqPublish(addr: String, result: DataStream[T], delim: String = ",") = {
+    result.map(_.mkString(delim)).addSink(new ZmqPublisher(addr)).setParallelism(1)
   }
 }
 

@@ -22,6 +22,8 @@ import dbis.pig.tools.CppCompiler
 import dbis.pig.tools.CppCompilerConf
 import dbis.pig.tools.Conf
 import de.tuilmenau.setm.SETM.timing
+import scalax.file.{Path => xPath}
+
 
 object PigletCompiler extends PigletLogging {
   
@@ -220,15 +222,11 @@ def createCodeFromInput(source: String, backend: String): String = {
       FileTools.extractJarToDir(jobJar, outputDirectory)
 
       // copy the common library to output
-      /*
-       From the previous path the backend library part is replaced by "common". The question mark
-       is necessary in case streaming mode is chosen, which would add an 's'. Since the backend
-       libraries use the same Jar per plattform the streaming versions does not exist (e.g. there
-       is only "flinklib" and no "flinkslib").
-      */
-      var commonJar =s"""(${backend}?lib)""".r.replaceAllIn(jobJar, "common")
-      logger.info(s"add common jar '${commonJar}' to job's jar file ...")
-      FileTools.extractJarToDir(commonJar, outputDirectory)
+      val commonJars = xPath("common/target/scala-2.11/",'/')  ** "*.jar"
+      commonJars.foreach { jar => 
+        logger.info(s"add common jar '${jar.path}' to job's jar file ...")
+        FileTools.extractJarToDir(jar.path, outputDirectory)
+      }
 
       val sources = ListBuffer(outputFile)
       

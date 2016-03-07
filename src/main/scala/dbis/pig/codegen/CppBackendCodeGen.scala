@@ -490,7 +490,7 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
         "input" -> s"op_${in.name}",
         "expr" -> emitOrderExpr(node.schema, orderSpec)))
       case SocketRead(out, address, mode, _, _, _) => callST("zmq_source", Map("op_name" -> s"op_${out.name}", "endpoint" -> s"${address.protocol}${address.hostname}:${address.port}", "tuple_type" -> s"${node.outPipeName}_TupleType"))
-      case SocketWrite(in, address, mode, _) => {
+      case SocketWrite(in, address, mode, _, _) => {
         callST("zmq_sink", Map("op_name" -> s"op_zmq_sink_${in.name}",
           "input" -> in.name,
           "endpoint" -> s"${address.protocol}${address.hostname}:${address.port}",

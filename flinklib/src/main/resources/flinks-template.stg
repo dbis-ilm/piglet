@@ -141,26 +141,33 @@ orderBy(out,in,key,asc) ::=<<
 orderHelper(params) ::=<<
 >>
 
-
 orderByHelper(params) ::=<<
     .toList.sortBy(t => <params.key>)(<params.ordering>)
 >>
 
 // ------------------ Passes Stream through a Window Operator -----------------
-window(out,in,window,wUnit,slider,sUnit) ::=<<
-<if (wUnit)>
-  <if (sUnit)>
-    val <out> = <in>.windowAll(SlidingTimeWindows.of(Time.of(<window>, TimeUnit.<wUnit>), Time.of(<slider>, TimeUnit.<sUnit>)))
-  <else>
-    val <out> = <in>.windowAll(TumblingTimeWindows.of(Time.of(<window>, TimeUnit.<wUnit>))).trigger(CountTrigger.of(<slider>))
-  <endif>
-<else>
-  <if (sUnit)>
-    val <out> = <in>.windowAll(GlobalWindows.create()).trigger(ContinuousEventTimeTrigger.of(Time.of(<slider>, TimeUnit.<sUnit>))).evictor(CountEvictor.of(<window>))
-  <else>
-    val <out> = <in>.windowAll(GlobalWindows.create()).evictor(CountEvictor.of(<window>)).trigger(CountTrigger.of(<slider>))
-  <endif>
-<endif>
+tumblingTimeWindow(out,in,unkeyed,window,wUnit) ::=<<
+    val <out> = <in>.timeWindow<if (unkeyed)>All<endif>(Time.of(<window>, TimeUnit.<wUnit>))
+>>
+
+tumblingCountWindow(out,in,unkeyed,window) ::=<<
+    val <out> = <in>.countWindow<if (unkeyed)>All<endif>(<window>)
+>>
+
+slidingTimeWindow(out,in,unkeyed,window,wUnit,slider,sUnit) ::=<<
+    val <out> = <in>.timeWindow<if (unkeyed)>All<endif>(Time.of(<window>, TimeUnit.<wUnit>), Time.of(<slider>, TimeUnit.<sUnit>))
+>>
+
+slidingCountWindow(out,in,unkeyed,window,slider) ::=<<
+    val <out> = <in>.countWindow<if (unkeyed)>All<endif>(<window>, <slider>)
+>>
+
+slidingTimeCountWindow(out,in,unkeyed,window,wUnit,slider) ::=<<
+    val <out> = <in>.window<if (unkeyed)>All<endif>(TumblingTimeWindows.of(Time.of(<window>, TimeUnit.<wUnit>))).trigger(CountTrigger.of(<slider>))
+>>
+
+slidingCountTimeWindow(out,in,unkeyed,window,slider,sUnit) ::=<<
+    val <out> = <in>.window<if (unkeyed)>All<endif>(GlobalWindows.create()).trigger(ContinuousEventTimeTrigger.of(Time.of(<slider>, TimeUnit.<sUnit>))).evictor(CountEvictor.of(<window>))
 >>
 
 // --------- Applies a function to a windowed Stream --------------------------
@@ -215,11 +222,11 @@ socketRead(out,addr,mode,class,extractor,func,params) ::=<<
 >>
 
 // ------------------ Writes to a SOCKET -------------------------------------
-socketWrite(in,addr,mode,func) ::=<<
+socketWrite(in,addr,mode,class,func,params) ::=<<
 <if (mode)>
-    <func>().zmqPublish("<addr.protocol><addr.hostname>:<addr.port>", <in>)
+    <func>[<class>]().zmqPublish("<addr.protocol><addr.hostname>:<addr.port>", <in><if (params)>, <params><endif>)
 <else>
-    <func>().bind("<addr.hostname>", <addr.port>, <in>)
+    <func>[<class>]().bind("<addr.hostname>", <addr.port>, <in><if (params)>, <params><endif>)
 <endif>
 >>
 

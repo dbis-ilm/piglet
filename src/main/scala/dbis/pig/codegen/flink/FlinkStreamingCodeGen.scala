@@ -567,7 +567,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
   /**
    * Generates code for the SOCKET_READ Operator
    *
-   * @param out name of the output bag
+   * @param node the SOCKET_READ operator
    * @param addr the socket address to connect to
    * @param mode the connection mode, e.g. zmq or empty for standard sockets
    * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
@@ -576,12 +576,10 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
    */
   def emitSocketRead(node: PigOperator, addr: SocketAddress, mode: String, streamFunc: Option[String], streamParams: List[String]): String = {
     var paramMap = super.emitExtractorFunc(node, streamFunc)
-
     node.schema match {
       case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
       case None    => paramMap += ("class" -> "Record")
     }
-
     val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
     val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
     paramMap ++= Map(
@@ -596,36 +594,58 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
   /**
    * Generates code for the SOCKET_WRITE Operator
    *
-   * @param in name of the input bag
+   * @param node the SOCKET_WRITE operator
    * @param addr the socket address to connect to
    * @param mode the connection mode, e.g. zmq or empty for standard sockets
    * @param streamFunc an optional stream function (we assume a corresponding Scala function is available)
+   * @param streamParams an optional list of parameters to a stream function (e.g. separators)
    * @return the Scala code implementing the SOCKET_WRITE operator
    */
-  def emitSocketWrite(in: String, addr: SocketAddress, mode: String, streamFunc: Option[String]): String = {
-    val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
-    if (mode != "")
-      callST("socketWrite", Map("in" -> in, "addr" -> addr, "mode" -> mode, "func" -> func))
-    else
-      callST("socketWrite", Map("in" -> in, "addr" -> addr, "func" -> func))
+  def emitSocketWrite(node: PigOperator, addr: SocketAddress, mode: String, streamFunc: Option[String], streamParams: List[String]): String = {
+    var paramMap = Map("in" -> node.inPipeName, "addr" -> addr,
+      "func" -> streamFunc.getOrElse(BackendManager.backend.defaultConnector))
+    node.schema match {
+      case Some(s) => paramMap += ("class" -> schemaClassName(s.className))
+      case None    => paramMap += ("class" -> "Record")
+    }
+    if (mode != "") paramMap += ("mode" -> mode)
+    if (streamParams != null && streamParams.nonEmpty) paramMap += ("params" -> streamParams.mkString(","))
+    callST("socketWrite", paramMap)
   }
 
   /**
    * Generates code for the WINDOW Operator
    *
-   * @param out name of the output bag
-   * @param in name of the input bag
+   * @param node Window operator
    * @param window window size information (Num, Unit)
    * @param slide window slider information (Num, Unit)
    * @return the Scala code implementing the WINDOW operator
    */
-  def emitWindow(out: String, in: String, window: Tuple2[Int, String], slide: Tuple2[Int, String]): String = {
-    if (window._2 == "") {
-      if (slide._2 == "") callST("window", Map("out" -> out, "in" -> in, "window" -> window._1, "slider" -> slide._1))
-      else callST("window", Map("out" -> out, "in" -> in, "window" -> window._1, "slider" -> slide._1, "sUnit" -> slide._2.toUpperCase()))
-    } else {
-      if (slide._2 == "") callST("window", Map("out" -> out, "in" -> in, "window" -> window._1, "wUnit" -> window._2.toUpperCase(), "slider" -> slide._1))
-      else callST("window", Map("out" -> out, "in" -> in, "window" -> window._1, "wUnit" -> window._2.toUpperCase(), "slider" -> slide._1, "sUnit" -> slide._2.toUpperCase()))
+  def emitWindow(node: PigOperator, window: Tuple2[Int, String], slide: Tuple2[Int, String]): String = {
+    val isKeyed = node.inputs.head.producer.isInstanceOf[Grouping]
+    val isTumbling = window == slide
+    val windowIsTime = window._2 != ""
+    val slideIsTime = slide._2 != ""
+    var paramMap = Map("out" -> node.outPipeName, "in" -> node.inPipeName, "window" -> window._1)
+
+    (isKeyed, isTumbling, windowIsTime, slideIsTime) match {
+      // For Keyed Streams
+      case (true, true, true, _)        => callST("tumblingTimeWindow", paramMap ++ Map("wUnit" -> window._2.toUpperCase()))
+      case (true, true, false, _)       => callST("tumblingCountWindow", paramMap)
+      case (true, false, true, true)    => callST("slidingTimeWindow", paramMap ++ Map("wUnit" -> window._2.toUpperCase(), "slider" -> slide._1, "sUnit" -> slide._2.toUpperCase()))
+      case (true, false, true, false)   => callST("slidingTimeCountWindow", paramMap ++ Map("wUnit" -> window._2.toUpperCase(), "slider" -> slide._1))
+      case (true, false, false, true)   => callST("slidingCountTimeWindow", paramMap ++ Map("slider" -> slide._1, "sUnit" -> slide._2.toUpperCase()))
+      case (true, false, false, false)  => callST("slidingCountWindow", paramMap ++ Map("slider" -> slide._1))
+
+      // For Unkeyed Streams
+      case (false, true, true, _)       => callST("tumblingTimeWindow", paramMap ++ Map("unkeyed" -> true, "wUnit" -> window._2.toUpperCase()))
+      case (false, true, false, _)      => callST("tumblingCountWindow", paramMap ++ Map("unkeyed" -> true))
+      case (false, false, true, true)   => callST("slidingTimeWindow", paramMap ++ Map("unkeyed" -> true, "wUnit" -> window._2.toUpperCase(), "slider" -> slide._1, "sUnit" -> slide._2.toUpperCase()))
+      case (false, false, true, false)  => callST("slidingTimeCountWindow", paramMap ++ Map("unkeyed" -> true, "wUnit" -> window._2.toUpperCase(), "slider" -> slide._1))
+      case (false, false, false, true)  => callST("slidingCountTimeWindow", paramMap ++ Map("unkeyed" -> true, "slider" -> slide._1, "sUnit" -> slide._2.toUpperCase()))
+      case (false, false, false, false) => callST("slidingCountWindow", paramMap ++ Map("unkeyed" -> true, "slider" -> slide._1))
+
+      case _                            => ???
     }
   }
 
@@ -654,8 +674,8 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
       case Join(_, rels, exprs, window) => emitJoin(node, node.outPipeName, node.inputs, exprs, window)
       case OrderBy(_, _, orderSpec, windowMode) => emitOrderBy(node, orderSpec, windowMode)
       case SocketRead(_, address, mode, schema, func, params) => emitSocketRead(node, address, mode, func, params)
-      case SocketWrite(_, address, mode, func) => emitSocketWrite(node.inPipeName, address, mode, func)
-      case Window(_, _, window, slide) => emitWindow(node.outPipeName, node.inPipeName, window, slide)
+      case SocketWrite(_, address, mode, func, params) => emitSocketWrite(node, address, mode, func, params)
+      case Window(_, _, window, slide) => emitWindow(node, window, slide)
       case WindowApply(_, _, fname) => callST("windowApply", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "func" -> fname))
       case _ => super.emitNode(node)
     }

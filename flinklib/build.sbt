@@ -17,3 +17,4 @@ resolvers += "Sonatype (releases)" at "https://oss.sonatype.org/content/reposito
 scalacOptions ++= Seq("-feature","-language:implicitConversions")
 
 test in assembly := {}
+logLevel in assembly := Level.Error

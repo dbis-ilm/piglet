@@ -50,8 +50,8 @@ object PigBuild extends Build {
 
   lazy val flinklib = (project in file("flinklib")).
     settings(commonSettings: _*).
-    dependsOn(common).
-    disablePlugins(sbtassembly.AssemblyPlugin)
+    dependsOn(common)
+//    .disablePlugins(sbtassembly.AssemblyPlugin)
 
   lazy val mapreducelib = (project in file("mapreducelib")).
     settings(commonSettings: _*).
@@ -144,7 +144,6 @@ object Dependencies {
     hadoop % "provided",
     twitterUtil,
     h2Database,
-    breeze,
-    log4j
+    breeze
   )
 }

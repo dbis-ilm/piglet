@@ -656,7 +656,9 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def rowsParam: Parser[Tuple2[Int,String]] = rowsKeyword ~ num ^^ {case _ ~ n => (n, "")}
   def windowParam: Parser[Tuple2[Int,String]] = (rangeParam | rowsParam)
   def windowStmt: Parser[PigOperator] = bag ~ "=" ~ windowKeyword ~ bag ~ windowParam ~ slideKeyword ~ windowParam ^^ {
-    case out ~ _ ~ _ ~ in ~ on ~ _ ~ slide => Window(Pipe(out), Pipe(in), on, slide)
+    case out ~ _ ~ _ ~ in ~ on ~ _ ~ slide => new Window(Pipe(out), Pipe(in), on, slide)
+  } | bag ~ "=" ~ windowKeyword ~ bag ~ windowParam ^^ {
+    case out ~ _ ~ _ ~ in ~ on => new Window(Pipe(out), Pipe(in), on, on)
   }
 
   /*
@@ -693,8 +695,8 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
           case _ => {}
         }
         u match {
-          case Some(p) => SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
-          case None =>  SocketRead(Pipe(out), addr, "", schema)
+          case Some(p) => new SocketRead(Pipe(out), addr, "", schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+          case None =>  new SocketRead(Pipe(out), addr, "", schema)
       }
 
     } |
@@ -706,22 +708,28 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
             case _ => {}
           }
           u match {
-          case Some(p) => SocketRead(Pipe(out), addr, mode, schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
-          case None => SocketRead(Pipe(out), addr, mode, schema)
+          case Some(p) => new SocketRead(Pipe(out), addr, mode, schema, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+          case None => new SocketRead(Pipe(out), addr, mode, schema)
         }
       }
 
   /*
-   * SOCKET_WRITE <A> TO '<address>' [ MODE ZMQ ]
+   * SOCKET_WRITE <A> TO '<address>' [ MODE ZMQ ] 
    */
   def socketWriteStmt: Parser[PigOperator] =
-    socketWriteKeyword ~ bag ~ toKeyword ~ inetAddress ^^ {
-      case _ ~ b ~ _ ~ addr => SocketWrite(Pipe(b), addr, "")
-    } |
-      socketWriteKeyword ~ bag ~ toKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ^^ {
-        case _ ~ b ~ _ ~ addr ~ _ ~ mode => SocketWrite(Pipe(b), addr, mode)
+    socketWriteKeyword ~ bag ~ toKeyword ~ inetAddress ~ (usingClause?) ^^ {
+      case _ ~ b ~ _ ~ addr ~ u => u match {
+        case Some(p) => new SocketWrite(Pipe(b), addr, "", Some(p._1), if(p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+        case None =>  new SocketWrite(Pipe(b), addr)
       }
-
+    } |
+      socketWriteKeyword ~ bag ~ toKeyword ~ zmqAddress ~ modeKeyword ~ zmqKeyword ~ (usingClause?) ^^ {
+        case _ ~ b ~ _ ~ addr ~ _ ~ mode ~ u => u match {
+          case Some(p) => new SocketWrite(Pipe(b), addr, mode, Some(p._1), if(p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+          case None =>  new SocketWrite(Pipe(b), addr, mode)
+        }
+      }
+  
   def streamingStmt: Parser[PigOperator] =  (socketReadStmt | socketWriteStmt | windowStmt)
 
   /* ---------------------------------------------------------------------------------------------------------------- */
