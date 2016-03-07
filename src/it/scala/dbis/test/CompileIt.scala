@@ -89,7 +89,11 @@ trait CompileIt extends Matchers {
   }
 
   private def runCompiler(script: String, resourceName: String, resultPath: Path, lang: String, backend: String): Boolean = {
-    println("execute: " + script)
+    val executeLine = "| execute: " + script + " |"
+    var frame = ""
+    for (c <- 1 to executeLine.length()) frame += "-"
+    print("\n" + frame + "\n" + executeLine + "\n" + frame)
+
     val params = new java.util.HashMap[String, Object]()
     params.put("backend", backend)
     params.put("languages", lang)

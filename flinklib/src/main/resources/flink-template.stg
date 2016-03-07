@@ -68,7 +68,7 @@ foreachNested(out, in, expr) ::=<<
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
 // Note, that the closing parenthesis is intentionally missing
 foreachFlatMap(out, in, expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>
+        val <out> = <in>.flatMap(t => <expr>)
 >>
 
 
