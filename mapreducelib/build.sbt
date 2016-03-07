@@ -5,6 +5,7 @@ name := "mapreduce"
 libraryDependencies ++= Seq(
     scalaTest % "test" withSources(),
     pig % "provided",
+    hadoop,
     typesafe
 )
 
