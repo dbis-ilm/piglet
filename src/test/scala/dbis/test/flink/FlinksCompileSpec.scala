@@ -70,7 +70,7 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
       |    }
       |}
     """.stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   /*------------------------------------------------------------------------------------------------- */
@@ -85,7 +85,7 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""a.map(_.mkString()).print""")
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   /******************/
@@ -145,7 +145,6 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
       """.stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
-  
 
   it should "contain code for SOCKET_READ with RDFStream" in {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.DoubleType)))), "t1")
@@ -175,18 +174,22 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
   /* Tests for SOCKET_WRITE */
   /**************************/
   it should "contain code for SOCKET_WRITE using a Web-Socket" in {
+    val schema = new Schema(BagType(TupleType(Array(Field("line", Types.CharArrayType)))), "t1")
     val op = SocketWrite(Pipe("a"), SocketAddress("", "localhost", "9999"), "")
+    op.schema = Some(schema)
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""PigStream().bind("localhost", 9999, a)""")
+    val expectedCode = cleanString("""PigStream[_t$1_Tuple]().bind("localhost", 9999, a)""")
     generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for SOCKET_WRITE in ZMQ mode" in {
+    val schema = new Schema(BagType(TupleType(Array(Field("line", Types.CharArrayType)))), "t1")
     val op = SocketWrite(Pipe("a"), SocketAddress("tcp://", "localhost", "9999"), "zmq")
+    op.schema = Some(schema)
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""PigStream().zmqPublish("tcp://localhost:9999", a)""")
+    val expectedCode = cleanString("""PigStream[_t$1_Tuple]().zmqPublish("tcp://localhost:9999", a)""")
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -280,9 +283,9 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
 
   it should "contain code for simple ORDER BY" in {
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.DoubleType)))), "t1")
-    val op = OrderBy(Pipe("c"), Pipe("b"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)),true)
+    val op = OrderBy(Pipe("c"), Pipe("b"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)), true)
     op.schema = Some(schema)
-    
+
     // Helping surrounding operators
     val win = Window(Pipe("b"), Pipe("a"), (5, "SECONDS"), (1, "SECONDS"))
     win.schema = Some(schema)
@@ -301,7 +304,7 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
     op.inputs = List(pipeB)
     op.outputs = List(pipeC)
     sink.inputs = List(pipeD, pipeC)
-    
+
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("")
@@ -322,9 +325,9 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
       Field("f2", Types.DoubleType),
       Field("f3", Types.IntType)))), "t1")
     val op = OrderBy(Pipe("c"), Pipe("b"), List(OrderBySpec(NamedField("f1"), OrderByDirection.AscendingOrder),
-      OrderBySpec(NamedField("f3"), OrderByDirection.AscendingOrder)),true)
+      OrderBySpec(NamedField("f3"), OrderByDirection.AscendingOrder)), true)
     op.schema = Some(schema)
-    
+
     // Helping surrounding operators
     val win = Window(Pipe("b"), Pipe("a"), (5, "SECONDS"), (1, "SECONDS"))
     win.schema = Some(schema)
@@ -343,7 +346,7 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
     op.inputs = List(pipeB)
     op.outputs = List(pipeC)
     sink.inputs = List(pipeD, pipeC)
-    
+
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("")
@@ -359,15 +362,16 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
     generatedHelperCode should matchSnippet(expectedHelperCode)
   }
 
-  /********************/
-  /* Tests for WINDOW */
-  /********************/
+  /******************************/
+  /* Tests for WINDOW (unkeyed) */
+  /******************************/
+
   it should "contain code for WINDOW with RANGE size and RANGE slider" in {
     val op = Window(Pipe("b"), Pipe("a"), (5, "SECONDS"), (1, "SECONDS"))
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val b = a.windowAll(SlidingTimeWindows.of(Time.of(5, TimeUnit.SECONDS), Time.of(1, TimeUnit.SECONDS)))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val b = a.timeWindowAll(Time.of(5, TimeUnit.SECONDS), Time.of(1, TimeUnit.SECONDS))")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for WINDOW with RANGE size and ROWS slider" in {
@@ -375,7 +379,7 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val b = a.windowAll(TumblingTimeWindows.of(Time.of(5, TimeUnit.SECONDS))).trigger(CountTrigger.of(10))")
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for WINDOW with ROWS size and RANGE slider" in {
@@ -383,15 +387,15 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("val b = a.windowAll(GlobalWindows.create()).trigger(ContinuousEventTimeTrigger.of(Time.of(1, TimeUnit.SECONDS))).evictor(CountEvictor.of(100))")
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for WINDOW with ROWS size and ROWS slider" in {
     val op = Window(Pipe("b"), Pipe("a"), (100, ""), (10, ""))
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("val b = a.windowAll(GlobalWindows.create()).evictor(CountEvictor.of(100)).trigger(CountTrigger.of(10))")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("val b = a.countWindowAll(100, 10)")
+    generatedCode should matchSnippet(expectedCode)
   }
 
   /*------------------------------------------------------------------------------------------------- */
@@ -486,7 +490,7 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
 
     generatedCode should matchSnippet(expectedCode)
   }
-  
+
   it should "contain code for a multiway JOIN statement" in {
     val file = new java.net.URI("input/file.csv")
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
@@ -578,7 +582,7 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
     val codeGenerator = new FlinkStreamingCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("")
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
 
     val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(apply))
     val expectedHelperCode = cleanString("""
