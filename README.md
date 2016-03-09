@@ -15,19 +15,8 @@ the official Pig compiler for Hadoop or its extensions such as PigSpork. Instead
 ### Installation ###
 
 #### Clone & Update ####
-Simply clone the git project recursively to get all submodules:
+Simply clone the git project.
 
-```
-git clone --recursive <project-url>
-```
-
-If you already have pulled the code without the `--recursive` strategy, change into
-the project directory and do:
-
-```
-git submodule init
-git submodule update
-```
 
 #### Build ####
 To build the project, in the project directory invoke
