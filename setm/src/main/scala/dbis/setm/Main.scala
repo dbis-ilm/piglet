@@ -1,6 +1,6 @@
-package de.tuilmenau.setm
+package dbis.setm
 
-import de.tuilmenau.setm.SETM._
+import dbis.setm.SETM._
 
 object Main {
 

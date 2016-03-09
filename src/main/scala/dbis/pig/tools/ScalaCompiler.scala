@@ -23,7 +23,7 @@ import scala.tools.nsc.reporters.ConsoleReporter
 import scala.tools.nsc.{Global, Settings}
 import java.nio.file.Path
 import dbis.pig.tools.logging.PigletLogging
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM.timing
 
 trait Probe
 

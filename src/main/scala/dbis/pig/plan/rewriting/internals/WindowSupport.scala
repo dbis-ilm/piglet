@@ -24,7 +24,7 @@ import dbis.pig.tools.{BreadthFirstBottomUpWalker, BreadthFirstTopDownWalker}
 import org.kiama.rewriting.Rewriter._
 import org.kiama.rewriting.Strategy
 
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM.timing
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer

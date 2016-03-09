@@ -28,7 +28,7 @@ import dbis.pig.backends.BackendConf
 import java.nio.file.Path
 import java.nio.file.Files
 import java.nio.file.Paths
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM.timing
 
 import scala.collection.mutable.ListBuffer
 

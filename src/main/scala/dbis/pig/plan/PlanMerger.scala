@@ -3,7 +3,7 @@ package dbis.pig.plan
 import dbis.pig.op.{PigOperator,Join,Cross,Load}
 import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.tools.BreadthFirstTopDownWalker
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM.timing
 
 object PlanMerger extends PigletLogging {
 

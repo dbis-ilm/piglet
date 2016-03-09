@@ -23,7 +23,7 @@ import dbis.pig.op.{Load, Materialize, Store}
 import dbis.pig.plan.{DataflowPlan, MaterializationManager}
 import dbis.pig.tools.BreadthFirstBottomUpWalker
 
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM.timing
 
 import scala.collection.mutable.ListBuffer
 

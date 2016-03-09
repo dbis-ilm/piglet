@@ -23,7 +23,7 @@ import scala.collection.immutable.Map
 import scala.collection.mutable.Set
 import org.clapper.scalasti.STGroupFile
 import dbis.pig.expr.{Expr, Value}
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM.timing
 
 /**
  * An exception representing an error in handling the templates for code generation.

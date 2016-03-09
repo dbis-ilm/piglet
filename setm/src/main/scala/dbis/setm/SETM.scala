@@ -1,4 +1,4 @@
-package de.tuilmenau.setm
+package dbis.setm
 
 import etm.core.configuration.BasicEtmConfigurator
 import etm.core.configuration.EtmManager

@@ -47,8 +47,8 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.{Map => MutableMap}
 import scalikejdbc._
 import dbis.pig.plan.PlanMerger
-import de.tuilmenau.setm.SETM
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM
+import dbis.setm.SETM.timing
 
 object Piglet extends PigletLogging {
 

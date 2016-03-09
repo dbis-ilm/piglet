@@ -29,7 +29,7 @@ import org.kiama.rewriting.Strategy
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM.timing
 
 case class RewriterException(msg: String) extends Exception(msg)
 

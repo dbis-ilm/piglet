@@ -21,7 +21,7 @@ import dbis.pig.tools.JarBuilder
 import dbis.pig.tools.CppCompiler
 import dbis.pig.tools.CppCompilerConf
 import dbis.pig.tools.Conf
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM.timing
 import scalax.file.{Path => xPath}
 
 

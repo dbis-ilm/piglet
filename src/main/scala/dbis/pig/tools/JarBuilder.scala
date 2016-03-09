@@ -12,7 +12,7 @@ import java.util.jar.{JarEntry, JarOutputStream}
 import java.nio.file.Path
 import java.nio.file.Files
 import dbis.pig.tools.logging.PigletLogging
-import de.tuilmenau.setm.SETM.timing
+import dbis.setm.SETM.timing
 
 
 /** Utility class for building a .jar file from a directory of .class files.
