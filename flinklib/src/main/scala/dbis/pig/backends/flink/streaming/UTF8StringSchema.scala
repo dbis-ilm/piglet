@@ -22,7 +22,7 @@ import org.apache.flink.streaming.util.serialization._
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.TypeExtractor
 
-class UTF8StringSchema extends DeserializationSchema[String] with SerializationSchema[String, Array[Byte]] {
+class UTF8StringSchema extends DeserializationSchema[String] with SerializationSchema[String] {
 
   override def deserialize(message: Array[Byte]): String = {
     new String(message, "UTF-8")

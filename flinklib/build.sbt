@@ -6,7 +6,7 @@ libraryDependencies ++= Seq(
     scalaCompiler,
     scalaTest % "test" withSources(),
     jeromq,
-    flinkCore % "provided",
+    flinkScala % "provided",
     flinkStreaming % "provided",
     typesafe,
     log4j

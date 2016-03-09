@@ -61,11 +61,13 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
       |import org.apache.flink.streaming.api.windowing.time._
       |import org.apache.flink.streaming.api.windowing.triggers._
       |import org.apache.flink.streaming.api.windowing.windows._
+      |import org.apache.flink.streaming.api.TimeCharacteristic
       |import dbis.pig.backends.{SchemaClass, Record}
       |
       |object test {
       |    def main(args: Array[String]) {
       |        val env = StreamExecutionEnvironment.getExecutionEnvironment
+      |        env.setStreamTimeCharacteristic(TimeCharacteristic.IngestionTime)
       |        env.execute("Starting Query")
       |    }
       |}
