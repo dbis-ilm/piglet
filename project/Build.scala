@@ -71,7 +71,7 @@ object PigBuild extends Build {
   
   val itDeps = backend match {
     case "flink" | "flinks" => Seq(
-       Dependencies.flinkCore % "test;it",
+       Dependencies.flinkScala % "test;it",
        Dependencies.flinkStreaming % "test;it"
     )
     case "spark" | "sparks" => Seq(
@@ -108,8 +108,8 @@ object Dependencies {
   val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.2"
   val sparkREPL = "org.apache.spark" %% "spark-repl" % "1.5.2"
   val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.5.2"
-  val flinkCore = "org.apache.flink" %% "flink-core" % "0.10.2"
-  val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % "0.10.2"
+  val flinkScala = "org.apache.flink" %% "flink-scala" % "1.0.0"
+  val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % "1.0.0"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"

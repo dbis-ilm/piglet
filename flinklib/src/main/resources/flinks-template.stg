@@ -10,6 +10,7 @@ import org.apache.flink.streaming.api.windowing.evictors._
 import org.apache.flink.streaming.api.windowing.time._
 import org.apache.flink.streaming.api.windowing.triggers._
 import org.apache.flink.streaming.api.windowing.windows._
+import org.apache.flink.streaming.api.TimeCharacteristic
 import dbis.pig.backends.{SchemaClass, Record}
 <if (additional_imports)>
 <additional_imports>
@@ -37,7 +38,8 @@ object <name> {
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name, profiling) ::= <<<\n>
   def main(args: Array[String]) {
-    val env = StreamExecutionEnvironment.getExecutionEnvironment<\n>
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.setStreamTimeCharacteristic(TimeCharacteristic.IngestionTime)<\n>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
