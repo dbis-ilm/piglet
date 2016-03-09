@@ -16,18 +16,26 @@
  */
 package dbis.pig.op
 
+import dbis.pig.schema.Schema
+
 /**
- * WindowFlatten is used to transform Windows back to a single continuous Stream.
+ * WindowApply is used to transform Windows back to a single continuous Stream.
  *
  * @param out the name of the output pipe.
  * @param in the name of the input pipe.
+ * @param fname the name of the function which will be applied to the input window operator.
  */
-case class WindowFlatten(out: Pipe, in: Pipe) extends PigOperator {
+case class WindowApply(out: Pipe, 
+                       in: Pipe, 
+                       fname: String) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
-
+  
+  override def constructSchema: Option[Schema] = {
+    schema
+  }
   override def lineageString: String = {
-    s"""WINDOWFLATTEN%""" + super.lineageString
+    s"""WINDOWAPPLY%${fname}%""" + super.lineageString
   }
 
 }

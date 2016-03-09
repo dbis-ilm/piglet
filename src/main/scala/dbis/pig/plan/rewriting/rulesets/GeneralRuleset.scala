@@ -138,7 +138,7 @@ object GeneralRuleset extends Ruleset {
   def removeNonStorageSinks(node: PigOperator): Option[PigOperator] = node match {
     // Store and Dump are ok
     // To prevent recursion, empty is ok as well
-    case _ : Store | _ : HdfsCmd | _ : Dump | _ : Display | _ : Empty | _ : Generate => None
+    case _ : Store | _ : HdfsCmd | _ : Dump | _ : Display | _ : Empty | _ : Generate | _ : SocketWrite => None
     case op: PigOperator =>
       if (op.outputs.map(_.consumer.isEmpty).fold(true)(_ && _)) {
         val newNode = Empty(Pipe(""))

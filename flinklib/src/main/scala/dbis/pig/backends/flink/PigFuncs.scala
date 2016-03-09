@@ -27,7 +27,7 @@ import org.apache.flink.api.java.functions._
 import org.apache.flink.api.common.typeinfo.TypeInformation
 
 class CustomSampler[T <: SchemaClass: ClassTag: TypeInformation](dataSet: DataSet[T]) {
-  def sample(withReplacement: Boolean,fraction: Double, seed: Long = new Random().nextLong() )  = {
+  def sample(withReplacement: Boolean, fraction: Double, seed: Long = new Random().nextLong()) = {
     dataSet.mapPartition(new SampleWithFraction[T](withReplacement, fraction, seed))
   }
 
@@ -40,7 +40,7 @@ object Sampler {
 }
 
 object PigFuncs {
-  def average[T: Numeric](bag: Iterable[T]) : Double = sum(bag).toDouble / count(bag).toDouble
+  def average[T: Numeric](bag: Iterable[T]): Double = sum(bag).toDouble / count(bag).toDouble
 
   def count(bag: Iterable[Any]): Long = bag.size
 
@@ -53,132 +53,22 @@ object PigFuncs {
   def tokenize(s: String, delim: String = """[, "]""") = s.split(delim)
 
   def startswith(haystack: String, prefix: String) = haystack.startsWith(prefix)
-  
+
   def strlen(s: String) = s.length()
-  
-  def streamCount(field: Int) = (in:List[Any], state: Option[Long]) => {
-    val currentState = state.getOrElse(0L)
-    val count = currentState+1
-    (in.updated(field,count), Some(count)) 
-  }
 
-  def streamCount(field: Int,field2: Int) = (in:List[Any], state: Option[Long]) => {
-    val currentState = state.getOrElse(0L)
-    val count = currentState+1
-    (in.updated(field, 
-      in(field).asInstanceOf[List[Any]].updated(0, 
-        in(field).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]].:+(count))), Some(count)) 
-  }
-
-  def streamSum(field: Int) = (in: List[Any], state: Option[Long]) => {
-    val currentState:Long = state.getOrElse(0L)
-    val updatedState = currentState + in(field).asInstanceOf[Int]
-    (in.updated(field, updatedState), Some(updatedState))
-  }
-
-  def streamSum(field: Int,field2: Int) = (in:List[Any], state: Option[Long]) => {
-    val currentState = state.getOrElse(0L)
-    val sum = currentState + in(field).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](field2).asInstanceOf[String].toInt
-    (in.updated(field, 
-      in(field).asInstanceOf[List[Any]].updated(0, 
-        in(field).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]].:+(sum))), Some(sum)) 
-  }
-
-  def streamAvg(field: Int) = (in: List[Any], state: Option[(Double, Long)]) => {
-    val currentState:Tuple2[Double, Long] = state.getOrElse(Tuple2(0.0, 0))
-    val updatedState = (currentState._1 + in(field).asInstanceOf[Int], currentState._2 + 1)
-    val avg = (updatedState._1 / updatedState._2)
-    (in.updated(field, avg), Some(updatedState))
-  }
-
-  /*
-   * Global Streaming Function
+  /**
+   * Incremental versions of the aggregate functions - used for implementing ACCUMULATE.
    */
-
-  def streamFunc(fields: List[(String,List[Int])]) = (in: List[Any], state:Option[List[Any]]) => {
-    if (fields.head._2.size>1) streamFuncG(fields,in,state) else streamFuncS(fields,in,state)
-  }
-
-  // For grouped Tuples
-  def streamFuncG(fields: List[(String, List[Int])], in: List[Any], state:Option[List[Any]]) = {
-
-    // Old or initial state
-    val currentState = state.getOrElse(fields.map{f => f._1 match {
-        case "AVG" => (0.0D, 0L)
-        case "SUM" => (0.0D)
-        case "COUNT" => (0L)
-        case "MAX" => (Double.MinValue)
-        case "MIN" => (Double.MaxValue)
-    }})
-
-    // Update state
-    val updatedState = currentState.zip(fields).map{a => a._2._1 match {
-      case "AVG" => {
-        val avgState = a._1.asInstanceOf[(Double,Long)]
-        (avgState._1 + in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[Int].toDouble,
-         avgState._2 + 1)
-      }
-      case "SUM" => (a._1.asInstanceOf[Double] +  in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[Int].toDouble)
-      case "COUNT" => (a._1.asInstanceOf[Long] + 1)
-      case "MAX" => Math.max(a._1.asInstanceOf[Double], in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[Int].toDouble)
-      case "MIN" => Math.min(a._1.asInstanceOf[Double], in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]](a._2._2(1)).asInstanceOf[Int].toDouble)
-    }}
-
-    // Update output Value
-    val updatedValue = updatedState.zip(fields.map(_._1)).map{ v => v._2 match {
-      case "AVG" => {
-        val avgUpdatedState = v._1.asInstanceOf[(Double,Long)]
-        (avgUpdatedState._1 / avgUpdatedState._2)
-      }
-      case _ => v._1
-    }}
-
-    // Add aggregates to output List
-    val output =  in.updated(1, 
-      in(1).asInstanceOf[List[Any]].updated(0, 
-        in(1).asInstanceOf[List[Any]](0).asInstanceOf[List[Any]].++(updatedValue))) 
-
-    (output, Some(updatedState))
-  }
-
-  // For flattened Tuples
-  def streamFuncS(fields: List[(String, List[Int])], in: List[Any], state:Option[List[Any]]) = {
-
-    // Old or initial state
-    val currentState = state.getOrElse(fields.map{f => f._1 match {
-        case "AVG" => (0.0D, 0L)
-        case "SUM" => (0.0D)
-        case "COUNT" => (0L)
-        case "MAX" => (Double.MinValue)
-        case "MIN" => (Double.MaxValue)
-      }})
-
-    // Update state
-    val updatedState = currentState.zip(fields).map{a => a._2._1 match {
-      case "AVG" => {
-        val avgState = a._1.asInstanceOf[(Double,Long)]
-        (avgState._1 + in(a._2._2(0)).asInstanceOf[Int].toDouble,
-         avgState._2 + 1)
-      }
-      case "SUM" => (a._1.asInstanceOf[Double] +  in(a._2._2(0)).asInstanceOf[Int].toDouble)
-      case "COUNT" => (a._1.asInstanceOf[Long] + 1)
-      case "MAX" => Math.max(a._1.asInstanceOf[Double], in(a._2._2(0)).asInstanceOf[Int].toDouble)
-      case "MIN" => Math.min(a._1.asInstanceOf[Double], in(a._2._2(0)).asInstanceOf[Int].toDouble)
-    }}
-
-    // Update output Value
-    val updatedValue = updatedState.zip(fields.map(_._1)).map{ v => v._2 match {
-      case "AVG" => {
-        val avgUpdatedState = v._1.asInstanceOf[(Double,Long)]
-        (avgUpdatedState._1 / avgUpdatedState._2)
-      }
-      case _ => v._1
-    }}
-
-    // Add aggregates to output List
-    val output =  in.++(updatedValue) 
-
-    (output, Some(updatedState))
-  }
-
+  def incrSUM(acc: Int, v: Int) = acc + v
+  def incrSUM(acc: Double, v: Double) = acc + v
+  def incrSUM(acc: Long, v: Long) = acc + v
+  def incrCOUNT(acc: Int, v: Int) = acc + 1
+  def incrCOUNT(acc: Long, v: Long) = acc + 1
+  def incrCOUNT(acc: Double, v: Double) = acc + 1
+  def incrMIN(acc: Int, v: Int) = math.min(acc, v)
+  def incrMIN(acc: Long, v: Long) = math.min(acc, v)
+  def incrMIN(acc: Double, v: Double) = math.min(acc, v)
+  def incrMAX(acc: Int, v: Int) = math.max(acc, v)
+  def incrMAX(acc: Long, v: Long) = math.max(acc, v)
+  def incrMAX(acc: Double, v: Double) = math.max(acc, v)
 }

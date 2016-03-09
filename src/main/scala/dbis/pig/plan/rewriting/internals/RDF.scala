@@ -109,7 +109,7 @@ object RDF {
       isNamedField(p.subj) ++
         isNamedField(p.pred) ++
         isNamedField(p.obj)
-
+    import scala.language.postfixOps
     patterns flatMap namedFieldsOf toSet
   }
 

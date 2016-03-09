@@ -48,11 +48,11 @@ object SnippetMatcher {
       .zipWithIndex
       .map{ case (p, offset) => p - offset}.toList
     val keys = pattern.findAllMatchIn(template).map(p => p.toString).toList
-
     val pattern2 = "[0-9]+".r
     var offs = 0
     for (i <- 0 until keys.length) {
       // now we look for the number that we use to replace the $i string
+      if (snippet.size < positions(i) + offs  + 1) return false
       pattern2.findFirstIn(snippet.substring(positions(i) + offs)) match {
         case Some(s) => {
           replacements += (keys(i) -> s)

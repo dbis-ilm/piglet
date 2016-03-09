@@ -455,7 +455,17 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
     Rewriter.insertBetween(this, inOp, outOp, op)
   }
 
-
+  /** Insert the operator op as new path from `in` to `out` in `plan`.  inOp and oldOp has to be already part of the plan.
+    *
+    * @param inOp The Operator being the input for the new operator.
+    * @param outOp The Operator being the output for the new operator.
+    * @param op The Operator getting inserted.
+    * @return The new DataflowPlan.
+    */
+  def insertConnect(inOp: PigOperator, outOp: PigOperator, op: PigOperator): DataflowPlan = {
+    Rewriter.insertConnect(this, inOp, outOp, op)
+  }
+  
   /**
    * Remove the given operator from the dataflow plan.
    *

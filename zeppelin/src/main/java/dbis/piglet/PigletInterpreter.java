@@ -9,7 +9,6 @@ import java.io.*;
 import java.util.*;
 import org.apache.spark.repl.*;
 import dbis.pig.codegen.PigletCompiler;
-import scala.tools.nsc.settings.*;
 import scala.tools.nsc.settings.MutableSettings.BooleanSetting;
 
 public class PigletInterpreter extends Interpreter {

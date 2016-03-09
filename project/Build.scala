@@ -10,7 +10,7 @@ object PigBuild extends Build {
    */
   lazy val commonSettings = Seq(
     version := "0.3",
-    scalaVersion := "2.11.7",
+    scalaVersion := "2.11.8",
     organization := "dbis",
     unmanagedJars in Compile += file("lib_unmanaged/jvmr_2.11-2.11.2.1.jar")
   )
@@ -50,8 +50,8 @@ object PigBuild extends Build {
 
   lazy val flinklib = (project in file("flinklib")).
     settings(commonSettings: _*).
-    dependsOn(common).
-    disablePlugins(sbtassembly.AssemblyPlugin)
+    dependsOn(common)
+//    .disablePlugins(sbtassembly.AssemblyPlugin)
 
   lazy val mapreducelib = (project in file("mapreducelib")).
     settings(commonSettings: _*).
@@ -98,8 +98,8 @@ object PigBuild extends Build {
  */
 object Dependencies {
   // Libraries
-  val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.7"
-  val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.7"
+  val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.8"
+  val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.8"
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.0-M12"
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
@@ -108,9 +108,8 @@ object Dependencies {
   val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.2"
   val sparkREPL = "org.apache.spark" %% "spark-repl" % "1.5.2"
   val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.5.2"
-  //val flinkDist = "org.apache.flink" %% "flink-dist" % "0.10.0"
-  val flinkCore = "org.apache.flink" %% "flink-core" % "0.10.0"
-  val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % "0.10.0"
+  val flinkCore = "org.apache.flink" %% "flink-core" % "0.10.2"
+  val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % "0.10.2"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
@@ -144,7 +143,6 @@ object Dependencies {
     hadoop % "provided",
     twitterUtil,
     h2Database,
-    breeze,
-    log4j
+    breeze
   )
 }

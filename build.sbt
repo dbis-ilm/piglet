@@ -17,6 +17,8 @@ mainClass in assembly := Some("dbis.pig.Piglet")
 
 test in assembly := {}
 
+logLevel in assembly := Level.Error
+
 parallelExecution in ThisBuild := false
 
 // needed for serialization/deserialization
@@ -29,6 +31,7 @@ fork in Test := true
 fork in IntegrationTest := false
 
 // scalacOptions ++= Seq("-unchecked", "-deprecation", "-feature","-Ylog-classpath")
+scalacOptions ++= Seq("-feature","-language:implicitConversions")
 
 // run only those it tests, that are available for the selected backend
 testOptions in IntegrationTest := Seq(

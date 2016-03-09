@@ -59,6 +59,7 @@ object ScalaCompiler extends PigletLogging {
 
     settings.outputDirs.setSingleOutput(target)
     settings.embeddedDefaults[Probe]
+    settings.processArgumentString("-feature -language implicitConversions")
 
     // println("settings = " + settings)
     val reporter = new ConsoleReporter(settings)

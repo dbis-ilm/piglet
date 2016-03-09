@@ -20,15 +20,16 @@ package dbis.pig.op
 /**
   * Window represents the WINDOW operator of Pig.
   *
-  * @param initialOutPipeName the name of the output pipe
-  * @param initialInPipeName the name of the input pipe
-  * @param window the window size
-  * @param windowUnit the window sizes time unit 
-  * @param slide the windows slider frequency (every)
-  * @param slideUnit the windows slider time unit
+  * @param out the name of the output pipe
+  * @param in the name of the input pipe
+  * @param window the window size and time unit 
+  * @param slide the windows slider frequency (every) and time unit
+  * @param applyData informations(func name, output schema, func body) needed for window apply function
   */
-case class Window(out: Pipe, in: Pipe, window: Tuple2[Int,String], 
-                  slide: Tuple2[Int,String]) extends PigOperator {
+case class Window(out:       Pipe, 
+                  in:        Pipe, 
+                  window:    Tuple2[Int,String], 
+                  slide:     Tuple2[Int,String]) extends PigOperator {
   _outputs = List(out)
   _inputs = List(in)
 

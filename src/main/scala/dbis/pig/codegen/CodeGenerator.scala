@@ -184,14 +184,14 @@ trait CodeGenerator {
     // generate import statements
     var code = codeGen.emitImport(additionalImports)
 
+    if (!forREPL)
+      code = code + codeGen.emitHeader1(scriptName, plan.code)
+
     // generate schema classes for all registered types and schemas
     for (schema <- Schema.schemaList) {
       code = code + codeGen.emitSchemaClass(schema)
     }
-
-    if (!forREPL)
-      code = code + codeGen.emitHeader1(scriptName, plan.code)
-
+      
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
       

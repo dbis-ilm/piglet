@@ -22,7 +22,7 @@ import org.apache.flink.configuration.Configuration
 import org.zeromq._
 import org.zeromq.ZMQ._
 
-class ZmqPublisher(addr: String) extends RichSinkFunction[List[String]]{ 
+class ZmqPublisher(addr: String) extends RichSinkFunction[String]{ 
   private var publisher: Socket = _
   private val schema = new UTF8StringSchema()
 
@@ -41,10 +41,10 @@ class ZmqPublisher(addr: String) extends RichSinkFunction[List[String]]{
     }
   }
 
-  override def invoke(in: List[String]) = {
+  override def invoke(in: String) = {
     val msg: Array[Byte] = schema.serialize(in)
     try {
-      printf("Sending: %s\n", in.mkString(","))
+      printf("Sending: %s\n", in)
       publisher.send(msg, 0)
     } catch {
       case e: java.io.IOException => throw new RuntimeException(s"Cannot send message ${in.toString} to socket $addr")

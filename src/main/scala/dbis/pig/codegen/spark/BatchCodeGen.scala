@@ -67,7 +67,6 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     */
   def emitNestedPlan(parent: PigOperator, plan: DataflowPlan): String = {
     val schema = parent.inputSchema
-
     require(parent.schema.isDefined)
     val className = schemaClassName(parent.schema.get.className)
 

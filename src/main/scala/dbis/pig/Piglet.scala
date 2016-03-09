@@ -229,10 +229,7 @@ object Piglet extends PigletLogging {
       case e: Exception =>
         logger.error(s"An error occured: ${e.getMessage}")
         logger.debug(e.getMessage, e)
-        
-
     } finally {
-
       // close connection pool
       if (profiling)
         DBConnection.exit()

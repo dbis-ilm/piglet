@@ -22,41 +22,49 @@ import org.apache.flink.streaming.api.scala._
 import scala.reflect.ClassTag
 import dbis.pig.backends._
 
+class PigStream[T <: SchemaClass: ClassTag: TypeInformation] extends java.io.Serializable {
 
-class PigStream [T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Serializable {
- 
-  def loadStream (env: StreamExecutionEnvironment,  path: String,  extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
+  def loadStream(env: StreamExecutionEnvironment, path: String, extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
     env.readTextFile(path).setParallelism(1).map(line => extract(line.split(delim, -1)))
   }
 
   def writeStream(path: String, result: DataStream[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path).setParallelism(1)
-  
-  
-   /*
-  def connect(env: StreamExecutionEnvironment, host: String, port: Int, delim: Char = '\t'): DataStream[List[String]] = {
-    env.socketTextStream(host,port).map(line => line.split(delim).toList)
+
+  def connect(env: StreamExecutionEnvironment, host: String, port: Int, extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
+    env.socketTextStream(host,port).map(line => extract(line.split(delim, -1)))
   }
 
-  def bind(host: String, port: Int, result: DataStream[List[String]]) = {
-    result.writeToSocket(host, port, new UTF8StringSchema())
+  def bind(host: String, port: Int, result: DataStream[T], delim: String = ",") = {
+    result.map(_.mkString(delim)).writeToSocket(host, port, new UTF8StringSchema())
   }
 
-  def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, delim: Char = '\t'): DataStream[List[String]] = {
-    env.addSource(new ZmqSubscriber(addr)).map(line => line.split(delim).toList)
+  def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
+    env.addSource(new ZmqSubscriber(addr)).map(line => extract(line.split(delim, -1)))
   }
 
-  def zmqPublish(addr: String, result: DataStream[List[String]]) = {
-    result.addSink(new ZmqPublisher(addr)).setParallelism(1)
-  }*/
+  def zmqPublish(addr: String, result: DataStream[T], delim: String = ",") = {
+    result.map(_.mkString(delim)).addSink(new ZmqPublisher(addr)).setParallelism(1)
+  }
+}
+
+class TextLoader[T <: SchemaClass: ClassTag: TypeInformation] extends java.io.Serializable {
+  def loadStream(env: StreamExecutionEnvironment, path: String, extract: (Array[String]) => T): DataStream[T] =
+    env.readTextFile(path).map(line => extract(Array(line)))
+}
+
+object TextLoader extends java.io.Serializable {
+  def apply[T <: SchemaClass: ClassTag: TypeInformation](): TextLoader[T] = {
+    new TextLoader[T]
+  }
 }
 
 object PigStream {
-  def apply[T <: SchemaClass :ClassTag: TypeInformation](): PigStream[T] = {
+  def apply[T <: SchemaClass: ClassTag: TypeInformation](): PigStream[T] = {
     new PigStream
   }
 }
-/*
-class RDFStream extends java.io.Serializable {
+
+class RDFStream[T <: SchemaClass: ClassTag: TypeInformation] extends java.io.Serializable {
 
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
@@ -65,21 +73,22 @@ class RDFStream extends java.io.Serializable {
     fields.toArray.slice(0, 3)
   }
 
-  def load(env: StreamExecutionEnvironment, path: String): DataStream[Array[String]] = {
-    env.readTextFile(path).map(line => rdfize(line))
+  def loadStream(env: StreamExecutionEnvironment, path: String, extract: (Array[String]) => T): DataStream[T] = {
+    env.readTextFile(path).map(line => extract(rdfize(line)))
   }
 
-  def connect(env: StreamExecutionEnvironment, host: String, port: Int): DataStream[Array[String]] = {
-    env.socketTextStream(host,port).map(line => rdfize(line))
+  def connect(env: StreamExecutionEnvironment, host: String, port: Int, extract: (Array[String]) => T): DataStream[T] = {
+    env.socketTextStream(host,port).map(line => extract(rdfize(line)))
   }
 
- def zmqSubscribe(env: StreamExecutionEnvironment, addr: String): DataStream[Array[String]] = {
-    env.addSource(new ZmqSubscriber(addr)).map(line => rdfize(line))
+ def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, extract: (Array[String]) => T): DataStream[T] = {
+    env.addSource(new ZmqSubscriber(addr)).map(line => extract(rdfize(line)))
   }
+
 }
 
 object RDFStream {
-  def apply(): RDFStream = {
+  def apply[T <: SchemaClass: ClassTag: TypeInformation](): RDFStream[T] = {
     new RDFStream
   }
-}*/
+}
