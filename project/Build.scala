@@ -10,7 +10,7 @@ object PigBuild extends Build {
    */
   lazy val commonSettings = Seq(
     version := "0.3",
-    scalaVersion := "2.11.7",
+    scalaVersion := "2.11.8",
     organization := "dbis",
     unmanagedJars in Compile += file("lib_unmanaged/jvmr_2.11-2.11.2.1.jar")
   )
@@ -98,8 +98,8 @@ object PigBuild extends Build {
  */
 object Dependencies {
   // Libraries
-  val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.7"
-  val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.7"
+  val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.8"
+  val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.8"
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.0-M12"
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
