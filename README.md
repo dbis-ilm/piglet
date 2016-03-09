@@ -6,7 +6,7 @@ the official Pig compiler for Hadoop or its extensions such as PigSpork. Instead
 
  * We want to build a compiler from scratch that compiles natively to the Scala-based Spark/Flink API and avoids all the
    stuff needed for MapReduce/Hadoop.
- * Though, we are aiming at being compatible to the original Pig compiler we plan to integrate extenisiblity features
+ * Though, we are aiming at being compatible to the original Pig compiler we plan to integrate extensiblity features
    allowing to define and use user-defined operators (not only UDFs) and in this way being able to integrate extensions
    for graph processing or machine learning.
  * Finally, it is also a nice exercise in Scala programming resulting in a more compact code simplifying maintenance
