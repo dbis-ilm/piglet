@@ -166,7 +166,12 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def matrixConstructor: Parser[ArithmeticExpr] = matrixTypeName ~ "(" ~ num ~ "," ~ num ~ ", " ~ arithmExpr ~ ")" ^^{
     case s ~ _ ~ rows ~ _ ~ cols ~ _ ~ expr ~ _ => ConstructMatrixExpr(s.substring(0, 2), rows, cols, expr)
   }
-  def typeConstructor: Parser[ArithmeticExpr] = (tupleConstructor | bagConstructor | mapConstructor | matrixConstructor)
+  def geometryConstructor: Parser[ArithmeticExpr] = geometryTypeName ~ "(" ~ arithmExpr ~ ")" ^^ {
+    case _ ~ _ ~ exp ~ _ => ConstructGeometryExpr(exp)
+  }
+  
+  
+  def typeConstructor: Parser[ArithmeticExpr] = (tupleConstructor | bagConstructor | mapConstructor | matrixConstructor | geometryConstructor)
 
   def comparisonExpr: Parser[Predicate] = arithmExpr ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ (arithmExpr |
     pigStringLiteral ) ^^ {
@@ -272,6 +277,8 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   lazy val accumulateKeyword = "accumulate".ignoreCase
   lazy val timestampKeyword = "timestamp".ignoreCase
 
+  lazy val geometryTypeName = "geometry".ignoreCase
+  
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
       | falseKeyword ^^ { _ => false }
@@ -290,6 +297,11 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
       val rep = if (n.charAt(0) == 's') MatrixRep.SparseMatrix else MatrixRep.DenseMatrix
       MatrixType(t, rows, cols, rep)
   }
+  
+//  def geometryTypeSpec: Parser[GeometryType] = geometryTypeName ~ "(" ~ stringLiteral ~ ")" ^^ {
+//    case _ ~ _ ~ wkt ~ _ =>  GeometryType(wkt)
+//    
+//  }
 
   def typeSpec: Parser[PigType] = (
     "int" ^^ { _ => Types.IntType }

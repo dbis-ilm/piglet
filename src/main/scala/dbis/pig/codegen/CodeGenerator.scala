@@ -180,6 +180,7 @@ trait CodeGenerator {
       println("------------------- MATRIX contained ---------------")
       additionalImports = Some("import breeze.linalg._")
     }
+    
 
     // generate import statements
     var code = codeGen.emitImport(additionalImports)

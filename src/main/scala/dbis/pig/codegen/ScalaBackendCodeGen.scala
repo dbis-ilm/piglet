@@ -359,6 +359,11 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       val mType = if (ty.charAt(1) == 'i') "Int" else "Double"
       s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(schema, expr, namedRef = namedRef)}.map(v => v._0).toArray)"
     }
+    
+    case ConstructGeometryExpr(wkt) => {
+      s"new WKTReader().read($wkt)"
+    }
+    
     case _ => println("unsupported expression: " + expr); ""
   }
 
