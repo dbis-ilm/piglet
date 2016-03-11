@@ -27,7 +27,7 @@ lodhub_data
 *.class
 *.log
 
-__my_script/
+__my_script*/
 
 #####
 # ignore database
