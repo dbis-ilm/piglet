@@ -45,10 +45,12 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.{Map => MutableMap}
+import scala.collection.JavaConverters._
 import scalikejdbc._
 import dbis.pig.plan.PlanMerger
 import dbis.setm.SETM
 import dbis.setm.SETM.timing
+import java.nio.file.Files
 
 object Piglet extends PigletLogging {
 
@@ -67,7 +69,8 @@ object Piglet extends PigletLogging {
                             loglevel: Option[String] = None,
                             sequential: Boolean = false,
                             keepFiles: Boolean = false,
-                            stats: Boolean = false
+                            stats: Boolean = false,
+                            paramFile: Option[File] = None 
                            )
 
 
@@ -90,6 +93,7 @@ object Piglet extends PigletLogging {
     var profiling = false
     var sequential = false
     var showStats = false
+    var paramFile: Option[Path] = None
     
 
     val parser = new OptionParser[CompilerConfig]("PigletCompiler") {
@@ -102,6 +106,7 @@ object Piglet extends PigletLogging {
       opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
       opt[Seq[String]]('l', "languages") optional() action { (x, c) => c.copy(languages = x) } text ("Accepted language dialects (pig = default, sparql, streaming, cep, all)")
       opt[Map[String, String]]('p', "params") valueName ("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text ("parameter(s) to subsitute")
+      opt[File]("param-file") optional() action { (x,c) => c.copy( paramFile = Some(x) ) } text ("Path to a file containing parameter value pairs")
       opt[Unit]('u', "update-config") optional() action { (_, c) => c.copy(updateConfig = true) } text (s"update config file in program home (see config file)")
       opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text (s"show the execution plan")
       opt[Unit]("sequential") optional() action{ (_,c) => c.copy(sequential = true) } text ("sequential execution (do not merge plans)")
@@ -140,6 +145,7 @@ object Piglet extends PigletLogging {
         sequential = config.sequential
         keepFiles = config.keepFiles
         showStats = config.stats
+        paramFile = config.paramFile.map { f => f.toPath() }
       }
       case None =>
         // arguments are bad, error message will have been displayed
@@ -171,10 +177,31 @@ object Piglet extends PigletLogging {
         case e: NoSuchElementException => println(s"ERROR: invalid log level ${logLevel} - continue with default")
       }
     }
+    
+    val paramMap = MutableMap.empty[String, String]
 
+    /* 
+     * If the parameter file is given, read each line, split it by = and add 
+     * the mapping to the parameters list
+     */
+    if(paramFile.isDefined) {
+      val s = Files.readAllLines(paramFile.get).asScala
+          .map { line => line.split("=", 2) } // 2 tells split to apply the regex 1 time (n-1) - the result array will be of size 2 (n)
+          .map { arr => (arr(0) -> arr(1) )}
+          
+      paramMap ++= s
+    }
+    
+    /* add the parameters supplied via CLI to the paramMap after we read the file
+     * this way, we can override the values in the file via CLI
+     */
+    paramMap ++= params
+    
+    logger.info(s"provided parameters: ${paramMap.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
+    
     
     // start processing
-    run(files, outDir, compileOnly, master, backend, languageFeatures, params, backendPath, backendArgs, profiling, showPlan, sequential)
+    run(files, outDir, compileOnly, master, backend, languageFeatures, paramMap.toMap, backendPath, backendArgs, profiling, showPlan, sequential)
     
     if(showStats) {
       // collect and print runtime stats
