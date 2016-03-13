@@ -516,7 +516,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
           s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf)
         case Line(s, buf) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
         case Line(s, buf) => try {
-          buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet))
+          buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = false)
           eliminateDuplicatePipes(buf)
           false
         } catch {

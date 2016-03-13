@@ -177,7 +177,6 @@ trait CodeGenerator {
 
     var additionalImports: Option[String] = None
     if (plan.checkExpressions(Expr.containsMatrixType)) {
-      println("------------------- MATRIX contained ---------------")
       additionalImports = Some("import breeze.linalg._")
     }
 
