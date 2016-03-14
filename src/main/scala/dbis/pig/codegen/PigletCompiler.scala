@@ -278,7 +278,9 @@ def createCodeFromInput(source: String, backend: String): String = {
                   langFeatures: List[LanguageFeature]): List[PigOperator] = timing("parse script from source") {
     // Handle IMPORT and %DECLARE statements.
 	  val (sourceLines, declareParams) = resolveImports(source.getLines())
-    logger.info("declared parameters: " + declareParams.mkString(", "))
+	  if(declareParams.nonEmpty)
+      logger.info("declared parameters: " + declareParams.mkString(", "))
+      
     val allParams = params ++ declareParams
 
 	  if (allParams.nonEmpty) {

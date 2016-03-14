@@ -24,6 +24,7 @@ import scala.collection.mutable.Set
 import org.clapper.scalasti.STGroupFile
 import dbis.pig.expr.{Expr, Value}
 import dbis.setm.SETM.timing
+import scala.collection.mutable.ListBuffer
 
 /**
  * An exception representing an error in handling the templates for code generation.
@@ -72,7 +73,8 @@ trait CodeGeneratorBase {
    *
    * @return a string representing the import code
    */
-  def emitImport(additionalImports: Option[String] = None): String
+//  def emitImport(additionalImports: Option[String] = None): String
+  def emitImport(additionalImports: Seq[String] = Seq.empty): String
 
   /**
    * Generate code for the header of the script outside the main class/object,
@@ -168,18 +170,27 @@ trait CodeGenerator {
    *                Header2 and Footer
    * @return the string representation of the code
    */
-  def compile(scriptName: String, plan: DataflowPlan, profiling: Boolean, forREPL: Boolean = false): String = timing("compile to code") {
+  def compile(scriptName: String, plan: DataflowPlan, profiling: Boolean, forREPL: Boolean = false): String = timing("generate code") {
     require(codeGen != null, "code generator undefined")
 
     if (plan.udfAliases != null) {
       codeGen.udfAliases = Some(plan.udfAliases.toMap)
     }
 
-    var additionalImports: Option[String] = None
+//    var additionalImports: Option[String] = None
+    val additionalImports = ListBuffer.empty[String]
     if (plan.checkExpressions(Expr.containsMatrixType)) {
-      println("------------------- MATRIX contained ---------------")
-      additionalImports = Some("import breeze.linalg._")
+//      println("------------------- MATRIX contained ---------------")
+//      additionalImports = Some("import breeze.linalg._")
+      additionalImports += "import breeze.linalg._"
     }
+    
+    if(plan.checkExpressions(Expr.containsGeometryType)) {
+      additionalImports ++= Seq(
+          "import com.vividsolutions.jts.io.WKTReader",
+          "import com.vividsolutions.jts.geom.Geometry")
+    }
+    
     
 
     // generate import statements
