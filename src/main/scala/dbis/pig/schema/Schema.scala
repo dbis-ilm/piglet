@@ -233,7 +233,7 @@ object Schema {
    * Clears the map of all schemas and resets the counter.
    */
   def init(): Unit = {
-    schemaSet.clear()
+     schemaSet.clear()
     cnt = 0
   }
 
