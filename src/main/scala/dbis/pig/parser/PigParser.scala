@@ -623,7 +623,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
    * A statement can be one of the above delimited by a semicolon.
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
-    distinctStmt | joinStmt | spatialJoinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    distinctStmt | spatialJoinStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt )
 
   /* ---------------------------------------------------------------------------------------------------------------- */
@@ -818,17 +818,9 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     case _ ~ _ ~ exp ~ _ => ConstructGeometryExpr(exp)
   }
   
-  import SpatialPredicateType._
-  
-  def containsPredicate = containsKeyword ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {    
-    case _ ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialPredicate(r1, r2, SpatialPredicateType.CONTAINS)
+  def spatialPredicate = (containsKeyword | intersectsKeyword) ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {
+    case kw ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialPredicate(r1,r2,  SpatialPredicateType.withName(kw.toUpperCase()))
   }
-  
-  def intersectsPredicate = intersectsKeyword ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {    
-    case _ ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialPredicate(r1, r2, SpatialPredicateType.INTERSECTS)
-  } 
-  
-  def spatialPredicate = containsPredicate | intersectsPredicate
   
   
   def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ "," ~ bag ~ onKeyword ~ spatialPredicate ^^ {

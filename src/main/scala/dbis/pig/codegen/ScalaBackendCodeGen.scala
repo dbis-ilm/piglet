@@ -726,10 +726,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   def emitSpatialJoin(j: SpatialJoin): String = {
     
     require(j.schema.isDefined, "Schema information is required for spatial join")
-    require(j.in.size == 2, "A spatial join must be made between exactly two relations")
+    require(j.inputs.size == 2, "A spatial join must be made between exactly two relations")
 
-    
-    
     val res = j.inputs.zip(Seq(j.predicate.left, j.predicate.right))
     val keys = res.map { case (i, k) => emitJoinKey(i.producer.schema, List(k)) }
 
@@ -738,15 +736,26 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
      * Thus, we build a list of 1 and 0's where 1 stands for a relation name for which we have already
      * created a _kv variable.
      */
-    val duplicates = j.in.map(r => if (joinKeyVars.contains(r.name)) 1 else 0)
+    val duplicates = j.inputs.map(r => if (joinKeyVars.contains(r.name)) 1 else 0)
 
     /*
      * Now we build lists for rels and keys by removing the elements corresponding to 1's in the duplicate
      * list.
      */
-    val drels = j.in.zipWithIndex.filter { r => duplicates(r._2) == 0 }.map(_._1)
+    val drels = j.inputs.zipWithIndex.filter { r => duplicates(r._2) == 0 }.map(_._1)
     val dkeys = keys.zipWithIndex.filter { k => duplicates(k._2) == 0 }.map(_._1)
 
+    val className = j.schema match {
+      case Some(s) => schemaClassName(s.className)
+      case None => schemaClassName(j.outPipeName)
+    }
+    
+//    logger.debug(s"j.in: ${j.in}")
+    
+    val vsize = j.inputs.head.inputSchema.get.fields.length
+    val fieldList = j.schema.get.fields.zipWithIndex
+        .map { case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}" }.mkString(", ")
+    
     /*
      * And finally, create the join kv vars for them...
      */
@@ -755,9 +764,11 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       callST("spatialJoin",
       Map(
         "out" -> j.outPipeName,
-        "rel1" -> j.in(0).name,
-        "rel2" -> j.in(1).name,
-        "predicate" -> j.predicate.predicateType.toString().toLowerCase()  
+        "rel1" -> j.inputs(0).name,
+        "rel2" -> j.inputs(1).name,
+        "predicate" -> j.predicate.predicateType.toString().toLowerCase(),  
+        "className" -> className,
+        "fields" -> fieldList
       )    
     )
     

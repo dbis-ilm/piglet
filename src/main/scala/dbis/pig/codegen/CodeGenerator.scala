@@ -188,7 +188,8 @@ trait CodeGenerator {
     if(plan.checkExpressions(Expr.containsGeometryType)) {
       additionalImports ++= Seq(
           "import com.vividsolutions.jts.io.WKTReader",
-          "import com.vividsolutions.jts.geom.Geometry")
+          "import com.vividsolutions.jts.geom.Geometry",
+          "import dbis.spark.spatial.SpatialRDD._")
     }
     
     

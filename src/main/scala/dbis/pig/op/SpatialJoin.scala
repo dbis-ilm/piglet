@@ -12,8 +12,8 @@ import dbis.pig.expr.SpatialPredicate
 
 
 case class SpatialJoin(
-    out: Pipe, 
-    in: List[Pipe], 
+    private val out: Pipe, 
+    private val in: List[Pipe], 
     predicate: SpatialPredicate
   ) extends PigOperator {
   
@@ -37,7 +37,8 @@ case class SpatialJoin(
   }
 
   override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"JOIN { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
+    println(indent(tab) + s"SPATIALJOIN { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
+    println(indent(tab + 2) + s"predicate: ${predicate.toString()}")
     println(indent(tab + 2) + "inSchema = {}")
     println(indent(tab + 2) + "outSchema = " + schema)
   }
