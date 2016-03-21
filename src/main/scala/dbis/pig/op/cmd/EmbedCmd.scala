@@ -30,6 +30,9 @@ import scala.util.parsing.input.CharSequenceReader
  * @param code The embedded code.
  */
 case class EmbedCmd(code: String, ruleCode: Option[String]) extends PigOperator {
+  _outputs = List()
+  _inputs = List()
+
   def this(code: String) = this(code, None)
 
   /**

@@ -52,8 +52,8 @@ object PigStorage extends java.io.Serializable {
 //-----------------------------------------------------------------------------------------------------
 
 class TextLoader[T <: SchemaClass :ClassTag] extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, ignored: (Array[String]) => T): RDD[Record] =
-    sc.textFile(path).map(line => Record(Array(line)))
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[T] =
+    sc.textFile(path).map(line => extract(Array(line)))  //.map(line => Record(Array(line)))
 }
 
 object TextLoader extends java.io.Serializable {
