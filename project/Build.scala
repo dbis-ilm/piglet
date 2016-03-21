@@ -32,9 +32,10 @@ object PigBuild extends Build {
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
     dependsOn(mapreducelib % "test;it").
+    dependsOn(ceplib % "test;it").
     dependsOn(setm).
 //    dependsOn(ProjectRef(uri("https://github.com/sthagedorn/setm.git#master"), "setm")).
-    aggregate(common, sparklib, flinklib, mapreducelib) // remove this if you don't want to automatically build these projects when building piglet 
+    aggregate(common, sparklib, flinklib, mapreducelib, ceplib) // remove this if you don't want to automatically build these projects when building piglet
 
   lazy val setm = (project in file("setm"))  
     
@@ -63,6 +64,10 @@ object PigBuild extends Build {
     dependsOn(common).
     disablePlugins(sbtassembly.AssemblyPlugin).
     dependsOn(piglet)
+
+  lazy val ceplib = (project in file("ceplib")).
+    settings(commonSettings: _*).
+    dependsOn(common)
 
   /*
    * define the backend for the compiler: currently we support spark and flink

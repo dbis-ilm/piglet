@@ -597,6 +597,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
         callST("topHelper", Map("params" -> params))
       }
+      case Matcher(out, in, pattern, events, mode, within) => emitMatcherHelper(node, out.name, pattern, events)
+
       case _ => ""
     }
   }
@@ -718,6 +720,57 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           "params" -> emitParamList(node.schema, node.params)))
   }
 
+  def emitMatcherHelper(node: PigOperator, out: String, pattern: Pattern, events: CompEvent): String = {
+    val filters = events.complex.map { f => f.simplePattern.asInstanceOf[SimplePattern].name }
+    val predics = events.complex.map { f => emitPredicate(node.schema, f.predicate) }
+    val hasSchema = node.schema.isDefined
+    val schemaClass = if (!hasSchema) {
+      "Record"
+    } else {
+      schemaClassName(node.schema.get.className)
+    }
+    var states: ListBuffer[String] = new ListBuffer()
+    states += "Start"
+    emitStates (pattern, states)
+    val transStates = (states -  states.last).toList
+    val tranNextStates = states.tail.toList
+    val types = states.zipWithIndex.map { case (x, i) =>
+      if (i == states.length - 1) "Final"
+      else "Normal"
+    }
+    callST("cepHelper",
+      Map("out" -> out,
+        "class" -> schemaClass,
+        "filters" -> filters,
+        "predcs" -> predics,
+        "states" -> states.toList,
+        "tran_states" ->transStates,
+        "tran_next_states" -> tranNextStates,
+        "types" -> types.toList))
+  }
+
+  def emitStates (pattern: Pattern, states: ListBuffer[String] ) {
+    pattern match  {
+      case SimplePattern(name) => states += name
+      case NegPattern(pattern) => emitStates(pattern, states)
+      case SeqPattern(patterns) => patterns.foreach { p => emitStates(p, states) }
+      case DisjPattern(patterns) => patterns.foreach { p => emitStates(p, states) }
+      case ConjPattern(patterns) => patterns.foreach { p => emitStates(p, states) }
+    }
+  }
+
+  def emitMatcher(out: String, in: String, mode: String): String = {
+    callST("cep", Map("out" -> out,
+      "in" -> in,
+      "mode" -> (mode.toLowerCase() match {
+        case "skip_till_any_match" => "AllMatches"
+        case "first_match" => "FirstMatch"
+        case "recent_match" => "RecentMatches"
+        case "cognitive_match" => "CognitiveMatches"
+        case _ => "NextMatches"
+      })))
+  }
+
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
@@ -768,6 +821,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
                               "string_rep" -> toStr))
   }
 
+
   /**
    * Generate code for the given Pig operator.
    *
@@ -796,7 +850,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case ConstructBag(in, ref) => "" // used only inside macros
       case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again
-      case Delay(out, in, size, wtime) => callST("delay", Map("out" -> node.outPipeName, "in"->node.inPipeName, "size"->size, "wait"->wtime)) 
+      case Matcher(out, in, pattern, events, mode, within) => emitMatcher(out.name, in.name, mode)
       case Empty(_) => ""
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }

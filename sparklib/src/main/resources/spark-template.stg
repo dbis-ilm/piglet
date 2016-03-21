@@ -184,6 +184,26 @@ accumulate(out, in, helper_class, class, init_expr, aggr_expr) ::=<<
         val <out> = sc.parallelize(Array(<class>(<aggr_expr>)))
 >>
 
+
+// ----------------- code for CEP MATCHER operator -----------------
+
+cepHelper(out, filters, predcs, class, states, tran_states, tran_next_states, types) ::=<<
+    object <out>NFA {
+        <filters, predcs:{ f, pred |def filter<f> (record: <class> ) : Boolean = <pred><\n>}>
+        def createNFA = {
+            val <out>OurNFA: NFAController[<class>] = new NFAController()<\n>
+            <states, types:{ s, t |val <s>State = <out>OurNFA.createAndGet<t>State("<s>")<\n>}>
+            <filters:{ f |val <f>Edge = <out>OurNFA.createAndGetForwardState(filter<f>)<\n>}>
+            <filters, tran_states, tran_next_states:{ f, s, n |<out>OurNFA.createForwardTransition(<s>State, <f>Edge, <n>State)<\n>}>
+            <out>OurNFA
+        }
+    }
+>>
+
+cep(out, in,  mode) ::= <<
+        val <out> = <in>.matchNFA(<out>NFA.createNFA, <mode>)
+>>
+
 // ----------------- END of the code implementing the query -------------------
 end_query(name) ::= <<
     
