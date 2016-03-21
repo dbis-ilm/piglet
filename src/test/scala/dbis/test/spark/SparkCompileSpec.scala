@@ -73,7 +73,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain the Spark header with additional imports" in {
     val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitImport(Some("import breeze.linalg._"))
+    val generatedCode = cleanString(codeGenerator.emitImport(Seq("import breeze.linalg._"))
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test",true)
       + codeGenerator.emitFooter)
