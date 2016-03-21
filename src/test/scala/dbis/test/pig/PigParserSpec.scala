@@ -755,6 +755,19 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         (30, "SECONDS"))))
   }
 
+  it should "parse a matcher statement with sequence pattern" in {
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0, B: x == 1 AND y == A.y) WITHIN 30 SECONDS;",
+      List(LanguageFeature.ComplexEventPig))
+      == List(Matcher(Pipe("a"), Pipe("b"),
+      SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
+      CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))),
+        SimpleEvent(SimplePattern("B"), And(Eq(RefExpr(NamedField("x")), RefExpr(Value(1))), Eq(RefExpr(NamedField("y")), RefExpr(DerefTuple(NamedField("A"), NamedField("y"))))))
+      )),
+      "skip_till_next_match",
+      (30, "SECONDS"))))
+  }
+
+
   it should "parse HDFS commands" in {
     assert(parseScript("fs -copyToRemote /usr/local/file /hdfs/data/file;")
       == List(HdfsCmd("copyToRemote", List("/usr/local/file", "/hdfs/data/file"))))
