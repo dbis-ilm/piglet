@@ -119,6 +119,10 @@ m_join(out, class, rel1, rel2, pairs, fields) ::=<<
         val <out> = <rel1>_kv<rel2: {rel | .join(<rel>_kv)}>.map{case (k,<pairs>) => <class>(<fields>)\}
 >>
 
+spatialJoin(out, rel1, rel2, predicate, fields, className) ::=<<
+        val <out> = <rel1>_kv.join(<rel2>_kv).map{ case (k,(v,w)) => <className>(<fields>)\}
+>>
+
 // ------------------ UNIONs multiple streams to one --------------------------
 union(out,in,others) ::=<<
         val <out> = <in><others:{ e | .union(<e>)}>

@@ -360,8 +360,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(schema, expr, namedRef = namedRef)}.map(v => v._0).toArray)"
     }
     
-    case ConstructGeometryExpr(wkt) => {
-      s"new WKTReader().read($wkt)"
+    case ConstructGeometryExpr(expr) => {
+      s"new WKTReader().read(${emitExpr(schema, expr, namedRef = namedRef)})"
     }
     
     case _ => println("unsupported expression: " + expr); ""
@@ -723,6 +723,61 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           "params" -> emitParamList(node.schema, node.params)))
   }
 
+  def emitSpatialJoin(j: SpatialJoin): String = {
+    
+    require(j.schema.isDefined, "Schema information is required for spatial join")
+    require(j.inputs.size == 2, "A spatial join must be made between exactly two relations")
+
+    val res = j.inputs.zip(Seq(j.predicate.left, j.predicate.right))
+    val keys = res.map { case (i, k) => emitJoinKey(i.producer.schema, List(k)) }
+
+    /*
+     * We don't generate key-value RDDs which we have already created and registered in joinKeyVars.
+     * Thus, we build a list of 1 and 0's where 1 stands for a relation name for which we have already
+     * created a _kv variable.
+     */
+    val duplicates = j.inputs.map(r => if (joinKeyVars.contains(r.name)) 1 else 0)
+
+    /*
+     * Now we build lists for rels and keys by removing the elements corresponding to 1's in the duplicate
+     * list.
+     */
+    val drels = j.inputs.zipWithIndex.filter { r => duplicates(r._2) == 0 }.map(_._1)
+    val dkeys = keys.zipWithIndex.filter { k => duplicates(k._2) == 0 }.map(_._1)
+
+    val className = j.schema match {
+      case Some(s) => schemaClassName(s.className)
+      case None => schemaClassName(j.outPipeName)
+    }
+    
+//    logger.debug(s"j.in: ${j.in}")
+    
+    val vsize = j.inputs.head.inputSchema.get.fields.length
+    val fieldList = j.schema.get.fields.zipWithIndex
+        .map { case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}" }.mkString(", ")
+    
+    /*
+     * And finally, create the join kv vars for them...
+     */
+    val str = 
+      callST("join_key_map", Map("rels" -> drels.map(_.name), "keys" -> dkeys)) + 
+      callST("spatialJoin",
+      Map(
+        "out" -> j.outPipeName,
+        "rel1" -> j.inputs(0).name,
+        "rel2" -> j.inputs(1).name,
+        "predicate" -> j.predicate.predicateType.toString().toLowerCase(),  
+        "className" -> className,
+        "fields" -> fieldList
+      )    
+    )
+    
+    
+    str
+  }
+  
+  
+  
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
@@ -801,19 +856,21 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case ConstructBag(in, ref) => "" // used only inside macros
       case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again
+      case spOp: SpatialJoin => emitSpatialJoin(spOp)
       case Delay(out, in, size, wtime) => callST("delay", Map("out" -> node.outPipeName, "in"->node.inPipeName, "size"->size, "wait"->wtime)) 
       case Empty(_) => ""
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
   }
-
+  
    /**
    * Generate code needed for importing required Scala packages.
    *
    * @return a string representing the import code
    */
-  def emitImport(additionalImports: Option[String] = None): String = callST("init_code",
-     Map("additional_imports" -> additionalImports.getOrElse("")))
+//  def emitImport(additionalImports: Option[String] = None): String = callST("init_code",
+  def emitImport(additionalImports: Seq[String] = Seq.empty): String = callST("init_code",
+     Map("additional_imports" -> additionalImports.mkString("\n")))
 
   /**
    * Generate code for the header of the script outside the main class/object,

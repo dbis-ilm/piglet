@@ -166,9 +166,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def matrixConstructor: Parser[ArithmeticExpr] = matrixTypeName ~ "(" ~ num ~ "," ~ num ~ ", " ~ arithmExpr ~ ")" ^^{
     case s ~ _ ~ rows ~ _ ~ cols ~ _ ~ expr ~ _ => ConstructMatrixExpr(s.substring(0, 2), rows, cols, expr)
   }
-  def geometryConstructor: Parser[ArithmeticExpr] = geometryTypeName ~ "(" ~ arithmExpr ~ ")" ^^ {
-    case _ ~ _ ~ exp ~ _ => ConstructGeometryExpr(exp)
-  }
+  
   
   
   def typeConstructor: Parser[ArithmeticExpr] = (tupleConstructor | bagConstructor | mapConstructor | matrixConstructor | geometryConstructor)
@@ -277,7 +275,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   lazy val accumulateKeyword = "accumulate".ignoreCase
   lazy val timestampKeyword = "timestamp".ignoreCase
 
-  lazy val geometryTypeName = "geometry".ignoreCase
+  
   
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
@@ -487,7 +485,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def extractJoinFields(jList: List[(String, List[Ref])]): List[List[Ref]] = { jList.map{ case (alias, refs) => refs } }
   def joinStmt: Parser[PigOperator] = bag ~ "=" ~ joinKeyword ~ joinExprList ^^ {
     case out ~ _ ~ _ ~ jlist => new Join(Pipe(out), extractJoinRelation(jlist), extractJoinFields(jlist)) }
-
+  
   /*
    * <A> = CROSS <B>, <C>, ...
    */
@@ -625,8 +623,8 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
    * A statement can be one of the above delimited by a semicolon.
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
-    distinctStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt)
+    distinctStmt | spatialJoinStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt )
 
   /* ---------------------------------------------------------------------------------------------------------------- */
   /*
@@ -804,6 +802,34 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
 
   /* ---------------------------------------------------------------------------------------------------------------- */
 
+  
+
+  /* ------------------------------------------------------------ */
+  /*        Pig extensions for spatial data
+   * ------------------------------------------------------------
+   */
+  
+  lazy val geometryTypeName = "geometry".ignoreCase
+  lazy val spatialJoinKeyword = "SPATIALJOIN".ignoreCase
+  lazy val containsKeyword = "contains".ignoreCase
+  lazy val intersectsKeyword = "intersects".ignoreCase
+  
+  def geometryConstructor: Parser[ArithmeticExpr] = geometryTypeName ~ "(" ~ arithmExpr ~ ")" ^^ {
+    case _ ~ _ ~ exp ~ _ => ConstructGeometryExpr(exp)
+  }
+  
+  def spatialPredicate = (containsKeyword | intersectsKeyword) ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {
+    case kw ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialPredicate(r1,r2,  SpatialPredicateType.withName(kw.toUpperCase()))
+  }
+  
+  
+  def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ "," ~ bag ~ onKeyword ~ spatialPredicate ^^ {
+    case out ~ _ ~ _ ~ in1 ~ _ ~ in2  ~ _ ~ expr => new SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr)
+  }
+  
+  /* ---------------------------------------------------------------------------------------------------------------- */
+  
+  
   def langStmt(features: List[LanguageFeature]): Parser[PigOperator] = {
     def parseStmt(feature: LanguageFeature) = {
       feature match {
