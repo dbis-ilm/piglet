@@ -125,14 +125,14 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   // def typeName: Parser[String] = ( "int" | "float" | "double" | "chararray"| " bytearray") ^^ { s => s }
 
   def castTypeSpec: Parser[PigType] = (
-    "int" ^^ { _ => Types.IntType }
-      | "long" ^^ { _ => Types.LongType }
-      | "float" ^^ { _ => Types.FloatType }
-      | "double" ^^ { _ => Types.DoubleType }
-      | "boolean" ^^ { _ => Types.BooleanType }
-      | "chararray" ^^ { _ => Types.CharArrayType }
-      | "bytearray" ^^{ _ => Types.ByteArrayType }
-      | "tuple" ~ "(" ~ repsep(castTypeSpec, ",") ~ ")" ^^{
+    intKeyword ^^ { _ => Types.IntType }
+      | longKeyword ^^ { _ => Types.LongType }
+      | floatKeyword ^^ { _ => Types.FloatType }
+      | doubleKeyword ^^ { _ => Types.DoubleType }
+      | booleanKeyword ^^ { _ => Types.BooleanType }
+      | chararrayKeyword ^^ { _ => Types.CharArrayType }
+      | bytearrayKeyword ^^{ _ => Types.ByteArrayType }
+      | tupleKeyword ~ "(" ~ repsep(castTypeSpec, ",") ~ ")" ^^{
             case _ ~ _ ~ typeList ~ _ => TupleType(typeList.map(t => Field("", t)).toArray)
         }
       /*
@@ -142,7 +142,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
       /*
        * map schema: map[<list of types>]
        */
-      | "map" ~ "[" ~ "]" ^^{ case _ ~ _ ~ _ => MapType(Types.ByteArrayType) }
+      | mapKeyword ~ "[" ~ "]" ^^{ case _ ~ _ ~ _ => MapType(Types.ByteArrayType) }
     )
 
   def factor: Parser[ArithmeticExpr] =  (
@@ -164,7 +164,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def bagConstructor: Parser[ArithmeticExpr] = "{" ~ repsep(arithmExpr, ",") ~ "}"  ^^ { case _ ~ l ~ _ => ConstructBagExpr(l) }
   def mapConstructor: Parser[ArithmeticExpr] = "[" ~ repsep(arithmExpr, ",") ~ "]"  ^^ { case _ ~ l ~ _ => ConstructMapExpr(l) }
   def matrixConstructor: Parser[ArithmeticExpr] = matrixTypeName ~ "(" ~ num ~ "," ~ num ~ ", " ~ arithmExpr ~ ")" ^^{
-    case s ~ _ ~ rows ~ _ ~ cols ~ _ ~ expr ~ _ => ConstructMatrixExpr(s.substring(0, 2), rows, cols, expr)
+    case s ~ _ ~ rows ~ _ ~ cols ~ _ ~ expr ~ _ => ConstructMatrixExpr(s.substring(0, 2).toLowerCase, rows, cols, expr)
   }
   def typeConstructor: Parser[ArithmeticExpr] = (tupleConstructor | bagConstructor | mapConstructor | matrixConstructor)
 
@@ -219,6 +219,17 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   /*
    * The list of case-insensitive keywords we want to accept.
    */
+  lazy val intKeyword = "int".ignoreCase
+  lazy val floatKeyword = "float".ignoreCase
+  lazy val longKeyword = "long".ignoreCase
+  lazy val doubleKeyword = "double".ignoreCase
+  lazy val bytearrayKeyword = "bytearray".ignoreCase
+  lazy val chararrayKeyword = "chararray".ignoreCase
+  lazy val tupleKeyword = "tuple".ignoreCase
+  lazy val mapKeyword = "map".ignoreCase
+  lazy val bagKeyword = "bag".ignoreCase
+  lazy val booleanKeyword = "boolean".ignoreCase
+
   lazy val loadKeyword = "load".ignoreCase
   lazy val dumpKeyword = "dump".ignoreCase
   lazy val displayKeyword = "display".ignoreCase
@@ -281,33 +292,33 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
    */
   def tupleTypeSpec: Parser[TupleType] =
-    ("tuple"?) ~ "(" ~repsep(fieldSchema, ",") ~ ")" ^^{ case _ ~ _ ~ fieldList ~ _ => TupleType(fieldList.toArray) }
+    (tupleKeyword ?) ~ "(" ~repsep(fieldSchema, ",") ~ ")" ^^{ case _ ~ _ ~ fieldList ~ _ => TupleType(fieldList.toArray) }
 
-  def matrixTypeName: Parser[String] = "[sd][id]matrix".r
+  def matrixTypeName: Parser[String] = "[sdSD][idID][mM][aA][tT][rR][iI][xX]".r
   def matrixTypeSpec: Parser[PigType] = matrixTypeName ~ "(" ~ num ~ "," ~ num ~ ")" ^^{
     case n ~ _ ~ rows ~ _ ~ cols ~ _ =>
-      val t = if (n.charAt(1) == 'i') Types.IntType else Types.DoubleType
-      val rep = if (n.charAt(0) == 's') MatrixRep.SparseMatrix else MatrixRep.DenseMatrix
+      val t = if (n.charAt(1) == 'i' || n.charAt(1) == 'I') Types.IntType else Types.DoubleType
+      val rep = if (n.charAt(0) == 's' || n.charAt(0) == 'S') MatrixRep.SparseMatrix else MatrixRep.DenseMatrix
       MatrixType(t, rows, cols, rep)
   }
 
   def typeSpec: Parser[PigType] = (
-    "int" ^^ { _ => Types.IntType }
-    | "long" ^^ { _ => Types.LongType }
-    | "float" ^^ { _ => Types.FloatType }
-    | "double" ^^ { _ => Types.DoubleType }
-    | "boolean" ^^ { _ => Types.BooleanType }
-    | "chararray" ^^ { _ => Types.CharArrayType }
-    | "bytearray" ^^{ _ => Types.ByteArrayType }
+    intKeyword ^^ { _ => Types.IntType }
+    | longKeyword ^^ { _ => Types.LongType }
+    | floatKeyword ^^ { _ => Types.FloatType }
+    | doubleKeyword ^^ { _ => Types.DoubleType }
+    | booleanKeyword ^^ { _ => Types.BooleanType }
+    | chararrayKeyword ^^ { _ => Types.CharArrayType }
+    | bytearrayKeyword ^^{ _ => Types.ByteArrayType }
     | tupleTypeSpec
       /*
        * bag schema: bag{<tuple>} or {<tuple>}
        */
-    | ("bag"?) ~ "{" ~ tupleTypeSpec ~ "}" ^^{ case _ ~  _ ~ tup ~ _ => BagType(tup) }
+    | (bagKeyword ?) ~ "{" ~ tupleTypeSpec ~ "}" ^^{ case _ ~  _ ~ tup ~ _ => BagType(tup) }
       /*
        * map schema: map[<list of fields>] or [<list of fields>]
        */
-    | ("map"?) ~ "[" ~(typeSpec?) ~ "]" ^^{ case _ ~ _ ~ ty ~ _ => ty match {
+    | (mapKeyword ?) ~ "[" ~(typeSpec?) ~ "]" ^^{ case _ ~ _ ~ ty ~ _ => ty match {
         case Some(t) => MapType(t)
         case None => MapType(Types.ByteArrayType)
     }}
