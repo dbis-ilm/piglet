@@ -27,9 +27,11 @@ import dbis.pig.expr.{Expr,Func}
  * @param in the input pipe.
  * @param generator the generator (a list of aggregation expressions)
  */
-case class Accumulate(out: Pipe, in: Pipe, generator: GeneratorList) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class Accumulate(
+    out: Pipe, 
+    in: Pipe, 
+    generator: GeneratorList
+  ) extends PigOperator(out, in) {
 
   override def lineageString: String = {
     s"""ACCUMULATE%${generator.exprs.mkString("%")}%""" + super.lineageString

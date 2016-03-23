@@ -36,17 +36,9 @@ case class SocketRead(private val out: Pipe,
                       mode: String,
                       var streamSchema: Option[Schema] = None,
                       streamFunc: Option[String] = None, //BackendManager.backend.defaultConnector,
-                      streamParams: List[String] = null) extends PigOperator{
-  _outputs = List(out)
-  _inputs = List()
-  schema = streamSchema
+                      streamParams: List[String] = null) extends PigOperator(List(out), List(), streamSchema) {
 
-  override def constructSchema: Option[Schema] = {
-    /*
-     * Either the schema was defined or it is None.
-     */
-    schema
-  }
+  
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

@@ -32,9 +32,7 @@ import dbis.pig.expr.DerefMap
  *
  * @param exprs list of generator expressions
  */
-case class Generate(exprs: List[GeneratorExpr]) extends PigOperator {
-  _outputs = List()
-  _inputs = List()
+case class Generate(exprs: List[GeneratorExpr]) extends PigOperator(List(), List()) {
 
   var parentOp: Foreach = null
 

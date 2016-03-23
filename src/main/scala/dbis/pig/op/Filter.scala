@@ -30,9 +30,12 @@ import dbis.pig.expr.Expr
  * @param pred the predicate used for filtering tuples from the input pipe
  * @param windowMode true if processed on a window on a data stream
  */
-case class Filter(out: Pipe, in: Pipe, pred: Predicate, var windowMode: Boolean = false) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class Filter(
+    out: Pipe, 
+    in: Pipe, 
+    pred: Predicate, 
+    var windowMode: Boolean = false
+  ) extends PigOperator(out, in) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

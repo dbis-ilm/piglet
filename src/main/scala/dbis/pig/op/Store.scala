@@ -29,9 +29,7 @@ import java.net.URI
 case class Store(in: Pipe,
                  file: URI,
                  func: Option[String] = None, //BackendManager.backend.defaultConnector,
-                 params: List[String] = null) extends PigOperator {
-  _outputs = List()
-  _inputs = List(in)
+                 params: List[String] = null) extends PigOperator(List(), List(in)) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

@@ -84,9 +84,7 @@ case class Matcher(out: Pipe, in: Pipe,
                    pattern: Pattern,
                    events: CompEvent,
                    mode: String = "skip_till_next_match",
-                   within: Tuple2[Int, String] = (0, "SECONDS")) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List()
+                   within: Tuple2[Int, String] = (0, "SECONDS")) extends PigOperator(out) {
 
   /**
    * construct the schema of this operator. In general, this operator will not

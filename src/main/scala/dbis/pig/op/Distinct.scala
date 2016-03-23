@@ -23,9 +23,11 @@ package dbis.pig.op
  * @param in the input pipe.
  * @param windowMode true if processed on a window on a data stream
  */
-case class Distinct(out: Pipe, in: Pipe, var windowMode: Boolean = false) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class Distinct(
+    out: Pipe, 
+    in: Pipe, 
+    var windowMode: Boolean = false
+  ) extends PigOperator(out, in) {
 
   override def lineageString: String = {
     s"""DISTINCT%""" + super.lineageString

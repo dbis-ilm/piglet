@@ -25,9 +25,12 @@ package dbis.pig.op
  * @param wtime the time for delaying the processing
  *
  */
-case class Delay(out: Pipe, in: Pipe, size: Double, wtime: Int) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class Delay(
+    out: Pipe, 
+    in: Pipe, 
+    size: Double, 
+    wtime: Int
+  ) extends PigOperator(out, in) {
 
   override def lineageString: String = {
     s"""DELAY%${size}%${wtime}%""" + super.lineageString

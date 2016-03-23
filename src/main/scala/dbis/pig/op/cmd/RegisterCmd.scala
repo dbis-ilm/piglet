@@ -26,5 +26,5 @@ import dbis.pig.op.PigOperator
  *
  * @param jarFile the URI of the Jar file to be registered
  */
-case class RegisterCmd(jarFile: String) extends PigOperator
+case class RegisterCmd(jarFile: String) extends PigOperator(List(), List())
 

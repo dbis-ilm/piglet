@@ -25,10 +25,8 @@ import dbis.pig.expr.Expr
  * @param in the input pipe.
  * @param expr an expression producing the sample size.
  */
-case class Sample(out: Pipe, in: Pipe, expr: ArithmeticExpr) extends PigOperator {
+case class Sample(out: Pipe, in: Pipe, expr: ArithmeticExpr) extends PigOperator(out, in) {
 
-  _outputs = List(out)
-  _inputs = List(in)
 
   override def lineageString: String = s"""SAMPLE%${expr}%""" + super.lineageString
 

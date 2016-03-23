@@ -30,10 +30,16 @@ import dbis.pig.expr.Ref
  * pipes representing the input and output connections to other operators in the
  * dataflow.
  */
-trait PigOperator extends Rewritable with Serializable {
-  protected var _outputs: List[Pipe] = _
-  protected var _inputs: List[Pipe] = _
+abstract class PigOperator(
+    private[op] var _outputs: List[Pipe], 
+    private[op] var _inputs: List[Pipe], 
+    var schema: Option[Schema] = None
+  ) extends Rewritable with Serializable {
 
+  def this(out: Pipe) = this(List(out), List(), None)
+  
+  def this(out: Pipe, in: Pipe) = this(List(out), List(in), None)
+  
   /**
    * A map of key-value pairs representing operator-specific parameters.
    */
@@ -42,7 +48,7 @@ trait PigOperator extends Rewritable with Serializable {
   /**
    * The (optional) schema describing the output produced by the operator.
    */
-  var schema: Option[Schema] = None
+//  var schema: Option[Schema] = None
 
   /**
    * Getter method for the output pipes.
@@ -57,7 +63,7 @@ trait PigOperator extends Rewritable with Serializable {
    *
    * @param o the new list of output pipes
    */
-  def outputs_=(o: List[Pipe]) = {
+  def outputs_=(o: List[Pipe]) {
     _outputs = o
     // 1. make sure we don't have multiple pipes with the same name
     if (_outputs.map(p => p.name).distinct.size != _outputs.size)

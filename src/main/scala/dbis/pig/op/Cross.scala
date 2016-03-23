@@ -26,9 +26,11 @@ import scala.collection.mutable.ArrayBuffer
  * @param out the name of the output pipe (relation).
  * @param in the list of input pipes.
  */
-case class Cross(out: Pipe, in: List[Pipe], timeWindow: Tuple2[Int,String]= null.asInstanceOf[Tuple2[Int,String]]) extends PigOperator {
-  _outputs = List(out)
-  _inputs = in
+case class Cross(
+    out: Pipe, 
+    in: List[Pipe], 
+    timeWindow: Tuple2[Int,String]= null.asInstanceOf[Tuple2[Int,String]]
+  ) extends PigOperator(List(out), in) {
 
   override def lineageString: String = {
     s"""CROSS%""" + super.lineageString

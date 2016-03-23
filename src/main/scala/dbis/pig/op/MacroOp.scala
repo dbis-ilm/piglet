@@ -31,9 +31,11 @@ import dbis.pig.expr.NamedField
  * @param macroName
  * @param params
  */
-case class MacroOp(out: Pipe, macroName: String, params: Option[List[Ref]] = None) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List()
+case class MacroOp(
+    out: Pipe, 
+    macroName: String, 
+    params: Option[List[Ref]] = None
+  ) extends PigOperator(out) {
 
   val paramMapping = Map[String, Ref]()
 
