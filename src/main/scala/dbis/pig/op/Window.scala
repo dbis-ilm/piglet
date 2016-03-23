@@ -27,8 +27,8 @@ package dbis.pig.op
   * @param applyData informations(func name, output schema, func body) needed for window apply function
   */
 case class Window(
-    out:Pipe, 
-    in: Pipe, 
+    private val out:Pipe, 
+    private val in: Pipe, 
     window: Tuple2[Int,String], 
     slide: Tuple2[Int,String]
   ) extends PigOperator(out, in) {

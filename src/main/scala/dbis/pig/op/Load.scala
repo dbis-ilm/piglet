@@ -32,11 +32,12 @@ import scala.collection.mutable.Map
  * @param loaderFunc
  * @param loaderParams
  */
-case class Load(out: Pipe, 
-                var file: URI,
-                private var loadSchema: Option[Schema] = None,
-                loaderFunc: Option[String] = None,
-                loaderParams: List[String] = null) extends PigOperator(List(out), List(), loadSchema) {
+case class Load(
+    private val out: Pipe, 
+    var file: URI,
+    private var loadSchema: Option[Schema] = None,
+    loaderFunc: Option[String] = None,
+    loaderParams: List[String] = null) extends PigOperator(List(out), List(), loadSchema) {
 
 //  override def constructSchema: Option[Schema] = schema
 

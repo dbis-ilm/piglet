@@ -73,8 +73,8 @@ case class GroupingExpression(val keyList: List[Ref]) {
  * @param windowMode true if processed on a window on a data stream
  */
 case class Grouping(
-    out: Pipe, 
-    in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     groupExpr: GroupingExpression, 
     var windowMode: Boolean = false
   ) extends PigOperator(out, in) {

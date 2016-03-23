@@ -30,7 +30,7 @@ import dbis.pig.expr.Ref
  * @param refExpr a reference referring to an expression constructing a relation (bag).
  */
 case class ConstructBag(
-    out: Pipe, 
+    private val out: Pipe, 
     refExpr: Ref
   ) extends PigOperator(out) {
 

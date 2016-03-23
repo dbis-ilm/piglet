@@ -30,8 +30,8 @@ case class TriplePattern(subj: Ref, pred: Ref, obj: Ref)
  * @param patterns
  */
 case class BGPFilter(
-    out: Pipe, 
-    in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     patterns: List[TriplePattern]
   ) extends PigOperator(out, in) {
 

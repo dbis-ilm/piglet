@@ -31,8 +31,8 @@ import dbis.pig.expr.Ref
  * @param resSchema the optional result schema
  */
 case class StreamOp(
-    out: Pipe, 
-    in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     opName: String, 
     params: Option[List[Ref]] = None,
     var resSchema: Option[Schema] = None

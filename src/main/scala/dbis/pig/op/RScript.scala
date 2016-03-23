@@ -22,8 +22,8 @@ import dbis.pig.schema.Schema
  * Created by kai on 13.07.15.
  */
 case class RScript(
-    val out: Pipe, 
-    val in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     val script: String, 
     val loadSchema: Option[Schema] = None
   ) extends PigOperator(List(out), List(in), loadSchema) {

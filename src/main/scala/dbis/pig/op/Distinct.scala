@@ -24,8 +24,8 @@ package dbis.pig.op
  * @param windowMode true if processed on a window on a data stream
  */
 case class Distinct(
-    out: Pipe, 
-    in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     var windowMode: Boolean = false
   ) extends PigOperator(out, in) {
 

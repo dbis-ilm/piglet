@@ -21,4 +21,4 @@ package dbis.pig.op
   * @param in
   */
 //noinspection ScalaDocMissingParameterDescription
-case class Empty(in: Pipe) extends PigOperator(List(), List(in)) 
+case class Empty(private val in: Pipe) extends PigOperator(List(), List(in)) 

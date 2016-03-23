@@ -602,7 +602,7 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
       // grouped aggregation
       callST("aggr", map ++ Map("in_tuple_type" -> s"${in}_TupleType", "input" -> s"op_${in}"))
     } else
-      callST("gaggr", map ++ Map("hash" -> buildGroupingList(schema), "in_tuple_type" -> s"${groupingNode.in.name}_TupleType", "input" -> s"op_${groupingNode.in.name}"))
+      callST("gaggr", map ++ Map("hash" -> buildGroupingList(schema), "in_tuple_type" -> s"${groupingNode.inputs.head.name}_TupleType", "input" -> s"op_${groupingNode.inputs.head.name}"))
   }
   /**
    * Generate a helper code for the aggregation operator

@@ -26,8 +26,8 @@ import dbis.pig.schema.Schema
  * @param fname the name of the function which will be applied to the input window operator.
  */
 case class WindowApply(
-    out: Pipe, 
-    in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     fname: String
   ) extends PigOperator(out, in) {
   

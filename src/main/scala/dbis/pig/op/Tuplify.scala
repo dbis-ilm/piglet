@@ -25,7 +25,7 @@ import dbis.pig.expr.Ref
  * @param initialInPipeName
  * @param ref a reference des
  */
-case class Tuplify(out: Pipe, in: Pipe, ref: Ref) extends PigOperator(out, in) {
+case class Tuplify(private val out: Pipe, private val in: Pipe, ref: Ref) extends PigOperator(out, in) {
 
   override def lineageString: String = s"""TUPLIFY%""" + super.lineageString
 

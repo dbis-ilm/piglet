@@ -4,7 +4,7 @@ package dbis.pig.op
  * This represent a MATERIALIZE operator in Pig
  * 
  */
-case class Materialize(in: Pipe) extends PigOperator(List(), List(in)) {
+case class Materialize(private val in: Pipe) extends PigOperator(List(), List(in)) {
   
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

@@ -27,8 +27,8 @@ import scala.collection.mutable.ArrayBuffer
  * @param in the list of input pipes.
  */
 case class Cross(
-    out: Pipe, 
-    in: List[Pipe], 
+    private val out: Pipe, 
+    private val in: List[Pipe], 
     timeWindow: Tuple2[Int,String]= null.asInstanceOf[Tuple2[Int,String]]
   ) extends PigOperator(List(out), in) {
 

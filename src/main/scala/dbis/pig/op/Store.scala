@@ -26,10 +26,11 @@ import java.net.URI
  * @param func the name of the storage function implemented in the backend library
  * @param params a list of parameter strings for the storage function
  */
-case class Store(in: Pipe,
-                 file: URI,
-                 func: Option[String] = None, //BackendManager.backend.defaultConnector,
-                 params: List[String] = null) extends PigOperator(List(), List(in)) {
+case class Store(
+    private val in: Pipe,
+    file: URI,
+    func: Option[String] = None, //BackendManager.backend.defaultConnector,
+    params: List[String] = null) extends PigOperator(List(), List(in)) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

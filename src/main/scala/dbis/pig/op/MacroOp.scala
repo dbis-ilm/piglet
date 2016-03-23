@@ -32,7 +32,7 @@ import dbis.pig.expr.NamedField
  * @param params
  */
 case class MacroOp(
-    out: Pipe, 
+    private val out: Pipe, 
     macroName: String, 
     params: Option[List[Ref]] = None
   ) extends PigOperator(out) {

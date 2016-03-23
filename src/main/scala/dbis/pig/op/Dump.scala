@@ -21,7 +21,7 @@ package dbis.pig.op
  *
  * @param in the input pipe
  */
-case class Dump(in: Pipe) extends PigOperator(List(), List(in)) {
+case class Dump(private val in: Pipe) extends PigOperator(List(), List(in)) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

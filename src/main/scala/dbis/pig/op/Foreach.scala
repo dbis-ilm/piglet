@@ -93,8 +93,8 @@ case class GeneratorPlan(var subPlan: List[PigOperator]) extends ForeachGenerato
  * @param windowMode ???
  */
 case class Foreach(
-    out: Pipe,
-    in: Pipe,
+    private val out: Pipe,
+    private val in: Pipe,
     var generator: ForeachGenerator,
     var windowMode: Boolean = false
   ) extends PigOperator(out, in) {

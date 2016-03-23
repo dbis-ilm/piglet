@@ -26,8 +26,8 @@ package dbis.pig.op
   * @param num
   */
 case class Top(
-    out: Pipe, 
-    in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     orderSpec: List[OrderBySpec], 
     num: Int
   ) extends PigOperator(out, in) {

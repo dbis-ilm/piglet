@@ -26,8 +26,8 @@ package dbis.pig.op
  *
  */
 case class Delay(
-    out: Pipe, 
-    in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     size: Double, 
     wtime: Int
   ) extends PigOperator(out, in) {

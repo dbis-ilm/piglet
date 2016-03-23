@@ -23,7 +23,7 @@ package dbis.pig.op
  * @param in the input pipe.
  * @param num the maximum number of tuples produced by this operator
  */
-case class Limit(out: Pipe, in: Pipe, num: Int) extends PigOperator(out, in) {
+case class Limit(private val out: Pipe, private val in: Pipe, num: Int) extends PigOperator(out, in) {
 
   override def lineageString: String = {
     s"""LIMIT%${num}%""" + super.lineageString

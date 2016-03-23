@@ -28,8 +28,8 @@ import dbis.pig.expr.{Expr,Func}
  * @param generator the generator (a list of aggregation expressions)
  */
 case class Accumulate(
-    out: Pipe, 
-    in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     generator: GeneratorList
   ) extends PigOperator(out, in) {
 

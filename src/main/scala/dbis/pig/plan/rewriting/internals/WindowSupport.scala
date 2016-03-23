@@ -100,8 +100,8 @@ trait WindowSupport extends PigletLogging {
           logger.debug(s"Rewrite Foreach to WindowMode")
           o.windowMode = true
           //val flatten = new WindowFlatten(Pipe("flattenNode"), o.outputs.head)
-          val apply = new WindowApply(Pipe(o.outPipeName+"Apply"), windowOp.out, "WindowFunc"+o.outPipeName)
-          val newPlan = plan.insertConnect(windowOp, o.out.consumer.head, apply)
+          val apply = new WindowApply(Pipe(o.outPipeName+"Apply"), windowOp.outputs.head, "WindowFunc"+o.outPipeName)
+          val newPlan = plan.insertConnect(windowOp, o.outputs.head.consumer.head, apply)
           apply.schema=o.schema
           return newPlan
         }
@@ -120,7 +120,7 @@ trait WindowSupport extends PigletLogging {
     }
     logger.debug(s"Reached End of Plan - Adding Flatten Node")
     val before = lastOp.inputs.head
-    val apply = new WindowApply(Pipe(before.name+"Apply"), windowOp.out, "WindowFunc"+before.name)
+    val apply = new WindowApply(Pipe(before.name+"Apply"), windowOp.outputs.head, "WindowFunc"+before.name)
     val newPlan = plan.insertConnect(windowOp, lastOp, apply)
     apply.schema = before.producer.schema
     lastOp.schema  = before.producer.schema
@@ -153,7 +153,7 @@ trait WindowSupport extends PigletLogging {
         if(windowDef!=Some(inputWindow.window))
           throw new RewriterException("Join input windows must have the same definition")
 
-        newInputs += inputWindow.in
+        newInputs += inputWindow.inputs.head
 
         // Remove Window-Join relations
         joinOp.inputs = joinOp.inputs.filterNot(_.producer == inputWindow)
@@ -164,8 +164,8 @@ trait WindowSupport extends PigletLogging {
       }
 
       val newJoin = joinOp match {
-        case o: Join => Join(o.out, newInputs.toList, o.fieldExprs, windowDef.getOrElse(null.asInstanceOf[Tuple2[Int,String]]))
-        case o: Cross => Cross(o.out, newInputs.toList, windowDef.getOrElse(null.asInstanceOf[Tuple2[Int,String]]))
+        case o: Join => Join(o.outputs.head, newInputs.toList, o.fieldExprs, windowDef.getOrElse(null.asInstanceOf[Tuple2[Int,String]]))
+        case o: Cross => Cross(o.outputs.head, newInputs.toList, windowDef.getOrElse(null.asInstanceOf[Tuple2[Int,String]]))
         case _ => ???
       }
 

@@ -31,8 +31,8 @@ import dbis.pig.expr.Expr
  * @param windowMode true if processed on a window on a data stream
  */
 case class Filter(
-    out: Pipe, 
-    in: Pipe, 
+    private val out: Pipe, 
+    private val in: Pipe, 
     pred: Predicate, 
     var windowMode: Boolean = false
   ) extends PigOperator(out, in) {

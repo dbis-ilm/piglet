@@ -28,7 +28,7 @@ case class SplitBranch(val output: Pipe, val expr: Predicate) {
  * @param initialInPipeName the names of the input pipe.
  * @param splits a list of split branches (output pipe + condition)
  */
-case class SplitInto(in: Pipe, splits: List[SplitBranch]) extends PigOperator(splits.map(s => s.output), List(in)) {
+case class SplitInto(private val in: Pipe, splits: List[SplitBranch]) extends PigOperator(splits.map(s => s.output), List(in)) {
 
   // override def initialOutPipeNames: List[String] = splits.map{ branch => branch.output.name }
 

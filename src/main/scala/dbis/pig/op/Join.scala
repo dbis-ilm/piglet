@@ -31,8 +31,8 @@ import dbis.pig.expr.Ref
  * @param timeWindow window definition for streaming joins
  */
 case class Join(
-    out:Pipe, 
-    in: List[Pipe], 
+    private val out:Pipe, 
+    private val in: List[Pipe], 
     fieldExprs: List[List[Ref]],
     timeWindow: Tuple2[Int,String] = null.asInstanceOf[Tuple2[Int,String]]
   ) extends PigOperator(List(out), in) {
