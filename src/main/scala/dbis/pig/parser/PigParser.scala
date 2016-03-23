@@ -376,6 +376,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
         case PositionalField(p) => s.get.timestampField = p
         case _ => {}
       }
+      
       u match {
         case Some(p) => 
           val params = if (p._2.isEmpty) null // no params given 
@@ -387,8 +388,18 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
                 else 
                   s
               ) 
-            }  
-          new Load(Pipe(b), uri, s, Some(p._1), params)
+            }
+          
+          val s2 = if(p._1.toLowerCase() == "textloader" && s.isEmpty) {
+              /* If no schema is given for text loader, create one implicitly. 
+               * The schema will be one field with name "line" and type chararray
+               */
+              Some(Schema(BagType(TupleType(Array(Field("line", Types.CharArrayType)))))) 
+            }
+            else 
+              s
+          
+          new Load(Pipe(b), uri, s2, Some(p._1), params)
             
         case None => new Load(Pipe(b), uri, s)
       }

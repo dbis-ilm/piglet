@@ -33,8 +33,8 @@ import scala.collection.mutable.Map
  * @param loaderParams
  */
 case class Load(out: Pipe, 
-                var file: URI,
-                var loadSchema: Option[Schema] = None,
+                private var file: URI,
+                private var loadSchema: Option[Schema] = None,
                 loaderFunc: Option[String] = None,
                 loaderParams: List[String] = null) extends PigOperator {
   _outputs = List(out)
