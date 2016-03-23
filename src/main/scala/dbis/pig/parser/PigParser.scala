@@ -68,7 +68,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def pigStringLiteral: Parser[String] =
     ("'"+"""([^'\p{Cntrl}\\]|\\[\\"bfnrt]|\\u[a-fA-F0-9]{4})*"""+"'").r
 
-  def unquote(s: String): String = s.substring(1, s.length - 1)
+  def unquote(s: String): String = if(s.startsWith("'") && s.endsWith("'")) s.substring(1, s.length - 1) else s
 
   def num: Parser[Int] = wholeNumber ^^ (_.toInt)
 
@@ -125,14 +125,14 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   // def typeName: Parser[String] = ( "int" | "float" | "double" | "chararray"| " bytearray") ^^ { s => s }
 
   def castTypeSpec: Parser[PigType] = (
-    "int" ^^ { _ => Types.IntType }
-      | "long" ^^ { _ => Types.LongType }
-      | "float" ^^ { _ => Types.FloatType }
-      | "double" ^^ { _ => Types.DoubleType }
-      | "boolean" ^^ { _ => Types.BooleanType }
-      | "chararray" ^^ { _ => Types.CharArrayType }
-      | "bytearray" ^^{ _ => Types.ByteArrayType }
-      | "tuple" ~ "(" ~ repsep(castTypeSpec, ",") ~ ")" ^^{
+    intKeyword ^^ { _ => Types.IntType }
+      | longKeyword ^^ { _ => Types.LongType }
+      | floatKeyword ^^ { _ => Types.FloatType }
+      | doubleKeyword ^^ { _ => Types.DoubleType }
+      | booleanKeyword ^^ { _ => Types.BooleanType }
+      | chararrayKeyword ^^ { _ => Types.CharArrayType }
+      | bytearrayKeyword ^^{ _ => Types.ByteArrayType }
+      | tupleKeyword ~ "(" ~ repsep(castTypeSpec, ",") ~ ")" ^^{
             case _ ~ _ ~ typeList ~ _ => TupleType(typeList.map(t => Field("", t)).toArray)
         }
       /*
@@ -142,7 +142,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
       /*
        * map schema: map[<list of types>]
        */
-      | "map" ~ "[" ~ "]" ^^{ case _ ~ _ ~ _ => MapType(Types.ByteArrayType) }
+      | mapKeyword ~ "[" ~ "]" ^^{ case _ ~ _ ~ _ => MapType(Types.ByteArrayType) }
     )
 
   def factor: Parser[ArithmeticExpr] =  (
@@ -164,7 +164,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def bagConstructor: Parser[ArithmeticExpr] = "{" ~ repsep(arithmExpr, ",") ~ "}"  ^^ { case _ ~ l ~ _ => ConstructBagExpr(l) }
   def mapConstructor: Parser[ArithmeticExpr] = "[" ~ repsep(arithmExpr, ",") ~ "]"  ^^ { case _ ~ l ~ _ => ConstructMapExpr(l) }
   def matrixConstructor: Parser[ArithmeticExpr] = matrixTypeName ~ "(" ~ num ~ "," ~ num ~ ", " ~ arithmExpr ~ ")" ^^{
-    case s ~ _ ~ rows ~ _ ~ cols ~ _ ~ expr ~ _ => ConstructMatrixExpr(s.substring(0, 2), rows, cols, expr)
+    case s ~ _ ~ rows ~ _ ~ cols ~ _ ~ expr ~ _ => ConstructMatrixExpr(s.substring(0, 2).toLowerCase, rows, cols, expr)
   }
   
   
@@ -194,7 +194,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     }
   }
 
-  def boolLiteral: Parser[Predicate] = boolean ^^ { b => BoolLiteral(b)}
+  def boolLiteral = boolean ^^ { b => BoolLiteral(b)}
 
   def boolFactor: Parser[Predicate] = (
     boolLiteral
@@ -222,6 +222,17 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   /*
    * The list of case-insensitive keywords we want to accept.
    */
+  lazy val intKeyword = "int".ignoreCase
+  lazy val floatKeyword = "float".ignoreCase
+  lazy val longKeyword = "long".ignoreCase
+  lazy val doubleKeyword = "double".ignoreCase
+  lazy val bytearrayKeyword = "bytearray".ignoreCase
+  lazy val chararrayKeyword = "chararray".ignoreCase
+  lazy val tupleKeyword = "tuple".ignoreCase
+  lazy val mapKeyword = "map".ignoreCase
+  lazy val bagKeyword = "bag".ignoreCase
+  lazy val booleanKeyword = "boolean".ignoreCase
+
   lazy val loadKeyword = "load".ignoreCase
   lazy val dumpKeyword = "dump".ignoreCase
   lazy val displayKeyword = "display".ignoreCase
@@ -286,13 +297,13 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
    */
   def tupleTypeSpec: Parser[TupleType] =
-    ("tuple"?) ~ "(" ~repsep(fieldSchema, ",") ~ ")" ^^{ case _ ~ _ ~ fieldList ~ _ => TupleType(fieldList.toArray) }
+    (tupleKeyword ?) ~ "(" ~repsep(fieldSchema, ",") ~ ")" ^^{ case _ ~ _ ~ fieldList ~ _ => TupleType(fieldList.toArray) }
 
-  def matrixTypeName: Parser[String] = "[sd][id]matrix".r
+  def matrixTypeName: Parser[String] = "[sdSD][idID][mM][aA][tT][rR][iI][xX]".r
   def matrixTypeSpec: Parser[PigType] = matrixTypeName ~ "(" ~ num ~ "," ~ num ~ ")" ^^{
     case n ~ _ ~ rows ~ _ ~ cols ~ _ =>
-      val t = if (n.charAt(1) == 'i') Types.IntType else Types.DoubleType
-      val rep = if (n.charAt(0) == 's') MatrixRep.SparseMatrix else MatrixRep.DenseMatrix
+      val t = if (n.charAt(1) == 'i' || n.charAt(1) == 'I') Types.IntType else Types.DoubleType
+      val rep = if (n.charAt(0) == 's' || n.charAt(0) == 'S') MatrixRep.SparseMatrix else MatrixRep.DenseMatrix
       MatrixType(t, rows, cols, rep)
   }
   
@@ -302,22 +313,22 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
 //  }
 
   def typeSpec: Parser[PigType] = (
-    "int" ^^ { _ => Types.IntType }
-    | "long" ^^ { _ => Types.LongType }
-    | "float" ^^ { _ => Types.FloatType }
-    | "double" ^^ { _ => Types.DoubleType }
-    | "boolean" ^^ { _ => Types.BooleanType }
-    | "chararray" ^^ { _ => Types.CharArrayType }
-    | "bytearray" ^^{ _ => Types.ByteArrayType }
+    intKeyword ^^ { _ => Types.IntType }
+    | longKeyword ^^ { _ => Types.LongType }
+    | floatKeyword ^^ { _ => Types.FloatType }
+    | doubleKeyword ^^ { _ => Types.DoubleType }
+    | booleanKeyword ^^ { _ => Types.BooleanType }
+    | chararrayKeyword ^^ { _ => Types.CharArrayType }
+    | bytearrayKeyword ^^{ _ => Types.ByteArrayType }
     | tupleTypeSpec
       /*
        * bag schema: bag{<tuple>} or {<tuple>}
        */
-    | ("bag"?) ~ "{" ~ tupleTypeSpec ~ "}" ^^{ case _ ~  _ ~ tup ~ _ => BagType(tup) }
+    | (bagKeyword ?) ~ "{" ~ tupleTypeSpec ~ "}" ^^{ case _ ~  _ ~ tup ~ _ => BagType(tup) }
       /*
        * map schema: map[<list of fields>] or [<list of fields>]
        */
-    | ("map"?) ~ "[" ~(typeSpec?) ~ "]" ^^{ case _ ~ _ ~ ty ~ _ => ty match {
+    | (mapKeyword ?) ~ "[" ~(typeSpec?) ~ "]" ^^{ case _ ~ _ ~ ty ~ _ => ty match {
         case Some(t) => MapType(t)
         case None => MapType(Types.ByteArrayType)
     }}
@@ -341,10 +352,29 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     case _ ~ _ ~ fieldList ~ _ => Schema(BagType(TupleType(fieldList.toArray)))
   }
 
-  def usingClause: Parser[(String, List[String])] = usingKeyword ~ ident ~ "(" ~ repsep(pigStringLiteral, ",") ~ ")" ^^ {
+  def usingClause: Parser[(String, List[String])] = usingKeyword ~ ident ~ "(" ~ repsep(params, ",") ~ ")" ^^ {
     case _ ~ loader ~ _ ~ params ~ _ => (loader, params)
   }
+  
+  def params: Parser[String] = kvParam | plainParams
+  
+  def kvParam = ident ~ "=" ~ params ^^ {
+    case k ~ _ ~ v =>
+      val v2 = if(v.startsWith("'") && v.endsWith("'"))
+                 s""""${unquote(v)}"""" 
+               else 
+                 v
+      
+      s"$k=$v2"
+  }
 
+  def plainParams = (boolLiteral | num | pigStringLiteral) ^^ { 
+    case p => p match {
+      case p: BoolLiteral => p.b.toString()
+      case _ => p.toString()
+    }
+  }
+  
   def fieldRef: Parser[Ref] = posField | namedFieldWithoutLineage
   def timestampClause: Parser[Ref] = timestampKeyword ~ "(" ~ fieldRef ~ ")" ^^ { case _ ~ _ ~ f ~ _ => f }
 
@@ -357,7 +387,19 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
         case _ => {}
       }
       u match {
-        case Some(p) => new Load(Pipe(b), uri, s, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+        case Some(p) => 
+          val params = if (p._2.isEmpty) null // no params given 
+            else {
+              // transform given params to convert ' into " - if it's an unquoted param (e.g. int, boolean values) leave it as is
+              p._2.map(s => 
+                if(s.startsWith("'") && s.endsWith("'"))
+                  s""""${unquote(s)}"""" 
+                else 
+                  s
+              ) 
+            }  
+          new Load(Pipe(b), uri, s, Some(p._1), params)
+            
         case None => new Load(Pipe(b), uri, s)
       }
   }
