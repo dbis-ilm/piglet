@@ -1098,8 +1098,47 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperClass = cleanString(
       """object bNFA {
-        |  def filterA (record: _t1_Tuple ) : Boolean = t._0 == 1
-        |  def filterB (record: _t1_Tuple ) : Boolean = t._1 == 2
+        |  def filterA (t: _t1_Tuple ) : Boolean = t._0 == 1
+        |  def filterB (t: _t1_Tuple ) : Boolean = t._1 == 2
+        |  def createNFA = {
+        |    val bOurNFA: NFAController[_t1_Tuple] = new NFAController()
+        |    val StartState = bOurNFA.createAndGetNormalState("Start")
+        |    val AState = bOurNFA.createAndGetNormalState("A")
+        |    val BState = bOurNFA.createAndGetFinalState("B")
+        |    val AEdge = bOurNFA.createAndGetForwardState(filterA)
+        |    val BEdge = bOurNFA.createAndGetForwardState(filterB)
+        |    bOurNFA.createForwardTransition(StartState, AEdge, AState)
+        |    bOurNFA.createForwardTransition(AState, BEdge, BState)
+        |    bOurNFA
+        |  }
+        |}""".stripMargin)
+    println("helper: " + generatedHelperClass)
+    generatedCode should matchSnippet(expectedCode)
+    generatedHelperClass should matchSnippet(expectedHelperClass)
+  }
+
+  it should "contain code for match_event with a pattern SEQ (A, B) where B refers to A" in {
+    Schema.init()
+    val ops = parseScript("""
+                            |b =  match_event b pattern SEQ (A, B) with (A: t1 == 1, B: t2 == 2 AND t3 == A.t3);
+                            |""".stripMargin, List(LanguageFeature.ComplexEventPig))
+    val schema = Schema(Array(Field("t1", Types.IntType),
+      Field("t2", Types.IntType),
+      Field("t3", Types.IntType)))
+    ops.head.schema = Some(schema)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("b").get
+    val codeGenerator = new BatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """
+        |val b = b.matchNFA(bNFA.createNFA, NextMatches)
+        |""".stripMargin)
+    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
+    val expectedHelperClass = cleanString(
+      """object bNFA {
+        |  def filterA (t: _t1_Tuple ) : Boolean = t._0 == 1
+        |  def filterB (t: _t1_Tuple ) : Boolean = t._1 == 2 && t._2 == ??._2
         |  def createNFA = {
         |    val bOurNFA: NFAController[_t1_Tuple] = new NFAController()
         |    val StartState = bOurNFA.createAndGetNormalState("Start")
