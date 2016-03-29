@@ -26,9 +26,7 @@ import scala.collection.mutable.ArrayBuffer
  * @param initialOutPipeName the name of the output pipe (relation).
  * @param initialInPipeNames the list of names of input pipes.
  */
-case class Union(out: Pipe, in: List[Pipe]) extends PigOperator {
-  _outputs = List(out)
-  _inputs = in
+case class Union(private val out: Pipe, private val in: List[Pipe]) extends PigOperator(List(out), in) {
 
   override def lineageString: String = {
     s"""UNION%""" + super.lineageString

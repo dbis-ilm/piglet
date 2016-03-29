@@ -92,12 +92,12 @@ case class GeneratorPlan(var subPlan: List[PigOperator]) extends ForeachGenerato
  * @param generator the generator (a list of expressions or a subplan)
  * @param windowMode ???
  */
-case class Foreach(out: Pipe,
-                   in: Pipe,
-                   var generator: ForeachGenerator,
-                   var windowMode: Boolean = false) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class Foreach(
+    private val out: Pipe,
+    private val in: Pipe,
+    var generator: ForeachGenerator,
+    var windowMode: Boolean = false
+  ) extends PigOperator(out, in) {
 
   var subPlan: Option[DataflowPlan] = None
 

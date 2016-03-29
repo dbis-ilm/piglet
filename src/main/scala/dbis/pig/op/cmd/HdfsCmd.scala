@@ -23,14 +23,12 @@ import dbis.pig.op.PigOperator
 /**
  * HdfsCmd represents a pseudo operator for HDFS commands.
  */
-case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator
+case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator(List(), List())
 {
 
   if (!isValid)
     throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
 
-  _outputs = List()
-  _inputs = List()
 
   override def outPipeNames: List[String] = List()
 

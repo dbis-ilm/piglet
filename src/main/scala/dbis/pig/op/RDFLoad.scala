@@ -5,9 +5,7 @@ import java.net.URI
 import org.kiama.rewriting.Rewriter.everything
 import scala.collection.mutable.Map
 
-case class RDFLoad(out: Pipe, uri: URI, grouped: Option[String]) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List.empty
+case class RDFLoad(private val out: Pipe, uri: URI, grouped: Option[String]) extends PigOperator(out) {
 
   schema = if (grouped.isDefined) {
     if (RDFLoad.groupedSchemas.contains(grouped.get)){

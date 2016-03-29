@@ -68,7 +68,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def pigStringLiteral: Parser[String] =
     ("'"+"""([^'\p{Cntrl}\\]|\\[\\"bfnrt]|\\u[a-fA-F0-9]{4})*"""+"'").r
 
-  def unquote(s: String): String = s.substring(1, s.length - 1)
+  def unquote(s: String): String = if(s.startsWith("'") && s.endsWith("'")) s.substring(1, s.length - 1) else s
 
   def num: Parser[Int] = wholeNumber ^^ (_.toInt)
 
@@ -191,7 +191,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     }
   }
 
-  def boolLiteral: Parser[Predicate] = boolean ^^ { b => BoolLiteral(b)}
+  def boolLiteral = boolean ^^ { b => BoolLiteral(b)}
 
   def boolFactor: Parser[Predicate] = (
     boolLiteral
@@ -342,10 +342,29 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     case _ ~ _ ~ fieldList ~ _ => Schema(BagType(TupleType(fieldList.toArray)))
   }
 
-  def usingClause: Parser[(String, List[String])] = usingKeyword ~ ident ~ "(" ~ repsep(pigStringLiteral, ",") ~ ")" ^^ {
+  def usingClause: Parser[(String, List[String])] = usingKeyword ~ ident ~ "(" ~ repsep(params, ",") ~ ")" ^^ {
     case _ ~ loader ~ _ ~ params ~ _ => (loader, params)
   }
+  
+  def params: Parser[String] = kvParam | plainParams
+  
+  def kvParam = ident ~ "=" ~ params ^^ {
+    case k ~ _ ~ v =>
+      val v2 = if(v.startsWith("'") && v.endsWith("'"))
+                 s""""${unquote(v)}"""" 
+               else 
+                 v
+      
+      s"$k=$v2"
+  }
 
+  def plainParams = (boolLiteral | num | pigStringLiteral) ^^ { 
+    case p => p match {
+      case p: BoolLiteral => p.b.toString()
+      case _ => p.toString()
+    }
+  }
+  
   def fieldRef: Parser[Ref] = posField | namedFieldWithoutLineage
   def timestampClause: Parser[Ref] = timestampKeyword ~ "(" ~ fieldRef ~ ")" ^^ { case _ ~ _ ~ f ~ _ => f }
 
@@ -357,8 +376,31 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
         case PositionalField(p) => s.get.timestampField = p
         case _ => {}
       }
+      
       u match {
-        case Some(p) => new Load(Pipe(b), uri, s, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
+        case Some(p) => 
+          val params = if (p._2.isEmpty) null // no params given 
+            else {
+              // transform given params to convert ' into " - if it's an unquoted param (e.g. int, boolean values) leave it as is
+              p._2.map(s => 
+                if(s.startsWith("'") && s.endsWith("'"))
+                  s""""${unquote(s)}"""" 
+                else 
+                  s
+              ) 
+            }
+          
+          val s2 = if(p._1.toLowerCase() == "textloader" && s.isEmpty) {
+              /* If no schema is given for text loader, create one implicitly. 
+               * The schema will be one field with name "line" and type chararray
+               */
+              Some(Schema(BagType(TupleType(Array(Field("line", Types.CharArrayType)))))) 
+            }
+            else 
+              s
+          
+          new Load(Pipe(b), uri, s2, Some(p._1), params)
+            
         case None => new Load(Pipe(b), uri, s)
       }
   }

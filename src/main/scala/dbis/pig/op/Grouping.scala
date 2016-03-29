@@ -72,9 +72,12 @@ case class GroupingExpression(val keyList: List[Ref]) {
  * @param groupExpr the expression (a key or a list of keys) used for grouping
  * @param windowMode true if processed on a window on a data stream
  */
-case class Grouping(out: Pipe, in: Pipe, groupExpr: GroupingExpression, var windowMode: Boolean = false) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class Grouping(
+    private val out: Pipe, 
+    private val in: Pipe, 
+    groupExpr: GroupingExpression, 
+    var windowMode: Boolean = false
+  ) extends PigOperator(out, in) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.

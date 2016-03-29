@@ -37,8 +37,22 @@ import scala.reflect.ClassTag
 //-----------------------------------------------------------------------------------------------------
 
 class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): RDD[T] =
-    sc.textFile(path).map(line => extract(line.split(delim, -1)))
+  
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t", 
+      skipFirstRow: Boolean = false, skipEmpty: Boolean = false, comments: String = ""): RDD[T] = {
+        
+    val raw = sc.textFile(path)
+    val nonEmpty = if(skipEmpty) raw.filter { line => line.nonEmpty } else raw
+    val nonComment = if(comments.nonEmpty) nonEmpty.filter { line => !line.startsWith(comments) } else nonEmpty
+    val content = if(skipFirstRow) {
+      val header = nonComment.first()
+      nonComment.filter { line => line != header }
+    } else 
+      nonComment
+      
+    
+    content.map(line => line.split(delim, -1)).map(extract)
+  }
 
   def write(path: String, rdd: RDD[T], delim: String = ",") = rdd.map(_.mkString(delim)).saveAsTextFile(path)
 }

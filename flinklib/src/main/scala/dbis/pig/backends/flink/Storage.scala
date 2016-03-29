@@ -28,8 +28,20 @@ import scala.reflect.ClassTag
 //-----------------------------------------------------------------------------------------------------
 
 class PigStorage[T <: SchemaClass :ClassTag: TypeInformation] extends java.io.Serializable {
-  def load(env: ExecutionEnvironment, path: String,  extract: (Array[String]) => T, delim: String = "\t"): DataSet[T] = {
-    env.readTextFile(path).map(line => extract(line.split(delim, -1)))
+  def load(env: ExecutionEnvironment, path: String,  extract: (Array[String]) => T, delim: String = "\t",
+      skipFirstRow: Boolean = false, skipEmpty: Boolean = false, comments: String = ""): DataSet[T] = {
+    
+    val raw = env.readTextFile(path) 
+    val nonEmpty = if(skipEmpty) raw.filter { line => line.nonEmpty } else raw
+    val nonComment = if(comments.nonEmpty) nonEmpty.filter { line => !line.startsWith(comments) } else nonEmpty
+    val content = if(skipFirstRow) {
+      val header = nonComment.first(1).collect().head
+      nonComment.filter { line => line != header }
+    } else 
+      nonComment
+      
+    
+    content.map(line => line.split(delim, -1)).map(extract)
   }
 
   def write(path: String, result: DataSet[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path).setParallelism(1)

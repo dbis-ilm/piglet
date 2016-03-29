@@ -27,6 +27,6 @@ import dbis.pig.op.PigOperator
  * @param param the parameter name
  * @param value the value of the parameter set by this statement
  */
-case class SetCmd(param: String, value: Value) extends PigOperator
+case class SetCmd(param: String, value: Value) extends PigOperator(List(), List())
 
 

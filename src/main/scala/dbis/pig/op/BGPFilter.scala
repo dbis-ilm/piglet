@@ -29,9 +29,11 @@ case class TriplePattern(subj: Ref, pred: Ref, obj: Ref)
  * @param in
  * @param patterns
  */
-case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class BGPFilter(
+    private val out: Pipe, 
+    private val in: Pipe, 
+    patterns: List[TriplePattern]
+  ) extends PigOperator(out, in) {
 
   override def lineageString: String = s"""BGPFilter%""" + super.lineageString
 

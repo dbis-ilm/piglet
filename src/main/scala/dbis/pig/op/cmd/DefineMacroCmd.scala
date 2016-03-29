@@ -22,9 +22,12 @@ import scala.collection.mutable.ListBuffer
 import dbis.pig.op.{Pipe,PigOperator}
 
 
-case class DefineMacroCmd(out: Pipe, macroName: String, params: Option[List[String]], stmts: List[PigOperator]) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List()
+case class DefineMacroCmd(
+    out: Pipe, 
+    macroName: String, 
+    params: Option[List[String]], 
+    stmts: List[PigOperator]
+  ) extends PigOperator(out) {
 
   var subPlan: Option[DataflowPlan] = None
   var inPipes = List[Pipe]()
