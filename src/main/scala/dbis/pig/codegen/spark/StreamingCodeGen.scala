@@ -35,11 +35,11 @@ class StreamingCodeGen(template: String) extends BatchCodeGen(template) {
   def emitWindow(out: String, in: String, window: Tuple2[Int, String], slide: Tuple2[Int, String]): String = {
     if(window._2==""){
       if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1))
-      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1, "sUnit"->slide._2))
+      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1, "sUnit"->slide._2.toUpperCase()))
     }
     else {
-      if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1))
-      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2, "slider"->slide._1, "sUnit"->slide._2))
+      if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2.toUpperCase(), "slider"->slide._1))
+      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2.toUpperCase(), "slider"->slide._1, "sUnit"->slide._2.toUpperCase()))
     }
   }
 
