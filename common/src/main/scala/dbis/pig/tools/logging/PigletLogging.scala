@@ -22,6 +22,16 @@ trait PigletLogging {
   
 
 
-  protected val logger: PigletLogger = PigletLogger(LoggerFactory.getLogger(getClass.getName).asInstanceOf[ch.qos.logback.classic.Logger])
+  protected val logger: PigletLogger = {
+    val baseLogger = LoggerFactory.getLogger(getClass.getName)
+    
+    if(baseLogger.isInstanceOf[ch.qos.logback.classic.Logger])
+    	PigletLogger(baseLogger.asInstanceOf[ch.qos.logback.classic.Logger])
+    else { 
+      Console.err.println(s"Could not bind logger: $baseLogger")
+      new PigletLogger(None)
+    }
+  }
+    
   
 }
