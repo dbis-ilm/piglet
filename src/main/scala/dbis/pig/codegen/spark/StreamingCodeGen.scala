@@ -19,6 +19,7 @@ package dbis.pig.codegen.spark
 import dbis.pig.backends.BackendManager
 import dbis.pig.op._
 import dbis.pig.codegen.CodeGenerator
+import dbis.pig.plan.DataflowPlan
 
 
 
@@ -35,11 +36,11 @@ class StreamingCodeGen(template: String) extends BatchCodeGen(template) {
   def emitWindow(out: String, in: String, window: Tuple2[Int, String], slide: Tuple2[Int, String]): String = {
     if(window._2==""){
       if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1))
-      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1, "sUnit"->slide._2.toUpperCase()))
+      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "slider"->slide._1, "sUnit"->slide._2.toUpperCase))
     }
     else {
-      if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2.toUpperCase(), "slider"->slide._1))
-      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2.toUpperCase(), "slider"->slide._1, "sUnit"->slide._2.toUpperCase()))
+      if(slide._2=="") callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2.toUpperCase, "slider"->slide._1))
+      else callST("window", Map("out"-> out,"in"->in, "window"->window._1, "wUnit"->window._2.toUpperCase, "slider"->slide._1, "sUnit"->slide._2.toUpperCase))
     }
   }
 
@@ -90,8 +91,21 @@ class StreamingCodeGen(template: String) extends BatchCodeGen(template) {
       case _ => super.emitNode(node)
     }
   }
+  
+  override def emitFooter(plan: DataflowPlan): String = {
+    /*
+     * We want to force the termination with the help of a timeout, 
+     * if all source nodes are Load operators as text files are not continuous.
+     */
+    var forceTermin = if(plan.operators.isEmpty) false else true
+    plan.sourceNodes.foreach(op => forceTermin &= op.isInstanceOf[Load])
+    var params = Map("name" -> "Starting Query")
+    if (forceTermin) params += ("forceTermin" -> forceTermin.toString())
+    callST("end_query", params)
+  }
 
 }
+
 
 class StreamingGenerator(templateFile: String) extends CodeGenerator {
   override val codeGen = new StreamingCodeGen(templateFile)

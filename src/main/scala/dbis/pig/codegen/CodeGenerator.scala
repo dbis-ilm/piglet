@@ -99,7 +99,7 @@ trait CodeGeneratorBase {
    *
    * @return a string representing the end of the code.
    */
-  def emitFooter: String
+  def emitFooter(plan: DataflowPlan): String
 
   /**
    * Generate code for any helper class/function if needed by the given operator.
@@ -223,6 +223,6 @@ trait CodeGenerator {
     }
 
     // generate the cleanup code
-    if (forREPL) code else code + codeGen.emitFooter
+    if (forREPL) code else code + codeGen.emitFooter(plan)
   }
 }
