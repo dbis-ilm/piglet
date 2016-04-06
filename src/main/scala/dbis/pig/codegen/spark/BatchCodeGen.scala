@@ -92,7 +92,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
         }
         case _ => "" // should not happen
       }
-      case n@Distinct(out, in, _) => callST("distinct", Map("out" -> n.outPipeName, "in" -> n.inPipeName))
+      case n@Distinct(out, in, _) => s"""val ${n.outPipeName} = ${n.inPipeName}.distinct"""
       case n@Filter(out, in, pred, _) => callST("filter", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "pred" -> emitPredicate(n.schema, pred)))
       case n@Limit(out, in, num) => callST("limit", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "num" -> num))
       case OrderBy(out, in, orderSpec, _) => "" // TODO!!!!
