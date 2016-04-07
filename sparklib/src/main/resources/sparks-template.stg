@@ -35,8 +35,8 @@ object <name> {
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
-        SparkStream.setAppName("<name>_App")
-        val ssc = SparkStream.ssc
+    	SparkStream.setAppName("<name>_App")
+    	val ssc = SparkStream.ssc
         <if (profiling)>
         val perfMon = new PerfMonitor("<name>_App")
         ssc.sparkContext.addSparkListener(perfMon)
@@ -87,7 +87,7 @@ foreachNested(out, in, expr) ::=<<
 // ------------------ Executes an expression FOREACH input element requiring a flatMap -----------
 // Note, that the closing parenthesis is intentionally missing
 foreachFlatMap(out, in, expr) ::=<<
-        val <out> = <in>.flatMap(t => <expr>
+        val <out> = <in>.flatMap(t => <expr>)
 >>
 
 // ------------------ Passes Stream through a Window Operator -----------------
@@ -191,9 +191,9 @@ rscript(out,in,script) ::=<<
 >>
 
 // ----------------- END of the code implementing the query -------------------
-end_query(name) ::= <<
-        ssc.start()             
-        ssc.awaitTermination()
+end_query(name,forceTermin) ::= <<
+        ssc.start()          
+	    ssc.awaitTermination<if (forceTermin)>OrTimeout(5000)<else>()<endif>
     }
 }
 >>

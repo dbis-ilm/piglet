@@ -47,7 +47,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test",true)
-      + codeGenerator.emitFooter)
+      + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
         |import org.apache.spark.SparkContext
         |import org.apache.spark.SparkContext._
@@ -76,7 +76,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitImport(Some("import breeze.linalg._"))
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test",true)
-      + codeGenerator.emitFooter)
+      + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
                                      |import org.apache.spark.SparkContext
                                      |import org.apache.spark.SparkContext._

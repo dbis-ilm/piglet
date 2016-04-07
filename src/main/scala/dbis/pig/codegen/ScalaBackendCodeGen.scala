@@ -17,7 +17,6 @@
 package dbis.pig.codegen
 
 import dbis.pig.tools.logging.PigletLogging
-
 import dbis.pig.op._
 import dbis.pig.op.cmd._
 import dbis.pig.expr._
@@ -25,10 +24,10 @@ import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import dbis.pig.udf._
-
 import java.net.URI
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Set
+import dbis.pig.plan.DataflowPlan
 
 
 // import scala.collection.mutable.Map
@@ -897,6 +896,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    *
    * @return a string representing the end of the code.
    */
-  def emitFooter: String = callST("end_query", Map("name" -> "Starting Query"))
+  def emitFooter(plan: DataflowPlan): String = callST("end_query", Map("name" -> "Starting Query"))
 
 }

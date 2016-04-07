@@ -5,6 +5,7 @@ import dbis.pig.expr._
 import dbis.pig.schema._
 import dbis.pig.udf._
 import dbis.pig.backends.BackendManager
+import dbis.pig.plan.DataflowPlan
 import org.clapper.scalasti.STGroupFile
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -532,7 +533,7 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
    *
    * @return a string representing the end of the code.
    */
-  def emitFooter: String = callST("parameterize_query") + emitStartupCode + callST("end_query")
+  def emitFooter(plan: DataflowPlan): String = callST("parameterize_query") + emitStartupCode + callST("end_query")
 
   /**
    * Generate code for any helper class/function if needed by the given operator.
