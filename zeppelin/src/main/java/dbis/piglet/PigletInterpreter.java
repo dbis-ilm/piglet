@@ -63,7 +63,11 @@ public class PigletInterpreter extends Interpreter {
         if (line == null || line.trim().length() == 0) {
             return new InterpreterResult(Code.SUCCESS);
         }
-        String sparkCode = PigletCompiler.createCodeFromInput(line, "spark");
+        
+        // TODO: add language feature COMPLETE here
+        List<String> features = new LinkedList<String>();
+        features.add("CompletePiglet");
+        String sparkCode = PigletCompiler.createCodeFromInput(line, "spark", features);
         sparkCode += "\nsc.stop()";
         // sparkCode = "println(\"%table x\ty\\n1\t2\\n3\t4\\n\\n\")";
         logger.info("PigletInterpreter.interpret = " + sparkCode);
@@ -78,7 +82,8 @@ public class PigletInterpreter extends Interpreter {
         if (pos == -1)
             return output;
         int last = output.indexOf("\n\n", pos);
-        logger.info("extracted result = {" + output.substring(pos, last) + "}");
-        return output.substring(pos, last);
+        String extracted = output.substring(pos, last);
+        logger.info("extracted result = {" + extracted + "}");
+        return extracted;
     }
 }

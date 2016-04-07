@@ -23,6 +23,7 @@ import dbis.pig.tools.CppCompilerConf
 import dbis.pig.tools.Conf
 import dbis.setm.SETM.timing
 import scalax.file.{Path => xPath}
+import dbis.pig.parser.LanguageFeature
 
 
 object PigletCompiler extends PigletLogging {
@@ -122,7 +123,9 @@ object PigletCompiler extends PigletLogging {
     (buf.toIterator, params)
   }
 
-  /**
+   
+   
+/**
  * Create Scala code for the given backend from the source string.
  * This method is provided mainly for Zeppelin.
  *
@@ -130,8 +133,9 @@ object PigletCompiler extends PigletLogging {
  * @param backend the backend used to compile and execute
  * @return the generated Scala code
  */
-def createCodeFromInput(source: String, backend: String): String = {
-  var plan = new DataflowPlan(PigParser.parseScript(source))
+def createCodeFromInput(source: String, backend: String, languageFeatures: List[String] = List.empty): String = {
+  val lf = languageFeatures.map { f => LanguageFeature.withName(f) }
+  var plan = new DataflowPlan(PigParser.parseScript(source, lf))
 
   if (!plan.checkConnectivity) {
     logger.error(s"dataflow plan not connected")
@@ -139,7 +143,7 @@ def createCodeFromInput(source: String, backend: String): String = {
   }
 
   logger.debug(s"successfully created dataflow plan")
-  // plan = processPlan(plan)
+  plan = processPlan(plan)
 
   // compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)
@@ -155,6 +159,13 @@ def createCodeFromInput(source: String, backend: String): String = {
   logger.debug("successfully generated scala program")
   code
 }
+
+  // Same as above, but accepts a Java list. Used as interface for our Zeppelin interpreter which is written in Java
+  def createCodeFromInput(source: String, backend: String, languageFeature: java.util.List[String]): String = {
+	  import scala.collection.JavaConverters._
+	  val scalaList = languageFeature.asScala.toList
+	  createCodeFromInput(source, backend, scalaList)
+  }
 
 
   /**
