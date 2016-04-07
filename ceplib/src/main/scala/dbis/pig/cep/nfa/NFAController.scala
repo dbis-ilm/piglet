@@ -3,12 +3,15 @@ package dbis.pig.cep.nfa
 import scala.reflect.ClassTag
 import scala.collection.mutable.ListBuffer
 import dbis.pig.backends.{SchemaClass => Event}
+import scala.collection.mutable.HashMap
 
 /**
  * @brief a controller class to construct the NFA for detecting the complex event.
  * The user should create the states, edges and transitions by calling particular methods
  */
 class NFAController[T <: Event: ClassTag] extends Serializable {
+  
+  type RelatedValueMap = HashMap[Int, ListBuffer[RelatedValue[T]]]
   /**
    * an edge counter to assign a unique id for each edge
    */
@@ -35,7 +38,9 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
    * the start state for this NFA
    */
    var startState: StartState[T] = null
-
+   
+   var initRelatedValue: Option[() => RelatedValueMap] = None
+   
   /**
    * creates the start state for this NFA and assigns its name
    * @param name the name of the start state
@@ -71,7 +76,7 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
    * @param predicate the predicate of this edge
    * @return a pointer to a forward edge
    */
-  def createAndGetForwardEdge(predicate: (T) => Boolean): ForwardEdge[T] = {
+  def createAndGetForwardEdge(predicate: (T, HashMap[Int, ListBuffer[RelatedValue[T]]]) => Boolean): ForwardEdge[T] = {
     val transition = new ForwardEdge(predicate, edgeID(), None)
     transitions += transition
     transition
@@ -88,6 +93,8 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
     forwardEdge.setDestState(dest)
     srcState.addEdge(forwardEdge)
   }
+  
+  def setInitRelatedValue(init: () => RelatedValueMap) : Unit = initRelatedValue = Some(init)
   /**
    * get a pointer to the start state
    * @return as above

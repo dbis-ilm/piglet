@@ -27,14 +27,22 @@ import dbis.pig.cep.nfa._
 import dbis.pig.cep.ops.SelectionStrategy._
 import dbis.pig.cep.ops.OutputStrategy._
 import dbis.pig.cep.spark.CustomRDDMatcher._
+import scala.collection.mutable.ListBuffer
+
+import scala.collection.mutable.HashMap
 
 case class BatchDoubleRecord(col1: Int, col2: Int) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = s"${col1}${delim}${col2}"
 }
+
+class RelatedValueRecord extends PreviousRelatedValue[BatchDoubleRecord] with java.io.Serializable {
+  override def updateValue(event: BatchDoubleRecord): Unit = value = Some(event.col1) 
+}
+
 object OurBatchNFA {
-    def filter1(record: BatchDoubleRecord): Boolean = record.col1 == 1
-    def filter2(record: BatchDoubleRecord): Boolean = record.col1 == 2
-    def filter3(record: BatchDoubleRecord): Boolean = record.col1 == 3
+    def filter1(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 1
+    def filter2(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 2
+    def filter3(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 3
     def createNFA = {
       val testNFA: NFAController[BatchDoubleRecord] = new NFAController()
       val firstState = testNFA.createAndGetStartState("First")
@@ -52,6 +60,40 @@ object OurBatchNFA {
       testNFA
     }
   }
+
+object OurReferBatchNFA {
+    def init() = {
+      val buffer0 = new ListBuffer[RelatedValue[BatchDoubleRecord]]()
+      buffer0 += new RelatedValueRecord()
+      val buffer1 = new ListBuffer[RelatedValue[BatchDoubleRecord]]()
+      buffer1 += new RelatedValueRecord()
+      val map = new HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]
+      map += (1 ->  buffer0)
+      map += (2 ->  buffer1)
+      map
+    }
+    def filter1(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 1
+    def filter2(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == rvalues(1)(0).getValue + 1
+    def filter3(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == rvalues(2)(0).getValue + 1
+    def createNFA = {
+      val testNFA: NFAController[BatchDoubleRecord] = new NFAController()
+      val firstState = testNFA.createAndGetStartState("First")
+      val secondState = testNFA.createAndGetNormalState("Second")
+      val thirdState = testNFA.createAndGetNormalState("Third")
+      val finalState = testNFA.createAndGetFinalState("Final")
+
+      val firstEdge = testNFA.createAndGetForwardEdge(filter1)
+      val secondEdge = testNFA.createAndGetForwardEdge(filter2)
+      val thirdEdge = testNFA.createAndGetForwardEdge(filter3)
+
+      testNFA.createForwardTransition(firstState, firstEdge, secondState)
+      testNFA.createForwardTransition(secondState, secondEdge, thirdState)
+      testNFA.createForwardTransition(thirdState, thirdEdge, finalState)
+      testNFA.setInitRelatedValue(init)
+      testNFA
+    }
+  }
+
 class SparkBatchCEPTest extends FlatSpec with Matchers with BeforeAndAfter {
   var sc: SparkContext = _
   var conf: SparkConf = _
@@ -81,7 +123,7 @@ class SparkBatchCEPTest extends FlatSpec with Matchers with BeforeAndAfter {
     BatchDoubleRecord(3, 5),
     BatchDoubleRecord(1, 6),
     BatchDoubleRecord(2, 7),
-    BatchDoubleRecord(3, 8))
+    BatchDoubleRecord(3, 8));
 
   "Spark CEP" should "detect the pattern SEQ(A, B, C) with first match" in {
     val data = sc.makeRDD(sample, 1)
@@ -130,6 +172,19 @@ class SparkBatchCEPTest extends FlatSpec with Matchers with BeforeAndAfter {
     val result = res.collect()
     result should be(Array(BatchDoubleRecord(1, 3),
       BatchDoubleRecord(2, 4),
+      BatchDoubleRecord(3, 5),
+      BatchDoubleRecord(1, 6),
+      BatchDoubleRecord(2, 7),
+      BatchDoubleRecord(3, 8)))
+  }
+  
+  "Spark CEP" should "detect the pattern SEQ(A, B, C) with first match and related value" in {
+    val data = sc.makeRDD(sample, 1)
+    val res = data.matchNFA(OurReferBatchNFA.createNFA, FirstMatch)
+    val result = res.collect()
+    result should be(Array(
+      BatchDoubleRecord(1, 1),
+      BatchDoubleRecord(2, 2),
       BatchDoubleRecord(3, 5),
       BatchDoubleRecord(1, 6),
       BatchDoubleRecord(2, 7),

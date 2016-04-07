@@ -29,15 +29,18 @@ import dbis.pig.cep.ops.SelectionStrategy._
 import dbis.pig.cep.ops.OutputStrategy._
 import dbis.pig.cep.flink.CustomDataSetMatcher._
 // import dbis.flink.test.FlinkBatchTestInit
+import scala.collection.mutable.ListBuffer
+
+import scala.collection.mutable.HashMap
 
 case class BatchDoubleRecord(col1: Int, col2: Int) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = s"${col1}${delim}${col2}"
 }
 
 object OurBatchNFA {
-    def filter1(record: BatchDoubleRecord): Boolean = record.col1 == 1
-    def filter2(record: BatchDoubleRecord): Boolean = record.col1 == 2
-    def filter3(record: BatchDoubleRecord): Boolean = record.col1 == 3
+    def filter1(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 1
+    def filter2(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 2
+    def filter3(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 3
     def createNFA = {
       val testNFA: NFAController[BatchDoubleRecord] = new NFAController()
       val firstState = testNFA.createAndGetStartState("First")
