@@ -817,9 +817,12 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * @param additionalCode Scala source code that was embedded into the script
    * @return a string representing the header code
    */
-  def emitHeader1(scriptName: String, additionalCode: String = ""): String =
-    callST("query_object", Map("name" -> scriptName, "embedded_code" -> additionalCode))
+  def emitHeader1(scriptName: String): String =
+    callST("query_object", Map("name" -> scriptName))
 
+  def emitEmbeddedCode(additionalCode: String) =
+    callST("embedded_code", Map("embedded_code" -> additionalCode))
+        
   /**
    *
    * Generate code for the header of the script which should be defined inside

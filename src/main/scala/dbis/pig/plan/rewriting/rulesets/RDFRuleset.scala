@@ -618,8 +618,6 @@ object RDFRuleset extends Ruleset {
       (isNamed(p.subj), isNamed(p.pred), isNamed(p.obj))
     } toSet
 
-    println(s"namedFields: $namedFields")
-    
 //    if (namedFields.size != 1) {
 //      // There are either no NamedFields or they appear in more than one position in different patterns, so it's
 //      // not a star join
@@ -679,7 +677,6 @@ object RDFRuleset extends Ruleset {
     foreach.constructSchema
 
     Rewriter.connect(join, foreach)
-    println(s"replace $op with $foreach")
     Rewriter.replaceOpInSuccessorsInputs(op, foreach)
 
     Some(filters)

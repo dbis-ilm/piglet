@@ -82,7 +82,9 @@ trait CodeGeneratorBase {
    * @param additionalCode source code (Scala, C++) that was embedded into the script
    * @return a string representing the header code
    */
-  def emitHeader1(scriptName: String, additionalCode: String): String
+  def emitHeader1(scriptName: String): String
+  
+  def emitEmbeddedCode(additionalCode: String): String
 
   /**
    * Generate code for the header of the script which should be defined inside
@@ -184,7 +186,10 @@ trait CodeGenerator {
     var code = codeGen.emitImport(additionalImports)
 
     if (!forREPL)
-      code = code + codeGen.emitHeader1(scriptName, plan.code)
+      code = code + codeGen.emitHeader1(scriptName)
+      
+    if(plan.code.nonEmpty)
+      code = code + codeGen.emitEmbeddedCode(plan.code)
 
     // generate schema classes for all registered types and schemas
     for (schema <- Schema.schemaList) {
