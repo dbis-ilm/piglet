@@ -23,9 +23,14 @@ implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-query_object(name, embedded_code) ::= <<
+query_object(name) ::= <<
 object <name> {
-    <embedded_code>
+
+>>
+
+embedded_code(embedded_code) ::= <<
+      <embedded_code>
+
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------

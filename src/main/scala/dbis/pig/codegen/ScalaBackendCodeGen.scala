@@ -744,7 +744,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     // build the list of field names (_0, ..., _n)
     val fieldNames = if (fieldList.size==1) "t" else fieldList.indices.map(t => "t._"+(t+1)).mkString(", ")
     val fieldTypes = fieldList.map(f => s"${typeName(f.fType, f.name)}").mkString(", ")
-    val fields= fieldList.zipWithIndex.map{ case (f, i) =>
+    val fields = fieldList.zipWithIndex.map{ case (f, i) =>
            (s"_$i", s"${typeName(f.fType, f.name)}")}
     val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
     

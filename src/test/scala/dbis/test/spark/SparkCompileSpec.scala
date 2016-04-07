@@ -816,9 +816,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val codeGenerator = new BatchCodeGen(templateFile)
-    assert(cleanString(codeGenerator.emitHeader1("test", plan.code)) ==
+    assert(cleanString(codeGenerator.emitEmbeddedCode(plan.code)) ==
       cleanString("""
-        |object test {
         |def someFunc(s: String): String = {
         | s
         |}

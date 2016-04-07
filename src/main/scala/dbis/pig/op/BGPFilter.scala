@@ -67,5 +67,13 @@ case class BGPFilter(
     }
     schema
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"BGP_FILTER { out = ${outPipeName} , in = ${inPipeName} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "pattern = " + patterns.mkString(","))
+  }
+
 }
 
