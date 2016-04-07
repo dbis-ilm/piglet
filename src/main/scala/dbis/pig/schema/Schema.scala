@@ -266,5 +266,5 @@ object Schema {
     *
     * @return the list of schemas
     */
-  def schemaList(): List[Schema] = schemaSet.values.toList.sortWith(_.schemaCode() < _.schemaCode())
+  def schemaList(): List[Schema] = schemaSet.values.toList.sortWith(_.schemaCode() > _.schemaCode())
 }
