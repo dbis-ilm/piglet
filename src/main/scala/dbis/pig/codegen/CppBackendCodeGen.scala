@@ -417,7 +417,7 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
     case None => throw CompilerException("the schema should be defined to define a format")
   }
 
-  def emitSchemaClass(schema: Schema): String = ""
+  def emitSchemaHelpers(schemas: List[Schema]): String = ""
 
   /**
    * Generate code for the given Pig operator. The system will go through each operator and render

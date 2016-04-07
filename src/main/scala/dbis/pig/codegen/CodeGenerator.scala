@@ -57,7 +57,8 @@ trait CodeGeneratorBase {
    * @param schema the schema for which we generate a class
    * @return a string representing the code
    */
-  def emitSchemaClass(schema: Schema): String
+//  def emitSchemaClass(schema: Schema): String
+  def emitSchemaHelpers(schemas: List[Schema]): String
 
   /**
    * Generate code for the given Pig operator.
@@ -192,9 +193,11 @@ trait CodeGenerator {
       code = code + codeGen.emitEmbeddedCode(plan.code)
 
     // generate schema classes for all registered types and schemas
-    for (schema <- Schema.schemaList) {
-      code = code + codeGen.emitSchemaClass(schema)
-    }
+//    for (schema <- Schema.schemaList) {
+//      code = code + codeGen.emitSchemaClass(schema)
+//    }
+      
+    code += codeGen.emitSchemaHelpers(Schema.schemaList)
       
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {

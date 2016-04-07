@@ -310,7 +310,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map(t => _t2_Tuple("all", t))""")
     assert(generatedCode == expectedCode)
 
-    val schemaCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    val schemaCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get)))
     val expectedSchemaCode =
       cleanString("""
          |case class _t$1_Tuple (_0: String, _1: Iterable[_t$2_Tuple]) extends java.io.Serializable with SchemaClass {
@@ -349,7 +349,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """val aa = bb.groupBy(t => {(t._0,t._1)}).map{case (k,v) => _t$1_Tuple(_t$2_Tuple(k._1, k._2),v)}""")
-    // val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    // val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get))
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -449,7 +449,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val finalJoinOp = plan.findOperatorForAlias("j").get
     // TODO: Schema classes!!!!
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(finalJoinOp.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(finalJoinOp.schema.get)))
 
     val expectedCode1 = cleanString(
       """val a_kv = a.map(t => (t._0,t))
@@ -589,7 +589,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |_t$1_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(foreachOp.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(foreachOp.schema.get)))
   }
 
   it should "contain code for a foreach statement with constructors for tuple, bag, and map" in {
@@ -599,7 +599,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val codeGenerator = new BatchCodeGen(templateFile)
     val op = plan.findOperatorForAlias("out").get
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get)))
 
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     //println("schema class = " + schemaClassCode)
@@ -816,7 +816,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val codeGenerator = new BatchCodeGen(templateFile)
-    assert(cleanString(codeGenerator.emitHeader1("test", plan.code)) ==
+    val theCode = codeGenerator.emitHeader1("test") + codeGenerator.emitEmbeddedCode(plan.code)
+    assert(cleanString(theCode) ==
       cleanString("""
         |object test {
         |def someFunc(s: String): String = {
@@ -930,7 +931,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
-      code = code + codeGenerator.emitSchemaClass(schema)
+      code = code + codeGenerator.emitSchemaHelpers(List(schema))
     }
 
     val generatedCode = cleanString(code)
@@ -963,7 +964,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
-      code = code + codeGenerator.emitSchemaClass(schema)
+      code = code + codeGenerator.emitSchemaHelpers(List(schema))
     }
 
     val generatedCode = cleanString(code)

@@ -17,6 +17,10 @@ schema_class(name, fieldNames, fieldTypes, fields, string_rep) ::= <<
 case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
   override def mkString(_c: String = ",") = <string_rep>
 }
+
+>>
+
+schema_converters(name,fieldNames,fieldTypes) ::= <<
 <if (fieldNames)>
 implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
 <endif>
