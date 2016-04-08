@@ -1,0 +1,60 @@
+<http://www.ins.cwi.nl/sib/person/p228> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> .
+<http://www.ins.cwi.nl/sib/person/p228> <http://xmlns.com/foaf/0.1/firstName> "Julia" .
+<http://www.ins.cwi.nl/sib/person/p228> <http://xmlns.com/foaf/0.1/lastName> "Hooda" .
+<http://www.ins.cwi.nl/sib/person/p228> <http://xmlns.com/foaf/0.1/based_near> <http://dbpedia.org/resource/India> .
+<http://www.ins.cwi.nl/sib/person/p228> <http://xmlns.com/foaf/0.1/based_near> "India" .
+<http://www.ins.cwi.nl/sib/person/p228> <http://dbpedia.org/property/latd> "22.42472841797112"^^<http://www.w3.org/2001/XMLSchema#double> .
+<http://www.ins.cwi.nl/sib/person/p228> <http://dbpedia.org/property/longd> "78.42472841797112"^^<http://www.w3.org/2001/XMLSchema#double> .
+<http://www.ins.cwi.nl/sib/person/p228> <http://www.ins.cwi.nl/sib/vocabulary/workAt> "Jet Airways" .
+<http://www.ins.cwi.nl/sib/person/p228> <http://www.ins.cwi.nl/sib/vocabulary/workFrom> "1970"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://www.ins.cwi.nl/sib/person/p228> <http://xmlns.com/foaf/0.1/birthday> "1969-03-26"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://www.ins.cwi.nl/sib/person/p228> <http://rdfs.org/sioc/ns#email> "Julia228@yahoo.com" .
+<http://www.ins.cwi.nl/sib/person/p228> <http://www.ins.cwi.nl/sib/vocabulary/browser> "Internet Explorer" .
+<http://www.ins.cwi.nl/sib/person/p228> <http://rdfs.org/sioc/ns#ip_address> "61.2.0.9" .
+<http://www.ins.cwi.nl/sib/user/u228> <http://rdfs.org/sioc/ns#account_of> <http://www.ins.cwi.nl/sib/person/p228> .
+<http://www.ins.cwi.nl/sib/person/p671> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> .
+<http://www.ins.cwi.nl/sib/person/p671> <http://xmlns.com/foaf/0.1/firstName> "Ling" .
+<http://www.ins.cwi.nl/sib/person/p671> <http://xmlns.com/foaf/0.1/lastName> "Chen" .
+<http://www.ins.cwi.nl/sib/person/p671> <http://xmlns.com/foaf/0.1/based_near> <http://dbpedia.org/resource/Peoples_Republic_of_China> .
+<http://www.ins.cwi.nl/sib/person/p671> <http://xmlns.com/foaf/0.1/based_near> "Peoples_Republic_of_China" .
+<http://www.ins.cwi.nl/sib/person/p671> <http://dbpedia.org/property/latd> "36.998476581325285"^^<http://www.w3.org/2001/XMLSchema#double> .
+<http://www.ins.cwi.nl/sib/person/p671> <http://dbpedia.org/property/longd> "106.99847658132528"^^<http://www.w3.org/2001/XMLSchema#double> .
+<http://www.ins.cwi.nl/sib/person/p671> <http://xmlns.com/foaf/0.1/organization> "HKU SPACE" .
+<http://www.ins.cwi.nl/sib/person/p671> <http://www.ins.cwi.nl/sib/vocabulary/class_year> "2008"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://www.ins.cwi.nl/sib/person/p671> <http://xmlns.com/foaf/0.1/birthday> "1980-11-09"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://www.ins.cwi.nl/sib/person/p671> <http://rdfs.org/sioc/ns#email> "Ling671@gmail.com" .
+<http://www.ins.cwi.nl/sib/person/p671> <http://www.ins.cwi.nl/sib/vocabulary/browser> "Chrome" .
+<http://www.ins.cwi.nl/sib/person/p671> <http://rdfs.org/sioc/ns#ip_address> "1.4.2.7" .
+<http://www.ins.cwi.nl/sib/user/u671> <http://rdfs.org/sioc/ns#account_of> <http://www.ins.cwi.nl/sib/person/p671> .
+<http://www.ins.cwi.nl/sib/person/p148> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> .
+<http://www.ins.cwi.nl/sib/person/p148> <http://xmlns.com/foaf/0.1/firstName> "Laurent" .
+<http://www.ins.cwi.nl/sib/person/p148> <http://xmlns.com/foaf/0.1/lastName> "Ciss\u0329" .
+<http://www.ins.cwi.nl/sib/person/p148> <http://xmlns.com/foaf/0.1/based_near> <http://dbpedia.org/resource/France> .
+<http://www.ins.cwi.nl/sib/person/p148> <http://xmlns.com/foaf/0.1/based_near> "France" .
+<http://www.ins.cwi.nl/sib/person/p148> <http://dbpedia.org/property/latd> "48.713715808031765"^^<http://www.w3.org/2001/XMLSchema#double> .
+<http://www.ins.cwi.nl/sib/person/p148> <http://dbpedia.org/property/longd> "50.713715808031765"^^<http://www.w3.org/2001/XMLSchema#double> .
+<http://www.ins.cwi.nl/sib/person/p148> <http://xmlns.com/foaf/0.1/organization> "?cole nationale sup?rieure de physique, ?lectronique et mat?riaux" .
+<http://www.ins.cwi.nl/sib/person/p148> <http://www.ins.cwi.nl/sib/vocabulary/workAt> "R\u0329gional Compagnie A\u0329rienne Europ\u0329enne" .
+<http://www.ins.cwi.nl/sib/person/p148> <http://www.ins.cwi.nl/sib/vocabulary/workFrom> "1971"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://www.ins.cwi.nl/sib/person/p148> <http://xmlns.com/foaf/0.1/gender> "female" .
+<http://www.ins.cwi.nl/sib/person/p148> <http://xmlns.com/foaf/0.1/birthday> "1986-05-10"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://www.ins.cwi.nl/sib/person/p148> <http://www.ins.cwi.nl/sib/vocabulary/browser> "Firefox" .
+<http://www.ins.cwi.nl/sib/person/p148> <http://rdfs.org/sioc/ns#ip_address> "46.182.72.5" .
+<http://www.ins.cwi.nl/sib/user/u148> <http://rdfs.org/sioc/ns#account_of> <http://www.ins.cwi.nl/sib/person/p148> .
+<http://www.ins.cwi.nl/sib/person/p149> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://xmlns.com/foaf/0.1/Person> .
+<http://www.ins.cwi.nl/sib/person/p149> <http://xmlns.com/foaf/0.1/firstName> "Jean-Pierre" .
+<http://www.ins.cwi.nl/sib/person/p149> <http://xmlns.com/foaf/0.1/lastName> "Hnatow" .
+<http://www.ins.cwi.nl/sib/person/p149> <http://xmlns.com/foaf/0.1/based_near> <http://dbpedia.org/resource/France> .
+<http://www.ins.cwi.nl/sib/person/p149> <http://xmlns.com/foaf/0.1/based_near> "France" .
+<http://www.ins.cwi.nl/sib/person/p149> <http://dbpedia.org/property/latd> "48.98976857688548"^^<http://www.w3.org/2001/XMLSchema#double> .
+<http://www.ins.cwi.nl/sib/person/p149> <http://dbpedia.org/property/longd> "50.98976857688548"^^<http://www.w3.org/2001/XMLSchema#double> .
+<http://www.ins.cwi.nl/sib/person/p149> <http://xmlns.com/foaf/0.1/organization> "Institut Lillois dIng?nierie de la Sant?" .
+<http://www.ins.cwi.nl/sib/person/p149> <http://www.ins.cwi.nl/sib/vocabulary/class_year> "1998"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://www.ins.cwi.nl/sib/person/p149> <http://www.ins.cwi.nl/sib/vocabulary/workAt> "LAvion" .
+<http://www.ins.cwi.nl/sib/person/p149> <http://www.ins.cwi.nl/sib/vocabulary/workFrom> "2003"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://www.ins.cwi.nl/sib/person/p149> <http://xmlns.com/foaf/0.1/gender> "male" .
+<http://www.ins.cwi.nl/sib/person/p149> <http://xmlns.com/foaf/0.1/birthday> "1977-12-02"^^<http://www.w3.org/2001/XMLSchema#date> .
+<http://www.ins.cwi.nl/sib/person/p149> <http://rdfs.org/sioc/ns#email> "Jean-Pierre149@gmail.com" .
+<http://www.ins.cwi.nl/sib/person/p149> <http://www.ins.cwi.nl/sib/vocabulary/browser> "Firefox" .
+<http://www.ins.cwi.nl/sib/person/p149> <http://rdfs.org/sioc/ns#ip_address> "46.18.120.15" .
+<http://www.ins.cwi.nl/sib/user/u149> <http://rdfs.org/sioc/ns#account_of> <http://www.ins.cwi.nl/sib/person/p149> .

@@ -774,13 +774,68 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
 
+  def emitSchemaHelpers(schemas: List[Schema]): String = {
+    var converterCode = ""
+    
+    val classes = ListBuffer.empty[(String, String)]
+    
+    for(schema <- schemas) {
+      val values = createSchemaInfo(schema)
+      
+      classes += emitSchemaClass(values)
+      converterCode += emitSchemaConverters(values)
+    }
+    
+    val p = "_t([0-9]+)_Tuple".r
+    
+    val sortedClasses = classes.sortWith { case (left, right) => 
+      val leftNum = left._1 match {
+        case p(group) => group.toInt
+        case _ => throw new IllegalArgumentException(s"unexpected class name: $left")
+      }
+      
+      val rightNum = right._1 match {
+        case p(group) => group.toInt
+        case _ => throw new IllegalArgumentException(s"unexpected class name: $left")
+      }
+      
+      leftNum < rightNum
+    
+    }
+
+    val classCode = sortedClasses.map(_._2).mkString("\n")
+    
+    classCode + "\n" + converterCode
+  }
+  
   /**
    * Generate code for a class representing a schema type.
    *
    * @param schema the schema for which we generate a class
    * @return a string representing the code
    */
-  def emitSchemaClass(schema: Schema): String = {
+  private def emitSchemaClass(values: (String, String, String, String, String)): (String, String) = {
+    val (name, fieldNames, fieldTypes, fieldStr, toStr) = values
+
+    val code = callST("schema_class", Map("name" -> name,
+                              "fieldNames" -> fieldNames,
+                              "fieldTypes" -> fieldTypes,
+                              "fields"   -> fieldStr,
+                              "string_rep" -> toStr))
+                              
+    (name, code)
+  }
+  
+  private def emitSchemaConverters(values: (String, String, String, String, String)): String = {
+    val (name, fieldNames, fieldTypes, _, _) = values
+
+    callST("schema_converters", Map("name" -> name,
+                              "fieldNames" -> fieldNames,
+                              "fieldTypes" -> fieldTypes
+                              ))
+  }
+  
+  private def createSchemaInfo(schema: Schema) = {
     def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
       case Some(n) => n
       case None => f match {
@@ -797,7 +852,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     // build the list of field names (_0, ..., _n)
     val fieldNames = if (fieldList.size==1) "t" else fieldList.indices.map(t => "t._"+(t+1)).mkString(", ")
     val fieldTypes = fieldList.map(f => s"${typeName(f.fType, f.name)}").mkString(", ")
-    val fields= fieldList.zipWithIndex.map{ case (f, i) =>
+    val fields = fieldList.zipWithIndex.map{ case (f, i) =>
            (s"_$i", s"${typeName(f.fType, f.name)}")}
     val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
     
@@ -812,12 +867,10 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         case _ => s"_$i" + (if (f.fType.tc != TypeCode.CharArrayType && fields.length == 1) ".toString" else "")
       }
     }.mkString(" + _c + ")
-
-    callST("schema_class", Map("name" -> schemaClassName(schema.className),
-                              "fieldNames" -> fieldNames,
-                              "fieldTypes" -> fieldTypes,
-                              "fields"   -> fieldStr,
-                              "string_rep" -> toStr))
+    
+    val name = schemaClassName(schema.className)
+    
+    (name, fieldNames, fieldTypes, fieldStr, toStr)
   }
 
 
@@ -871,9 +924,12 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * @param additionalCode Scala source code that was embedded into the script
    * @return a string representing the header code
    */
-  def emitHeader1(scriptName: String, additionalCode: String = ""): String =
-    callST("query_object", Map("name" -> scriptName, "embedded_code" -> additionalCode))
+  def emitHeader1(scriptName: String): String =
+    callST("query_object", Map("name" -> scriptName))
 
+  def emitEmbeddedCode(additionalCode: String) =
+    callST("embedded_code", Map("embedded_code" -> additionalCode))
+        
   /**
    *
    * Generate code for the header of the script which should be defined inside

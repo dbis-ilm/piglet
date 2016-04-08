@@ -417,7 +417,7 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
     case None => throw CompilerException("the schema should be defined to define a format")
   }
 
-  def emitSchemaClass(schema: Schema): String = ""
+  def emitSchemaHelpers(schemas: List[Schema]): String = ""
 
   /**
    * Generate code for the given Pig operator. The system will go through each operator and render
@@ -515,10 +515,12 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader1(scriptName: String, additionalCode: String): String = {
+  def emitHeader1(scriptName: String): String = {
     "" // TODO: typedefs for all tuple types callST("tuple_typedef")
   }
 
+  def emitEmbeddedCode(additionalCode: String): String = ???
+  
   /**
    * Generate code for the header of the script which should be defined inside
    * the main class/object.
