@@ -35,7 +35,7 @@ class PigStream[T <: SchemaClass: ClassTag: TypeInformation] extends java.io.Ser
   }
 
   def bind(host: String, port: Int, result: DataStream[T], delim: String = ",") = {
-    result.map(_.mkString(delim)).writeToSocket(host, port, new UTF8StringSchema())
+    result.map(_.mkString(delim) + "\n").writeToSocket(host, port, new UTF8StringSchema())
   }
 
   def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, extract: (Array[String]) => T, delim: String = "\t"): DataStream[T] = {
