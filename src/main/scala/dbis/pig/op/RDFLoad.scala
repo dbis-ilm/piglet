@@ -31,7 +31,8 @@ object RDFLoad {
   /** The schema for plain RDF data
     *
     */
-  final val plainSchema: Some[Schema] = Some(
+  // final val plainSchema: Some[Schema] = Some(
+  def plainSchema: Some[Schema] = Some(
     Schema(
       BagType(
         TupleType(
@@ -43,7 +44,8 @@ object RDFLoad {
   /** A map of column names to the schema where the data is grouped by that column.
     *
     */
-  lazy final val groupedSchemas = {
+ // lazy final val groupedSchemas = {
+  def groupedSchemas = {
     var m = Map[String, Schema]()
     val columns = List[String]("subject", "predicate", "object")
     for (grouping_column <- columns) {

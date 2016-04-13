@@ -202,7 +202,7 @@ object Piglet extends PigletLogging {
     
     // start processing
     run(files, outDir, compileOnly, master, backend, languageFeatures, paramMap.toMap, backendPath, backendArgs, profiling, showPlan, sequential)
-    
+
     if(showStats) {
       // collect and print runtime stats
       collectStats

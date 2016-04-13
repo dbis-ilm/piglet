@@ -4,9 +4,11 @@ import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.parser.LanguageFeature._
 import java.nio.file.Path
+
 import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.parser.PigParser
 import dbis.pig.plan.rewriting.Rewriter._
+
 import scala.collection.mutable
 import scala.io.Source
 import scala.collection.mutable.ListBuffer
@@ -15,6 +17,7 @@ import dbis.pig.op.PigOperator
 import java.nio.file.Paths
 import java.nio.file.Files
 import java.io.FileWriter
+
 import dbis.pig.tools.FileTools
 import dbis.pig.tools.ScalaCompiler
 import dbis.pig.tools.JarBuilder
@@ -22,8 +25,10 @@ import dbis.pig.tools.CppCompiler
 import dbis.pig.tools.CppCompilerConf
 import dbis.pig.tools.Conf
 import dbis.setm.SETM.timing
+
 import scalax.file.{Path => xPath}
 import dbis.pig.parser.LanguageFeature
+import dbis.pig.schema.Schema
 
 
 object PigletCompiler extends PigletLogging {
@@ -134,6 +139,7 @@ object PigletCompiler extends PigletLogging {
  * @return the generated Scala code
  */
 def createCodeFromInput(source: String, backend: String, languageFeatures: List[String] = List.empty): String = {
+  Schema.init()
   val lf = languageFeatures.map { f => LanguageFeature.withName(f) }
   var plan = new DataflowPlan(PigParser.parseScript(source, lf))
 
