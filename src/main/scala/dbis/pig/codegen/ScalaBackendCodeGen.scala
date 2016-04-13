@@ -94,6 +94,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
 
   // TODO: complex types
   val scalaTypeMappingTable = Map[PigType, String](
+    Types.BooleanType -> "Boolean",  
     Types.IntType -> "Int",
     Types.LongType -> "Long",
     Types.FloatType -> "Float",
