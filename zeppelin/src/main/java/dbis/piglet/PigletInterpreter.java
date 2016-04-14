@@ -72,16 +72,16 @@ public class PigletInterpreter extends Interpreter {
         // sparkCode = "println(\"%table x\ty\\n1\t2\\n3\t4\\n\\n\")";
         logger.info("PigletInterpreter.interpret = " + sparkCode);
         String res = iLoop.run(sparkCode, settings);
-        System.out.println("PigletInterpreter.interpret = '" + sparkCode + "'");
+        // System.out.println("PigletInterpreter.interpret = '" + sparkCode + "'");
        // if (res.matches(".*<console>:\\d+: error:.*")) {
         if (res.contains("error:") || res.contains("Exception:")) {
-            System.out.println("ERROR: " + res);
+            // System.out.println("ERROR: " + res);
             logger.error("ERROR in interpreter: " + res);
             InterpreterResult result = new InterpreterResult(Code.ERROR, "");
             return result;
         }
         else {
-            System.out.println("HUHUUUUUUU");
+            // System.out.println("HUHUUUUUUU");
             logger.info("result = " + res);
             InterpreterResult result = new InterpreterResult(Code.SUCCESS, extractResult(res));
             return result;
