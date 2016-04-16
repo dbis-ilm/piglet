@@ -49,7 +49,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test")
-      + codeGenerator.emitFooter)
+      + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
       |import org.apache.flink.api.scala._
       |import dbis.pig.backends.flink._
@@ -307,7 +307,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |_t$1_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(foreachOp.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(foreachOp.schema.get)))
   }
 
   it should "contain code for a foreach statement with constructors for tuple, bag, and map" in {
@@ -317,7 +317,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
     val op = plan.findOperatorForAlias("out").get
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get)))
 
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     //println("schema class = " + schemaClassCode)
@@ -408,7 +408,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString("""
       |val aa = bb.groupBy(t => (t._0,t._1)).reduceGroup{ (in, out: Collector[_t3_Tuple]) => val itr = in.toIterable; out.collect(_t3_Tuple(_t2_Tuple(itr.head._0,itr.head._1), itr)) }""".stripMargin)
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get)))
     assert(generatedCode == expectedCode)
   }
   it should "contain code for simple ORDER BY" in {
@@ -440,7 +440,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val expectedCode = cleanString("""val aa = bb.setParallelism(1).mapPartition( (in, out: Collector[_t2_Tuple]) =>  out.collect(_t2_Tuple("all", in.toIterable)))""")
     assert(generatedCode == expectedCode)
 
-    val schemaCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    val schemaCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get)))
     val expectedSchemaCode =
       cleanString("""
          |case class _t2_Tuple (_0: String, _1: Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
@@ -551,7 +551,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val finalJoinOp = plan.findOperatorForAlias("j").get
     // TODO: Schema classes!!!!
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(finalJoinOp.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(finalJoinOp.schema.get)))
 
     val expectedCode1 = cleanString(
       """val j1 = a.join(b).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v2._0) }""".stripMargin)
@@ -601,7 +601,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val codeGenerator = new FlinkBatchCodeGen(templateFile)
-    assert(cleanString(codeGenerator.emitHeader1("test", plan.code)) ==
+    val theCode = codeGenerator.emitHeader1("test") + codeGenerator.emitEmbeddedCode(plan.code)
+    assert(cleanString(theCode) ==
       cleanString("""
         |object test {
         |def someFunc(s: String): String = {
@@ -715,7 +716,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
-      code = code + codeGenerator.emitSchemaClass(schema)
+      code = code + codeGenerator.emitSchemaHelpers(List(schema))
     }
 
     val generatedCode = cleanString(code)
@@ -748,7 +749,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
-      code = code + codeGenerator.emitSchemaClass(schema)
+      code = code + codeGenerator.emitSchemaHelpers(List(schema))
     }
 
     val generatedCode = cleanString(code)

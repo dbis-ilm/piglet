@@ -618,12 +618,13 @@ object RDFRuleset extends Ruleset {
       (isNamed(p.subj), isNamed(p.pred), isNamed(p.obj))
     } toSet
 
-    if (namedFields.size != 1) {
-      // There are either no NamedFields or they appear in more than one position in different patterns, so it's
-      // not a star join
-      return None
-    }
+//    if (namedFields.size != 1) {
+//      // There are either no NamedFields or they appear in more than one position in different patterns, so it's
+//      // not a star join
+//      return None
+//    }
 
+    
     // We'll reuse in later on, so we need to remove `op` from its consumers
     in.removeConsumer(op)
 

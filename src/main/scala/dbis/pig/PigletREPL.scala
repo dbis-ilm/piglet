@@ -364,10 +364,11 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
 
       buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = false)
       var plan = new DataflowPlan(buf.toList)
-
+      logger.debug("plan created.")
       val mm = new MaterializationManager
       plan = processMaterializations(plan, mm)
       plan = processPlan(plan)
+      logger.debug("plan rewritten.")
 
       try {
         // if this does _not_ throw an exception, the schema is ok

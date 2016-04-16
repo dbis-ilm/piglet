@@ -24,21 +24,21 @@ import dbis.pig.backends._
 
 class PigStream[T <: SchemaClass: ClassTag: TypeInformation] extends java.io.Serializable {
 
-  def loadStream(env: StreamExecutionEnvironment, path: String, extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
+  def loadStream(env: StreamExecutionEnvironment, path: String, extract: (Array[String]) => T, delim: String = "\t"): DataStream[T] = {
     env.readTextFile(path).setParallelism(1).map(line => extract(line.split(delim, -1)))
   }
 
   def writeStream(path: String, result: DataStream[T], delim: String = ",") = result.map(_.mkString(delim)).writeAsText(path).setParallelism(1)
 
-  def connect(env: StreamExecutionEnvironment, host: String, port: Int, extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
+  def connect(env: StreamExecutionEnvironment, host: String, port: Int, extract: (Array[String]) => T, delim: String = "\t"): DataStream[T] = {
     env.socketTextStream(host,port).map(line => extract(line.split(delim, -1)))
   }
 
   def bind(host: String, port: Int, result: DataStream[T], delim: String = ",") = {
-    result.map(_.mkString(delim)).writeToSocket(host, port, new UTF8StringSchema())
+    result.map(_.mkString(delim) + "\n").writeToSocket(host, port, new UTF8StringSchema())
   }
 
-  def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, extract: (Array[String]) => T, delim: String = " "): DataStream[T] = {
+  def zmqSubscribe(env: StreamExecutionEnvironment, addr: String, extract: (Array[String]) => T, delim: String = "\t"): DataStream[T] = {
     env.addSource(new ZmqSubscriber(addr)).map(line => extract(line.split(delim, -1)))
   }
 
