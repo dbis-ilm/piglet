@@ -164,3 +164,4 @@ case class MatrixType(valueType: PigType, rows: Int, cols: Int, rep: MatrixRep =
 
   override def descriptionString = name
 }
+

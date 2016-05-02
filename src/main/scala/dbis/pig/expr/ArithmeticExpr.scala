@@ -291,3 +291,15 @@ case class ConstructMatrixExpr(typeString: String, rows: Int, cols: Int, ex: Ari
     MatrixType(t, rows, cols, k)
   }
 }
+
+case class ConstructGeometryExpr(ex: ArithmeticExpr) extends ConstructExpr {
+  exprs = List(ex)
+  
+  override def resultType(schema: Option[Schema]): PigType = {
+    if(ex.resultType(schema).tc != TypeCode.CharArrayType)
+      throw new SchemaException(s"geometry construction requires a string parameter")
+    
+    GeometryType()
+  }
+  
+}
