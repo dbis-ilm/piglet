@@ -15,10 +15,8 @@ case class SpatialJoin(
     private val out: Pipe, 
     private val in: List[Pipe], 
     predicate: SpatialPredicate
-  ) extends PigOperator {
+  ) extends PigOperator(List(out), in) {
   
-  _outputs = List(out)
-  _inputs = in
   
   override def lineageString: String = {
     s"""JOIN%${predicate.toString()}%""" + super.lineageString
