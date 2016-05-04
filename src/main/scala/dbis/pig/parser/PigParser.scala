@@ -358,7 +358,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   
   def params: Parser[String] = kvParam | plainParams
   
-  def kvParam = ident ~ "=" ~ params ^^ {
+  def kvParam = ident ~ "=" ~ plainParams ^^ {
     case k ~ _ ~ v =>
       val v2 = if(v.startsWith("'") && v.endsWith("'"))
                  s""""${unquote(v)}"""" 
@@ -368,7 +368,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
       s"$k=$v2"
   }
 
-  def plainParams = (boolLiteral | num | pigStringLiteral) ^^ { 
+  def plainParams = (boolLiteral | decimalNumber | num | pigStringLiteral) ^^ { 
     case p => p match {
       case p: BoolLiteral => p.b.toString()
       case _ => p.toString()
@@ -675,7 +675,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
-  def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
+  def delimStmt: Parser[PigOperator] = (loadStmt | indexStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt | spatialJoinStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt )
 
@@ -866,6 +866,8 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   lazy val spatialJoinKeyword = "SPATIALJOIN".ignoreCase
   lazy val containsKeyword = "contains".ignoreCase
   lazy val intersectsKeyword = "intersects".ignoreCase
+  lazy val indexKeyword = "index".ignoreCase
+  lazy val rtreeKeyword = "rtree".ignoreCase
   
   def geometryConstructor: Parser[ArithmeticExpr] = geometryTypeName ~ "(" ~ arithmExpr ~ ")" ^^ {
     case _ ~ _ ~ exp ~ _ => ConstructGeometryExpr(exp)
@@ -878,6 +880,16 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   
   def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ "," ~ bag ~ onKeyword ~ spatialPredicate ^^ {
     case out ~ _ ~ _ ~ in1 ~ _ ~ in2  ~ _ ~ expr => new SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr)
+  }
+  
+  
+  def indexMethod = rtreeKeyword ~ "(" ~ repsep(params, ",") ~ ")" ^^ {
+    case method ~ _ ~ paramList ~ _ => (IndexMethod.withName(method.toUpperCase()), paramList)
+  }
+  
+  
+  def indexStmt: Parser[PigOperator] = bag ~ "=" ~ indexKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ indexMethod  ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ methodWithParams => IndexOp(Pipe(out), Pipe(in), field, methodWithParams._1, methodWithParams._2)
   }
   
   /* ---------------------------------------------------------------------------------------------------------------- */
