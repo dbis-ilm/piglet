@@ -194,7 +194,7 @@ object SpatialPredicateType extends Enumeration {
 }
 
 case class SpatialPredicate(left: Ref, right: Ref, predicateType: SpatialPredicateType.Value) extends Predicate {
-  
+  // FIXME(hage): are the traverse methods OK?
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)

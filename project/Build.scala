@@ -32,9 +32,10 @@ object PigBuild extends Build {
     dependsOn(sparklib % "test;it").
     dependsOn(flinklib % "test;it"). 
     dependsOn(mapreducelib % "test;it").
+    dependsOn(ceplib % "test;it").
     dependsOn(setm).
 //    dependsOn(ProjectRef(uri("https://github.com/sthagedorn/setm.git#master"), "setm")).
-    aggregate(common, sparklib, flinklib, mapreducelib) // remove this if you don't want to automatically build these projects when building piglet 
+    aggregate(common, sparklib, flinklib, mapreducelib, ceplib) // remove this if you don't want to automatically build these projects when building piglet
 
   lazy val setm = (project in file("setm"))  
     
@@ -63,6 +64,10 @@ object PigBuild extends Build {
     dependsOn(common).
     disablePlugins(sbtassembly.AssemblyPlugin).
     dependsOn(piglet)
+
+  lazy val ceplib = (project in file("ceplib")).
+    settings(commonSettings: _*).
+    dependsOn(common)
 
   /*
    * define the backend for the compiler: currently we support spark and flink
@@ -104,10 +109,10 @@ object Dependencies {
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
   val jline = "jline" % "jline" % "2.13"
-  val sparkCore = "org.apache.spark" %% "spark-core" % "1.5.2"
-  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.5.2"
-  val sparkREPL = "org.apache.spark" %% "spark-repl" % "1.5.2"
-  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.5.2"
+  val sparkCore = "org.apache.spark" %% "spark-core" % "1.6.1"
+  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.6.1"
+  val sparkREPL = "org.apache.spark" %% "spark-repl" % "1.6.1"
+  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.6.1"
   val flinkScala = "org.apache.flink" %% "flink-scala" % "1.0.0"
   val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % "1.0.0"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"

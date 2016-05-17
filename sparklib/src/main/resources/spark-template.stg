@@ -17,6 +17,10 @@ schema_class(name, fieldNames, fieldTypes, fields, string_rep) ::= <<
 case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
   override def mkString(_c: String = ",") = <string_rep>
 }
+
+>>
+
+schema_converters(name,fieldNames,fieldTypes) ::= <<
 <if (fieldNames)>
 implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
 <endif>
@@ -24,11 +28,15 @@ implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
 >>
 
 // ----------------- BEGIN of code building and initializing the query --------
-query_object(name, embedded_code) ::= <<
+query_object(name) ::= <<
 object <name> {
-    <embedded_code>
 
 >>
+
+embedded_code(embedded_code) ::= <<
+      <embedded_code>
+      
+>>      
 
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name, profiling) ::= <<
@@ -54,7 +62,7 @@ dump(in) ::=<<
 
 // ------------------ DISPLAY results in Zeppelin -----------------------------
 display(in, tableHeader) ::=<<
-        println("%table <tableHeader>\n" + <in>.collect.map(t => t.mkString("\t")).mkString("\n") + "\n\n")
+        println(s"%table <tableHeader> \n ${<in>.collect.map(t => t.mkString("\t")).mkString("\n")} \n\n")
 >>
 
 // ------------------ STORE Results on disk -----------------------------------
@@ -120,8 +128,13 @@ m_join(out, class, rel1, rel2, pairs, fields) ::=<<
 >>
 
 spatialJoin(out, rel1, rel2, predicate, fields, className) ::=<<
-        val <out> = <rel1>_kv.join(<rel2>_kv).map{ case (k,(v,w)) => <className>(<fields>)\}
+        val <out> = <rel1>.join(<rel2>_kv).map{ case (k,(v,w)) => <className>(<fields>)\}
 >>
+
+index(out, in, field, method, params) ::=<<
+        val <out>_index_kv = <in>.keyBy(t => <field>)
+        val <out> = <out>_index_kv.index(<params>)
+>>        
 
 // ------------------ UNIONs multiple streams to one --------------------------
 union(out,in,others) ::=<<
@@ -186,6 +199,26 @@ accumulate(out, in, helper_class, class, init_expr, aggr_expr) ::=<<
         val <out>_fold = <in>.map(t => <helper_class>(t, <init_expr>))
                                         .aggregate(<helper_class>())(aggr_<out>_seq, aggr_<out>_comp)
         val <out> = sc.parallelize(Array(<class>(<aggr_expr>)))
+>>
+
+
+// ----------------- code for CEP MATCHER operator -----------------
+
+cepHelper(out, filters, predcs, class, states, tran_states, tran_next_states, types) ::=<<
+    object <out>NFA {
+        <filters, predcs:{ f, pred |def filter<f> (t: <class> ) : Boolean = <pred><\n>}>
+        def createNFA = {
+            val <out>OurNFA: NFAController[<class>] = new NFAController()<\n>
+            <states, types:{ s, t |val <s>State = <out>OurNFA.createAndGet<t>State("<s>")<\n>}>
+            <filters:{ f |val <f>Edge = <out>OurNFA.createAndGetForwardState(filter<f>)<\n>}>
+            <filters, tran_states, tran_next_states:{ f, s, n |<out>OurNFA.createForwardTransition(<s>State, <f>Edge, <n>State)<\n>}>
+            <out>OurNFA
+        }
+    }
+>>
+
+cep(out, in,  mode) ::= <<
+        val <out> = <in>.matchNFA(<out>NFA.createNFA, <mode>)
 >>
 
 // ----------------- END of the code implementing the query -------------------

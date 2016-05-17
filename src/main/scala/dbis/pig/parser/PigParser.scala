@@ -855,6 +855,8 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   lazy val spatialJoinKeyword = "SPATIALJOIN".ignoreCase
   lazy val containsKeyword = "contains".ignoreCase
   lazy val intersectsKeyword = "intersects".ignoreCase
+  lazy val indexKeyword = "index".ignoreCase
+  lazy val rtreeKeyword = "rtree".ignoreCase
   
   def geometryConstructor: Parser[ArithmeticExpr] = geometryTypeName ~ "(" ~ arithmExpr ~ ")" ^^ {
     case _ ~ _ ~ exp ~ _ => ConstructGeometryExpr(exp)
@@ -864,9 +866,19 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     case kw ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialPredicate(r1,r2,  SpatialPredicateType.withName(kw.toUpperCase()))
   }
   
+  def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ (indexKeyword?) ~ "," ~ bag ~ onKeyword ~ spatialPredicate  ^^ {
+    case out ~ _ ~ _ ~ in1 ~ idx ~ _ ~ in2  ~ _ ~ expr => new SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr, idx.isDefined )
+
+  }
   
-  def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ "," ~ bag ~ onKeyword ~ spatialPredicate ^^ {
-    case out ~ _ ~ _ ~ in1 ~ _ ~ in2  ~ _ ~ expr => new SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr)
+  
+  def indexMethod = rtreeKeyword ~ "(" ~ repsep(params, ",") ~ ")" ^^ {
+    case method ~ _ ~ paramList ~ _ => (IndexMethod.withName(method.toUpperCase()), paramList)
+  }
+  
+  
+  def indexStmt: Parser[PigOperator] = bag ~ "=" ~ indexKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ indexMethod  ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ methodWithParams => IndexOp(Pipe(out), Pipe(in), field, methodWithParams._1, methodWithParams._2)
   }
   
   /* ---------------------------------------------------------------------------------------------------------------- */
