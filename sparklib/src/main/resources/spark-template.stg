@@ -132,7 +132,7 @@ spatialJoin(out, rel1, rel2, predicate, fields, className) ::=<<
 >>
 
 index(out, in, field, method, params) ::=<<
-        val <out> = <in>.index(<params>) 
+        val <out> = <in>.keyBy(t => <field>).index(<params>) 
 >>        
 
 // ------------------ UNIONs multiple streams to one --------------------------

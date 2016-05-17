@@ -428,7 +428,13 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     require(j.schema.isDefined, "Schema information is required for spatial join")
     require(j.inputs.size == 2, "A spatial join must be made between exactly two relations")
 
-    val res = j.inputs.zip(Seq(j.predicate.left, j.predicate.right))
+    //    println(s"left schema: ${j.inputs(0).producer.schema}")
+//    println(s"right schema: ${j.inputs(1).producer.schema}")
+
+    /*
+     * If the left relation is indexed, exclude it from kv generation (drop)
+     */    
+    val res = j.inputs.drop(if(j.withIndex) 1 else 0).zip(Seq(j.predicate.left, j.predicate.right).drop(if(j.withIndex) 1 else 0))
     val keys = res.map { case (i, k) => emitJoinKey(i.producer.schema, List(k)) }
 
     /*
@@ -436,13 +442,13 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
      * Thus, we build a list of 1 and 0's where 1 stands for a relation name for which we have already
      * created a _kv variable.
      */
-    val duplicates = j.inputs.map(r => if (joinKeyVars.contains(r.name)) 1 else 0)
+    val duplicates = j.inputs.drop(if(j.withIndex) 1 else 0).map(r => if (joinKeyVars.contains(r.name)) 1 else 0)
 
     /*
      * Now we build lists for rels and keys by removing the elements corresponding to 1's in the duplicate
      * list.
      */
-    val drels = j.inputs.zipWithIndex.filter { r => duplicates(r._2) == 0 }.map(_._1)
+    val drels = j.inputs.drop(if(j.withIndex) 1 else 0).zipWithIndex.filter { r => duplicates(r._2) == 0 }.map(_._1)
     val dkeys = keys.zipWithIndex.filter { k => duplicates(k._2) == 0 }.map(_._1)
 
     val className = j.schema match {
@@ -456,20 +462,22 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     val fieldList = j.schema.get.fields.zipWithIndex
         .map { case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}" }.mkString(", ")
     
-    /*
-     * And finally, create the join kv vars for them...
-     */
+    // the name of the left relation. For indexed join, no _kv needs to be appended.
+    val leftName = j.inputs(0).name + (if(j.withIndex) "" else "_kv")        
+        
     val str = 
-      callST("join_key_map", Map("rels" -> drels.map(_.name), "keys" -> dkeys)) + 
+      // create the join kv vars
+      callST("join_key_map", Map("rels" -> drels.map(_.name), "keys" -> dkeys)) +
+      // create join op
       callST("spatialJoin",
-      Map(
-        "out" -> j.outPipeName,
-        "rel1" -> j.inputs(0).name,
-        "rel2" -> j.inputs(1).name,
-        "predicate" -> j.predicate.predicateType.toString().toLowerCase(),  
-        "className" -> className,
-        "fields" -> fieldList
-      )    
+        Map(
+          "out" -> j.outPipeName,
+          "rel1" -> leftName,
+          "rel2" -> j.inputs(1).name,
+          "predicate" -> j.predicate.predicateType.toString().toLowerCase(),  
+          "className" -> className,
+          "fields" -> fieldList
+        )    
     )
     
     
@@ -480,7 +488,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     callST("index", Map(
       "out" -> op.outPipeName,
       "in" -> op.inPipeName,
-      "field" -> emitRef(op.schema, op.field, "", false, false),
+      "field" -> emitRef(op.schema, op.field),
       "method" -> IndexMethod.methodName(op.method),
       "params" -> op.params.mkString(",")
     ))
