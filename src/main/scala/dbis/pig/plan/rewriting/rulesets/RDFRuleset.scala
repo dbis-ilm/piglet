@@ -104,8 +104,8 @@ object RDFRuleset extends Ruleset {
     if (op.schema.isEmpty) {
       return None
     }
-
-    Some(Load(op.out, op.uri, op.schema, Some("RDFFileStorage")))
+ 
+    Some(Load(op.outputs.head, op.uri, op.schema, Some("RDFFileStorage")))
   }
 
   /** Applies rewriting rule F1 of the paper [[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
@@ -618,12 +618,13 @@ object RDFRuleset extends Ruleset {
       (isNamed(p.subj), isNamed(p.pred), isNamed(p.obj))
     } toSet
 
-    if (namedFields.size != 1) {
-      // There are either no NamedFields or they appear in more than one position in different patterns, so it's
-      // not a star join
-      return None
-    }
+//    if (namedFields.size != 1) {
+//      // There are either no NamedFields or they appear in more than one position in different patterns, so it's
+//      // not a star join
+//      return None
+//    }
 
+    
     // We'll reuse in later on, so we need to remove `op` from its consumers
     in.removeConsumer(op)
 

@@ -59,15 +59,15 @@ object PigBuild extends Build {
     dependsOn(common).
     disablePlugins(sbtassembly.AssemblyPlugin)
 
+  lazy val ceplib = (project in file("ceplib")).
+      settings(commonSettings: _*).
+      dependsOn(common)
+
   lazy val zeppelin = (project in file("zeppelin")).
     settings(commonSettings: _*).
     dependsOn(common).
     disablePlugins(sbtassembly.AssemblyPlugin).
     dependsOn(piglet)
-
-  lazy val ceplib = (project in file("ceplib")).
-    settings(commonSettings: _*).
-    dependsOn(common)
 
   /*
    * define the backend for the compiler: currently we support spark and flink

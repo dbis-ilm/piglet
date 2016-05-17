@@ -5,9 +5,7 @@ import java.net.URI
 import org.kiama.rewriting.Rewriter.everything
 import scala.collection.mutable.Map
 
-case class RDFLoad(out: Pipe, uri: URI, grouped: Option[String]) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List.empty
+case class RDFLoad(private val out: Pipe, uri: URI, grouped: Option[String]) extends PigOperator(out) {
 
   schema = if (grouped.isDefined) {
     if (RDFLoad.groupedSchemas.contains(grouped.get)){
@@ -33,7 +31,8 @@ object RDFLoad {
   /** The schema for plain RDF data
     *
     */
-  final val plainSchema: Some[Schema] = Some(
+  // final val plainSchema: Some[Schema] = Some(
+  def plainSchema: Some[Schema] = Some(
     Schema(
       BagType(
         TupleType(
@@ -45,7 +44,8 @@ object RDFLoad {
   /** A map of column names to the schema where the data is grouped by that column.
     *
     */
-  lazy final val groupedSchemas = {
+ // lazy final val groupedSchemas = {
+  def groupedSchemas = {
     var m = Map[String, Schema]()
     val columns = List[String]("subject", "predicate", "object")
     for (grouping_column <- columns) {

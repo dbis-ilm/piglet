@@ -358,7 +358,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   
   def params: Parser[String] = kvParam | plainParams
   
-  def kvParam = ident ~ "=" ~ params ^^ {
+  def kvParam = ident ~ "=" ~ plainParams ^^ {
     case k ~ _ ~ v =>
       val v2 = if(v.startsWith("'") && v.endsWith("'"))
                  s""""${unquote(v)}"""" 
@@ -368,7 +368,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
       s"$k=$v2"
   }
 
-  def plainParams = (boolLiteral | num | pigStringLiteral) ^^ { 
+  def plainParams = (boolLiteral | decimalNumber | num | pigStringLiteral) ^^ { 
     case p => p match {
       case p: BoolLiteral => p.b.toString()
       case _ => p.toString()
@@ -386,6 +386,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
         case PositionalField(p) => s.get.timestampField = p
         case _ => {}
       }
+      
       u match {
         case Some(p) => 
           val params = if (p._2.isEmpty) null // no params given 
@@ -397,8 +398,18 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
                 else 
                   s
               ) 
-            }  
-          new Load(Pipe(b), uri, s, Some(p._1), params)
+            }
+          
+          val s2 = if(p._1.toLowerCase() == "textloader" && s.isEmpty) {
+              /* If no schema is given for text loader, create one implicitly. 
+               * The schema will be one field with name "line" and type chararray
+               */
+              Some(Schema(BagType(TupleType(Array(Field("line", Types.CharArrayType)))))) 
+            }
+            else 
+              s
+          
+          new Load(Pipe(b), uri, s2, Some(p._1), params)
             
         case None => new Load(Pipe(b), uri, s)
       }
@@ -664,7 +675,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
-  def delimStmt: Parser[PigOperator] = (loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
+  def delimStmt: Parser[PigOperator] = (loadStmt | indexStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt | spatialJoinStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt )
 
@@ -880,6 +891,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def indexStmt: Parser[PigOperator] = bag ~ "=" ~ indexKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ indexMethod  ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ methodWithParams => IndexOp(Pipe(out), Pipe(in), field, methodWithParams._1, methodWithParams._2)
   }
+  
   
   /* ---------------------------------------------------------------------------------------------------------------- */
   

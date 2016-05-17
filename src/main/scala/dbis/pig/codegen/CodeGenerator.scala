@@ -58,7 +58,8 @@ trait CodeGeneratorBase {
    * @param schema the schema for which we generate a class
    * @return a string representing the code
    */
-  def emitSchemaClass(schema: Schema): String
+//  def emitSchemaClass(schema: Schema): String
+  def emitSchemaHelpers(schemas: List[Schema]): String
 
   /**
    * Generate code for the given Pig operator.
@@ -84,7 +85,9 @@ trait CodeGeneratorBase {
    * @param additionalCode source code (Scala, C++) that was embedded into the script
    * @return a string representing the header code
    */
-  def emitHeader1(scriptName: String, additionalCode: String): String
+  def emitHeader1(scriptName: String): String
+  
+  def emitEmbeddedCode(additionalCode: String): String
 
   /**
    * Generate code for the header of the script which should be defined inside
@@ -101,7 +104,7 @@ trait CodeGeneratorBase {
    *
    * @return a string representing the end of the code.
    */
-  def emitFooter: String
+  def emitFooter(plan: DataflowPlan): String
 
   /**
    * Generate code for any helper class/function if needed by the given operator.
@@ -198,12 +201,17 @@ trait CodeGenerator {
     var code = codeGen.emitImport(additionalImports)
 
     if (!forREPL)
-      code = code + codeGen.emitHeader1(scriptName, plan.code)
+      code = code + codeGen.emitHeader1(scriptName)
+      
+    if(plan.code.nonEmpty)
+      code = code + codeGen.emitEmbeddedCode(plan.code)
 
     // generate schema classes for all registered types and schemas
-    for (schema <- Schema.schemaList) {
-      code = code + codeGen.emitSchemaClass(schema)
-    }
+//    for (schema <- Schema.schemaList) {
+//      code = code + codeGen.emitSchemaClass(schema)
+//    }
+      
+    code += codeGen.emitSchemaHelpers(Schema.schemaList)
       
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
@@ -237,6 +245,6 @@ trait CodeGenerator {
     }
 
     // generate the cleanup code
-    if (forREPL) code else code + codeGen.emitFooter
+    if (forREPL) code else code + codeGen.emitFooter(plan)
   }
 }

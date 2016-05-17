@@ -25,9 +25,12 @@ package dbis.pig.op
   * @param orderSpec
   * @param num
   */
-case class Top(out: Pipe, in: Pipe, orderSpec: List[OrderBySpec], num: Int) extends PigOperator{
-  outputs = List(out)
-  inputs = List(in)
+case class Top(
+    private val out: Pipe, 
+    private val in: Pipe, 
+    orderSpec: List[OrderBySpec], 
+    num: Int
+  ) extends PigOperator(out, in) {
 
   override def lineageString: String = s"""TOP${num}""" + super.lineageString
 }

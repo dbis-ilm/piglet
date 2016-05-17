@@ -26,12 +26,12 @@ package dbis.pig.op
   * @param slide the windows slider frequency (every) and time unit
   * @param applyData informations(func name, output schema, func body) needed for window apply function
   */
-case class Window(out:       Pipe, 
-                  in:        Pipe, 
-                  window:    Tuple2[Int,String], 
-                  slide:     Tuple2[Int,String]) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class Window(
+    private val out:Pipe, 
+    private val in: Pipe, 
+    window: Tuple2[Int,String], 
+    slide: Tuple2[Int,String]
+  ) extends PigOperator(out, in) {
 
   /** 
     * Returns the lineage string describing the sub-plan producing the input for this operator.

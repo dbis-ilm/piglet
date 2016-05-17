@@ -42,7 +42,7 @@ object Sampler {
 object PigFuncs {
   def average[T: Numeric](bag: Iterable[T]): Double = sum(bag).toDouble / count(bag).toDouble
 
-  def count(bag: Iterable[Any]): Long = bag.size
+  def count(bag: Iterable[Any]): Int = bag.size
 
   def sum[T: Numeric](bag: Iterable[T]): T = bag.sum
 

@@ -25,11 +25,11 @@ import dbis.pig.schema.Schema
  * @param in the name of the input pipe.
  * @param fname the name of the function which will be applied to the input window operator.
  */
-case class WindowApply(out: Pipe, 
-                       in: Pipe, 
-                       fname: String) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class WindowApply(
+    private val out: Pipe, 
+    private val in: Pipe, 
+    fname: String
+  ) extends PigOperator(out, in) {
   
   override def constructSchema: Option[Schema] = {
     schema

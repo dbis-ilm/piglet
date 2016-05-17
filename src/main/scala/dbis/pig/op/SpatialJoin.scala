@@ -18,6 +18,7 @@ case class SpatialJoin(
     withIndex: Boolean
   ) extends PigOperator(List(out), in) {
   
+  
   override def lineageString: String = {
     s"""JOIN%${predicate.toString()}%""" + super.lineageString
   }

@@ -5,6 +5,7 @@ import dbis.pig.expr._
 import dbis.pig.schema._
 import dbis.pig.udf._
 import dbis.pig.backends.BackendManager
+import dbis.pig.plan.DataflowPlan
 import org.clapper.scalasti.STGroupFile
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -416,7 +417,7 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
     case None => throw CompilerException("the schema should be defined to define a format")
   }
 
-  def emitSchemaClass(schema: Schema): String = ""
+  def emitSchemaHelpers(schemas: List[Schema]): String = ""
 
   /**
    * Generate code for the given Pig operator. The system will go through each operator and render
@@ -514,10 +515,12 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader1(scriptName: String, additionalCode: String): String = {
+  def emitHeader1(scriptName: String): String = {
     "" // TODO: typedefs for all tuple types callST("tuple_typedef")
   }
 
+  def emitEmbeddedCode(additionalCode: String): String = ???
+  
   /**
    * Generate code for the header of the script which should be defined inside
    * the main class/object.
@@ -532,7 +535,7 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
    *
    * @return a string representing the end of the code.
    */
-  def emitFooter: String = callST("parameterize_query") + emitStartupCode + callST("end_query")
+  def emitFooter(plan: DataflowPlan): String = callST("parameterize_query") + emitStartupCode + callST("end_query")
 
   /**
    * Generate code for any helper class/function if needed by the given operator.
@@ -602,7 +605,7 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
       // grouped aggregation
       callST("aggr", map ++ Map("in_tuple_type" -> s"${in}_TupleType", "input" -> s"op_${in}"))
     } else
-      callST("gaggr", map ++ Map("hash" -> buildGroupingList(schema), "in_tuple_type" -> s"${groupingNode.in.name}_TupleType", "input" -> s"op_${groupingNode.in.name}"))
+      callST("gaggr", map ++ Map("hash" -> buildGroupingList(schema), "in_tuple_type" -> s"${groupingNode.inputs.head.name}_TupleType", "input" -> s"op_${groupingNode.inputs.head.name}"))
   }
   /**
    * Generate a helper code for the aggregation operator

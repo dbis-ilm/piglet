@@ -22,7 +22,7 @@ import LogLevel._
  */
 object PigletLogger  {
   
-  protected[logging] def apply(underlying: Underlying): PigletLogger = new PigletLogger(underlying)
+  protected[logging] def apply(underlying: Underlying): PigletLogger = new PigletLogger(Some(underlying))
 
   private[logging] var level: LogLevel = WARN
   
@@ -44,31 +44,33 @@ object PigletLogger  {
   
 }
 
-final class PigletLogger private(private[this] val underlying: Underlying) extends java.io.Serializable {
+final class PigletLogger private[logging](private[this] val underlying: Option[Underlying]) extends java.io.Serializable {
   
   setLevel(PigletLogger.level)
   
   def setLevel(level: LogLevel): Unit = {
-    underlying.setLevel(PigletLogger.underlyingLevel(level))
-    PigletLogger.level = level
+    if(underlying.isDefined) {
+    	underlying.get.setLevel(PigletLogger.underlyingLevel(level))
+    	PigletLogger.level = level
+    }
   }
   
-  def getLevel: LogLevel = PigletLogger.level(underlying.getLevel)
+  def getLevel: LogLevel = if(underlying.isDefined) PigletLogger.level(underlying.get.getLevel) else LogLevel.OFF 
   
-  def error(msg: String): Unit = if(underlying.isErrorEnabled()) underlying.error(msg)
+  def error(msg: String): Unit = if(underlying.isDefined) if(underlying.get.isErrorEnabled()) underlying.get.error(msg) 
   
-  def error(msg: String, cause: Throwable): Unit = if(underlying.isErrorEnabled())  underlying.error(msg, cause)
+  def error(msg: String, cause: Throwable): Unit = if(underlying.isDefined) if(underlying.get.isErrorEnabled())  underlying.get.error(msg, cause)
 
-  def warn(msg: String): Unit = if(underlying.isWarnEnabled()) underlying.warn(msg)
+  def warn(msg: String): Unit = if(underlying.isDefined) if(underlying.get.isWarnEnabled()) underlying.get.warn(msg)
   
-  def warn(msg: String, cause: Throwable): Unit = if(underlying.isWarnEnabled())  underlying.warn(msg, cause)
+  def warn(msg: String, cause: Throwable): Unit = if(underlying.isDefined) if(underlying.get.isWarnEnabled())  underlying.get.warn(msg, cause)
   
-  def info(msg: String): Unit = if(underlying.isInfoEnabled()) underlying.info(msg)
+  def info(msg: String): Unit = if(underlying.isDefined) if(underlying.get.isInfoEnabled()) underlying.get.info(msg)
   
-  def info(msg: String, cause: Throwable): Unit = if(underlying.isInfoEnabled())  underlying.info(msg, cause)
+  def info(msg: String, cause: Throwable): Unit = if(underlying.isDefined) if(underlying.get.isInfoEnabled())  underlying.get.info(msg, cause)
   
-  def debug(msg: String): Unit = if(underlying.isDebugEnabled()) underlying.debug(msg)
+  def debug(msg: String): Unit = if(underlying.isDefined) if(underlying.get.isDebugEnabled()) underlying.get.debug(msg)
   
-  def debug(msg: String, cause: Throwable): Unit = if(underlying.isDebugEnabled())  underlying.debug(msg, cause)
+  def debug(msg: String, cause: Throwable): Unit = if(underlying.isDefined) if(underlying.get.isDebugEnabled())  underlying.get.debug(msg, cause)
   
 }

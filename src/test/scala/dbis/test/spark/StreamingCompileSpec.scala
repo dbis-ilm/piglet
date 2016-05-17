@@ -51,7 +51,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
     val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test")
-      + codeGenerator.emitFooter)
+      + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString(
       """
         |import org.apache.spark._

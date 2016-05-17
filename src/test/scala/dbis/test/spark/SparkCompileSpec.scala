@@ -47,7 +47,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test",true)
-      + codeGenerator.emitFooter)
+      + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
         |import org.apache.spark.SparkContext
         |import org.apache.spark.SparkContext._
@@ -76,7 +76,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitImport(Seq("import breeze.linalg._"))
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test",true)
-      + codeGenerator.emitFooter)
+      + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
                                      |import org.apache.spark.SparkContext
                                      |import org.apache.spark.SparkContext._
@@ -310,7 +310,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map(t => _t2_Tuple("all", t))""")
     assert(generatedCode == expectedCode)
 
-    val schemaCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    val schemaCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get)))
     val expectedSchemaCode =
       cleanString("""
          |case class _t$1_Tuple (_0: String, _1: Iterable[_t$2_Tuple]) extends java.io.Serializable with SchemaClass {
@@ -349,7 +349,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """val aa = bb.groupBy(t => {(t._0,t._1)}).map{case (k,v) => _t$1_Tuple(_t$2_Tuple(k._1, k._2),v)}""")
-    // val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    // val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get))
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -449,7 +449,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val finalJoinOp = plan.findOperatorForAlias("j").get
     // TODO: Schema classes!!!!
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(finalJoinOp.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(finalJoinOp.schema.get)))
 
     val expectedCode1 = cleanString(
       """val a_kv = a.map(t => (t._0,t))
@@ -589,7 +589,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |_t$1_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(foreachOp.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(foreachOp.schema.get)))
   }
 
   it should "contain code for a foreach statement with constructors for tuple, bag, and map" in {
@@ -599,7 +599,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val codeGenerator = new BatchCodeGen(templateFile)
     val op = plan.findOperatorForAlias("out").get
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaClass(op.schema.get))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get)))
 
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     //println("schema class = " + schemaClassCode)
@@ -816,7 +816,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val codeGenerator = new BatchCodeGen(templateFile)
-    assert(cleanString(codeGenerator.emitHeader1("test", plan.code)) ==
+    val theCode = codeGenerator.emitHeader1("test") + codeGenerator.emitEmbeddedCode(plan.code)
+    assert(cleanString(theCode) ==
       cleanString("""
         |object test {
         |def someFunc(s: String): String = {
@@ -930,7 +931,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
-      code = code + codeGenerator.emitSchemaClass(schema)
+      code = code + codeGenerator.emitSchemaHelpers(List(schema))
     }
 
     val generatedCode = cleanString(code)
@@ -963,7 +964,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
-      code = code + codeGenerator.emitSchemaClass(schema)
+      code = code + codeGenerator.emitSchemaHelpers(List(schema))
     }
 
     val generatedCode = cleanString(code)
@@ -1077,4 +1078,83 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
 
   }
+
+  it should "contain code for match_event with a pattern SEQ (A, B)" in {
+    Schema.init()
+    val ops = parseScript("""
+                            |b =  match_event b pattern SEQ (A, B) with (A: t1 == 1, B: t2 == 2);
+                            |""".stripMargin, List(LanguageFeature.ComplexEventPig))
+    val schema = Schema(Array(Field("t1", Types.IntType),
+      Field("t2", Types.IntType),
+      Field("t3", Types.IntType)))
+    ops.head.schema = Some(schema)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("b").get
+    val codeGenerator = new BatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """
+        |val b = b.matchNFA(bNFA.createNFA, NextMatches)
+        |""".stripMargin)
+    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
+    val expectedHelperClass = cleanString(
+      """object bNFA {
+        |  def filterA (t: _t1_Tuple ) : Boolean = t._0 == 1
+        |  def filterB (t: _t1_Tuple ) : Boolean = t._1 == 2
+        |  def createNFA = {
+        |    val bOurNFA: NFAController[_t1_Tuple] = new NFAController()
+        |    val StartState = bOurNFA.createAndGetNormalState("Start")
+        |    val AState = bOurNFA.createAndGetNormalState("A")
+        |    val BState = bOurNFA.createAndGetFinalState("B")
+        |    val AEdge = bOurNFA.createAndGetForwardState(filterA)
+        |    val BEdge = bOurNFA.createAndGetForwardState(filterB)
+        |    bOurNFA.createForwardTransition(StartState, AEdge, AState)
+        |    bOurNFA.createForwardTransition(AState, BEdge, BState)
+        |    bOurNFA
+        |  }
+        |}""".stripMargin)
+    println("helper: " + generatedHelperClass)
+    generatedCode should matchSnippet(expectedCode)
+    generatedHelperClass should matchSnippet(expectedHelperClass)
+  }
+
+  it should "contain code for match_event with a pattern SEQ (A, B) where B refers to A" in {
+    Schema.init()
+    val ops = parseScript("""
+                            |b =  match_event b pattern SEQ (A, B) with (A: t1 == 1, B: t2 == 2 AND t3 == A.t3);
+                            |""".stripMargin, List(LanguageFeature.ComplexEventPig))
+    val schema = Schema(Array(Field("t1", Types.IntType),
+      Field("t2", Types.IntType),
+      Field("t3", Types.IntType)))
+    ops.head.schema = Some(schema)
+    val plan = new DataflowPlan(ops)
+    val op = plan.findOperatorForAlias("b").get
+    val codeGenerator = new BatchCodeGen(templateFile)
+    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val expectedCode = cleanString(
+      """
+        |val b = b.matchNFA(bNFA.createNFA, NextMatches)
+        |""".stripMargin)
+    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
+    val expectedHelperClass = cleanString(
+      """object bNFA {
+        |  def filterA (t: _t1_Tuple ) : Boolean = t._0 == 1
+        |  def filterB (t: _t1_Tuple ) : Boolean = t._1 == 2 && t._2 == ??._2
+        |  def createNFA = {
+        |    val bOurNFA: NFAController[_t1_Tuple] = new NFAController()
+        |    val StartState = bOurNFA.createAndGetNormalState("Start")
+        |    val AState = bOurNFA.createAndGetNormalState("A")
+        |    val BState = bOurNFA.createAndGetFinalState("B")
+        |    val AEdge = bOurNFA.createAndGetForwardState(filterA)
+        |    val BEdge = bOurNFA.createAndGetForwardState(filterB)
+        |    bOurNFA.createForwardTransition(StartState, AEdge, AState)
+        |    bOurNFA.createForwardTransition(AState, BEdge, BState)
+        |    bOurNFA
+        |  }
+        |}""".stripMargin)
+    println("helper: " + generatedHelperClass)
+    generatedCode should matchSnippet(expectedCode)
+    generatedHelperClass should matchSnippet(expectedHelperClass)
+  }
+
 }

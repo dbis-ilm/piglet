@@ -30,10 +30,12 @@ import dbis.pig.expr.Ref
  * @param fieldExprs  list of key expressions (list of keys) used as join expressions.
  * @param timeWindow window definition for streaming joins
  */
-case class Join(out:Pipe, in: List[Pipe], fieldExprs: List[List[Ref]],
-                timeWindow: Tuple2[Int,String] = null.asInstanceOf[Tuple2[Int,String]]) extends PigOperator {
-  _outputs = List(out)
-  _inputs = in
+case class Join(
+    private val out:Pipe, 
+    private val in: List[Pipe], 
+    fieldExprs: List[List[Ref]],
+    timeWindow: Tuple2[Int,String] = null.asInstanceOf[Tuple2[Int,String]]
+  ) extends PigOperator(List(out), in) {
 
   override def lineageString: String = {
     s"""JOIN%${fieldExprs}%""" + super.lineageString

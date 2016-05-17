@@ -29,6 +29,7 @@ import dbis.pig.udf._
 import java.net.URI
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Set
+import dbis.pig.plan.DataflowPlan
 
 
 // import scala.collection.mutable.Map
@@ -95,6 +96,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
 
   // TODO: complex types
   val scalaTypeMappingTable = Map[PigType, String](
+    Types.BooleanType -> "Boolean",  
     Types.IntType -> "Int",
     Types.LongType -> "Long",
     Types.FloatType -> "Float",
@@ -602,6 +604,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
         callST("topHelper", Map("params" -> params))
       }
+      case Matcher(out, in, pattern, events, mode, within) => emitMatcherHelper(node, out.name, pattern, events)
+
       case _ => ""
     }
   }
@@ -723,72 +727,125 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           "params" -> emitParamList(node.schema, node.params)))
   }
 
-  def emitSpatialJoin(j: SpatialJoin): String = {
-    
-    require(j.schema.isDefined, "Schema information is required for spatial join")
-    require(j.inputs.size == 2, "A spatial join must be made between exactly two relations")
-
-    val res = j.inputs.zip(Seq(j.predicate.left, j.predicate.right))
-    val keys = res.map { case (i, k) => emitJoinKey(i.producer.schema, List(k)) }
-
-    /*
-     * We don't generate key-value RDDs which we have already created and registered in joinKeyVars.
-     * Thus, we build a list of 1 and 0's where 1 stands for a relation name for which we have already
-     * created a _kv variable.
-     */
-    val duplicates = j.inputs.map(r => if (joinKeyVars.contains(r.name)) 1 else 0)
-
-    /*
-     * Now we build lists for rels and keys by removing the elements corresponding to 1's in the duplicate
-     * list.
-     */
-    val drels = j.inputs.zipWithIndex.filter { r => duplicates(r._2) == 0 }.map(_._1)
-    val dkeys = keys.zipWithIndex.filter { k => duplicates(k._2) == 0 }.map(_._1)
-
-    val className = j.schema match {
-      case Some(s) => schemaClassName(s.className)
-      case None => schemaClassName(j.outPipeName)
+  def emitMatcherHelper(node: PigOperator, out: String, pattern: Pattern, events: CompEvent): String = {
+    val filters = events.complex.map { f => f.simplePattern.asInstanceOf[SimplePattern].name }
+    val predics = events.complex.map { f => emitPredicate(node.schema, f.predicate) }
+    val hasSchema = node.schema.isDefined
+    val schemaClass = if (!hasSchema) {
+      "Record"
+    } else {
+      schemaClassName(node.schema.get.className)
     }
-    
-//    logger.debug(s"j.in: ${j.in}")
-    
-    val vsize = j.inputs.head.inputSchema.get.fields.length
-    val fieldList = j.schema.get.fields.zipWithIndex
-        .map { case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}" }.mkString(", ")
-    
-    /*
-     * And finally, create the join kv vars for them...
-     */
-    val str = 
-      callST("join_key_map", Map("rels" -> drels.map(_.name), "keys" -> dkeys)) + 
-      callST("spatialJoin",
-      Map(
-        "out" -> j.outPipeName,
-        "rel1" -> j.inputs(0).name,
-        "rel2" -> j.inputs(1).name,
-        "predicate" -> j.predicate.predicateType.toString().toLowerCase(),  
-        "className" -> className,
-        "fields" -> fieldList
-      )    
-    )
-    
-    
-    str
+    var states: ListBuffer[String] = new ListBuffer()
+    states += "Start"
+    emitStates (pattern, states)
+    val transStates = (states -  states.last).toList
+    val tranNextStates = states.tail.toList
+    val types = states.zipWithIndex.map { case (x, i) =>
+      if (i == states.length - 1) "Final"
+      else "Normal"
+    }
+    callST("cepHelper",
+      Map("out" -> out,
+        "class" -> schemaClass,
+        "filters" -> filters,
+        "predcs" -> predics,
+        "states" -> states.toList,
+        "tran_states" ->transStates,
+        "tran_next_states" -> tranNextStates,
+        "types" -> types.toList))
   }
+
+  def emitStates (pattern: Pattern, states: ListBuffer[String] ) {
+    pattern match  {
+      case SimplePattern(name) => states += name
+      case NegPattern(pattern) => emitStates(pattern, states)
+      case SeqPattern(patterns) => patterns.foreach { p => emitStates(p, states) }
+      case DisjPattern(patterns) => patterns.foreach { p => emitStates(p, states) }
+      case ConjPattern(patterns) => patterns.foreach { p => emitStates(p, states) }
+    }
+  }
+
+  def emitMatcher(out: String, in: String, mode: String): String = {
+    callST("cep", Map("out" -> out,
+      "in" -> in,
+      "mode" -> (mode.toLowerCase() match {
+        case "skip_till_any_match" => "AllMatches"
+        case "first_match" => "FirstMatch"
+        case "recent_match" => "RecentMatches"
+        case "cognitive_match" => "CognitiveMatches"
+        case _ => "NextMatches"
+      })))
+  }
+
   
-  
-  
+
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
 
+  def emitSchemaHelpers(schemas: List[Schema]): String = {
+    var converterCode = ""
+    
+    val classes = ListBuffer.empty[(String, String)]
+    
+    for(schema <- schemas) {
+      val values = createSchemaInfo(schema)
+      
+      classes += emitSchemaClass(values)
+      converterCode += emitSchemaConverters(values)
+    }
+    
+    val p = "_t([0-9]+)_Tuple".r
+    
+    val sortedClasses = classes.sortWith { case (left, right) => 
+      val leftNum = left._1 match {
+        case p(group) => group.toInt
+        case _ => throw new IllegalArgumentException(s"unexpected class name: $left")
+      }
+      
+      val rightNum = right._1 match {
+        case p(group) => group.toInt
+        case _ => throw new IllegalArgumentException(s"unexpected class name: $left")
+      }
+      
+      leftNum < rightNum
+    
+    }
+
+    val classCode = sortedClasses.map(_._2).mkString("\n")
+    
+    classCode + "\n" + converterCode
+  }
+  
   /**
    * Generate code for a class representing a schema type.
    *
    * @param schema the schema for which we generate a class
    * @return a string representing the code
    */
-  def emitSchemaClass(schema: Schema): String = {
+  private def emitSchemaClass(values: (String, String, String, String, String)): (String, String) = {
+    val (name, fieldNames, fieldTypes, fieldStr, toStr) = values
+
+    val code = callST("schema_class", Map("name" -> name,
+                              "fieldNames" -> fieldNames,
+                              "fieldTypes" -> fieldTypes,
+                              "fields"   -> fieldStr,
+                              "string_rep" -> toStr))
+                              
+    (name, code)
+  }
+  
+  private def emitSchemaConverters(values: (String, String, String, String, String)): String = {
+    val (name, fieldNames, fieldTypes, _, _) = values
+
+    callST("schema_converters", Map("name" -> name,
+                              "fieldNames" -> fieldNames,
+                              "fieldTypes" -> fieldTypes
+                              ))
+  }
+  
+  private def createSchemaInfo(schema: Schema) = {
     def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
       case Some(n) => n
       case None => f match {
@@ -805,7 +862,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     // build the list of field names (_0, ..., _n)
     val fieldNames = if (fieldList.size==1) "t" else fieldList.indices.map(t => "t._"+(t+1)).mkString(", ")
     val fieldTypes = fieldList.map(f => s"${typeName(f.fType, f.name)}").mkString(", ")
-    val fields= fieldList.zipWithIndex.map{ case (f, i) =>
+    val fields = fieldList.zipWithIndex.map{ case (f, i) =>
            (s"_$i", s"${typeName(f.fType, f.name)}")}
     val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
     
@@ -820,13 +877,12 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         case _ => s"_$i" + (if (f.fType.tc != TypeCode.CharArrayType && fields.length == 1) ".toString" else "")
       }
     }.mkString(" + _c + ")
-
-    callST("schema_class", Map("name" -> schemaClassName(schema.className),
-                              "fieldNames" -> fieldNames,
-                              "fieldTypes" -> fieldTypes,
-                              "fields"   -> fieldStr,
-                              "string_rep" -> toStr))
+    
+    val name = schemaClassName(schema.className)
+    
+    (name, fieldNames, fieldTypes, fieldStr, toStr)
   }
+
 
   /**
    * Generate code for the given Pig operator.
@@ -856,19 +912,18 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case ConstructBag(in, ref) => "" // used only inside macros
       case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again
-      case spOp: SpatialJoin => emitSpatialJoin(spOp)
       case Delay(out, in, size, wtime) => callST("delay", Map("out" -> node.outPipeName, "in"->node.inPipeName, "size"->size, "wait"->wtime)) 
+      case Matcher(out, in, pattern, events, mode, within) => emitMatcher(out.name, in.name, mode)
       case Empty(_) => ""
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
     }
   }
-  
+
    /**
    * Generate code needed for importing required Scala packages.
    *
    * @return a string representing the import code
    */
-//  def emitImport(additionalImports: Option[String] = None): String = callST("init_code",
   def emitImport(additionalImports: Seq[String] = Seq.empty): String = callST("init_code",
      Map("additional_imports" -> additionalImports.mkString("\n")))
 
@@ -880,9 +935,12 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * @param additionalCode Scala source code that was embedded into the script
    * @return a string representing the header code
    */
-  def emitHeader1(scriptName: String, additionalCode: String = ""): String =
-    callST("query_object", Map("name" -> scriptName, "embedded_code" -> additionalCode))
+  def emitHeader1(scriptName: String): String =
+    callST("query_object", Map("name" -> scriptName))
 
+  def emitEmbeddedCode(additionalCode: String) =
+    callST("embedded_code", Map("embedded_code" -> additionalCode))
+        
   /**
    *
    * Generate code for the header of the script which should be defined inside
@@ -905,6 +963,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    *
    * @return a string representing the end of the code.
    */
-  def emitFooter: String = callST("end_query", Map("name" -> "Starting Query"))
+  def emitFooter(plan: DataflowPlan): String = callST("end_query", Map("name" -> "Starting Query"))
 
 }

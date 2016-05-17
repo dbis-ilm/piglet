@@ -30,11 +30,13 @@ import dbis.pig.expr.Ref
  * @param params an optional list of parameter values passed to the UDF
  * @param resSchema the optional result schema
  */
-case class StreamOp(out: Pipe, in: Pipe, opName: String, params: Option[List[Ref]] = None,
-                    var resSchema: Option[Schema] = None) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
-  schema = resSchema
+case class StreamOp(
+    private val out: Pipe, 
+    private val in: Pipe, 
+    opName: String, 
+    params: Option[List[Ref]] = None,
+    var resSchema: Option[Schema] = None
+  ) extends PigOperator(List(out), List(in), resSchema) {
 
   override def lineageString: String = s"""STREAM%${opName}%""" + super.lineageString
 

@@ -62,7 +62,7 @@ dump(in) ::=<<
 
 // ------------------ DISPLAY results in Zeppelin -----------------------------
 display(in, tableHeader) ::=<<
-        println(s"%table <tableHeader> \n ${<in>.collect.map(t => t.mkString("\t")).mkString("\n")} \n\n")
+        println("%table <tableHeader>\n" + <in>.collect.map(t => t.mkString("\t")).mkString("\n") + "\n\n")
 >>
 
 // ------------------ STORE Results on disk -----------------------------------
@@ -132,8 +132,7 @@ spatialJoin(out, rel1, rel2, predicate, fields, className) ::=<<
 >>
 
 index(out, in, field, method, params) ::=<<
-        val <out>_index_kv = <in>.keyBy(t => <field>)
-        val <out> = <out>_index_kv.index(<params>)
+        val <out> = <in>.index(<params>) 
 >>        
 
 // ------------------ UNIONs multiple streams to one --------------------------

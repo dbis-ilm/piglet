@@ -29,9 +29,11 @@ case class TriplePattern(subj: Ref, pred: Ref, obj: Ref)
  * @param in
  * @param patterns
  */
-case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
+case class BGPFilter(
+    private val out: Pipe, 
+    private val in: Pipe, 
+    patterns: List[TriplePattern]
+  ) extends PigOperator(out, in) {
 
   override def lineageString: String = s"""BGPFilter%""" + super.lineageString
 
@@ -65,5 +67,13 @@ case class BGPFilter(out: Pipe, in: Pipe, patterns: List[TriplePattern]) extends
     }
     schema
   }
+
+  override def printOperator(tab: Int): Unit = {
+    println(indent(tab) + s"BGP_FILTER { out = ${outPipeName} , in = ${inPipeName} }")
+    println(indent(tab + 2) + "inSchema = " + inputSchema)
+    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + "pattern = " + patterns.mkString(","))
+  }
+
 }
 

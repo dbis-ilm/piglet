@@ -29,9 +29,10 @@ import dbis.pig.expr.Ref
  * @param out the output pipe (relation).
  * @param refExpr a reference referring to an expression constructing a relation (bag).
  */
-case class ConstructBag(out: Pipe, refExpr: Ref) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List()
+case class ConstructBag(
+    private val out: Pipe, 
+    refExpr: Ref
+  ) extends PigOperator(out) {
 
   // TODO: what do we need here?
   var parentSchema: Option[Schema] = None

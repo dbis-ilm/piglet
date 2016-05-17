@@ -21,16 +21,14 @@ import dbis.pig.schema.Schema
 /**
  * Created by kai on 13.07.15.
  */
-case class RScript(out: Pipe, in: Pipe, script: String, var loadSchema: Option[Schema] = None) extends PigOperator {
-  _outputs = List(out)
-  _inputs = List(in)
-  schema = loadSchema
+case class RScript(
+    private val out: Pipe, 
+    private val in: Pipe, 
+    val script: String, 
+    val loadSchema: Option[Schema] = None
+  ) extends PigOperator(List(out), List(in), loadSchema) {
 
   override def lineageString: String = s"""STREAM%""" + super.lineageString
 
-  override def constructSchema: Option[Schema] = {
-    // TODO
-    schema
-  }
 }
 

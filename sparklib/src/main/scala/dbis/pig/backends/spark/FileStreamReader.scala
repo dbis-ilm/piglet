@@ -28,12 +28,19 @@ class FileStreamReader(file: String, @transient val ssc: StreamingContext) exten
         store(line)
         //Thread sleep 1000 // for testing
       }
-      stop("stoppped ...") // stop receiver
+      //stop("stopped ...") // stop receiver
       //ssc.stop()
-      SparkStream.ssc.stop(true, true) // stop streaming context gracefully
+      //SparkStream.ssc.stop(true, true) // stop streaming context gracefully
     } catch {
       case ex: FileNotFoundException => println(s"Could not find $file file.")
       case ex: IOException           => println(s"Had an IOException during reading $file file")
+    } finally {
+      stop("Stopped Receiver")
+      ssc.stop(true, true)
+      SparkStream.ssc.stop(true, true)
+      //sys.exit()
+      
+      
     }
   }
 }

@@ -29,6 +29,6 @@ import dbis.pig.expr.Value
  * @param scalaName the full classified Scala name of the function
  * @param paramList a list of values uses as the first standard parameters in the function call
  */
-case class DefineCmd(alias: String, scalaName: String, paramList: List[Value]) extends PigOperator
+case class DefineCmd(alias: String, scalaName: String, paramList: List[Value]) extends PigOperator(List(), List())
 
 

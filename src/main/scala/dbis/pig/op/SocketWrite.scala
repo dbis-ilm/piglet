@@ -25,13 +25,12 @@ import dbis.pig.backends.BackendManager
  * @param addr the socket address to write to
  * @param mode empty for standard socket or currently also possible "zmq"
  */
-case class SocketWrite(in: Pipe,
-                       addr: SocketAddress,
-                       mode: String = "",
-                       func: Option[String] = None, //BackendManager.backend.defaultConnector
-                       params: List[String] = null) extends PigOperator {
-  _outputs = List()
-  _inputs = List(in)
+case class SocketWrite(
+    private val in: Pipe,
+    addr: SocketAddress,
+    mode: String = "",
+    func: Option[String] = None, //BackendManager.backend.defaultConnector
+    params: List[String] = null) extends PigOperator(List(), List(in)) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
