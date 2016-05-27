@@ -44,6 +44,8 @@ import dbis.pig.plan.rewriting.Rewriter
 import dbis.pig.tools.DBConnection
 
 import scopt.OptionParser
+import java.net.URI
+import dbis.pig.tools.ConnectionSetting
 
 sealed trait JLineEvent
 
@@ -63,7 +65,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
                         backend: String = Conf.defaultBackend,
                         backendPath: String = ".",
                         interactive: Boolean = true,
-                        profiling: Boolean = false,
+                        profiling: Option[URI] = None,
                         backendArgs: Map[String, String] = Map(),
                         loglevel: Option[String] = None)
 
@@ -449,7 +451,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
   def main(args: Array[String]): Unit = {
     var outDir: Path = null
     var interactive: Boolean = true
-    var profiling = false
+    var profiling: Option[URI] = None
     var logLevel: Option[String] = None
     val parser = new OptionParser[REPLConfig]("PigREPL") {
       head("PigletREPL", BuildInfo.version)
@@ -458,7 +460,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x) } text ("output directory for generated code")
       opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = x) } text ("Target backend (spark, flink, ...)")
       opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
-      opt[Boolean]("profiling") optional() action { (x, c) => c.copy(profiling = x) } text ("Switch on profiling")
+      opt[URI]("profiling") optional() action { (x, c) => c.copy(profiling = Some(x) ) } text ("Switch on profiling")
       opt[String]('g', "log-level") optional() action { (x,c) => c.copy(loglevel = Some(x.toUpperCase()))} text ("Set the log level: DEBUG, INFO, WARN, ERROR")
       opt[Map[String, String]]("<backend-arguments>...") optional() action { (x, c) => c.copy(backendArgs = x) } text ("Pig script files to execute")
       help("help") text ("prints this usage text")
@@ -499,9 +501,9 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
 
       BackendManager.backend = backendConf
 
-      if (profiling) {
+      if (profiling.isDefined) {
         // initialize database driver and connection pool
-        DBConnection.init(Conf.databaseSetting)
+        DBConnection.init(ConnectionSetting(profiling.get))
       }
 
       console {
@@ -526,7 +528,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         case _ => false
       }
     } finally {
-      if (profiling)
+      if (profiling.isDefined)
         DBConnection.exit()
     }
   }

@@ -11,8 +11,8 @@ libraryDependencies ++= Seq(
     sparkStreaming % "provided",
     typesafe,
     scalikejdbc,
-    scalikejdbc_config,
-    h2Database
+    //scalikejdbc_config,
+    jdbc
 )
 
 test in assembly := {}

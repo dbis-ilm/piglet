@@ -17,8 +17,12 @@
 
 package dbis.pig
 
+import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{Map => MutableMap}
+import scala.collection.JavaConverters._
 
 import java.nio.file.Path
+
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
 import dbis.pig.parser.LanguageFeature
@@ -43,14 +47,13 @@ import scopt.OptionParser
 import scala.io.Source
 import java.nio.file.Path
 import java.nio.file.Paths
-import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.{Map => MutableMap}
-import scala.collection.JavaConverters._
-import scalikejdbc._
+
 import dbis.pig.plan.PlanMerger
 import dbis.setm.SETM
 import dbis.setm.SETM.timing
 import java.nio.file.Files
+import dbis.pig.tools.ConnectionSetting
+import java.net.URI
 
 object Piglet extends PigletLogging {
 
@@ -65,7 +68,7 @@ object Piglet extends PigletLogging {
                             updateConfig: Boolean = false,
                             showPlan: Boolean = false,
                             backendArgs: Map[String, String] = Map(),
-                            profiling: Boolean = false,
+                            profiling: Option[URI] = None,
                             loglevel: Option[String] = None,
                             sequential: Boolean = false,
                             keepFiles: Boolean = false,
@@ -90,7 +93,7 @@ object Piglet extends PigletLogging {
     var updateConfig = false
     var showPlan = false
     var backendArgs: Map[String, String] = null
-    var profiling = false
+    var profiling: Option[URI] = None
     var sequential = false
     var showStats = false
     var paramFile: Option[Path] = None
@@ -100,7 +103,7 @@ object Piglet extends PigletLogging {
       head("PigletCompiler", s"ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
       opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
       opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text ("compile only (don't execute the script)")
-      opt[Unit]("profiling") optional() action { (_, c) => c.copy(profiling = true) } text ("Switch on profiling")
+      opt[URI]("profiling") optional() action { (x, c) => c.copy(profiling = Some(x)) } text ("Switch on profiling and write to DB. Provide the connection string as schema://host:port/dbname?user=username&pw=password")
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x) } text ("output directory for generated code")
       opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = x) } text ("Target backend (spark, flink, sparks, ...)")
       opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
@@ -212,7 +215,7 @@ object Piglet extends PigletLogging {
 
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String], backendPath: String,
-          backendArgs: Map[String, String], profiling: Boolean, showPlan: Boolean, sequential: Boolean): Unit = timing("execution") {
+          backendArgs: Map[String, String], profiling: Option[URI], showPlan: Boolean, sequential: Boolean): Unit = timing("execution") {
     run(Seq(inputFile), outDir, compileOnly, master, backend, langFeatures, params, backendPath,
       backendArgs, profiling, showPlan, sequential)
   }
@@ -222,13 +225,17 @@ object Piglet extends PigletLogging {
     */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
-          backendPath: String, backendArgs: Map[String, String], profiling: Boolean, 
+          backendPath: String, backendArgs: Map[String, String], profiling: Option[URI], 
           showPlan: Boolean, sequential: Boolean): Unit = {
 
     try {
       // initialize database driver and connection pool
-      if (profiling)
-        DBConnection.init(Conf.databaseSetting)
+      if (profiling.isDefined) {
+//        val settings = Conf.databaseSetting
+        val settings = ConnectionSetting(profiling.get)
+        
+    	  DBConnection.init(settings)
+      }
 
       val backendConf = BackendManager.backend(backend)
       BackendManager.backend = backendConf
@@ -239,7 +246,7 @@ object Piglet extends PigletLogging {
           return
         }
 
-        if (profiling) {
+        if (profiling.isDefined) {
           logger.error("Raw backends do not support profiling yet! Aborting")
           return
         }
@@ -258,7 +265,7 @@ object Piglet extends PigletLogging {
         logger.debug(e.getMessage, e)
     } finally {
       // close connection pool
-      if (profiling)
+      if (profiling.isDefined)
         DBConnection.exit()
     }
   }
@@ -279,7 +286,7 @@ object Piglet extends PigletLogging {
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
                             langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
                             backendPath: String, backendConf: BackendConf, backendArgs: Map[String, String],
-                            profiling: Boolean, showPlan: Boolean, sequential: Boolean): Unit = timing("run with generation") {
+                            profiling: Option[URI], showPlan: Boolean, sequential: Boolean): Unit = timing("run with generation") {
     logger.debug("start parsing input files")
     
     var schedule = ListBuffer.empty[(DataflowPlan,Path)]
@@ -308,71 +315,40 @@ object Piglet extends PigletLogging {
       schedule = ListBuffer((mergedPlan, Paths.get(s"merged_${System.currentTimeMillis()}.pig")))  
     }
     
-    // begin global analysis phase
-    if (profiling)
-      analyzePlans(schedule)
+    val templateFile = backendConf.templateFile
+		val jarFile = Conf.backendJar(backend)
+		val mm = new MaterializationManager
+		val profiler = new DataflowProfiler
+
+		
+		// begin global analysis phase
+		
+		// count occurrences of each operator in schedule
+    if (profiling.isDefined)
+      profiler.createOpCounter(schedule)
 
     logger.debug("start processing created dataflow plans")
-
-    val templateFile = backendConf.templateFile
-    val jarFile = Conf.backendJar(backend)
-    val mm = new MaterializationManager
-
-    val profiler = new DataflowProfiler
 
     for ((plan, path) <- schedule) timing("execute plan") {
 
       // 3. now, we should apply optimizations
       var newPlan = plan
 
-      if (profiling)
+      // process explicit MATERIALIZE operators
+      if (profiling.isDefined)
         newPlan = processMaterializations(newPlan, mm)
 
 
+      // rewrite WINDOW operators for Flink streaming
       if (langFeatures.contains(LanguageFeature.StreamingPig) && backend == "flinks")
         newPlan = processWindows(newPlan)
 
       Rules.registerBackendRules(backend)
       newPlan = processPlan(newPlan)
+
       // find materialization points
-
-      if (profiling) {
-        val walker = new DepthFirstTopDownWalker
-        walker.walk(newPlan) { op =>
-
-          logger.debug( s"""checking database for runtime information for operator "${op.lineageSignature}" """)
-          // check for the current operator, if we have some runtime/stage information 
-          val avg = DB readOnly { implicit session =>
-            sql"select avg(progduration) as pd, avg(stageduration) as sd from exectimes where lineage = ${op.lineageSignature} group by lineage"
-              .map { rs => (rs.long("pd"), rs.long("sd")) }.single().apply()
-          }
-
-          // if we have information, create a (potential) materialization point
-          if (avg.isDefined) {
-            val (progduration, stageduration) = avg.get
-
-            logger.debug( s"""found runtime information: program: $progduration  stage: $stageduration""")
-
-            /* XXX: calculate benefit
-             * Here, we do not have the parent hash information.
-             * But is it still needed? Since we have the program runtime duration 
-             * from beginning until the end the stage, we don't need to calculate
-             * the cumulative benefit?
-             */
-            val mp = MaterializationPoint(op.lineageSignature,
-              None, // currently, we do not consider the parent
-              progduration, // set the processing time
-              0L, // TODO: calculate loading time at this point
-              0L, // TODO: calculate saving time at this point
-              0 // no count/size information so far
-            )
-
-            profiler.addMaterializationPoint(mp)
-
-          } else {
-            logger.debug(s" found no runtime information")
-          }
-        }
+      if (profiling.isDefined) {
+        profiler.addMaterializationPoints(newPlan)
       }
 
 
@@ -399,7 +375,7 @@ object Piglet extends PigletLogging {
       logger.debug(s"using script name: $scriptName")
 
       PigletCompiler.compilePlan(newPlan, scriptName, outDir, Paths.get(backendPath,jarFile.toString),
-        templateFile, backend, profiling, keepFiles) match {
+        templateFile, backend, profiling.isDefined, keepFiles) match {
         // the file was created --> execute it
         case Some(jarFile) =>
           if (!compileOnly) {
@@ -419,43 +395,6 @@ object Piglet extends PigletLogging {
     }
   }
 
-  private def analyzePlans(schedule: Seq[(DataflowPlan, Path)]) = timing("analyze plans") {
-
-    logger.debug("start creating lineage counter map")
-
-    val walker = new BreadthFirstTopDownWalker
-
-    val lineageMap = MutableMap.empty[String, Int]
-
-    def visitor(op: PigOperator): Unit = {
-      val lineage = op.lineageSignature
-      //      logger.debug(s"visiting: $lineage")
-      var old = 0
-      if (lineageMap.contains(lineage))
-        old = lineageMap(lineage)
-
-      lineageMap(lineage) = old + 1
-    }
-
-    schedule.foreach { plan => walker.walk(plan._1)(visitor) }
-
-    val entrySet = lineageMap.map { case (k, v) => Seq('id -> k, 'cnt -> v) }.toSeq
-
-
-    DB autoCommit { implicit session =>
-      sql"create table if not exists opcount(id varchar(200) primary key, cnt int default 0)"
-        .execute
-        .apply()
-    }
-
-    DB localTx { implicit session =>
-
-      sql"merge into opcount(id,cnt) select {id}, case when exists(select 1 from opcount where id={id}) then (select cnt from opcount where id={id})+{cnt} else 1 end"
-        .batchByName(entrySet: _ *)
-        .apply()
-
-    }
-  }
 
   /**
     * Sets the various configuration parameters to the given string values.

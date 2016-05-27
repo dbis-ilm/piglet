@@ -82,7 +82,7 @@ object PigBuild extends Build {
     case "spark" | "sparks" => Seq(
       Dependencies.sparkCore % "test;it",
       Dependencies.sparkSql % "test;it",
-      Dependencies.h2Database % "test;it"
+      Dependencies.jdbc % "test;it"
     )
     case "mapreduce" => Seq(Dependencies.pig % "test;it")
     case _ => println(s"Unsupported backend: $backend ! I don't know which dependencies to include!"); Seq.empty[ModuleID]
@@ -125,8 +125,9 @@ object Dependencies {
   val commons = "org.apache.commons" % "commons-exec" % "1.3"
   val twitterUtil = "com.twitter" %% "util-eval" % "6.29.0"
   val scalikejdbc = "org.scalikejdbc" %% "scalikejdbc" % "2.2.7"
-  val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
-  val h2Database = "com.h2database" % "h2" % "1.4.190"
+//  val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
+//  val h2Database = "com.h2database" % "h2" % "1.4.190"
+  val jdbc = "org.postgresql" % "postgresql" % "9.4.1208"
   val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
   val log4j = "log4j" % "log4j" % "1.2.17"
 
@@ -143,11 +144,11 @@ object Dependencies {
     kiama,
     typesafe,
     scalikejdbc,
-    scalikejdbc_config,
+//    scalikejdbc_config,
     commons,
     hadoop % "provided",
     twitterUtil,
-    h2Database,
+    jdbc,
     breeze
   )
 }

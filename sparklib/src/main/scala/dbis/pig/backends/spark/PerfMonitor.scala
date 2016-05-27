@@ -12,12 +12,7 @@ import scalikejdbc._
  * 
  * We use the provided information to collect statistics about runtimes and result sizes of a stage 
  */
-class PerfMonitor(appName: String, 
-    driver: String = "org.h2.Driver",
-    url: String = "jdbc:h2:tcp://cloud01.prakinf.tu-ilmenau.de/data/stha1in/pigletdb",
-    user: String = "sa",
-    pw: String = "")
-  extends SparkListener {
+class PerfMonitor(appName: String) extends SparkListener {
   
   private val progStartTime = System.currentTimeMillis()
   
