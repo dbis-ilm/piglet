@@ -126,8 +126,8 @@ object Dependencies {
   val twitterUtil = "com.twitter" %% "util-eval" % "6.29.0"
   val scalikejdbc = "org.scalikejdbc" %% "scalikejdbc" % "2.2.7"
 //  val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
-//  val h2Database = "com.h2database" % "h2" % "1.4.190"
-  val jdbc = "org.postgresql" % "postgresql" % "9.4.1208"
+  val jdbc = "com.h2database" % "h2" % "1.4.190"
+  // val jdbc = "org.postgresql" % "postgresql" % "9.4.1208"
   val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
   val log4j = "log4j" % "log4j" % "1.2.17"
 

@@ -116,7 +116,7 @@ object Piglet extends PigletLogging {
       opt[String]('g', "log-level") optional() action { (x, c) => c.copy(loglevel = Some(x.toUpperCase())) } text ("Set the log level: DEBUG, INFO, WARN, ERROR")
       opt[Unit]('k',"keep") optional() action { (x,c) => c.copy(keepFiles = true) } text ("keep generated files")
       opt[Unit]("show-stats") optional() action { (_,c) => c.copy(stats = true) } text ("print detailed timing stats at the end")
-      opt[Map[String, String]]("backend-args") valueName ("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to subsitute")
+      opt[Map[String, String]]("backend-args") valueName ("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to substitute")
       help("help") text ("prints this usage text")
       version("version") text ("prints this version info")
       arg[File]("<file>...") unbounded() optional() action { (x, c) => c.copy(inputs = c.inputs :+ x) } text ("Pig script files to execute")
