@@ -421,6 +421,78 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
       "aggr_expr" -> aggrExpr))
     res
   }
+  
+  
+  def emitSpatialJoin(j: SpatialJoin): String = {
+    
+    require(j.schema.isDefined, "Schema information is required for spatial join")
+    require(j.inputs.size == 2, "A spatial join must be made between exactly two relations")
+
+    //    println(s"left schema: ${j.inputs(0).producer.schema}")
+//    println(s"right schema: ${j.inputs(1).producer.schema}")
+
+    /*
+     * If the left relation is indexed, exclude it from kv generation (drop)
+     */    
+    val res = j.inputs.drop(if(j.withIndex) 1 else 0).zip(Seq(j.predicate.left, j.predicate.right).drop(if(j.withIndex) 1 else 0))
+    val keys = res.map { case (i, k) => emitJoinKey(i.producer.schema, List(k)) }
+
+    /*
+     * We don't generate key-value RDDs which we have already created and registered in joinKeyVars.
+     * Thus, we build a list of 1 and 0's where 1 stands for a relation name for which we have already
+     * created a _kv variable.
+     */
+    val duplicates = j.inputs.drop(if(j.withIndex) 1 else 0).map(r => if (joinKeyVars.contains(r.name)) 1 else 0)
+
+    /*
+     * Now we build lists for rels and keys by removing the elements corresponding to 1's in the duplicate
+     * list.
+     */
+    val drels = j.inputs.drop(if(j.withIndex) 1 else 0).zipWithIndex.filter { r => duplicates(r._2) == 0 }.map(_._1)
+    val dkeys = keys.zipWithIndex.filter { k => duplicates(k._2) == 0 }.map(_._1)
+
+    val className = j.schema match {
+      case Some(s) => schemaClassName(s.className)
+      case None => schemaClassName(j.outPipeName)
+    }
+    
+//    logger.debug(s"j.in: ${j.in}")
+    
+    val vsize = j.inputs.head.inputSchema.get.fields.length
+    val fieldList = j.schema.get.fields.zipWithIndex
+        .map { case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}" }.mkString(", ")
+    
+    // the name of the left relation. For indexed join, no _kv needs to be appended.
+    val leftName = j.inputs(0).name + (if(j.withIndex) "" else "_kv")        
+        
+    val str = 
+      // create the join kv vars
+      callST("join_key_map", Map("rels" -> drels.map(_.name), "keys" -> dkeys)) +
+      // create join op
+      callST("spatialJoin",
+        Map(
+          "out" -> j.outPipeName,
+          "rel1" -> leftName,
+          "rel2" -> j.inputs(1).name,
+          "predicate" -> j.predicate.predicateType.toString().toLowerCase(),  
+          "className" -> className,
+          "fields" -> fieldList
+        )    
+    )
+    
+    
+    str
+  }
+  
+  def emitIndex(op: IndexOp): String = {
+    callST("index", Map(
+      "out" -> op.outPipeName,
+      "in" -> op.inPipeName,
+      "field" -> emitRef(op.schema, op.field),
+      "method" -> IndexMethod.methodName(op.method),
+      "params" -> op.params.mkString(",")
+    ))
+  }
 
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
@@ -448,10 +520,15 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
       case OrderBy(out, in, orderSpec, _) => emitOrderBy(node, orderSpec)
       case Accumulate(out, in, gen) => emitAccumulate(node, gen)
       case Top(_, _, spec, num) => emitTop(node, spec, num)
+      case spOp: SpatialJoin => emitSpatialJoin(spOp)
+      case idxOp: IndexOp => emitIndex(idxOp)
       case _ => super.emitNode(node)
     }
   }
 
+  
+  
+  
 
   /**
     * Generate code for helper classes supporting the actual transformation/action.

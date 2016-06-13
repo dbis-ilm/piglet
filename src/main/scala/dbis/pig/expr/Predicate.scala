@@ -186,3 +186,23 @@ case class PPredicate(a: Predicate) extends Predicate {
   override def toString = s"(${a.toString})"
 
 }
+
+object SpatialPredicateType extends Enumeration {
+//  type SpatialPredicateType = Value
+  val CONTAINS, INTERSECTS = Value
+  
+}
+
+case class SpatialPredicate(left: Ref, right: Ref, predicateType: SpatialPredicateType.Value) extends Predicate {
+  // FIXME(hage): are the traverse methods OK?
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
+
+  override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = {} //a.resolveReferences(mapping)
+
+  override def toString = s"$predicateType(${left.toString},${right.toString})"  
+  
+}

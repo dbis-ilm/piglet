@@ -47,24 +47,32 @@ We provide a simple wrapper script for processing Pig scripts. Just call it with
 ```
 piglet --master local[4] --backend spark your_script.pig
 ```
-To run this script you have to specify the full path of platform distribution jar in the environment 
-variable `SPARK_JAR` for Spark (e.g. `spark-assembly-1.5.2-hadoop2.6.0.jar`) and in `FLINK_JAR` for Flink,  
-e.g.
+To run this script you have to specify the full path to the platform distribution jar in the environment
+variable `SPARK_JAR` for Spark (e.g. `spark-assembly-1.5.2-hadoop2.6.0.jar`) and in `FLINK_JAR` (e.g. `flink-dist_2.11-1.0.0.jar`) for Flink.
+For Flink you also have to provide the path to the `conf` directory in `FLINK_CONF_DIR`.
 
+An example for Spark could look like the following:
 ```
-export SPARK_JAR=/opt/spark-1.5.2/assembly/target/scala-2.11/spark-assembly-1.5.2-hadoop2.6.0.jar
+export SPARK_JAR=/opt/spark-1.6.0/assembly/target/scala-2.11/spark-assembly-1.6.0-hadoop2.6.0.jar
 piglet --master local[4] --backend spark your_script.pig
 ```
-Note, that both for Spark and Flink you need a version built for Scala 2.11 (see e.g. 
-[Spark doc](http://spark.apache.org/docs/latest/building-spark.html#building-for-scala-211))
-and for Flink you have to run the start script found in the bin directory (e.g. start-local.sh).
+The equivalent for Flink would be:
+```
+export FLINK_JAR=/opt/flink-1.0.0/build-target/lib/flink-dist_2.11-1.0.0.jar
+export FLINK_CONF_DIR=/opt/flink-1.0.0/build-target/conf
+piglet --master local[4] --backend flink your_script.pig
+```
+
+Note, that both for Spark and Flink you need a version built for Scala 2.11 (see e.g.
+[Spark doc](http://spark.apache.org/docs/latest/building-spark.html#building-for-scala-211) and [Flink doc](https://ci.apache.org/projects/flink/flink-docs-release-1.0/setup/building.html ))
+and the same version used for building must also be used for execution. For Flink you have to run the start script found in the bin directory (e.g. `/opt/flink-1.0.0/build-target/bin/start-local.sh`) before executing scripts.
 
 The following options are supported:
  * `--master m` specifies the master (local, yarn-client, yarn)
  * `--compile` compile and build jar, but do not execute
- * `--profiling` 
+ * `--profiling`
  * `--outdir dir` specifies the output directory for the generated code
- * `--backend b` specifies the backend to execute the script. Currently, we support 
+ * `--backend b` specifies the backend to execute the script. Currently, we support
     * `spark` (Apache Spark in batch mode)
     * `sparks`: Apache Spark Streaming
     * `flink`: Apache Flink in batch mode
@@ -80,7 +88,7 @@ The following options are supported:
  * `--keep` Keep generated files
  * `--sequential` If more than one input script is provided, do not merge them but execute them sequentially
  * `--log-level l`
- * `--backend-args key=value, ...` 
+ * `--backend-args key=value, ...`
 
 In addition, you can start an interactive Pig shell similar to Grunt:
 
@@ -93,23 +101,23 @@ a `DUMP` or `STORE` statement is entered. Furthermore, the schema can be printed
 
 #### Docker ####
 
-Piglet can also be run as a [Docker](https://www.docker.com/) container. However, the image is not 
+Piglet can also be run as a [Docker](https://www.docker.com/) container. However, the image is not
 yet on DockerHub, so it has to be built manually:
 ```
 sbt clean package assembly
 docker build -t dbis/piglet .
 ```
 
-Currently, the Docker image supports the Spark backend only. 
+Currently, the Docker image supports the Spark backend only.
 
 To start the container, run:
 ```
-docker run -it --rm --name piglet dbis/piglet 
+docker run -it --rm --name piglet dbis/piglet
 ```
 
 This uses the container's entrypoint which runs piglet. The above command will print the help message.
 
-You can start the interactive mode, using `-i` option and enter your script. 
+You can start the interactive mode, using `-i` option and enter your script.
 
 ```
 docker run -it --rm --name piglet dbis/piglet -b spark -i
@@ -120,10 +128,10 @@ Alternatively, you can add your existing files into the container by [mounting v
 docker run -it --rm --name piglet -v /tmp/test.pig:/test.pig dbis/piglet -b spark /test.pig
 ```
 
-As mentioned before, the container provides an entrypoint that executes piglet. In case you need a bash for that container, 
+As mentioned before, the container provides an entrypoint that executes piglet. In case you need a bash for that container,
 you need to overwrite the entrypoint:
 ```
-docker run -it --rm --name piglet --entrypoint /bin/bash dbis/piglet 
+docker run -it --rm --name piglet --entrypoint /bin/bash dbis/piglet
 ```
 
 ### Configuration ###
@@ -146,6 +154,6 @@ More detailed information on how to create backends can be found in [backends.md
 
  * Details on the supported language features (statements, functions, etc.) are described [here](Language.md).
  * Documentation on [how to setup](Zeppelin.md) integration with [Zeppelin](https://zeppelin.incubator.apache.org/).
- * We use the [Scala testing framework](http://www.scalatest.org/) as well as the [scoverage tool](http://scoverage.org/) 
+ * We use the [Scala testing framework](http://www.scalatest.org/) as well as the [scoverage tool](http://scoverage.org/)
    for test coverage. You can produce a coverage report by running `sbt clean coverage test`. The results can be found in
    `target/scala-2.11/scoverage-report/index.html`.

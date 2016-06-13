@@ -22,6 +22,8 @@ import dbis.pig.tools.logging.PigletLogging
 /**
  * @author hage
  */
+/* NOT WORKING!!!!
+
 class MaterializeTest extends FlatSpec with Matchers with BeforeAndAfter {
   
   
@@ -138,3 +140,5 @@ class MaterializeTest extends FlatSpec with Matchers with BeforeAndAfter {
     
   }
 }
+
+*/

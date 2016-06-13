@@ -176,7 +176,7 @@ abstract class PigOperator(
    * @return the output schema
    */
   def constructSchema: Option[Schema] = {
-    if (inputs.nonEmpty) {
+    if (inputs.nonEmpty /* && schema.isEmpty*/) {
       schema = inputs.head.producer.schema
     }
     schema

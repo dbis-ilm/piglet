@@ -78,16 +78,16 @@ object Conf extends PigletLogging {
   def hdfsCoreSiteFile = Paths.get(appconf.getString("hdfs.coresite"))
   def hdfsHdfsSiteFile = Paths.get(appconf.getString("hdfs.hdfssite"))
   
-  def databaseSetting: ConnectionSetting = {
-    val driver = appconf.getString("db.driver")
-    val url = appconf.getString("db.url")
-    val user = appconf.getString("db.user")
-    val pw = appconf.getString("db.password")
-    
-    ConnectionSetting(driver, url, user, pw)
-    
-  }
+//  def databaseSetting: ConnectionSetting = {
+//    val driver = appconf.getString("db.driver")
+//    val url = appconf.getString("db.url")
+//    val user = appconf.getString("db.user")
+//    val pw = appconf.getString("db.password")
+//    
+//    ConnectionSetting(driver, url, user, pw)
+//    
+//  }
 
-  def hookImport = appconf.getString("hooks.import")
+//  def hookImport = appconf.getString("hooks.import")
   
 }

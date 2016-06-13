@@ -194,4 +194,9 @@ object Expr {
     case ConstructMatrixExpr(_, _, _, _) => true
     case _ => false
   }
+  
+  def containsGeometryType(schema: Schema, ex: Expr): Boolean = ex match {
+    case ConstructGeometryExpr(_) => true
+    case _ => false
+  }
 }

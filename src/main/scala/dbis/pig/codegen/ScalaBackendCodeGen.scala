@@ -17,6 +17,7 @@
 package dbis.pig.codegen
 
 import dbis.pig.tools.logging.PigletLogging
+
 import dbis.pig.op._
 import dbis.pig.op.cmd._
 import dbis.pig.expr._
@@ -24,6 +25,7 @@ import dbis.pig.backends.BackendManager
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.schema._
 import dbis.pig.udf._
+
 import java.net.URI
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Set
@@ -359,6 +361,11 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       val mType = if (ty.charAt(1) == 'i') "Int" else "Double"
       s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(schema, expr, namedRef = namedRef)}.map(v => v._0).toArray)"
     }
+    
+    case ConstructGeometryExpr(expr) => {
+      s"new WKTReader().read(${emitExpr(schema, expr, namedRef = namedRef)})"
+    }
+    
     case _ => println("unsupported expression: " + expr); ""
   }
 
@@ -771,6 +778,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       })))
   }
 
+  
+
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
   /*------------------------------------------------------------------------------------------------- */
@@ -903,6 +912,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       case RScript(out, in, script, schema) => callST("rscript", Map("out"->node.outPipeName,"in"->node.inputs.head.name,"script"->quote(script)))
       case ConstructBag(in, ref) => "" // used only inside macros
       case DefineMacroCmd(_, _, _, _) => "" // code is inlined in MacroOp; no need to generate it here again
+      case Delay(out, in, size, wtime) => callST("delay", Map("out" -> node.outPipeName, "in"->node.inPipeName, "size"->size, "wait"->wtime)) 
       case Matcher(out, in, pattern, events, mode, within) => emitMatcher(out.name, in.name, mode)
       case Empty(_) => ""
       case _ => throw new TemplateException(s"Template for node '$node' not implemented or not found")
@@ -914,8 +924,8 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    *
    * @return a string representing the import code
    */
-  def emitImport(additionalImports: Option[String] = None): String = callST("init_code",
-     Map("additional_imports" -> additionalImports.getOrElse("")))
+  def emitImport(additionalImports: Seq[String] = Seq.empty): String = callST("init_code",
+     Map("additional_imports" -> additionalImports.mkString("\n")))
 
   /**
    * Generate code for the header of the script outside the main class/object,
