@@ -24,8 +24,7 @@ import dbis.pig.plan.DataflowPlan
 import dbis.pig.backends.BackendManager
 import scala.collection.mutable.ListBuffer
 import java.nio.file.Path
-import dbis.pig.codegen.ScalaBackendCodeGen
-import dbis.pig.codegen.CodeGenerator
+import dbis.pig.codegen.{CodeGenContext, ScalaBackendCodeGen, CodeGenerator}
 import scala.collection.mutable
 import scala.collection.mutable.{ Map => MMap }
 import scala.collection.mutable.ArrayBuffer
@@ -45,7 +44,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
       e.expr match {
         case Func(f, _) => UDFTable.findFirstUDF(f) match {
           case Some(udf) if udf.isAggregate => return true
-          case _                            =>
+          case _ =>
         }
         case _ =>
       }
@@ -54,23 +53,21 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
   }
 
   /**
-   *
-   * @param schema
-   * @param ref
-   * @param tuplePrefix
-   * @return
-   */
-  override def emitRef(schema: Option[Schema], ref: Ref,
-                       tuplePrefix: String = "t",
-                       aggregate: Boolean = false,
-                       namedRef: Boolean = false): String = ref match {
+    *
+    * @param schema
+    * @param ref
+    * @param tuplePrefix
+    * @return
+    */
+  override def emitRef(ctx: CodeGenContext, ref: Ref): String = ref match {
     case DerefTuple(r1, r2) =>
-      if (aggregate)
-        s"${emitRef(schema, r1, "t")}.map(e => e${emitRef(tupleSchema(schema, r1), r2, "")})"
-      else
-        s"${emitRef(schema, r1, "t")}${emitRef(tupleSchema(schema, r1), r2, "", aggregate, namedRef)}"
-    case _ => super.emitRef(schema, ref, tuplePrefix, aggregate, namedRef)
+    if (ctx.aggregate)
+      s"${emitRef(CodeGenContext(schema = ctx.schema, tuplePrefix = "t"), r1)}.map(e => e${emitRef(CodeGenContext(schema = tupleSchema(ctx.schema, r1), tuplePrefix = ""), r2)})"
+    else
+      s"${emitRef(CodeGenContext(schema = ctx.schema, tuplePrefix = "t"), r1)}${emitRef(CodeGenContext(schema = tupleSchema(ctx.schema, r1), tuplePrefix = "", aggregate = ctx.aggregate, namedRef = ctx.namedRef), r2)}"
+    case _ => super.emitRef(ctx, ref)
   }
+
   override def emitHelperClass(node: PigOperator): String = {
     //require(node.schema.isDefined)
     def emitHelperAccumulate(node: PigOperator, gen: GeneratorList): String = {
@@ -125,7 +122,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
           val str = refExpr.r match {
             case nf @ NamedField(n, _) => s"t._${node.inputSchema.get.indexOfField(nf)}"
             case PositionalField(p)    => if (node.inputSchema.isDefined) s"t._$p" else s"t.get(0)"
-            case DerefTuple(r1, r2)    => emitRef(node.inputSchema, r1, "t") + ".head" + emitRef(tupleSchema(node.inputSchema, r1), r2, "")
+            case DerefTuple(r1, r2)    => emitRef(CodeGenContext(schema = node.inputSchema, tuplePrefix = "t"), r1) + ".head" + emitRef(CodeGenContext(schema = tupleSchema(node.inputSchema, r1), tuplePrefix = ""), r2)
             case _                     => ""
           }
           // in case of AVERAGE we need fields for SUM and COUNT
@@ -152,7 +149,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
           val operator = littleWalker.dequeue()
           operator match {
             case o @ Filter(_, _, pred, windowMode) if (windowMode) => {
-              val predicate = emitPredicate(o.schema, pred)
+              val predicate = emitPredicate(CodeGenContext(schema = o.schema), pred)
               applyBody += callST("filterHelper", Map("pred" -> predicate)) + "\n"
             }
             case o @ Distinct(_, _, windowMode) if (windowMode) => {
@@ -160,13 +157,13 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
             }
             case o @ OrderBy(_, _, spec, windowMode) if (windowMode) => {
               var params = Map[String, Any]()
-              params += "key" -> emitSortKey(o.schema, spec, o.outPipeName, o.inPipeName)
+              params += "key" -> emitSortKey(CodeGenContext(schema = o.schema), spec, o.outPipeName, o.inPipeName)
               params += "ordering" -> emitOrdering(o.schema, spec)
               applyBody += callST("orderByHelper", Map("params" -> params)) + "\n"
             }
             case o @ Grouping(_, _, groupExpr, windowMode) if (windowMode) => {
               var params = Map[String, Any]()
-              params += "expr" -> emitGroupExpr(node.inputSchema, groupExpr)
+              params += "expr" -> emitGroupExpr(CodeGenContext(schema = node.inputSchema), groupExpr)
               params += "class" -> schemaClassName(o.schema.get.className)
               applyBody += callST("groupByHelper", Map("params" -> params)) + "\n"
             }
@@ -227,7 +224,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
     val className = schemaClassName(parent.schema.get.className)
 
     "{\n" + plan.operators.map {
-      case n @ Generate(expr) => if (aggr) emitAccumulate(n, GeneratorList(expr)) else s"""${className}(${emitGenerator(schema, expr, namedRef = true)})"""
+      case n @ Generate(expr) => if (aggr) emitAccumulate(n, GeneratorList(expr)) else s"""${className}(${emitGenerator(CodeGenContext(schema = schema, namedRef = true), expr)})"""
       case n @ ConstructBag(out, ref) => ref match {
         case DerefTuple(r1, r2) => {
           // there are two options of ConstructBag
@@ -248,7 +245,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
         case _ => "" // should not happen
       }
       case n @ Distinct(out, in, windowMode)       => s"""val ${n.outPipeName} = ${n.inPipeName}.distinct"""
-      case n @ Filter(out, in, pred, windowMode)   => callST("filter", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "pred" -> emitPredicate(n.schema, pred), "windowMode" -> windowMode))
+      case n @ Filter(out, in, pred, windowMode)   => callST("filter", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "pred" -> emitPredicate(CodeGenContext(schema = n.schema), pred), "windowMode" -> windowMode))
       case OrderBy(out, in, orderSpec, windowMode) => "" // TODO!!!!
       case _                                       => ""
     }.mkString("\n") + "}"
@@ -263,7 +260,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
         if (requiresFlatMap) emitBagFlattenGenerator(node, expr)
         else {
           if (aggr) emitAccumulate(node, gl)
-          else emitGenerator(node.inputSchema, expr)
+          else emitGenerator(CodeGenContext(schema = node.inputSchema), expr)
         }
       }
       case GeneratorPlan(plan) => {
@@ -310,11 +307,11 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
     (pairs, fields)
   }
 
-  override def emitSortKey(schema: Option[Schema], orderSpec: List[OrderBySpec], out: String, in: String): String = {
+  override def emitSortKey(ctx: CodeGenContext, orderSpec: List[OrderBySpec], out: String, in: String): String = {
     if (orderSpec.size == 1)
-      emitRef(schema, orderSpec.head.field)
+      emitRef(ctx, orderSpec.head.field)
     else
-      s"(${orderSpec.map(r => emitRef(schema, r.field)).mkString(",")})"
+      s"(${orderSpec.map(r => emitRef(ctx, r.field)).mkString(",")})"
   }
 
   /**
@@ -366,7 +363,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
         else
           s"t._$aggrCounter"
       } else
-        "t._t" + s"${emitExpr(node.inputSchema, e.expr)}".drop(1)
+        "t._t" + s"${emitExpr(CodeGenContext(schema = node.inputSchema), e.expr)}".drop(1)
     }.mkString(", ")
     val params = MMap[String, Any]()
     params += "out" -> node.outPipeName
@@ -443,7 +440,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
         Map("out" -> node.outPipeName,
           "in" -> node.inPipeName,
           "class" -> className,
-          "pred" -> emitPredicate(node.schema, pred))
+          "pred" -> emitPredicate(CodeGenContext(schema = node.schema), pred))
     callST("filter", params)
   }
 
@@ -494,7 +491,8 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
     if (groupExpr.keyList.isEmpty)
       callST("groupBy", Map("out" -> out, "in" -> in, "class" -> className))
     else
-      callST("groupBy", Map("out" -> out, "in" -> in, "expr" -> emitGroupExpr(node.inputSchema, groupExpr), "class" -> className))
+      callST("groupBy", Map("out" -> out, "in" -> in,
+        "expr" -> emitGroupExpr(CodeGenContext(schema = node.inputSchema), groupExpr), "class" -> className))
   }
 
   /**
@@ -513,7 +511,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
       case None    => schemaClassName(node.outPipeName)
     }
     val res = node.inputs.zip(exprs)
-    val keys = res.map { case (i, k) => emitJoinKey(i.producer.schema, k) }
+    val keys = res.map { case (i, k) => emitJoinKey(CodeGenContext(schema = i.producer.schema), k) }
 
     val extractor = emitJoinFieldList(node)
 
@@ -559,7 +557,7 @@ class FlinkStreamingCodeGen(template: String) extends ScalaBackendCodeGen(templa
    * @return the Scala code implementing the ORDERBY operator
    */
   def emitOrderBy(node: PigOperator, spec: List[OrderBySpec], windowMode: Boolean): String = {
-    val key = emitSortKey(node.schema, spec, node.outPipeName, node.inPipeName)
+    val key = emitSortKey(CodeGenContext(schema = node.schema), spec, node.outPipeName, node.inPipeName)
     val asc = ascendingSortOrder(spec.head)
     callST("orderBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "key" -> key, "asc" -> asc))
   }
