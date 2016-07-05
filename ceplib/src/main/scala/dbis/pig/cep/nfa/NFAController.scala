@@ -43,7 +43,8 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
    
   /**
    * creates the start state for this NFA and assigns its name
-   * @param name the name of the start state
+    *
+    * @param name the name of the start state
    */
   def createAndGetStartState(name: String): StartState[T] = {
     startState = new StartState(stateID(), Some(name))
@@ -52,7 +53,8 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
   /**
    * creates a normal state for this NFA and assign its name, this state should not
    * be final state or start state or kleene state
-   * @param name the name of this normal state
+    *
+    * @param name the name of this normal state
    * @return a pointer to the normal state
    */
   def createAndGetNormalState(name: String): NormalState[T] = {
@@ -62,7 +64,8 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
   }
   /**
    * creates a final state for this NFA and assign its name
-   * @param name the name of the final state
+    *
+    * @param name the name of the final state
    * @return a pointer to the final state
    */
   def createAndGetFinalState(name: String): FinalState[T] = {
@@ -73,7 +76,8 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
   }
   /**
    * creates a forward edge for this NFA for a given predicate
-   * @param predicate the predicate of this edge
+    *
+    * @param predicate the predicate of this edge
    * @return a pointer to a forward edge
    */
   def createAndGetForwardEdge(predicate: (T, HashMap[Int, ListBuffer[RelatedValue[T]]]) => Boolean): ForwardEdge[T] = {
@@ -83,7 +87,8 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
   }
   /**
    * creates a forward transition for this NFA between two states via an edge
-   * @param src the source state of this transition
+    *
+    * @param src the source state of this transition
    * @param dest the destination state of this transition
    * @param edge an edge to connect both the source and destination nodes
    */
@@ -97,12 +102,14 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
   def setInitRelatedValue(init: () => RelatedValueMap) : Unit = initRelatedValue = Some(init)
   /**
    * get a pointer to the start state
-   * @return as above
+    *
+    * @return as above
    */
   def getStartState = startState
   /**
    * get the id of the start state
-   * @return as above
+    *
+    * @return as above
    */
   def getStartStateID(): Int = startState.id
 } 

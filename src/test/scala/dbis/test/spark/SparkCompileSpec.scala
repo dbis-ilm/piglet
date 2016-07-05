@@ -1137,7 +1137,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |""".stripMargin)
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperClass = cleanString(
-      """object bNFA {
+      """class RelatedValueRecord extends PreviousRelatedValue[_t1_Tuple] with java.io.Serializable {
+        |  override def updateValue(event: _t1_Tuple): Unit = value = Some(event._2)
+        |}
+        |
+        |object bNFA {
         |  def init() = {}
         |  def filterA (t: _t1_Tuple, rvalues: HashMap[Int, ListBuffer[RelatedValue[_t1_Tuple]]]) : Boolean = t._0 == 1
         |  def filterB (t: _t1_Tuple, rvalues: HashMap[Int, ListBuffer[RelatedValue[_t1_Tuple]]]) : Boolean = t._1 == 2 && t._2 == rvalues(0)(2).getValue
