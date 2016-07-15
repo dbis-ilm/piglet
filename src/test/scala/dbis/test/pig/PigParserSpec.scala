@@ -729,6 +729,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         "skip_till_next_match",
         (30, "SECONDS"))))
   }
+  
   it should "parse a matcher statement using composite sequence pattern" in {
     assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, seq(B, D), C) WITH (A: x == 0, C: x == 1, D: y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;",
       List(LanguageFeature.ComplexEventPig))

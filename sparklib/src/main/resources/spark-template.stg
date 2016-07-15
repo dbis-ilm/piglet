@@ -205,14 +205,12 @@ accumulate(out, in, helper_class, class, init_expr, aggr_expr) ::=<<
 
 cepHelper(out, init, filters, predcs, class, states, tran_states, tran_next_states, types) ::=<<
     object <out>NFA {
-        def init() = {<init>}
-        <filters, predcs:{ f, pred |def filter<f> (t: <class>, rvalues: HashMap[Int, ListBuffer[RelatedValue[<class>]]]) : Boolean = <pred><\n>}>
+        <filters, predcs:{ f, pred |def filter<f> (t: <class>, rvalues: NFAStructure[<class>]) : Boolean = <pred><\n>}>
         def createNFA = {
             val <out>OurNFA: NFAController[<class>] = new NFAController()<\n>
             <states, types:{ s, t |val <s>State = <out>OurNFA.createAndGet<t>State("<s>")<\n>}>
             <filters:{ f |val <f>Edge = <out>OurNFA.createAndGetForwardState(filter<f>)<\n>}>
             <filters, tran_states, tran_next_states:{ f, s, n |<out>OurNFA.createForwardTransition(<s>State, <f>Edge, <n>State)<\n>}>
-            <out>OurNFA.setInitRelatedValue(init)
             <out>OurNFA
         }
     }

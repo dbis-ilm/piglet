@@ -64,7 +64,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
               if (p == -1)
                 throw new TemplateException(s"invalid field name $r2 in event ${r1.toString}")
 
-              s"rvalues(${res(0)._2})($p).getValue"
+              s"rvalues.events(${res(0)._2})._$p)"  //TODO: work more on other related values
             }
           }
           case None => s"${emitRef(CodeGenContext(schema = ctx.schema, tuplePrefix = "t", events = ctx.events), r1)}${emitRef(CodeGenContext(schema = tupleSchema(ctx.schema, r1), tuplePrefix = "", aggregate = ctx.aggregate, namedRef = ctx.namedRef, events = ctx.events), r2)}"
