@@ -34,6 +34,13 @@ import dbis.pig.plan.DataflowPlan
 
 // import scala.collection.mutable.Map
 
+case class CodeGenContext (
+                     schema: Option[Schema] = None,
+                     tuplePrefix: String = "t",
+                     aggregate: Boolean = false,
+                     namedRef: Boolean = false,
+                     events: Option[CompEvent] = None
+                     )
 /**
  * Implements a code generator for Scala-based backends such as Spark or Flink which use
  * a template file for the backend-specific code.
@@ -166,24 +173,18 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    /**
     * Generate Scala code for a reference to a named field, a positional field or a tuple/map derefence.
     *
-    * @param schema the (optional) schema describing the tuple structure
+    * @param ctx an object representing context information for code generation
     * @param ref the reference object
-    * @param tuplePrefix the variable name
-    * @param aggregate
     * @return the generated code
     */
-  def emitRef(schema: Option[Schema],
-              ref: Ref,
-              tuplePrefix: String = "t",
-              aggregate: Boolean = false,
-              namedRef: Boolean = false): String = ref match {
-    case nf @ NamedField(f, _) => if (namedRef) {
+  def emitRef(ctx: CodeGenContext, ref: Ref): String = ref match {
+    case nf @ NamedField(f, _) => if (ctx.namedRef) {
       // check if f exists in the schema
-      schema match {
+      ctx.schema match {
         case Some(s) => {
           val p = s.indexOfField(nf)
           if (p != -1)
-            s"$tuplePrefix._$p"
+            s"${ctx.tuplePrefix}._$p"
           else
             f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
         }
@@ -193,21 +194,21 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       }
     }
     else {
-      val pos = schema.get.indexOfField(nf)
+      val pos = ctx.schema.get.indexOfField(nf)
       if (pos == -1)
-        throw new TemplateException(s"invalid field name $f")
-      s"$tuplePrefix._$pos" // s"$tuplePrefix.$f"
+        throw new TemplateException(s"invalid field name $nf")
+      s"${ctx.tuplePrefix}._$pos" // s"$tuplePrefix.$f"
     }
-    case PositionalField(pos) => schema match {
-      case Some(s) => s"$tuplePrefix._$pos"
+    case PositionalField(pos) => ctx.schema match {
+      case Some(s) => s"${ctx.tuplePrefix}._$pos"
       case None =>
         // if we don't have a schema the Record class is used
-        s"$tuplePrefix.get($pos)"
+        s"${ctx.tuplePrefix}.get($pos)"
     }
     case Value(v) => v.toString
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
     // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
-    case DerefMap(m, k) => s"${emitRef(schema, m)}(${k})"
+    case DerefMap(m, k) => s"${emitRef(ctx, m)}(${k})"
     case _ => { "" }
   }
 
@@ -218,6 +219,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * @param predicate the actual predicate
    * @return a string representation of the generated Scala code
    */
+  /*
   def emitPredicate(schema: Option[Schema], predicate: Predicate): String = predicate match {
     case Eq(left, right) => { s"${emitExpr(schema, left)} == ${emitExpr(schema, right)}"}
     case Neq(left, right) => { s"${emitExpr(schema, left)} != ${emitExpr(schema, right)}"}
@@ -231,50 +233,50 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     case PPredicate(pred) => s"(${emitPredicate(schema, pred)})"
     case _ => { s"UNKNOWN PREDICATE: $predicate" }
   }
-
+*/
   /**
    * Generates Scala code for a grouping expression in GROUP BY. We construct code for map
    * in the form "map(t => {(t(0),t(1),...)}" if t(0), t(1) are grouping attributes.
    *
-   * @param schema the optional input schema of the operator where the expressions refer to.
+   * @param ctx an object representing context information for code generation
    * @param groupingExpr the actual grouping expression object
    * @return a string representation of the generated Scala code
    */
-  def emitGroupExpr(schema: Option[Schema], groupingExpr: GroupingExpression): String = {
+  def emitGroupExpr(ctx: CodeGenContext, groupingExpr: GroupingExpression): String = {
     if (groupingExpr.keyList.size == 1)
-      groupingExpr.keyList.map(e => emitRef(schema, e)).mkString
+      groupingExpr.keyList.map(e => emitRef(ctx, e)).mkString
     else
-      "(" + groupingExpr.keyList.map(e => emitRef(schema, e)).mkString(",") + ")"
+      "(" + groupingExpr.keyList.map(e => emitRef(ctx, e)).mkString(",") + ")"
   }
 
   /**
    *
-   * @param schema
+   * @param ctx an object representing context information for code generation
    * @param joinExpr
    * @return
    */
-  def emitJoinKey(schema: Option[Schema], joinExpr: List[Ref]): String = {
+  def emitJoinKey(ctx: CodeGenContext, joinExpr: List[Ref]): String = {
     if (joinExpr.size == 1)
-      emitRef(schema, joinExpr.head)
+      emitRef(ctx, joinExpr.head)
     else
-      s"Array(${joinExpr.map(e => emitRef(schema, e)).mkString(",")}).mkString"
+      s"Array(${joinExpr.map(e => emitRef(ctx, e)).mkString(",")}).mkString"
   }
 
   /**
     * Generate Scala code for a function call with parameters.
     *
+    * @param ctx an object representing context information for code generation
     * @param f the function name
     * @param params the list of parameters
-    * @param schema the schema
     * @return the generated Scala code
     */
-  def emitFuncCall(f: String, params: List[ArithmeticExpr], schema: Option[Schema], namedRef: Boolean): String = {
-    val pTypes = params.map(p => p.resultType(schema))
+  def emitFuncCall(ctx: CodeGenContext, f: String, params: List[ArithmeticExpr]): String = {
+    val pTypes = params.map(p => p.resultType(ctx.schema))
     UDFTable.findUDF(f, pTypes) match {
       case Some(udf) => {
         // println(s"udf: $f found: " + udf)
         if (udf.isAggregate) {
-          s"${udf.scalaName}(${emitExpr(schema, params.head, aggregate = true, namedRef = namedRef)})"
+          s"${udf.scalaName}(${emitExpr(CodeGenContext(schema = ctx.schema, tuplePrefix = ctx.tuplePrefix, aggregate = true, events = ctx.events, namedRef = ctx.namedRef), params.head)})"
         }
         else {
           val mapStr = if (udf.resultType.isInstanceOf[ComplexType]) {
@@ -287,11 +289,11 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
             // if we know the expected parameter type and the expression type
             // is a generic bytearray then we cast it to the expected type
             val typeCast = if (udf.paramTypes.length > i && // make sure the function has enough parameters
-              e.resultType(schema) == Types.ByteArrayType &&
+              e.resultType(ctx.schema) == Types.ByteArrayType &&
               (udf.paramTypes(i) != Types.ByteArrayType && udf.paramTypes(i) != Types.AnyType)) {
               s".asInstanceOf[${scalaTypeMappingTable(udf.paramTypes(i))}]"
             } else ""
-            emitExpr(schema, e, namedRef = namedRef) + typeCast
+            emitExpr(ctx, e) + typeCast
           }
 
           s"${udf.scalaName}(${paramExprList.mkString(",")})${mapStr}"
@@ -302,12 +304,12 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
         // check if we have have an alias in DataflowPlan
         if (udfAliases.nonEmpty && udfAliases.get.contains(f)) {
           val alias = udfAliases.get(f)
-          val paramList = alias._2 ::: params.map(e => emitExpr(schema, e, namedRef = namedRef))
+          val paramList = alias._2 ::: params.map(e => emitExpr(ctx, e))
           s"${alias._1}(${paramList.mkString(",")})"
         }
         else {
           // we don't know the function yet, let's assume there is a corresponding Scala function
-          s"$f(${params.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
+          s"$f(${params.map(e => emitExpr(ctx, e)).mkString(",")})"
         }
       }
     }
@@ -319,10 +321,11 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * @param expr
    * @return
    */
+  /*
   def emitExpr(schema: Option[Schema],
                expr: ArithmeticExpr,
                aggregate: Boolean = false,
-               namedRef: Boolean = false): String = expr match {
+               namedRef: Boolean = false, inMatcher: Boolean = false): String = expr match {
     case CastExpr(t, e) => {
       // TODO: check for invalid type
       val targetType = scalaTypeMappingTable(t)
@@ -368,23 +371,23 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     
     case _ => println("unsupported expression: " + expr); ""
   }
-
+*/
   /**
    * Constructs the Scala code for flattening a tuple. We have to determine the field in the
    * input schema refering to a tuple type and extract all fields of this tuple type.
    *
-   * @param schema the input schema of the FOREACH operator
+   * @param ctx an object representing context information for code generation
    * @param e the expression to be flattened (should be a RefExpr)
    * @return a string representation of the Scala code
    */
-  def flattenExpr(schema: Option[Schema], e: ArithmeticExpr): String = {
-    if (schema.isEmpty) throw new TemplateException("cannot flatten a tuple without a schema")
+  def flattenExpr(ctx: CodeGenContext, e: ArithmeticExpr): String = {
+    if (ctx.schema.isEmpty) throw new TemplateException("cannot flatten a tuple without a schema")
     // we need the field name used in Scala (either the actual name or _<position>) as well as
     // the actual field
     val (refName, field) = e match {
       case RefExpr(r) => r match {
-        case nf@NamedField(n, _) => ("_" + schema.get.indexOfField(nf), schema.get.field(nf))
-        case PositionalField(p) => ("_" + p.toString, schema.get.field(p))
+        case nf@NamedField(n, _) => ("_" + ctx.schema.get.indexOfField(nf), ctx.schema.get.field(nf))
+        case PositionalField(p) => ("_" + p.toString, ctx.schema.get.field(p))
           // either a named or a positional field: all other cases are not allowed!?
         case _ => throw new TemplateException("invalid flatten expression: argument isn't a reference")
       }
@@ -409,12 +412,13 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   /**
    * Constructs the GENERATE expression list in FOREACH.
    *
-   * @param schema the input schema
+   * @param ctx an object representing context information for code generation
    * @param genExprs the list of expressions in the GENERATE clause
    * @return a string representation of the Scala code
    */
-  def emitGenerator(schema: Option[Schema], genExprs: List[GeneratorExpr], namedRef: Boolean = false): String = {
-    s"${genExprs.map(e => emitExpr(schema, e.expr, aggregate = false, namedRef = namedRef)).mkString(", ")}"
+  def emitGenerator(ctx: CodeGenContext, genExprs: List[GeneratorExpr], namedRef: Boolean = false): String = {
+    s"${genExprs.map(e =>
+      emitExpr(CodeGenContext(schema = ctx.schema, aggregate = false, namedRef = ctx.namedRef), e.expr)).mkString(", ")}"
   }
 
   /**
@@ -435,16 +439,17 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     if (flattenExprs.size == 1) {
       // there is only a single flatten expression
       val ex: FlattenExpr = flattenExprs.head.expr.asInstanceOf[FlattenExpr]
+      val ctx = CodeGenContext(schema = node.inputSchema)
       if (otherExprs.nonEmpty) {
         // we have to cross join the flatten expression with the others:
         // t._1.map(s => <class>(<expr))
-        val exs = otherExprs.map(e => emitExpr(node.inputSchema, e.expr)).mkString(",")
-        s"${emitExpr(node.inputSchema, ex)}.map(s => ${className}($exs, s))"
+        val exs = otherExprs.map(e => emitExpr(ctx, e.expr)).mkString(",")
+        s"${emitExpr(ctx, ex)}.map(s => ${className}($exs, s))"
       }
       else {
         // there is no other expression: we just construct an expression for flatMap:
         // (<expr>).map(t => <class>(t))
-        s"${emitExpr(node.inputSchema, ex.a)}.map(t => ${className}(t._0))"
+        s"${emitExpr(ctx, ex.a)}.map(t => ${className}(t._0))"
       }
     }
     else
@@ -453,12 +458,12 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
 
   /**
    *
-   * @param schema the input schema of the operator
+   * @param ctx an object representing context information for code generation
    * @param params the list of parameters (as Refs)
    * @return the generated code
    */
-  def emitParamList(schema: Option[Schema], params: Option[List[Ref]]): String = params match {
-    case Some(refList) => if (refList.nonEmpty) s",${refList.map(r => emitRef(schema, r)).mkString(",")}" else ""
+  def emitParamList(ctx: CodeGenContext, params: Option[List[Ref]]): String = params match {
+    case Some(refList) => if (refList.nonEmpty) s",${refList.map(r => emitRef(ctx, r)).mkString(",")}" else ""
     case None => ""
   }
 
@@ -470,11 +475,11 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * @param in
    * @return
    */
-  def emitSortKey(schema: Option[Schema], orderSpec: List[OrderBySpec], out: String, in: String) : String = {
+  def emitSortKey(ctx: CodeGenContext, orderSpec: List[OrderBySpec], out: String, in: String) : String = {
     if (orderSpec.size == 1)
-      emitRef(schema, orderSpec.head.field)
+      emitRef(ctx, orderSpec.head.field)
     else
-      s"custKey_${out}_${in}(${orderSpec.map(r => emitRef(schema, r.field)).mkString(",")})"
+      s"custKey_${out}_${in}(${orderSpec.map(r => emitRef(ctx, r.field)).mkString(",")})"
   }
   
   val castMethods = Set.empty[String]
@@ -529,7 +534,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
 
         //Flink??
         params += "out" -> node.outPipeName
-        params += "key" -> orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
+        params += "key" -> orderSpec.map(r => emitRef(CodeGenContext(schema = node.schema), r.field)).mkString(",")
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
 
         callST("orderHelper", Map("params" -> params))
@@ -600,7 +605,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
 
         //Flink
         params += "out" -> node.outPipeName
-        params += "key" -> orderSpec.map(r => emitRef(node.schema, r.field)).mkString(",")
+        params += "key" -> orderSpec.map(r => emitRef(CodeGenContext(schema = node.schema), r.field)).mkString(",")
         if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
         callST("topHelper", Map("params" -> params))
       }
@@ -724,12 +729,89 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           "class" -> className,
           "in_fields" -> inFields,
           "out_fields" -> outFields,
-          "params" -> emitParamList(node.schema, node.params)))
+          "params" -> emitParamList(CodeGenContext(schema = node.schema), node.params)))
   }
+
+  /**
+    *
+    * @param schema
+    * @param expr
+    * @return
+    */
+  def emitExpr(ctx: CodeGenContext,
+               expr: ArithmeticExpr): String = expr match {
+    case CastExpr(t, e) => {
+      // TODO: check for invalid type
+      val targetType = scalaTypeMappingTable(t)
+      s"${emitExpr(ctx, e)}.to$targetType"
+    }
+    case PExpr(e) => s"(${emitExpr(ctx, e)})"
+    case MSign(e) => s"-${emitExpr(ctx, e)}"
+    case Add(e1, e2) => s"${emitExpr(ctx, e1)} + ${emitExpr(ctx, e2)}"
+    case Minus(e1, e2) => s"${emitExpr(ctx, e1)} - ${emitExpr(ctx, e2)}"
+    case Mult(e1, e2) => s"${emitExpr(ctx, e1)} * ${emitExpr(ctx, e2)}"
+    case Div(e1, e2) => s"${emitExpr(ctx, e1)} / ${emitExpr(ctx, e2)}"
+    case RefExpr(e) => s"${emitRef(CodeGenContext(schema = ctx.schema, aggregate = ctx.aggregate, tuplePrefix = "t", namedRef = ctx.namedRef, events = ctx.events), e)}"
+    case Func(f, params) => emitFuncCall(ctx, f, params)
+    case FlattenExpr(e) => flattenExpr(ctx, e)
+    case ConstructTupleExpr(exprs) => {
+      val exType = expr.resultType(ctx.schema).asInstanceOf[TupleType]
+      val s = Schema(new BagType(exType))
+      s"${schemaClassName(s.className)}(${exprs.map(e => emitExpr(ctx, e)).mkString(",")})"
+    }
+    case ConstructBagExpr(exprs) => {
+      val exType = expr.resultType(ctx.schema).asInstanceOf[BagType]
+      val s = Schema(exType)
+      s"List(${exprs.map(e => s"${schemaClassName(s.className)}(${emitExpr(ctx, e)})").mkString(",")})"
+    }
+    case ConstructMapExpr(exprs) => {
+      val exType = expr.resultType(ctx.schema).asInstanceOf[MapType]
+      val valType = exType.valueType
+      val exprList = exprs.map(e => emitExpr(ctx, e))
+      // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
+      val mapStr = exprList.zip(exprList.tail).zipWithIndex.filter{
+        case (p, i) => i % 2 == 0
+      }.map{case (p, i) => s"${p._1} -> ${p._2}"}.mkString(",")
+      s"Map[String,${scalaTypeMappingTable(valType)}](${mapStr})"
+    }
+    case ConstructMatrixExpr(ty, rows, cols, expr) => {
+      val mType = if (ty.charAt(1) == 'i') "Int" else "Double"
+      s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(ctx, expr)}.map(v => v._0).toArray)"
+    }
+
+    case ConstructGeometryExpr(expr) => {
+      s"new WKTReader().read(${emitExpr(ctx, expr)})"
+    }
+
+    case _ => println("unsupported expression: " + expr); ""
+  }
+
+  /**
+    * Generate Scala code for a predicate on expressions within a MATCHER statement.
+    *
+    * @param ctx an object representing additional information about the context
+    * @param predicate the actual predicate
+    * @return a string representation of the generated Scala code
+    */
+  def emitPredicate(ctx: CodeGenContext, predicate: Predicate): String =  predicate match {
+    case Eq(left, right) => { s"${emitExpr(ctx, left)} == ${emitExpr(ctx, right)}"}
+    case Neq(left, right) => { s"${emitExpr(ctx, left)} != ${emitExpr(ctx, right)}"}
+    case Leq(left, right) => { s"${emitExpr(ctx, left)} <= ${emitExpr(ctx, right)}"}
+    case Lt(left, right) => { s"${emitExpr(ctx, left)} < ${emitExpr(ctx, right)}"}
+    case Geq(left, right) => { s"${emitExpr(ctx, left)} >= ${emitExpr(ctx, right)}"}
+    case Gt(left, right) => { s"${emitExpr(ctx, left)} > ${emitExpr(ctx, right)}"}
+    case And(left, right) => s"${emitPredicate(ctx, left)} && ${emitPredicate(ctx, right)}"
+    case Or(left, right) => s"${emitPredicate(ctx, left)} || ${emitPredicate(ctx, right)}"
+    case Not(pred) => s"!(${emitPredicate(ctx, pred)})"
+    case PPredicate(pred) => s"(${emitPredicate(ctx, pred)})"
+    case _ => { s"UNKNOWN PREDICATE: $predicate" }
+  }
+
 
   def emitMatcherHelper(node: PigOperator, out: String, pattern: Pattern, events: CompEvent): String = {
     val filters = events.complex.map { f => f.simplePattern.asInstanceOf[SimplePattern].name }
-    val predics = events.complex.map { f => emitPredicate(node.schema, f.predicate) }
+    val predics = events.complex.map {
+      f => emitPredicate(CodeGenContext(schema = node.schema, events = Some(events)), f.predicate) }
     val hasSchema = node.schema.isDefined
     val schemaClass = if (!hasSchema) {
       "Record"
@@ -747,6 +829,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     }
     callST("cepHelper",
       Map("out" -> out,
+        "init" -> "",
         "class" -> schemaClass,
         "filters" -> filters,
         "predcs" -> predics,
@@ -902,9 +985,9 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       case Display(in) => callST("display", Map("in"->node.inPipeName, "tableHeader"->tableHeader(node.inputSchema)))
       case Store(in, file, func, params) => emitStore(node, file, func, params)
       case Describe(in) => s"""println("${node.schemaToString}")"""
-      case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(node.schema, s.expr))))
+      case SplitInto(in, splits) => callST("splitInto", Map("in"->node.inPipeName, "out"->node.outPipeNames, "pred"->splits.map(s => emitPredicate(CodeGenContext(schema = node.schema), s.expr))))
       case Union(out, rels) => callST("union", Map("out"->node.outPipeName,"in"->node.inPipeName,"others"->node.inPipeNames.tail))
-      case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(node.schema, expr)))
+      case Sample(out, in, expr) => callST("sample", Map("out"->node.outPipeName,"in"->node.inPipeName,"expr"->emitExpr(CodeGenContext(schema = node.schema), expr)))
       case sOp@StreamOp(out, in, op, params, schema) => emitStreamThrough(sOp)
       // case MacroOp(out, name, params) => callST("call_macro", Map("out"->node.outPipeName,"macro_name"->name,"params"->emitMacroParamList(node.schema, params)))
       case hOp@HdfsCmd(cmd, params) => callST("fs", Map("cmd"->cmd,
@@ -932,7 +1015,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * i.e. defining the main object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
-   * @param additionalCode Scala source code that was embedded into the script
    * @return a string representing the header code
    */
   def emitHeader1(scriptName: String): String =

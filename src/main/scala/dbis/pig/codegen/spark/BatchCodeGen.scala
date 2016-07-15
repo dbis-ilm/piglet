@@ -28,9 +28,7 @@ import dbis.pig.expr.Expr
 import dbis.pig.expr.Func
 import dbis.pig.expr.NamedField
 import dbis.pig.expr.PositionalField
-import dbis.pig.codegen.CodeGenerator
-import dbis.pig.codegen.ScalaBackendCodeGen
-import dbis.pig.codegen.TemplateException
+import dbis.pig.codegen.{CodeGenContext, CodeGenerator, ScalaBackendCodeGen, TemplateException}
 
 
 class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
@@ -46,16 +44,34 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     * @param tuplePrefix
     * @return
     */
-  override def emitRef(schema: Option[Schema], ref: Ref,
-                       tuplePrefix: String = "t",
-                       aggregate: Boolean = false,
-                       namedRef: Boolean = false): String = ref match {
+  override def emitRef(ctx: CodeGenContext, ref: Ref): String = ref match {
     case DerefTuple(r1, r2) =>
-      if (aggregate)
-        s"${emitRef(schema, r1, "t")}.map(e => e${emitRef(tupleSchema(schema, r1), r2, "")})"
-      else
-        s"${emitRef(schema, r1, "t")}${emitRef(tupleSchema(schema, r1), r2, "", aggregate, namedRef)}"
-    case _ => super.emitRef(schema, ref, tuplePrefix, aggregate, namedRef)
+      if (ctx.aggregate)
+        s"${emitRef(CodeGenContext(schema = ctx.schema, tuplePrefix = "t"), r1)}.map(e => e${emitRef(CodeGenContext(schema = tupleSchema(ctx.schema, r1), tuplePrefix = ""), r2)})"
+      else {
+        ctx.events match {
+          case Some(evs) => {
+            // we try to find r1 in the specification of the events and retrieve the position (or -1 if not found)
+            val res = evs.complex.zipWithIndex.filter{ case (e, pos)  => e.simplePattern.asInstanceOf[SimplePattern].name == r1.toString  }
+            if (res.length != 1)
+              s"${emitRef(CodeGenContext(schema = ctx.schema, tuplePrefix = "t", events = ctx.events), r1)}${emitRef(CodeGenContext(schema = tupleSchema(ctx.schema, r1), tuplePrefix = "", aggregate = ctx.aggregate, namedRef = ctx.namedRef, events = ctx.events), r2)}"
+            else {
+              val p = r2 match {
+                case nf @ NamedField(f, _) => ctx.schema.get.indexOfField(nf)
+                case PositionalField (pos) => pos
+                case _ => 0
+              }
+              if (p == -1)
+                throw new TemplateException(s"invalid field name $r2 in event ${r1.toString}")
+
+              s"rvalues.events(${res(0)._2})._$p)"  //TODO: work more on other related values
+            }
+          }
+          case None => s"${emitRef(CodeGenContext(schema = ctx.schema, tuplePrefix = "t", events = ctx.events), r1)}${emitRef(CodeGenContext(schema = tupleSchema(ctx.schema, r1), tuplePrefix = "", aggregate = ctx.aggregate, namedRef = ctx.namedRef, events = ctx.events), r2)}"
+
+        }
+      }
+    case _ => super.emitRef(ctx, ref)
   }
 
   /**
@@ -71,7 +87,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     val className = schemaClassName(parent.schema.get.className)
 
     "{\n" + plan.operators.map {
-      case Generate(expr) => s"""${className}(${emitGenerator(schema, expr, namedRef = true)})"""
+      case Generate(expr) => s"""${className}(${emitGenerator(CodeGenContext(schema = schema, namedRef = true), expr)})"""
       case n@ConstructBag(out, ref) => ref match {
         case DerefTuple(r1, r2) => {
           // there are two options of ConstructBag
@@ -93,7 +109,8 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
         case _ => "" // should not happen
       }
       case n@Distinct(out, in, _) => s"""val ${n.outPipeName} = ${n.inPipeName}.distinct"""
-      case n@Filter(out, in, pred, _) => callST("filter", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "pred" -> emitPredicate(n.schema, pred)))
+      case n@Filter(out, in, pred, _) => callST("filter", Map("out" -> n.outPipeName, "in" -> n.inPipeName,
+        "pred" -> emitPredicate(CodeGenContext(schema = n.schema), pred)))
       case n@Limit(out, in, num) => callST("limit", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "num" -> num))
       case OrderBy(out, in, orderSpec, _) => "" // TODO!!!!
       case _ => ""
@@ -109,7 +126,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
         if (requiresFlatMap)
           emitBagFlattenGenerator(node, expr)
         else
-          emitGenerator(node.inputSchema, expr)
+          emitGenerator(CodeGenContext(schema = node.inputSchema), expr)
       }
       case GeneratorPlan(plan) => {
         val subPlan = node.asInstanceOf[Foreach].subPlan.get
@@ -155,7 +172,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     */
   def emitFilter(node: PigOperator, pred: Predicate): String = {
     callST("filter", Map("out" -> node.outPipeName, "in" -> node.inPipeName,
-      "pred" -> emitPredicate(node.schema, pred)))
+      "pred" -> emitPredicate(CodeGenContext(schema = node.schema), pred)))
   }
 
   /**
@@ -213,7 +230,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
       else "k" // the simple case: the key is a single field
 
       callST("groupBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className,
-        "expr" -> emitGroupExpr(node.inputSchema, groupExpr),
+        "expr" -> emitGroupExpr(CodeGenContext(schema = node.inputSchema), groupExpr),
         "keyExtr" -> keyExtr))
     }
   }
@@ -230,7 +247,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     require(node.schema.isDefined)
 
     val res = node.inputs.zip(exprs)
-    val keys = res.map { case (i, k) => emitJoinKey(i.producer.schema, k) }
+    val keys = res.map { case (i, k) => emitJoinKey(CodeGenContext(schema = i.producer.schema), k) }
 
     /*
      * We don't generate key-value RDDs which we have already created and registered in joinKeyVars.
@@ -313,20 +330,20 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
   }
 
   /**
-    * Generates code for the ORDERBYoOperator
+    * Generates code for the ORDERBY Operator
     *
     * @param node the OrderBy operator node
     * @param spec Order specification
     * @return the Scala code implementing the ORDERBY operator
     */
   def emitOrderBy(node: PigOperator, spec: List[OrderBySpec]): String = {
-    val key = emitSortKey(node.schema, spec, node.outPipeName, node.inPipeName)
+    val key = emitSortKey(CodeGenContext(schema = node.schema), spec, node.outPipeName, node.inPipeName)
     val asc = ascendingSortOrder(spec.head)
     callST("orderBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "key" -> key, "asc" -> asc))
   }
 
   def emitTop(node: PigOperator, spec: List[OrderBySpec], num: Int): String = {
-    val key = emitSortKey(node.schema, spec, node.outPipeName, node.inPipeName)
+    val key = emitSortKey(CodeGenContext(schema = node.schema), spec, node.outPipeName, node.inPipeName)
     val asc = ascendingSortOrder(spec.head)
     callST("top", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "num" -> num, "key" -> key))
   }
@@ -435,7 +452,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
      * If the left relation is indexed, exclude it from kv generation (drop)
      */    
     val res = j.inputs.drop(if(j.withIndex) 1 else 0).zip(Seq(j.predicate.left, j.predicate.right).drop(if(j.withIndex) 1 else 0))
-    val keys = res.map { case (i, k) => emitJoinKey(i.producer.schema, List(k)) }
+    val keys = res.map { case (i, k) => emitJoinKey(CodeGenContext(schema = i.producer.schema), List(k)) }
 
     /*
      * We don't generate key-value RDDs which we have already created and registered in joinKeyVars.
@@ -488,7 +505,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     callST("index", Map(
       "out" -> op.outPipeName,
       "in" -> op.inPipeName,
-      "field" -> emitRef(op.schema, op.field),
+      "field" -> emitRef(CodeGenContext(schema = op.schema), op.field),
       "method" -> IndexMethod.methodName(op.method),
       "params" -> op.params.mkString(",")
     ))

@@ -1099,8 +1099,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperClass = cleanString(
       """object bNFA {
-        |  def filterA (t: _t1_Tuple ) : Boolean = t._0 == 1
-        |  def filterB (t: _t1_Tuple ) : Boolean = t._1 == 2
+        |  def filterA (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._0 == 1
+        |  def filterB (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._1 == 2
         |  def createNFA = {
         |    val bOurNFA: NFAController[_t1_Tuple] = new NFAController()
         |    val StartState = bOurNFA.createAndGetNormalState("Start")
@@ -1138,8 +1138,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
     val expectedHelperClass = cleanString(
       """object bNFA {
-        |  def filterA (t: _t1_Tuple ) : Boolean = t._0 == 1
-        |  def filterB (t: _t1_Tuple ) : Boolean = t._1 == 2 && t._2 == ??._2
+        |  def filterA (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._0 == 1
+        |  def filterB (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._1 == 2 && t._2 == rvalues.events(0)._2)
         |  def createNFA = {
         |    val bOurNFA: NFAController[_t1_Tuple] = new NFAController()
         |    val StartState = bOurNFA.createAndGetNormalState("Start")
@@ -1149,8 +1149,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    val BEdge = bOurNFA.createAndGetForwardState(filterB)
         |    bOurNFA.createForwardTransition(StartState, AEdge, AState)
         |    bOurNFA.createForwardTransition(AState, BEdge, BState)
-        |    bOurNFA
-        |  }
+        |    bOurNFA 
+        |  } 
         |}""".stripMargin)
     println("helper: " + generatedHelperClass)
     generatedCode should matchSnippet(expectedCode)

@@ -37,7 +37,7 @@ abstract class CEPEngine[T <: Event: ClassTag](nfaController: NFAController[T], 
       val currentState = currenStr.getCurrentState.asInstanceOf[NormalState[T]]
       currentState.edges.zipWithIndex.foreach {
         case (e, i) =>
-          if (e.evaluate(event)) {
+          if (e.evaluate(event, currenStr)) {
             result = i
           }
       }

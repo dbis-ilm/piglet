@@ -1,7 +1,9 @@
 package dbis.pig.cep.nfa
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
+import scala.collection.mutable.HashMap
 import dbis.pig.backends.{SchemaClass => Event}
+import scala.collection.mutable.ListBuffer
 
 /**
  * @brief this class implements the execution instance of the NFA. 
@@ -10,6 +12,11 @@ import dbis.pig.backends.{SchemaClass => Event}
  * At the end, this structure may or may not have a match
  */
 class NFAStructure[T <: Event: ClassTag](nfaController: NFAController[T]) extends scala.Cloneable with Serializable   {
+  
+	//var relatedValue: HashMap[String, ListBuffer[RelatedValue[T]]] = nfaController.initRelatedValue match {
+			//case Some(init) => init()
+			//case _ => null
+  //}
   /**
    * stores the events of this structure which contribute 
    * on the complex event
@@ -30,6 +37,7 @@ class NFAStructure[T <: Event: ClassTag](nfaController: NFAController[T]) extend
    * @return the current state
    */
   def getCurrentState = currenState
+  
   /**
    * adds an event to this structure, and makes necessary updates such as 
    * jumping to the next state and check whether the match is detected or not
@@ -38,6 +46,12 @@ class NFAStructure[T <: Event: ClassTag](nfaController: NFAController[T]) extend
    */
   def addEvent(event: T, currentEdge: ForwardEdge[T]): Unit = {
     events += event
+    //if (relatedValue != null) {
+     // relatedValue.get(currentEdge.name.get) match {
+       // case Some(x) => x.foreach (r => r.updateValue(event))
+        //case None => Nil
+      //}
+    //}
     currenState = currentEdge.destState
     if (currenState.isInstanceOf[FinalState[T]])
       complete = true

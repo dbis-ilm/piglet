@@ -28,9 +28,8 @@ import dbis.pig.expr.Expr
 import dbis.pig.expr.Func
 import dbis.pig.expr.NamedField
 import dbis.pig.expr.PositionalField
-import dbis.pig.codegen.CodeGenerator
+import dbis.pig.codegen.{CodeGenContext, CodeGenerator, TemplateException}
 import dbis.pig.codegen.spark.BatchCodeGen
-import dbis.pig.codegen.TemplateException
 import scala.collection.mutable.ListBuffer
 
 class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
@@ -74,11 +73,11 @@ class FlinkBatchCodeGen(template: String) extends BatchCodeGen(template) {
           case _               => throw TemplateException("unknown type for grouping key")
         }
 
-        s"${className}(" + groupExpr.keyList.map(e => emitRef(node.inputSchema, e, "itr.head")).mkString(",") + ")"
-      } else groupExpr.keyList.map(e => emitRef(node.inputSchema, e, "itr.head")).mkString // the simple case: the key is a single field
+        s"${className}(" + groupExpr.keyList.map(e => emitRef(CodeGenContext(schema = node.inputSchema, tuplePrefix = "itr.head"), e)).mkString(",") + ")"
+      } else groupExpr.keyList.map(e => emitRef(CodeGenContext(schema = node.inputSchema, tuplePrefix = "itr.head"), e)).mkString // the simple case: the key is a single field
 
       callST("groupBy", Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className,
-        "expr" -> emitGroupExpr(node.inputSchema, groupExpr),
+        "expr" -> emitGroupExpr(CodeGenContext(schema = node.inputSchema), groupExpr),
         "keyExtr" -> keyExtr))
     }
   }
