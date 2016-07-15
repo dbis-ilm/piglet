@@ -11,7 +11,7 @@ import scala.collection.mutable.HashMap
  */
 class NFAController[T <: Event: ClassTag] extends Serializable {
   
-  type RelatedValueMap = HashMap[Int, ListBuffer[RelatedValue[T]]]
+  type RelatedValueMap = HashMap[String, ListBuffer[RelatedValue[T]]]
   /**
    * an edge counter to assign a unique id for each edge
    */
@@ -80,7 +80,7 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
     * @param predicate the predicate of this edge
    * @return a pointer to a forward edge
    */
-  def createAndGetForwardEdge(predicate: (T, HashMap[Int, ListBuffer[RelatedValue[T]]]) => Boolean): ForwardEdge[T] = {
+  def createAndGetForwardEdge(predicate: (T, NFAStructure[T]) => Boolean): ForwardEdge[T] = {
     val transition = new ForwardEdge(predicate, edgeID(), None)
     transitions += transition
     transition
@@ -99,7 +99,7 @@ class NFAController[T <: Event: ClassTag] extends Serializable {
     srcState.addEdge(forwardEdge)
   }
   
-  def setInitRelatedValue(init: () => RelatedValueMap) : Unit = initRelatedValue = Some(init)
+  //def setInitRelatedValue(init: () => RelatedValueMap) : Unit = initRelatedValue = Some(init)
   /**
    * get a pointer to the start state
     *

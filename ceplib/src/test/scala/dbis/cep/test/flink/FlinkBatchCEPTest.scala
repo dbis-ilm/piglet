@@ -38,9 +38,9 @@ case class BatchDoubleRecord(col1: Int, col2: Int) extends java.io.Serializable 
 }
 
 object OurBatchNFA {
-    def filter1(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 1
-    def filter2(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 2
-    def filter3(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 3
+    def filter1(record: BatchDoubleRecord, rvalues: NFAStructure[BatchDoubleRecord]): Boolean = record.col1 == 1
+    def filter2(record: BatchDoubleRecord, rvalues: NFAStructure[BatchDoubleRecord]): Boolean = record.col1 == 2
+    def filter3(record: BatchDoubleRecord, rvalues: NFAStructure[BatchDoubleRecord]): Boolean = record.col1 == 3
     def createNFA = {
       val testNFA: NFAController[BatchDoubleRecord] = new NFAController()
       val firstState = testNFA.createAndGetStartState("First")

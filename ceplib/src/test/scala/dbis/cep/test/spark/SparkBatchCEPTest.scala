@@ -35,14 +35,10 @@ case class BatchDoubleRecord(col1: Int, col2: Int) extends java.io.Serializable 
   override def mkString(delim: String) = s"${col1}${delim}${col2}"
 }
 
-class RelatedValueRecord extends PreviousRelatedValue[BatchDoubleRecord] with java.io.Serializable {
-  override def updateValue(event: BatchDoubleRecord): Unit = value = Some(event.col1) 
-}
-
 object OurBatchNFA {
-    def filter1(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 1
-    def filter2(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 2
-    def filter3(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 3
+    def filter1(record: BatchDoubleRecord, rvalues: NFAStructure[BatchDoubleRecord]): Boolean = record.col1 == 1
+    def filter2(record: BatchDoubleRecord, rvalues: NFAStructure[BatchDoubleRecord]): Boolean = record.col1 == 2
+    def filter3(record: BatchDoubleRecord, rvalues: NFAStructure[BatchDoubleRecord]): Boolean = record.col1 == 3
     def createNFA = {
       val testNFA: NFAController[BatchDoubleRecord] = new NFAController()
       val firstState = testNFA.createAndGetStartState("First")
@@ -62,19 +58,9 @@ object OurBatchNFA {
   }
 
 object OurReferBatchNFA {
-    def init() = {
-      val buffer0 = new ListBuffer[RelatedValue[BatchDoubleRecord]]()
-      buffer0 += new RelatedValueRecord()
-      val buffer1 = new ListBuffer[RelatedValue[BatchDoubleRecord]]()
-      buffer1 += new RelatedValueRecord()
-      val map = new HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]
-      map += (1 ->  buffer0)
-      map += (2 ->  buffer1)
-      map
-    }
-    def filter1(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == 1
-    def filter2(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == rvalues(1)(0).getValue + 1
-    def filter3(record: BatchDoubleRecord, rvalues: HashMap[Int, ListBuffer[RelatedValue[BatchDoubleRecord]]]): Boolean = record.col1 == rvalues(2)(0).getValue + 1
+    def filter1(record: BatchDoubleRecord, rvalues: NFAStructure[BatchDoubleRecord]): Boolean = record.col1 == 1
+    def filter2(record: BatchDoubleRecord, rvalues: NFAStructure[BatchDoubleRecord]): Boolean = record.col1 == rvalues.events(0).col1 + 1
+    def filter3(record: BatchDoubleRecord, rvalues: NFAStructure[BatchDoubleRecord]): Boolean = record.col1 == rvalues.events(1).col1 + 1
     def createNFA = {
       val testNFA: NFAController[BatchDoubleRecord] = new NFAController()
       val firstState = testNFA.createAndGetStartState("First")
@@ -89,7 +75,6 @@ object OurReferBatchNFA {
       testNFA.createForwardTransition(firstState, firstEdge, secondState)
       testNFA.createForwardTransition(secondState, secondEdge, thirdState)
       testNFA.createForwardTransition(thirdState, thirdEdge, finalState)
-      testNFA.setInitRelatedValue(init)
       testNFA
     }
   }

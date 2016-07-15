@@ -23,18 +23,18 @@ import scala.collection.mutable.ListBuffer
  * @param predicate the predicate assigned to this edge
  * @param name the edge name assigned to this edge (optional)
  */
-abstract class Edge[T <: Event: ClassTag](predicate: (T, HashMap[Int, ListBuffer[RelatedValue[T]]]) => Boolean, id: Int, name: Option[String]) extends Serializable  {
+abstract class Edge[T <: Event: ClassTag](predicate: (T, NFAStructure[T]) => Boolean, id: Int, name: Option[String]) extends Serializable  {
   /**
    * a constructor to set the predicate of the edge without assigning a name (None) and id (0)
    * @param predicate the predicate assigned to this edge
    */
-  def this(predicate: (T, HashMap[Int, ListBuffer[RelatedValue[T]]]) => Boolean) = this(predicate, 0, None)
+  def this(predicate: (T, NFAStructure[T]) => Boolean) = this(predicate, 0, None)
   /**
    * a constructor to set the predicate of the edge without assigning a name (None)
    * @param predicate the predicate assigned to this edge
    * @param id the edge id assigned to this edge
    */
-  def this(predicate: (T, HashMap[Int, ListBuffer[RelatedValue[T]]]) => Boolean, id: Int) = this(predicate, id, None)
+  def this(predicate: (T, NFAStructure[T]) => Boolean, id: Int) = this(predicate, id, None)
   /**
    * outputs member variable information.
    * @return as above
@@ -47,7 +47,7 @@ abstract class Edge[T <: Event: ClassTag](predicate: (T, HashMap[Int, ListBuffer
    * values from other edges. Therefore, the CEP structure has to be checked as well
    * @param in the incoming tuple
    */
-  def evaluate(in: T, relatedValue: HashMap[Int, ListBuffer[RelatedValue[T]]] = null): Boolean = predicate(in, relatedValue)
+  def evaluate(in: T, relatedValue: NFAStructure[T] = null): Boolean = predicate(in, relatedValue)
 }
 
 /**
@@ -59,7 +59,7 @@ abstract class Edge[T <: Event: ClassTag](predicate: (T, HashMap[Int, ListBuffer
  * @param name the edge name assigned to this edge (optional)
  */
 case class ForwardEdge[T <: Event: ClassTag](
-  predicate: (T, HashMap[Int, ListBuffer[RelatedValue[T]]]) => Boolean,
+  predicate: (T, NFAStructure[T]) => Boolean,
   id: Int,
   name: Option[String])
     extends Edge(predicate, id, name) with Serializable {
@@ -86,7 +86,7 @@ case class ForwardEdge[T <: Event: ClassTag](
  * @param name the edge name assigned to this edge (optional)
  */
 case class LoopEdge[T <: Event: ClassTag](
-  predicate: (T, HashMap[Int, ListBuffer[RelatedValue[T]]]) => Boolean,
+  predicate: (T, NFAStructure[T]) => Boolean,
   id: Int,
   numOfLoop: Int = Int.MaxValue,
   name: Option[String])

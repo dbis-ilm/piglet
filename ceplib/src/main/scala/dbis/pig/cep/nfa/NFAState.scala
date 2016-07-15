@@ -80,7 +80,7 @@ class NormalState[T <: Event: ClassTag](id: Int, name: Option[String])
    * @param id the id of that edge
    * @param predicate the predicate of this edge
    */
-  def addEdge(predicate: (T, HashMap[Int, ListBuffer[RelatedValue[T]]]) => Boolean, id: Int): Unit = edges += new ForwardEdge(predicate, id, None)
+  def addEdge(predicate: (T, NFAStructure[T]) => Boolean, id: Int): Unit = edges += new ForwardEdge(predicate, id, None)
   /**
    * gets the number of edges for this state
    * @return As above

@@ -13,10 +13,10 @@ import scala.collection.mutable.ListBuffer
  */
 class NFAStructure[T <: Event: ClassTag](nfaController: NFAController[T]) extends scala.Cloneable with Serializable   {
   
-	var relatedValue: HashMap[Int, ListBuffer[RelatedValue[T]]] = nfaController.initRelatedValue match {
-			case Some(init) => init()
-			case _ => null
-  }
+	//var relatedValue: HashMap[String, ListBuffer[RelatedValue[T]]] = nfaController.initRelatedValue match {
+			//case Some(init) => init()
+			//case _ => null
+  //}
   /**
    * stores the events of this structure which contribute 
    * on the complex event
@@ -46,12 +46,12 @@ class NFAStructure[T <: Event: ClassTag](nfaController: NFAController[T]) extend
    */
   def addEvent(event: T, currentEdge: ForwardEdge[T]): Unit = {
     events += event
-    if (relatedValue != null) {
-      relatedValue.get(currentEdge.id) match {
-        case Some(x) => x.foreach (r => r.updateValue(event))
-        case None => Nil
-      }
-    }
+    //if (relatedValue != null) {
+     // relatedValue.get(currentEdge.name.get) match {
+       // case Some(x) => x.foreach (r => r.updateValue(event))
+        //case None => Nil
+      //}
+    //}
     currenState = currentEdge.destState
     if (currenState.isInstanceOf[FinalState[T]])
       complete = true
