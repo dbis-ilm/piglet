@@ -18,7 +18,7 @@
 package dbis.cep.test.flink
 
 import java.io.File
-/*
+
 import dbis.pig.backends.{ Record, SchemaClass }
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.scalatest._
@@ -31,16 +31,15 @@ import dbis.pig.cep.flink.CustomDataStreamMatcher._
 import scala.collection.mutable.ArrayBuffer
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow
 import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows
-import dbis.flink.test.FlinkStreamingTestInit 
 
 case class StreamingDoubleRecord(col1: Int, col2: Int) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = s"${col1}${delim}${col2}"
 }
 
 object OurStreamingNFA {
-    def filter1(record: StreamingDoubleRecord): Boolean = record.col1 == 1
-    def filter2(record: StreamingDoubleRecord): Boolean = record.col1 == 2
-    def filter3(record: StreamingDoubleRecord): Boolean = record.col1 == 3
+    def filter1(record: StreamingDoubleRecord, rvalues: NFAStructure[StreamingDoubleRecord]): Boolean = record.col1 == 1
+    def filter2(record: StreamingDoubleRecord, rvalues: NFAStructure[StreamingDoubleRecord]): Boolean = record.col1 == 2
+    def filter3(record: StreamingDoubleRecord, rvalues: NFAStructure[StreamingDoubleRecord]): Boolean = record.col1 == 3
     def createNFA = {
       val testNFA: NFAController[StreamingDoubleRecord] = new NFAController()
       val firstState = testNFA.createAndGetStartState("First")
@@ -58,12 +57,13 @@ object OurStreamingNFA {
       testNFA
     }
   }
-class FlinkStreamingCEPTest extends FlatSpec with Matchers with FlinkStreamingTestInit with BeforeAndAfterEach {
+
+class FlinkStreamingCEPTest extends FlatSpec with Matchers with BeforeAndAfterEach {
   var resultArray = new ArrayBuffer[StreamingDoubleRecord]
   override def beforeEach() {
      resultArray.clear()
-   }
-  
+  }
+
   val sample = Seq(
       StreamingDoubleRecord(1,1), 
       StreamingDoubleRecord(2,2), 
@@ -97,4 +97,4 @@ class FlinkStreamingCEPTest extends FlatSpec with Matchers with FlinkStreamingTe
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurStreamingNFA.createNFA, env, ContiguityMatches)
   }
-}*/
+}

@@ -58,10 +58,8 @@ object OurBatchNFA {
       testNFA
     }
   }
-// TODO: enable these tests again
 
-/*
-class FlinkBatchCEPTest extends FlatSpec with Matchers with FlinkBatchTestInit {
+class FlinkBatchCEPTest extends FlatSpec with Matchers {
 
   val sample = Seq(
       BatchDoubleRecord(1,1), 
@@ -131,4 +129,3 @@ class FlinkBatchCEPTest extends FlatSpec with Matchers with FlinkBatchTestInit {
   }
 }
 
-*/
