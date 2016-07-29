@@ -1,6 +1,5 @@
 
 package dbis.pig.backends.spark
-import org.apache.spark.Logging
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.receiver.Receiver
 import scala.io.Source
@@ -8,7 +7,7 @@ import java.io.{ FileNotFoundException, IOException }
 import org.apache.spark.streaming.scheduler._
 import org.apache.spark.streaming.StreamingContext
 
-class FileStreamReader(file: String, @transient val ssc: StreamingContext) extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) with Logging {
+class FileStreamReader(file: String, @transient val ssc: StreamingContext) extends Receiver[String](StorageLevel.MEMORY_AND_DISK_2) {
 
   def onStart() {
     // Start the thread that reads data from a file
