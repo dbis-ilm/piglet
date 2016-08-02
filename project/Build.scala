@@ -105,14 +105,14 @@ object Dependencies {
   // Libraries
   val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.8"
   val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.8"
-  val scalaTest = "org.scalatest" %% "scalatest" % "3.0.0-M12"
+  val scalaTest = "org.scalatest" %% "scalatest" % "3.0.0-RC4"
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
   val jline = "jline" % "jline" % "2.13"
-  val sparkCore = "org.apache.spark" %% "spark-core" % "1.6.1"
-  val sparkSql = "org.apache.spark" %% "spark-sql" % "1.6.1"
-  val sparkREPL = "org.apache.spark" %% "spark-repl" % "1.6.1"
-  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "1.6.1"
+  val sparkCore = "org.apache.spark" %% "spark-core" % "2.0.0"
+  val sparkSql = "org.apache.spark" %% "spark-sql" % "2.0.0"
+  val sparkREPL = "org.apache.spark" %% "spark-repl" % "2.0.0"
+  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "2.0.0"
   val flinkScala = "org.apache.flink" %% "flink-scala" % "1.0.0"
   val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % "1.0.0"
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
@@ -124,12 +124,15 @@ object Dependencies {
   val pig = "org.apache.pig" % "pig" % "0.15.0"
   val commons = "org.apache.commons" % "commons-exec" % "1.3"
   val twitterUtil = "com.twitter" %% "util-eval" % "6.29.0"
-  val scalikejdbc = "org.scalikejdbc" %% "scalikejdbc" % "2.2.7"
+//  val scalikejdbc = "org.scalikejdbc" %% "scalikejdbc" % "2.2.7"
 //  val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val jdbc = "com.h2database" % "h2" % "1.4.190"
   // val jdbc = "org.postgresql" % "postgresql" % "9.4.1208"
   val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
   val log4j = "log4j" % "log4j" % "1.2.17"
+  
+  val scalajhttp = "org.scalaj" % "scalaj-http_2.11" % "2.3.0"
+  val json4s = "org.json4s" % "json4s-native_2.11" % "3.4.0"
 
   // Projects
   val rootDeps = Seq(
@@ -143,12 +146,14 @@ object Dependencies {
     scalasti,
     kiama,
     typesafe,
-    scalikejdbc,
+//    scalikejdbc,
 //    scalikejdbc_config,
     commons,
     hadoop % "provided",
     twitterUtil,
     jdbc,
-    breeze
+    breeze,
+    scalajhttp,
+    json4s
   )
 }
