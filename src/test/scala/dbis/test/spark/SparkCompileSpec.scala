@@ -30,6 +30,7 @@ import dbis.pig.udf.UDFTable
 import dbis.test.CodeMatchers
 import dbis.test.TestTools._
 import org.scalatest.{Matchers, BeforeAndAfterAll, FlatSpec}
+import java.net.URI
 
 class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
   
@@ -46,7 +47,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
-      + codeGenerator.emitHeader2("test",true)
+      + codeGenerator.emitHeader2("test",Some(new URI("http://localhost:5555/materialization")))
       + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
         |import org.apache.spark.SparkContext
@@ -61,7 +62,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    def main(args: Array[String]) {
         |      val conf = new SparkConf().setAppName("test_App")
         |      val sc = new SparkContext(conf)
-        |      val perfMon = new PerfMonitor("test_App")
+        |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/materialization")
         |      sc.addSparkListener(perfMon)
         |      sc.stop()
         |      
@@ -75,7 +76,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport(Seq("import breeze.linalg._"))
       + codeGenerator.emitHeader1("test")
-      + codeGenerator.emitHeader2("test",true)
+      + codeGenerator.emitHeader2("test",Some(new URI("http://localhost:5555/materialization")))
       + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
                                      |import org.apache.spark.SparkContext
@@ -91,7 +92,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |    def main(args: Array[String]) {
                                      |      val conf = new SparkConf().setAppName("test_App")
                                      |      val sc = new SparkContext(conf)
-                                     |      val perfMon = new PerfMonitor("test_App")
+                                     |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/materialization")
                                      |      sc.addSparkListener(perfMon)
                                      |      sc.stop()
                                      |

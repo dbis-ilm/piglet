@@ -44,7 +44,7 @@ begin_query(name, profiling) ::= <<
         val conf = new SparkConf().setAppName("<name>_App")
         val sc = new SparkContext(conf)
         <if (profiling)>
-    	val perfMon = new PerfMonitor("<name>_App")
+    	val perfMon = new PerfMonitor("<name>_App","<profiling>")
     	sc.addSparkListener(perfMon)
     	<endif>
         

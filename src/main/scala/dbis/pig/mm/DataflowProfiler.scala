@@ -2,25 +2,38 @@ package dbis.pig.mm
 
 import scala.collection.mutable.{Map => MutableMap}
 import scala.collection.mutable.ListBuffer
-
-import java.nio.file.Path
 import scala.io.Source
-import scalikejdbc._
-import dbis.pig.tools.DepthFirstTopDownWalker
-import dbis.pig.plan.DataflowPlan
-import dbis.pig.tools.logging.PigletLogging
 
-import dbis.setm.SETM.timing
-import dbis.pig.tools.BreadthFirstTopDownWalker
+import java.net.URI
+import java.nio.file.Path
+
+import org.json4s._
+import org.json4s.native.JsonMethods._
+
 import dbis.pig.op.PigOperator
+import dbis.pig.plan.DataflowPlan
+import dbis.pig.plan.MaterializationManager
+import dbis.pig.tools.Conf
+import dbis.pig.tools.BreadthFirstTopDownWalker
+import dbis.pig.tools.DepthFirstTopDownWalker
+import dbis.pig.tools.logging.PigletLogging
+import dbis.setm.SETM.timing
 
 /**
  * Created by kai on 24.08.15.
  */
-class DataflowProfiler extends PigletLogging {
+class DataflowProfiler(private val url: Option[URI]) extends PigletLogging {
+  
+  
+  def this() = this(None)
   
   private val cache = MutableMap.empty[String, MaterializationPoint]
 
+  implicit lazy val formats = org.json4s.DefaultFormats
+  
+  
+  logger.info(s"Using storage service at $url for execution times")
+  
   def getMaterializationPoint(hash: String): Option[MaterializationPoint] = cache.get(hash)
 
   def addMaterializationPoint(matPoint: MaterializationPoint): Unit = {
@@ -36,6 +49,37 @@ class DataflowProfiler extends PigletLogging {
   }
 
   override def toString = cache.mkString(",")
+  
+  
+  
+  def getExectimes(lineage: String): Option[(Long, Long)] = {
+    if(url.isEmpty) {
+      logger.warn("cannot retreive execution statistics: No URL to storage service set")
+      return None
+    }
+    val u = url.get.resolve(s"${Conf.EXECTIMES_FRAGMENT}/$lineage")
+    val result = scalaj.http.Http(u.toString()).asString
+      
+    if(result.isError) {
+      logger.warn(s"Could not retreive exectimes for $lineage: ${result.statusLine}")
+      return None
+    }
+    
+    
+    val json = parse(result.body)
+    
+    
+    if((json \ "exectimes").children.size <= 0)
+      return None
+    
+    val progDurations = (json \ "exectimes" \ "progduration").extract[Seq[Long]]
+    val avgProgDuration = progDurations.sum / progDurations.size 
+    
+    val stageDurations = (json \ "exectimes" \ "stageduration").extract[Seq[Long]]
+    val avgStageDuration = stageDurations.sum / stageDurations.size
+    
+    return Some(avgProgDuration, avgStageDuration)
+  }
 
   /**
    * Go over the plan and and check for existing runtime information for each op (lineage).
@@ -46,12 +90,9 @@ class DataflowProfiler extends PigletLogging {
     val walker = new DepthFirstTopDownWalker 
     walker.walk(plan) { op =>
 
-      logger.debug( s"""checking database for runtime information for operator "${op.lineageSignature}" """)
+      logger.debug( s"""checking storage service for runtime information for operator "${op.lineageSignature}" """)
       // check for the current operator, if we have some runtime/stage information 
-      val avg = DB readOnly { implicit session =>
-        sql"select avg(progduration) as pd, avg(stageduration) as sd from exectimes where lineage = ${op.lineageSignature} group by lineage"
-          .map { rs => (rs.long("pd"), rs.long("sd")) }.single().apply()
-      }
+      val avg: Option[(Long, Long)] = getExectimes(op.lineageSignature) 
 
       // if we have information, create a (potential) materialization point
       if (avg.isDefined) {
@@ -117,16 +158,17 @@ class DataflowProfiler extends PigletLogging {
     // prepare map content to be stored into database (using batch insert)
     val entrySet = lineageMap.map { case (k, v) => Seq('id -> k, 'cnt -> v) }.toSeq
     
-    DB localTx { implicit session =>
-      /* this insert statement requires Postgres 9.5 (or higher):
-       * we try to insert the id and count value, if there is a conflict on the ID (lineage) column,
-       * it means that there already exists a value for this lineage, in this case we update the
-       * existing value by adding the current value
-       */
-      sql"insert into opcount(id,cnt) values({id},{cnt}) on conflict (id) do update set cnt = opcount.cnt+{cnt};"
-        .batchByName(entrySet: _*)
-        .apply()
-    }
+    // TODO send opcount statistics to server
+//    DB localTx { implicit session =>
+//      /* this insert statement requires Postgres 9.5 (or higher):
+//       * we try to insert the id and count value, if there is a conflict on the ID (lineage) column,
+//       * it means that there already exists a value for this lineage, in this case we update the
+//       * existing value by adding the current value
+//       */
+//      sql"insert into opcount(id,cnt) values({id},{cnt}) on conflict (id) do update set cnt = opcount.cnt+{cnt};"
+//        .batchByName(entrySet: _*)
+//        .apply()
+//    }
     
     
     

@@ -3,7 +3,6 @@ package dbis.pig.backends.spark
 import org.apache.spark.scheduler._
 import scala.collection.mutable.{Map => MutableMap}
 import scala.collection.mutable.ListBuffer
-import scalikejdbc._
 
 /**
  * A performance monitor to collect Spark job statistics. It extends {{SparkListener}}
@@ -12,13 +11,14 @@ import scalikejdbc._
  * 
  * We use the provided information to collect statistics about runtimes and result sizes of a stage 
  */
-class PerfMonitor(appName: String) extends SparkListener {
+class PerfMonitor(appName: String, url: String) extends SparkListener {
   
   private val progStartTime = System.currentTimeMillis()
   
   private val lineLineageMapping = MutableMap.empty[Int, String]
   
   private val stageSizeMapping = MutableMap.empty[Int, Long]  
+  
 
   /**
    * Action when a task has completed. Here, we collect information about the result
@@ -42,21 +42,22 @@ class PerfMonitor(appName: String) extends SparkListener {
    */
   override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = this.synchronized {
     
-     DB localTx { implicit session =>
-      sql"""insert into exectimes(appname, stageid, stagename, lineage, stageduration, progduration, submissiontime, completiontime, size) VALUES(
-              ${appName},
-              ${stageCompleted.stageInfo.stageId},
-              ${stageCompleted.stageInfo.name},
-              ${lineLineageMapping.getOrElse(stageCompleted.stageInfo.name.split(":")(1).toInt, null) },
-              ${stageCompleted.stageInfo.completionTime.get - stageCompleted.stageInfo.submissionTime.get},
-              ${stageCompleted.stageInfo.completionTime.get - progStartTime},
-              ${stageCompleted.stageInfo.submissionTime.get},
-              ${stageCompleted.stageInfo.completionTime.get},
-              ${stageSizeMapping.getOrElse(stageCompleted.stageInfo.stageId, null)}
-            )"""
-        .update
-        .apply()
-      }
+    val jsonString = s"""{
+        "appname": "$appName",
+        "stageid": ${stageCompleted.stageInfo.stageId},
+        "stagename":"${stageCompleted.stageInfo.name}",
+        "lineage": "${lineLineageMapping.getOrElse(stageCompleted.stageInfo.name.split(":")(1).toInt, "") }",
+        "stageduration": ${stageCompleted.stageInfo.completionTime.get - stageCompleted.stageInfo.submissionTime.get},
+        "progduration": ${stageCompleted.stageInfo.completionTime.get - progStartTime},
+        "submissiontime": ${stageCompleted.stageInfo.submissionTime.get},
+        "completiontime": ${stageCompleted.stageInfo.completionTime.get},
+        "size": ${stageSizeMapping.getOrElse(stageCompleted.stageInfo.stageId, -1)}
+      }"""
+        
+    val result = scalaj.http.Http(url).postData(jsonString).header("Content-Type", "application/json").header("Charset","UTF-8").asString
+    
+    if(result.isError)
+      println(s"Failed to send execution statistics for stage ${stageCompleted.stageInfo.stageId}: ${result.statusLine}")
   }
 
   
