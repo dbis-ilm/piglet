@@ -199,6 +199,15 @@ object Piglet extends PigletLogging {
     
     logger.info(s"provided parameters: ${paramMap.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
     
+    if(profiling.isDefined) {
+      val reachable = FileTools.checkHttpServer(profiling.get)
+      
+      if(! reachable) {
+        logger.error(s"Statistics management server is not reachable at ${profiling.get}. Aborting")
+        return
+      }
+    }
+    
     
     // start processing
     run(files, outDir, compileOnly, master, backend, languageFeatures, paramMap.toMap, backendPath, backendArgs, profiling, showPlan, sequential)

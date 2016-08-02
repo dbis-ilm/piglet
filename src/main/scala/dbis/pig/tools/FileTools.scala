@@ -31,6 +31,8 @@ import java.nio.file.Paths
 import dbis.setm.SETM.timing
 
 import scala.collection.mutable.ListBuffer
+import java.net.URI
+import java.net.ConnectException
 
 object FileTools extends PigletLogging {
   
@@ -67,4 +69,19 @@ object FileTools extends PigletLogging {
       }
     }
   }
+  
+  /**
+   * Send a HTTP GET request to the specified server.
+   * The method returns <code>true</code> if the response
+   * is a success otherwise <code>false</code>. 
+   * 
+   * @param url the HTTP URL of the server to check
+   * @return Returns <code>true</code> if the server is reachable, otherwise <code>false</code>
+   */
+  def checkHttpServer(url: URI): Boolean = try {
+    scalaj.http.Http(url.toString()).asString.isSuccess
+  } catch {
+  case e: ConnectException => false
+  }
+    
 }

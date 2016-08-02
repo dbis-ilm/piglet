@@ -505,7 +505,16 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
 
 
-      BackendManager.backend = backendConf
+    BackendManager.backend = backendConf
+    
+    if(profiling.isDefined) {
+      val reachable = FileTools.checkHttpServer(profiling.get)
+      
+      if(! reachable) {
+        logger.error(s"Statistics management server is not reachable at ${profiling.get}. Aborting")
+        return
+      }
+    }
 
 
     console {
