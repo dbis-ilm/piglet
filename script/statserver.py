@@ -138,4 +138,4 @@ if __name__ == '__main__':
 	exectimes = db.table("exectimes")
 	materializations = db.table("materializations")
 
-	app.run(debug=True,port=args.port)
+	app.run(host='0.0.0.0',debug=False,port=args.port)
