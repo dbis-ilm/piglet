@@ -155,12 +155,18 @@ Currently, two spatial predicates are supported:
 
 Please note, although we defined the behavior of these predicates here, the actual meaning is determined by the implementing backend.
 
-#### Spatial Filter - *Not available yet - coming soon* ####
+#### Spatial Filter ####
 
 Filtering on a spatial column can be achieved by using a spatial filter operator:
 ```
-out = SPATIALFILTER in BY contains(geometry("POLYGON(...)", geom));
+out = SPATIALFILTER in BY contains(geom, geometry("POLYGON(...)"));
 ```
+
+*Note:* For spatial filter, the predicate is of the form `predicate(ref, geom-constructor)`, where
+  
+  - `predicate` is one of `intersects`, `contains`, `containedBy`
+  - `ref` is a field reference in `in`
+  - `geom-constructor` is an expression from which a geometry can be constructed
 
 #### Indexing ####
 The spatial spark extension supports indexed data sets. To create an index for a bag, simply use the `INDEX` operator:
