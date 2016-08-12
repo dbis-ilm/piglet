@@ -189,7 +189,7 @@ case class PPredicate(a: Predicate) extends Predicate {
 
 object SpatialPredicateType extends Enumeration {
 //  type SpatialPredicateType = Value
-  val CONTAINS, INTERSECTS = Value
+  val CONTAINS, CONTAINEDBY, INTERSECTS = Value
   
 }
 

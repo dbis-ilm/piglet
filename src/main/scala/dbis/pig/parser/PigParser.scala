@@ -866,6 +866,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   lazy val spatialJoinKeyword = "SPATIALJOIN".ignoreCase
   lazy val spatialFilterKeyword = "SPATIALFILTER".ignoreCase
   lazy val containsKeyword = "contains".ignoreCase
+  lazy val containedByKeyword = "containedBy".ignoreCase
   lazy val intersectsKeyword = "intersects".ignoreCase
   lazy val indexKeyword = "index".ignoreCase
   lazy val rtreeKeyword = "rtree".ignoreCase
@@ -874,7 +875,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     case _ ~ _ ~ exp ~ _ => ConstructGeometryExpr(exp)
   }
   
-  def spatialJoinPredicate = (containsKeyword | intersectsKeyword) ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {
+  def spatialJoinPredicate = (containsKeyword | intersectsKeyword | containedByKeyword) ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {
     case kw ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialJoinPredicate(r1,r2,  SpatialPredicateType.withName(kw.toUpperCase()))
   }
   
@@ -883,7 +884,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
 
   }
   
-  def spatialFilterPredicate = (containsKeyword | intersectsKeyword) ~ "(" ~ ref ~ "," ~ geometryConstructor ~ ")" ^^ {
+  def spatialFilterPredicate = (containsKeyword | intersectsKeyword | containedByKeyword) ~ "(" ~ ref ~ "," ~ geometryConstructor ~ ")" ^^ {
     case kw ~ _ ~ f ~ _ ~ expr ~ _ => new SpatialFilterPredicate(f, expr, SpatialPredicateType.withName(kw.toUpperCase()))
   }
   
