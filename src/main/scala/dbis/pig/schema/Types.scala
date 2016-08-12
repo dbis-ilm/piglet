@@ -70,7 +70,8 @@ case class SimpleType(name: String, tc: TypeCode) extends java.io.Serializable w
 case class GeometryType() extends PigType with java.io.Serializable {
   
   override def tc = TypeCode.GeometryType
-  override def name = "Geometry"
+//  override def name = "Geometry"
+  override def name = "SpatialObject"
 
   override def encode: String = "g"
 

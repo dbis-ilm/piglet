@@ -131,6 +131,10 @@ spatialJoin(out, rel1, rel2, predicate, fields, className) ::=<<
         val <out> = <rel1>.join(<rel2>_kv).map{ case (k,(v,w)) => <className>(<fields>)\}
 >>
 
+spatialfilter(out, in, predicate, other, field) ::=<<
+        val <out> = <in>.keyBy(t => <field>).<predicate>(<other>).map{case (g,v) => v}
+>>        
+
 index(out, in, field, method, params) ::=<<
         val <out> = <in>.keyBy(t => <field>).index(<params>) 
 >>        

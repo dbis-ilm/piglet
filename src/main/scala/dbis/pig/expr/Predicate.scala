@@ -193,7 +193,7 @@ object SpatialPredicateType extends Enumeration {
   
 }
 
-case class SpatialPredicate(left: Ref, right: Ref, predicateType: SpatialPredicateType.Value) extends Predicate {
+case class SpatialJoinPredicate(left: Ref, right: Ref, predicateType: SpatialPredicateType.Value) extends Predicate {
   // FIXME(hage): are the traverse methods OK?
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
 
@@ -204,5 +204,19 @@ case class SpatialPredicate(left: Ref, right: Ref, predicateType: SpatialPredica
   override def resolveReferences(mapping: Map[String, Ref]): Unit = {} //a.resolveReferences(mapping)
 
   override def toString = s"$predicateType(${left.toString},${right.toString})"  
+  
+}
+
+case class SpatialFilterPredicate(field: Ref, expr: ArithmeticExpr, predicateType: SpatialPredicateType.Value) extends Predicate {
+  // FIXME(hage): are the traverse methods OK?
+  override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
+
+  override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
+
+  override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
+
+  override def resolveReferences(mapping: Map[String, Ref]): Unit = {} //a.resolveReferences(mapping)
+
+  override def toString = s"$predicateType(${expr.toString})"  
   
 }

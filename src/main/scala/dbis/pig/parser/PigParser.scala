@@ -676,7 +676,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
    * A statement can be one of the above delimited by a semicolon.
    */
   def delimStmt: Parser[PigOperator] = (loadStmt | indexStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
-    distinctStmt | spatialJoinStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    distinctStmt | spatialFilterStmt | spatialJoinStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt )
 
   /* ---------------------------------------------------------------------------------------------------------------- */
@@ -864,6 +864,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   
   lazy val geometryTypeName = "geometry".ignoreCase
   lazy val spatialJoinKeyword = "SPATIALJOIN".ignoreCase
+  lazy val spatialFilterKeyword = "SPATIALFILTER".ignoreCase
   lazy val containsKeyword = "contains".ignoreCase
   lazy val intersectsKeyword = "intersects".ignoreCase
   lazy val indexKeyword = "index".ignoreCase
@@ -873,13 +874,21 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     case _ ~ _ ~ exp ~ _ => ConstructGeometryExpr(exp)
   }
   
-  def spatialPredicate = (containsKeyword | intersectsKeyword) ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {
-    case kw ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialPredicate(r1,r2,  SpatialPredicateType.withName(kw.toUpperCase()))
+  def spatialJoinPredicate = (containsKeyword | intersectsKeyword) ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {
+    case kw ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialJoinPredicate(r1,r2,  SpatialPredicateType.withName(kw.toUpperCase()))
   }
   
-  def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ (indexKeyword?) ~ "," ~ bag ~ onKeyword ~ spatialPredicate  ^^ {
+  def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ (indexKeyword?) ~ "," ~ bag ~ onKeyword ~ spatialJoinPredicate  ^^ {
     case out ~ _ ~ _ ~ in1 ~ idx ~ _ ~ in2  ~ _ ~ expr => new SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr, idx.isDefined )
 
+  }
+  
+  def spatialFilterPredicate = (containsKeyword | intersectsKeyword) ~ "(" ~ ref ~ "," ~ geometryConstructor ~ ")" ^^ {
+    case kw ~ _ ~ f ~ _ ~ expr ~ _ => new SpatialFilterPredicate(f, expr, SpatialPredicateType.withName(kw.toUpperCase()))
+  }
+  
+  def spatialFilterStmt = bag ~ "=" ~ spatialFilterKeyword ~ bag ~ byKeyword ~ spatialFilterPredicate ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ pred => new SpatialFilter(Pipe(out), Pipe(in), pred)
   }
   
   

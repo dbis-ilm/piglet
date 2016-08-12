@@ -439,6 +439,19 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     res
   }
   
+  def emitSpatialFilter(node: SpatialFilter): String = {
+    val ctx = new CodeGenContext(schema = node.schema)
+    callST("spatialfilter", 
+        Map(
+          "out" -> node.outPipeName,
+          "in" -> node.inPipeName,
+          "predicate" -> node.pred.predicateType.toString().toLowerCase(),
+          "field" -> emitRef(ctx, node.pred.field),
+          "other" -> emitExpr(ctx, node.pred.expr)
+        )
+    )
+  }
+  
   
   def emitSpatialJoin(j: SpatialJoin): String = {
     
@@ -539,6 +552,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
       case Top(_, _, spec, num) => emitTop(node, spec, num)
       case spOp: SpatialJoin => emitSpatialJoin(spOp)
       case idxOp: IndexOp => emitIndex(idxOp)
+      case sf: SpatialFilter => emitSpatialFilter(sf)
       case _ => super.emitNode(node)
     }
   }

@@ -780,7 +780,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     }
 
     case ConstructGeometryExpr(expr) => {
-      s"new WKTReader().read(${emitExpr(ctx, expr)})"
+      s"SpatialObject(new WKTReader().read(${emitExpr(ctx, expr)}))"
     }
 
     case _ => println("unsupported expression: " + expr); ""

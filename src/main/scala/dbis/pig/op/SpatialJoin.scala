@@ -7,14 +7,14 @@ import scala.collection.mutable.ArrayBuffer
 import dbis.pig.schema.BagType
 import dbis.pig.schema.TupleType
 import dbis.pig.schema.Types
-import dbis.pig.expr.SpatialPredicate
+import dbis.pig.expr.SpatialJoinPredicate
 
 
 
 case class SpatialJoin(
     private val out: Pipe, 
     private val in: List[Pipe], 
-    predicate: SpatialPredicate,
+    predicate: SpatialJoinPredicate,
     withIndex: Boolean
   ) extends PigOperator(List(out), in) {
   
