@@ -779,8 +779,18 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(ctx, expr)}.map(v => v._0).toArray)"
     }
 
-    case ConstructGeometryExpr(expr) => {
-      s"SpatialObject(new WKTReader().read(${emitExpr(ctx, expr)}))"
+    case ConstructGeometryExpr(expr,time) => {
+      val timeStr = time.map { t => t match {
+        case Instant(value) => s"Instant(${emitExpr(ctx, value)})"
+        case Interval(s,Some(e)) => s"Interval(${emitExpr(ctx, s)}, ${emitExpr(ctx, e)})"
+        case Interval(s,None) => s"Interval(${emitExpr(ctx, s)}, None)"
+        case _ => logger.error(s"Unsupported temporal expression type $t"); ""
+        } 
+      }
+      
+      
+      
+      s"SpatialObject(new WKTReader().read(${emitExpr(ctx, expr)}) ${ if(timeStr.isDefined) s", $timeStr.get" else ""  } )"
     }
 
     case _ => println("unsupported expression: " + expr); ""

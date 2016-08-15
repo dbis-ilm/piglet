@@ -292,7 +292,11 @@ case class ConstructMatrixExpr(typeString: String, rows: Int, cols: Int, ex: Ari
   }
 }
 
-case class ConstructGeometryExpr(ex: ArithmeticExpr) extends ConstructExpr {
+trait TempEx
+case class Instant(value: ArithmeticExpr) extends TempEx
+case class Interval(start: ArithmeticExpr, stop: Option[ArithmeticExpr]) extends TempEx
+
+case class ConstructGeometryExpr(ex: ArithmeticExpr, time: Option[TempEx]) extends ConstructExpr {
   exprs = List(ex)
   
   override def resultType(schema: Option[Schema]): PigType = {
@@ -303,3 +307,4 @@ case class ConstructGeometryExpr(ex: ArithmeticExpr) extends ConstructExpr {
   }
   
 }
+

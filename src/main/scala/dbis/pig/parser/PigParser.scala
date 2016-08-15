@@ -871,8 +871,15 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   lazy val indexKeyword = "index".ignoreCase
   lazy val rtreeKeyword = "rtree".ignoreCase
   
-  def geometryConstructor: Parser[ArithmeticExpr] = geometryTypeName ~ "(" ~ arithmExpr ~ ")" ^^ {
-    case _ ~ _ ~ exp ~ _ => ConstructGeometryExpr(exp)
+  
+  def instant = arithmExpr  ^^ { case e => Instant(e) }
+  
+  def interval = arithmExpr ~ "," ~ arithmExpr ^^ { case s ~ _ ~ e => Interval(s,Some(e)) }
+  
+  def timeExp: Parser[TempEx] = "," ~ (interval | instant) ^^ { case _ ~ time => time }
+  
+  def geometryConstructor = geometryTypeName ~ "(" ~ arithmExpr ~ (timeExp?) ~ ")" ^^ {
+    case _ ~ _ ~ geo ~ time ~ _ => ConstructGeometryExpr(geo, time)
   }
   
   def spatialJoinPredicate = (containsKeyword | intersectsKeyword | containedByKeyword) ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {

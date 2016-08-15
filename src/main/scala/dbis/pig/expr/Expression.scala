@@ -196,7 +196,7 @@ object Expr {
   }
   
   def containsGeometryType(schema: Schema, ex: Expr): Boolean = ex match {
-    case ConstructGeometryExpr(_) => true
+    case ConstructGeometryExpr(_,_) => true
     case _ => false
   }
 }
