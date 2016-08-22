@@ -39,6 +39,7 @@ object LoadFuncs extends Enumeration {
   }
 }
 import LoadFuncs._
+import java.net.URI
 
 class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
 
@@ -526,9 +527,10 @@ class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
    * the main class/object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
+   * @param profiling URI to send profiling information to - currently ignored
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String, enableProfiling: Boolean): String = callST("begin_query")
+  def emitHeader2(scriptName: String, profiling: Option[URI]): String = callST("begin_query")
 
   /**
    * Generate code needed for finishing the script.

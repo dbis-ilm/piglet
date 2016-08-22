@@ -30,6 +30,7 @@ import java.net.URI
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Set
 import dbis.pig.plan.DataflowPlan
+import dbis.pig.tools.Conf
 
 
 // import scala.collection.mutable.Map
@@ -1041,11 +1042,12 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * @param scriptName the name of the script (e.g. used for the object)
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String, enableProfiling: Boolean = false): String = {
+  def emitHeader2(scriptName: String, profiling: Option[URI] = None): String = {
     var map = Map("name" -> scriptName)
     
-    if(enableProfiling)
-      map += ("profiling" -> "profiling")
+    profiling.map { u => u.resolve(Conf.EXECTIMES_FRAGMENT).toString() }
+             .foreach { s => map += ("profiling" -> s) }
+    
     
     callST("begin_query", map )
   }

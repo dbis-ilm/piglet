@@ -41,11 +41,9 @@ import dbis.pig.tools.Conf
 
 import dbis.pig.plan.MaterializationManager
 import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.tools.DBConnection
 
 import scopt.OptionParser
 import java.net.URI
-import dbis.pig.tools.ConnectionSetting
 
 sealed trait JLineEvent
 
@@ -70,7 +68,6 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
                         loglevel: Option[String] = None)
 
 
-  val profiling = false
   val keepFiles = false
   val defaultScriptName = "__my_script"
 
@@ -283,11 +280,14 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return
     */
-  def handlePrettyPrint(buf: ListBuffer[PigOperator]): Boolean = {
+  def handlePrettyPrint(buf: ListBuffer[PigOperator], profiling: Option[URI]): Boolean = {
     var plan = new DataflowPlan(buf.toList)
 
-    val mm = new MaterializationManager
-    plan = processMaterializations(plan, mm)
+    if(profiling.isDefined) {
+  	  val mm = new MaterializationManager(Conf.materializationBaseDir, profiling.get)
+			plan = processMaterializations(plan, mm)
+    }
+    
     plan = processPlan(plan)
 
     plan.printPlan(0)
@@ -301,12 +301,14 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return false
     */
-  def handleDescribe(s: String, buf: ListBuffer[PigOperator]): Boolean = {
+  def handleDescribe(s: String, buf: ListBuffer[PigOperator], profiling: Option[URI]): Boolean = {
     var plan = new DataflowPlan(buf.toList)
 
-    val mm = new MaterializationManager
-    plan = processMaterializations(plan, mm)
-
+    if(profiling.isDefined) {
+      val mm = new MaterializationManager(Conf.materializationBaseDir, profiling.get)
+      plan = processMaterializations(plan, mm)
+    }
+    
     try {
       plan.checkSchemaConformance
 
@@ -347,7 +349,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return false
     */
-  def executeScript(s: String, buf: ListBuffer[PigOperator]): Boolean = {
+  def executeScript(s: String, buf: ListBuffer[PigOperator], profiling: Option[URI]): Boolean = {
     try {
       if (s.toLowerCase.startsWith("dump ")) {
         // if we have multiple dumps in our script then only the first one
@@ -367,8 +369,13 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = false)
       var plan = new DataflowPlan(buf.toList)
       logger.debug("plan created.")
-      val mm = new MaterializationManager
-      plan = processMaterializations(plan, mm)
+      
+      if(profiling.isDefined) {
+        val mm = new MaterializationManager(Conf.materializationBaseDir, profiling.get)
+        plan = processMaterializations(plan, mm)
+      }
+      
+      
       plan = processPlan(plan)
       logger.debug("plan rewritten.")
 
@@ -497,39 +504,39 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     if (backendConf.raw)
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
 
-    try {
 
-      BackendManager.backend = backendConf
-
-      if (profiling.isDefined) {
-        // initialize database driver and connection pool
-        DBConnection.init(ConnectionSetting(profiling.get))
+    BackendManager.backend = backendConf
+    
+    if(profiling.isDefined) {
+      val reachable = FileTools.checkHttpServer(profiling.get)
+      
+      if(! reachable) {
+        logger.error(s"Statistics management server is not reachable at ${profiling.get}. Aborting")
+        return
       }
+    }
 
-      console {
-        case EOF => println("Ctrl-d"); true
-        case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
-        case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
-        case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf)
-        case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => handleRewrite(buf)
-        case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf)
-        case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
-          s.toLowerCase.startsWith(s"display ") ||
-          s.toLowerCase.startsWith(s"store ") ||
-          s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf)
-        case Line(s, buf) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
-        case Line(s, buf) => try {
-          buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = false)
-          eliminateDuplicatePipes(buf)
-          false
-        } catch {
-          case iae: IllegalArgumentException => println(iae.getMessage); false
-        }
-        case _ => false
+
+    console {
+      case EOF => println("Ctrl-d"); true
+      case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
+      case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
+      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf, profiling)
+      case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => handleRewrite(buf)
+      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf, profiling)
+      case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
+        s.toLowerCase.startsWith(s"display ") ||
+        s.toLowerCase.startsWith(s"store ") ||
+        s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf, profiling)
+      case Line(s, buf) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
+      case Line(s, buf) => try {
+        buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = false)
+        eliminateDuplicatePipes(buf)
+        false
+      } catch {
+        case iae: IllegalArgumentException => println(iae.getMessage); false
       }
-    } finally {
-      if (profiling.isDefined)
-        DBConnection.exit()
+      case _ => false
     }
   }
 }

@@ -25,6 +25,7 @@ import org.clapper.scalasti.STGroupFile
 import dbis.pig.expr.{Expr, Value}
 import dbis.setm.SETM.timing
 import scala.collection.mutable.ListBuffer
+import java.net.URI
 
 /**
  * An exception representing an error in handling the templates for code generation.
@@ -97,7 +98,7 @@ trait CodeGeneratorBase {
    * @param enableProfiling add profiling code to the generated code
    * @return a string representing the header code
    */
-  def emitHeader2(scriptName: String, enableProfiling: Boolean): String
+  def emitHeader2(scriptName: String, profiling: Option[URI]): String
 
   /**
    * Generate code needed for finishing the script.
@@ -173,7 +174,7 @@ trait CodeGenerator {
    *                Header2 and Footer
    * @return the string representation of the code
    */
-  def compile(scriptName: String, plan: DataflowPlan, profiling: Boolean, forREPL: Boolean = false): String = timing("generate code") {
+  def compile(scriptName: String, plan: DataflowPlan, profiling: Option[URI], forREPL: Boolean = false): String = timing("generate code") {
     require(codeGen != null, "code generator undefined")
 
     if (plan.udfAliases != null) {
@@ -228,7 +229,7 @@ trait CodeGenerator {
     for (n <- plan.operators) {
       val generatedCode = codeGen.emitNode(n)
       
-      if(profiling) {
+      if(profiling.isDefined) {
         /* count the generated lines
          * this is needed for the PerfMonitor to identify stages by line number
          * 

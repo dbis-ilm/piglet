@@ -2,6 +2,7 @@ package dbis.test.pig
 
 import dbis.pig.mm.{DataflowProfiler, MaterializationPoint}
 import org.scalatest.{FlatSpec, Matchers}
+import java.net.URI
 
 /**
  * Created by kai on 13.07.15.

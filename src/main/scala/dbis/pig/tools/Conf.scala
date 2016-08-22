@@ -15,6 +15,10 @@ import java.nio.file.Path
  */
 object Conf extends PigletLogging {
   
+  val EXECTIMES_FRAGMENT = "exectimes"
+  val MATERIALIZATION_FRAGMENT = "materializations"
+  
+  
 	val programHome = Paths.get(System.getProperty("user.home"), ".piglet")
   
   /**

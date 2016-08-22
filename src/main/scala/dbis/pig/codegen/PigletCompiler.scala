@@ -29,6 +29,7 @@ import dbis.setm.SETM.timing
 import scalax.file.{Path => xPath}
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.schema.Schema
+import java.net.URI
 
 
 object PigletCompiler extends PigletLogging {
@@ -161,7 +162,7 @@ def createCodeFromInput(source: String, backend: String, languageFeatures: List[
   val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
 
   // 5. generate the Scala code
-  val code = compiler.compile("blubs", plan, profiling = false, forREPL = true)
+  val code = compiler.compile("blubs", plan, profiling = None, forREPL = true)
   logger.debug("successfully generated scala program")
   code
 }
@@ -187,7 +188,7 @@ def createCodeFromInput(source: String, backend: String, languageFeatures: List[
    * @param keepFiles Flag indicating whether generated source files should be deleted or kept
    */
   def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, backendJar: Path, 
-      templateFile: String, backend: String, profiling: Boolean, keepFiles: Boolean): Option[Path] = timing("compile plan") {
+      templateFile: String, backend: String, profiling: Option[URI], keepFiles: Boolean): Option[Path] = timing("compile plan") {
     
     // compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)

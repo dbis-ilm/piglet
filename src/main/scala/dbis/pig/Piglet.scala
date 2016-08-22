@@ -17,11 +17,18 @@
 
 package dbis.pig
 
+import scala.io.Source
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.{Map => MutableMap}
 import scala.collection.JavaConverters._
 
+import scopt.OptionParser
+
+import java.io.File
 import java.nio.file.Path
+import java.nio.file.Paths
+import java.nio.file.Files
+import java.net.URI
 
 import dbis.pig.op.PigOperator
 import dbis.pig.parser.PigParser
@@ -35,25 +42,15 @@ import dbis.pig.plan.MaterializationManager
 import dbis.pig.tools.Conf
 import dbis.pig.backends.BackendManager
 import dbis.pig.backends.BackendConf
-import dbis.pig.tools.DBConnection
 import dbis.pig.tools.{DepthFirstTopDownWalker, BreadthFirstTopDownWalker}
 import dbis.pig.mm.{DataflowProfiler, MaterializationPoint}
 import dbis.pig.codegen.PigletCompiler
 import dbis.pig.tools.logging.PigletLogging
 import dbis.pig.tools.logging.LogLevel
 import dbis.pig.tools.logging.LogLevel._
-import java.io.File
-import scopt.OptionParser
-import scala.io.Source
-import java.nio.file.Path
-import java.nio.file.Paths
-
 import dbis.pig.plan.PlanMerger
 import dbis.setm.SETM
 import dbis.setm.SETM.timing
-import java.nio.file.Files
-import dbis.pig.tools.ConnectionSetting
-import java.net.URI
 
 object Piglet extends PigletLogging {
 
@@ -202,6 +199,15 @@ object Piglet extends PigletLogging {
     
     logger.info(s"provided parameters: ${paramMap.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
     
+    if(profiling.isDefined) {
+      val reachable = FileTools.checkHttpServer(profiling.get)
+      
+      if(! reachable) {
+        logger.error(s"Statistics management server is not reachable at ${profiling.get}. Aborting")
+        return
+      }
+    }
+    
     
     // start processing
     run(files, outDir, compileOnly, master, backend, languageFeatures, paramMap.toMap, backendPath, backendArgs, profiling, showPlan, sequential)
@@ -229,13 +235,6 @@ object Piglet extends PigletLogging {
           showPlan: Boolean, sequential: Boolean): Unit = {
 
     try {
-      // initialize database driver and connection pool
-      if (profiling.isDefined) {
-//        val settings = Conf.databaseSetting
-        val settings = ConnectionSetting(profiling.get)
-        
-    	  DBConnection.init(settings)
-      }
 
       val backendConf = BackendManager.backend(backend)
       BackendManager.backend = backendConf
@@ -263,10 +262,6 @@ object Piglet extends PigletLogging {
       case e: Exception =>
         logger.error(s"An error occured: ${e.getMessage}")
         logger.debug(e.getMessage, e)
-    } finally {
-      // close connection pool
-      if (profiling.isDefined)
-        DBConnection.exit()
     }
   }
 
@@ -317,15 +312,14 @@ object Piglet extends PigletLogging {
     
     val templateFile = backendConf.templateFile
 		val jarFile = Conf.backendJar(backend)
-		val mm = new MaterializationManager
-		val profiler = new DataflowProfiler
+		
+		val profiler = profiling.map { u => new DataflowProfiler(Some(u)) }
 
 		
 		// begin global analysis phase
 		
 		// count occurrences of each operator in schedule
-    if (profiling.isDefined)
-      profiler.createOpCounter(schedule)
+    profiler.foreach { p => p.createOpCounter(schedule) }
 
     logger.debug("start processing created dataflow plans")
 
@@ -335,8 +329,10 @@ object Piglet extends PigletLogging {
       var newPlan = plan
 
       // process explicit MATERIALIZE operators
-      if (profiling.isDefined)
+      if (profiling.isDefined) {
+        val mm = new MaterializationManager(Conf.materializationBaseDir, profiling.get)
         newPlan = processMaterializations(newPlan, mm)
+      }
 
 
       // rewrite WINDOW operators for Flink streaming
@@ -347,10 +343,7 @@ object Piglet extends PigletLogging {
       newPlan = processPlan(newPlan)
 
       // find materialization points
-      if (profiling.isDefined) {
-        profiler.addMaterializationPoints(newPlan)
-      }
-
+      profiler.foreach { p => p.addMaterializationPoints(newPlan) }
 
       logger.debug("finished optimizations")
 
@@ -375,7 +368,7 @@ object Piglet extends PigletLogging {
       logger.debug(s"using script name: $scriptName")
 
       PigletCompiler.compilePlan(newPlan, scriptName, outDir, Paths.get(backendPath,jarFile.toString),
-        templateFile, backend, profiling.isDefined, keepFiles) match {
+        templateFile, backend, profiling, keepFiles) match {
         // the file was created --> execute it
         case Some(jarFile) =>
           if (!compileOnly) {
@@ -468,8 +461,10 @@ object Piglet extends PigletLogging {
     val scriptName = "__r_piglet"
     val templateFile = backendConf.templateFile
     val jarFile = Conf.backendJar(backend)
+    val profiling: Option[URI] = None
+    
     val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(backendPath,jarFile.toString),
-      templateFile, backend, false, false) match {
+      templateFile, backend, profiling, false) match {
       case Some(jarFile) => {
         val runner = backendConf.runnerClass
         logger.debug(s"using runner class ${runner.getClass.toString()}")

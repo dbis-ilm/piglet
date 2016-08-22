@@ -10,9 +10,10 @@ libraryDependencies ++= Seq(
     sparkSql % "provided",
     sparkStreaming % "provided",
     typesafe,
-    scalikejdbc,
+    //scalikejdbc,
     //scalikejdbc_config,
-    jdbc
+    jdbc,
+    scalajhttp
 )
 
 test in assembly := {}
