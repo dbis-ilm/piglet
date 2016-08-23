@@ -59,7 +59,7 @@ object Piglet extends PigletLogging {
                             compile: Boolean = false,
                             outDir: String = ".",
                             params: Map[String, String] = Map(),
-                            backend: String = Conf.defaultBackend,
+                            backend: Option[String] = None,//Conf.defaultBackend,
                             backendPath: String = ".",
                             languages: Seq[String] = Seq.empty,
                             updateConfig: Boolean = false,
@@ -84,6 +84,7 @@ object Piglet extends PigletLogging {
   def main(args: Array[String]): Unit = {
     
     var inputFiles: Seq[Path] = null
+		var backendCLI: Option[String] = None
     var compileOnly: Boolean = false
     var outDir: Path = null
     var params: Map[String, String] = null
@@ -102,7 +103,7 @@ object Piglet extends PigletLogging {
       opt[Unit]('c', "compile") action { (_, c) => c.copy(compile = true) } text ("compile only (don't execute the script)")
       opt[URI]("profiling") optional() action { (x, c) => c.copy(profiling = Some(x)) } text ("Switch on profiling and write to DB. Provide the connection string as schema://host:port/dbname?user=username&pw=password")
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x) } text ("output directory for generated code")
-      opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = x) } text ("Target backend (spark, flink, sparks, ...)")
+      opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = Some(x) ) } text ("Target backend (spark, flink, sparks, ...)")
       opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
       opt[Seq[String]]('l', "languages") optional() action { (x, c) => c.copy(languages = x) } text ("Accepted language dialects (pig = default, sparql, streaming, cep, all)")
       opt[Map[String, String]]('p', "params") valueName ("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text ("parameter(s) to subsitute")
@@ -128,7 +129,7 @@ object Piglet extends PigletLogging {
         compileOnly = config.compile
         outDir = Paths.get(config.outDir)
         params = config.params
-        backend = config.backend
+        backendCLI = config.backend
         backendPath = config.backendPath
         updateConfig = config.updateConfig
         showPlan = config.showPlan
@@ -154,14 +155,27 @@ object Piglet extends PigletLogging {
 
     startCollectStats(showStats)
 
+    if (logLevel.isDefined) {
+    	try {
+    		logger.setLevel(LogLevel.withName(logLevel.get))
+    	} catch {
+    	case e: NoSuchElementException => println(s"ERROR: invalid log level ${logLevel} - continue with default")
+    	}
+    }
+    
+    
     /* IMPORTANT: This must be the first call to Conf
      * Otherwise, the config file was already loaded before we could copy the new one
      */
     if (updateConfig) {
       // in case of --update we just copy the config file and exit
       Conf.copyConfigFile()
+      println(s"Config file copied to ${Conf.programHome} - exitting now")
       sys.exit()
     }
+    
+    // set default backend if necessary now - we had to "wait" until after the update conf call
+    backend = backendCLI.getOrElse(Conf.defaultBackend)
 
     val files = inputFiles.takeWhile { p => !p.startsWith("-") }
     if (files.isEmpty) {
@@ -170,13 +184,6 @@ object Piglet extends PigletLogging {
       sys.exit(-1)
     }
 
-    if (logLevel.isDefined) {
-      try {
-        logger.setLevel(LogLevel.withName(logLevel.get))
-      } catch {
-        case e: NoSuchElementException => println(s"ERROR: invalid log level ${logLevel} - continue with default")
-      }
-    }
     
     val paramMap = MutableMap.empty[String, String]
 
@@ -463,8 +470,9 @@ object Piglet extends PigletLogging {
     val jarFile = Conf.backendJar(backend)
     val profiling: Option[URI] = None
     
-    val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, Paths.get(backendPath,jarFile.toString),
-      templateFile, backend, profiling, false) match {
+    val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, 
+        Paths.get(backendPath,jarFile.toString), templateFile, backend, profiling, false) match {
+      
       case Some(jarFile) => {
         val runner = backendConf.runnerClass
         logger.debug(s"using runner class ${runner.getClass.toString()}")
