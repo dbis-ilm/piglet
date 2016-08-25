@@ -57,7 +57,7 @@ class DataflowProfiler(private val url: Option[URI]) extends PigletLogging {
       logger.warn("cannot retreive execution statistics: No URL to storage service set")
       return None
     }
-    val u = url.get.resolve(s"${Conf.EXECTIMES_FRAGMENT}/$lineage")
+    val u = url.get.resolve(s"/${Conf.EXECTIMES_FRAGMENT}/$lineage")
     val result = scalaj.http.Http(u.toString()).asString
       
     if(result.isError) {
