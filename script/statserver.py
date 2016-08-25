@@ -13,9 +13,14 @@ from tinydb import TinyDB, where, Query
 import argparse
 
 
-
 # a new Flask app for REST service
 app = Flask(__name__)
+
+# set log level to ERROR only
+# http://stackoverflow.com/questions/14888799/disable-console-messages-in-flask-server
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 @app.errorhandler(404)
 def not_found(error):
