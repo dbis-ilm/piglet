@@ -167,6 +167,7 @@ object Rewriter extends PigletLogging
     val rewriter = ior(outermost(ourStrategy), fostrat)
     processPlan(plan, rewriter)
   }
+  
   def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
     evalExtraRuleCode(plan.extraRuleCode)
 
@@ -177,7 +178,7 @@ object Rewriter extends PigletLogging
         case op: PigOperator => List(op)
         case ops: Seq[PigOperator@unchecked] => ops
         case e => throw new IllegalArgumentException(s"A rewriting operation returned something other than a " +
-          "PigOperator or Sequence of them, namely $e")
+          s"PigOperator or Sequence of them, namely $e")
       }).filterNot(_.isInstanceOf[Empty]).toList
 
     var newPlanNodes = mutable.LinkedHashSet[PigOperator]() ++= newSources

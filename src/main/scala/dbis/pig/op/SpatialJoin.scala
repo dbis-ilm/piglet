@@ -20,7 +20,7 @@ case class SpatialJoin(
   
   
   override def lineageString: String = {
-    s"""JOIN%${predicate.toString()}%""" + super.lineageString
+    s"""JOIN%${predicate.toString()}%index=${withIndex}%""" + super.lineageString
   }
 
   override def constructSchema: Option[Schema] = {

@@ -57,7 +57,7 @@ loader(out, file, class, func, extractor, params) ::= <<
 
 // ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
-        <in>.collect.map(t => println(t.mkString()))
+        <in>.collect.foreach(t => println(t.mkString())) //map(t => println(t.mkString()))
 >>
 
 // ------------------ DISPLAY results in Zeppelin -----------------------------
@@ -68,7 +68,7 @@ display(in, tableHeader) ::=<<
 // ------------------ STORE Results on disk -----------------------------------
 
 store(in, file, class, func, params) ::= <<
-    val <in>_helper = <in>.coalesce(1, true)
+    val <in>_helper = <in> //.coalesce(1, true)
     <func>[<class>]().write("<file>", <in>_helper<if (params)>, <params><endif>)
 >>
 
@@ -128,7 +128,7 @@ m_join(out, class, rel1, rel2, pairs, fields) ::=<<
 >>
 
 spatialJoin(out, rel1, rel2, predicate, fields, className) ::=<<
-        val <out> = <rel1>.join(<rel2>_kv).map{ case (k,(v,w)) => <className>(<fields>)\}
+        val <out> = <rel1>.join(<rel2>_kv,dbis.stark.spatial.Predicates.<predicate> _).map{ case (v,w) => <className>(<fields>)\}
 >>
 
 spatialfilter(out, in, predicate, other, field) ::=<<

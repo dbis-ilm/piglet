@@ -153,8 +153,10 @@ object Piglet extends PigletLogging {
         return
     }
 
+    // start statistics collector SETM if needed
     startCollectStats(showStats)
 
+    // set the log level as defined in the parameters
     if (logLevel.isDefined) {
     	try {
     		logger.setLevel(LogLevel.withName(logLevel.get))
@@ -164,7 +166,8 @@ object Piglet extends PigletLogging {
     }
     
     
-    /* IMPORTANT: This must be the first call to Conf
+    /* Copy config file to the user's home directory
+     * IMPORTANT: This must be the first call to Conf
      * Otherwise, the config file was already loaded before we could copy the new one
      */
     if (updateConfig) {
@@ -177,13 +180,13 @@ object Piglet extends PigletLogging {
     // set default backend if necessary now - we had to "wait" until after the update conf call
     backend = backendCLI.getOrElse(Conf.defaultBackend)
 
+    // get the input files
     val files = inputFiles.takeWhile { p => !p.startsWith("-") }
     if (files.isEmpty) {
       // because the file argument was optional we have to check it here
       println("Error: Missing argument <file>...\nTry --help for more information.")
       sys.exit(-1)
     }
-
     
     val paramMap = MutableMap.empty[String, String]
 
@@ -204,8 +207,13 @@ object Piglet extends PigletLogging {
      */
     paramMap ++= params
     
-    logger.info(s"provided parameters: ${paramMap.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
-    
+    if(paramMap.nonEmpty)
+    	logger.info(s"provided parameters: ${paramMap.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
+
+    	
+    /* if profiling is enabled, check the HTTP server
+     * If it's unavailable print an error and stop	
+     */
     if(profiling.isDefined) {
       val reachable = FileTools.checkHttpServer(profiling.get)
       
@@ -218,7 +226,8 @@ object Piglet extends PigletLogging {
     
     // start processing
     run(files, outDir, compileOnly, master, backend, languageFeatures, paramMap.toMap, backendPath, backendArgs, profiling, showPlan, sequential)
-
+    
+    // at the end, show the statistics
     if(showStats) {
       // collect and print runtime stats
       collectStats
@@ -226,6 +235,7 @@ object Piglet extends PigletLogging {
     
   } // main
 
+  
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String], backendPath: String,
           backendArgs: Map[String, String], profiling: Option[URI], showPlan: Boolean, sequential: Boolean): Unit = timing("execution") {
