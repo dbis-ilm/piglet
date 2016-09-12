@@ -24,7 +24,6 @@ import dbis.test.CompileIt
 class SparkCompileIt extends FlatSpec with CompileIt{
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
-
     //SPARK
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
