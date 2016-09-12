@@ -47,7 +47,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
-      + codeGenerator.emitHeader2("test",Some(new URI("http://localhost:5555/materialization")))
+      + codeGenerator.emitHeader2("test",Some(new URI("http://localhost:5555/exectimes")))
       + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
         |import org.apache.spark.SparkContext
@@ -62,7 +62,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    def main(args: Array[String]) {
         |      val conf = new SparkConf().setAppName("test_App")
         |      val sc = new SparkContext(conf)
-        |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/materialization")
+        |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
         |      sc.addSparkListener(perfMon)
         |      sc.stop()
         |      
@@ -76,7 +76,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitImport(Seq("import breeze.linalg._"))
       + codeGenerator.emitHeader1("test")
-      + codeGenerator.emitHeader2("test",Some(new URI("http://localhost:5555/materialization")))
+      + codeGenerator.emitHeader2("test",Some(new URI("http://localhost:5555/exectimes")))
       + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
                                      |import org.apache.spark.SparkContext
@@ -92,7 +92,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |    def main(args: Array[String]) {
                                      |      val conf = new SparkConf().setAppName("test_App")
                                      |      val sc = new SparkContext(conf)
-                                     |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/materialization")
+                                     |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
                                      |      sc.addSparkListener(perfMon)
                                      |      sc.stop()
                                      |
@@ -232,7 +232,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val op = Dump(Pipe("a"))
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString("""a.collect.map(t => println(t.mkString()))""")
+//    val expectedCode = cleanString("""a.collect.map(t => println(t.mkString()))""")
+    val expectedCode = cleanString("""a.collect.foreach(t => println(t.mkString()))""")
     assert(generatedCode == expectedCode)
   }
 
@@ -243,10 +244,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val op = Store(Pipe("A"), file)
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
+//    |val A_helper = A.coalesce(1, true)
     val expectedCode = cleanString(
       s"""
-         |val A_helper = A.coalesce(1, true)
-         |PigStorage[Record]().write("$file", A_helper)""".stripMargin)
+         |PigStorage[Record]().write("$file", A)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -261,8 +262,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
-         |val A_helper = A.coalesce(1, true)
-         |PigStorage[_t$1_Tuple]().write("input/file.csv", A_helper)""".stripMargin)
+         |PigStorage[_t$1_Tuple]().write("input/file.csv", A)""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
   
@@ -277,8 +277,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """
-         |val A_helper = A.coalesce(1, true)
-         |PigStorage[_t$1_Tuple]().write("input/file.csv", A_helper, "#")""".stripMargin)
+         |PigStorage[_t$1_Tuple]().write("input/file.csv", A, "#")""".stripMargin)
    generatedCode should matchSnippet(expectedCode)
   }
   
@@ -291,8 +290,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     
     val expectedCode = cleanString(
       s"""
-         |val A_helper = A.coalesce(1, true)
-         |BinStorage[Record]().write("$file", A_helper)""".stripMargin)
+         |BinStorage[Record]().write("$file", A)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
