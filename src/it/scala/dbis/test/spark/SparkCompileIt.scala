@@ -66,8 +66,9 @@ class SparkCompileIt extends FlatSpec with CompileIt{
     ("simple_matrix.pig", "simple-matrix.out", "truth/simple-matrix-res.data", true, "pig", "spark"),
 
     ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false, "sparql", "spark"),
-    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false, "sparql", "spark")
+    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false, "sparql", "spark"),
    // ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true, "plain", "spark")
+    ("two_joins.pig", "twojoins.out", "truth/twojoins.data", false, "pig", "spark")
 
   )
   //Note: checking the spark jar inclusion is done also in the piglet script
