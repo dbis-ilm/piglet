@@ -15,7 +15,7 @@ import org.apache.flink.streaming.api.scala._
 class CustomDataStreamMatcher[T <: Event: ClassTag: TypeInformation](@transient val dataStream: DataStream[T]) {
 
   def matchNFA(nfa: NFAController[T], flinkEnv: StreamExecutionEnvironment, sstr: SelectionStrategy = FirstMatch, out: OutputStrategy = Combined)  = {
-    println("create a new DataStream matcher")
+    // println("create a new DataStream matcher")
     new DataStreamMatcher(dataStream, nfa, flinkEnv, sstr, out).compute()
   }
 
@@ -24,7 +24,7 @@ class CustomDataStreamMatcher[T <: Event: ClassTag: TypeInformation](@transient 
 object CustomDataStreamMatcher {
 
   implicit def addDataSetMatcher[T <: Event: ClassTag: TypeInformation](@transient dataStream: DataStream[T]) = {
-    println("add a custom DataStream function")
+    // println("add a custom DataStream function")
     new CustomDataStreamMatcher(dataStream)
   }
 }

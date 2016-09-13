@@ -89,10 +89,13 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def namedFieldWithLineage: Parser[NamedField] = rep1sep(bag, Field.lineageSeparator) ^^
     { case l  => NamedField.fromStringList(l) }
 
+  /*
+   * A constant is either a floating point number, an integer, a string literal or a boolean value.
+   */
   def literalField: Parser[Ref] =
-    decimalNumber ^^ { i => if (i.contains('.')) Value(i.toDouble) else Value(i.toInt) } |
-    // floatingPointNumber ^^ { n => Value(n.toDouble) } |
-    stringLiteral ^^ { s => Value(s) } |
+    floatingPointNumber ^^ { n => if (n.contains('.')) Value(n.toDouble) else Value(n.toInt) } |
+      wholeNumber ^^ { i => Value(i.toInt) } |
+      stringLiteral ^^ { s => Value(s) } |
     boolean ^^ { b => Value(b) }
 
   def fieldSpec: Parser[Ref] = (namedField | posField | literalField)
