@@ -12,7 +12,7 @@ import dbis.pig.backends.{SchemaClass => Event}
 class CustomDStreamMatcher[T <: Event: ClassTag](dstream: DStream[T]) {
 
   def matchNFA(nfa: NFAController[T], sstr: SelectionStrategy = FirstMatch, out: OutputStrategy = Combined) = {
-    println("create a new DStream matcher")
+    // println("create a new DStream matcher")
     new DStreamMatcher(dstream, nfa, sstr, out)
   }
 
@@ -21,7 +21,7 @@ class CustomDStreamMatcher[T <: Event: ClassTag](dstream: DStream[T]) {
 object CustomDStreamMatcher {
 
   implicit def addDStreamMatcher[T <: Event: ClassTag](dstream: DStream[T]) = {
-    println("add a custom DStream function")
+    // println("add a custom DStream function")
     new CustomDStreamMatcher(dstream)
   }
 }

@@ -15,7 +15,7 @@ import org.apache.flink.api.scala._
 class CustomDataSetMatcher[T <: Event: ClassTag: TypeInformation](dataSet: DataSet[T]) {
 
   def matchNFA(nfa: NFAController[T], sstr: SelectionStrategy = FirstMatch, out: OutputStrategy = Combined)  = {
-    println("create a new DataSet matcher")
+    // println("create a new DataSet matcher")
     val flinkEnv = dataSet.getExecutionEnvironment
     new DataSetMatcher(dataSet, nfa, flinkEnv, sstr, out).compute()
   }
@@ -25,7 +25,7 @@ class CustomDataSetMatcher[T <: Event: ClassTag: TypeInformation](dataSet: DataS
 object CustomDataSetMatcher {
 
   implicit def addDataSetMatcher[T <: Event: ClassTag: TypeInformation](dataSet: DataSet[T]) = {
-    println("add a custom DataSet function")
+    // println("add a custom DataSet function")
     new CustomDataSetMatcher(dataSet)
   }
 }

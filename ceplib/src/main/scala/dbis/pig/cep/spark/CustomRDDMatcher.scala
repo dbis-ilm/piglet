@@ -11,7 +11,7 @@ import dbis.pig.backends.{SchemaClass => Event}
 class CustomRDDMatcher[T <: Event: ClassTag](rdd: RDD[T]) {
 
   def matchNFA(nfa: NFAController[T], sstr: SelectionStrategy = FirstMatch, out: OutputStrategy = Combined) = {
-    println("create a new RDD matcher")
+    // println("create a new RDD matcher")
     val newRDD = rdd.coalesce(1, true)
     new RDDMatcher(newRDD, nfa, sstr, out)
   }
@@ -21,7 +21,7 @@ class CustomRDDMatcher[T <: Event: ClassTag](rdd: RDD[T]) {
 object CustomRDDMatcher {
 
   implicit def addRDDMatcher[T <: Event: ClassTag](rdd: RDD[T]) = {
-    println("add a custom RDD function")
+    // println("add a custom RDD function")
     new CustomRDDMatcher(rdd)
   }
 }

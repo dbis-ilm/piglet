@@ -558,11 +558,11 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     assert(generatedCode1 == expectedCode1)
 
     val expectedCode2 = cleanString(
-      """val j2 = a.join(c).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v2._0) }""".stripMargin)
+      """val j2 = a.join(c).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t3_Tuple(v1._0, v2._0) }""".stripMargin)
     assert(generatedCode2 == expectedCode2)
    
     val expectedCode3 = cleanString(
-        """ val j = j1.join(j2).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t3_Tuple(v1._0, v1._1, v2._0, v2._1) }""".stripMargin)
+        """ val j = j1.join(j2).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t4_Tuple(v1._0, v1._1, v2._0, v2._1) }""".stripMargin)
     assert(generatedCode3 == expectedCode3)
   }
 
@@ -755,14 +755,14 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
       """
-        |case class _t1_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
-        |  override def mkString(_c: String = ",") = _0 + _c + _1
-        |}
-        |implicit def convert_t1_Tuple(t: (String, String)): _t1_Tuple = _t1_Tuple(t._1, t._2)
         |case class _t2_Tuple (_0: String, _1: Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
         |}
         |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
+        |case class _t1_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
+        |  override def mkString(_c: String = ",") = _0 + _c + _1
+        |}
+        |implicit def convert_t1_Tuple(t: (String, String)): _t1_Tuple = _t1_Tuple(t._1, t._2)
         |""".stripMargin
     )
     assert(generatedCode == expectedCode)
