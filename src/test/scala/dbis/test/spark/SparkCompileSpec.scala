@@ -969,14 +969,14 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
       """
-        |case class _t$1_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
-        |  override def mkString(_c: String = ",") = _0 + _c + _1
-        |}
-        |implicit def convert_t1_Tuple(t: (String, String)): _t1_Tuple = _t1_Tuple(t._1, t._2)
         |case class _t$2_Tuple (_0: String, _1: Iterable[_t$1_Tuple]) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
         |}
-        |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
+        |implicit def convert_t$2_Tuple(t: (String, Iterable[_t$1_Tuple])): _t$2_Tuple = _t$2_Tuple(t._1, t._2)
+        |case class _t$1_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
+        |  override def mkString(_c: String = ",") = _0 + _c + _1
+        |}
+        |implicit def convert_t$1_Tuple(t: (String, String)): _t$1_Tuple = _t$1_Tuple(t._1, t._2)
         |""".stripMargin
     )
     generatedCode should matchSnippet(expectedCode)
@@ -1112,7 +1112,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    bOurNFA
         |  }
         |}""".stripMargin)
-    println("helper: " + generatedHelperClass)
+    // println("helper: " + generatedHelperClass)
     generatedCode should matchSnippet(expectedCode)
     generatedHelperClass should matchSnippet(expectedHelperClass)
   }
@@ -1151,7 +1151,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    bOurNFA 
         |  } 
         |}""".stripMargin)
-    println("helper: " + generatedHelperClass)
+    // println("helper: " + generatedHelperClass)
     generatedCode should matchSnippet(expectedCode)
     generatedHelperClass should matchSnippet(expectedHelperClass)
   }
