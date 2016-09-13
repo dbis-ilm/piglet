@@ -126,6 +126,11 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
       List(Load(Pipe("a"), uri, Some(Schema(schema)))))
   }
 
+  /* -------------------- Numbers --------------------- */
+  it should "parse various kinds of numbers" in {
+    parseScript("a = filter b by $1 > -1 and $1 < 1.2345 and $1 > -1.234")
+  }
+
   /* -------------------- Comments -------------------- */
   it should "ignore comments" in {
     assert(parseScript("dump b; -- A comment") == List(Dump(Pipe("b"))))
