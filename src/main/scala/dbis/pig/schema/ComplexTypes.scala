@@ -66,7 +66,7 @@ case class TupleType(var fields: Array[Field],var className: String = "") extend
   override def tc = TypeCode.TupleType
   override def name = "tuple"
 
-  override def encode: String = s"(${fields.map(f => f.name + ":" + f.fType.encode).mkString})"
+  override def encode: String = s"(${fields.map(f => f.nameWithLineage + ":" + f.fType.encode).mkString})"
 
   override def equals(that: Any): Boolean = that match {
     case TupleType(f, _) => this.fields.deep == f.deep

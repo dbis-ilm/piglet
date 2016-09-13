@@ -26,6 +26,7 @@ import scala.io.Source
 import scalax.file.Path
 import org.apache.commons.exec._
 import org.apache.commons.exec.environment.EnvironmentUtils
+import java.nio.charset.MalformedInputException
 
 trait CompileIt extends Matchers {
   this: FlatSpec =>
@@ -81,9 +82,15 @@ trait CompileIt extends Matchers {
     if (resultFile.isFile)
       result ++= Source.fromFile(resultFile).getLines()
     else {
-      // for the test cases we assume only a single file part-00000
-      for (file <- resultFile.listFiles if file.getName == "part-00000")
-        result ++= Source.fromFile(file).getLines()
+      /*
+       * Read in all result files. There may be multiple files
+       * if the RDD has more than one partition. We iterate over
+       * all files (in order) and read their content       
+       */
+      for (file <- resultFile.listFiles().filter(_.getName.startsWith("part-")).sortBy { f => f.getName }) {
+        result ++= Source.fromFile(file).getLines
+      }
+      
     }
     result.toSeq
   }
@@ -113,6 +120,7 @@ trait CompileIt extends Matchers {
     cmdLine.addArgument("${outdir}")
     cmdLine.addArgument("--params")
     cmdLine.addArgument("${params}")
+    cmdLine.addArgument("--keep")
     cmdLine.addArgument("${script}")
 
     cmdLine.setSubstitutionMap(params)

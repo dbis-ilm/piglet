@@ -57,7 +57,7 @@ loader(out, file, class, func, extractor, params) ::= <<
 
 // ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
-        <in>.collect.foreach(t => println(t.mkString())) //map(t => println(t.mkString()))
+        <in>.collect.foreach(t => println(t.mkString()))
 >>
 
 // ------------------ DISPLAY results in Zeppelin -----------------------------
@@ -66,10 +66,10 @@ display(in, tableHeader) ::=<<
 >>
 
 // ------------------ STORE Results on disk -----------------------------------
+// we had val <in>_helper = <in>.coalesce(1, true) 
 
-store(in, file, class, func, params) ::= <<
-    val <in>_helper = <in> //.coalesce(1, true)
-    <func>[<class>]().write("<file>", <in>_helper<if (params)>, <params><endif>)
+store(in, file, class, func, params) ::= <<    
+    <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)
 >>
 
 // ------------------ FILTER for a predicate ----------------------------------

@@ -24,7 +24,6 @@ import dbis.test.CompileIt
 class SparkCompileIt extends FlatSpec with CompileIt{
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
-
     //SPARK
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
@@ -67,8 +66,9 @@ class SparkCompileIt extends FlatSpec with CompileIt{
     ("simple_matrix.pig", "simple-matrix.out", "truth/simple-matrix-res.data", true, "pig", "spark"),
 
     ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false, "sparql", "spark"),
-    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false, "sparql", "spark")
+    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false, "sparql", "spark"),
    // ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true, "plain", "spark")
+    ("two_joins.pig", "twojoins.out", "truth/twojoins.data", false, "pig", "spark")
 
   )
   //Note: checking the spark jar inclusion is done also in the piglet script

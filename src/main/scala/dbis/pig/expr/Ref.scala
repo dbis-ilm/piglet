@@ -21,7 +21,8 @@ import dbis.pig.schema.Field
 sealed abstract class Ref
 
 case class NamedField(var name: String, lineage: List[String] = List.empty) extends Ref {
-  override def toString = name + (if (lineage.nonEmpty) lineage.mkString("::") else "")
+//  override def toString = name + (if (lineage.nonEmpty) lineage.mkString("::") else "")
+  override def toString = (lineage :+ name).mkString(Field.lineageSeparator)
 }
 
 object NamedField {
@@ -31,7 +32,7 @@ object NamedField {
   }
 
   def fromStringList(s: List[String]): NamedField = {
-    require(s.length != 0, "s has to contain at least once element, the name of the field")
+    require(s.length != 0, "s has to contain at least one element, the name of the field")
     if (s.length == 1) {
       NamedField(s.head)
     } else {
