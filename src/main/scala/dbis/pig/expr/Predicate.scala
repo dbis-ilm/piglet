@@ -130,7 +130,7 @@ case class And(a: Predicate, b: Predicate) extends Predicate {
     b.resolveReferences(mapping)
   }
 
-  override def toString = s"${a.toString} AND ${b.toString}"
+  override def toString = s"(${a.toString}) AND (${b.toString})"
 }
 
 case class Or(a: Predicate, b: Predicate) extends Predicate {

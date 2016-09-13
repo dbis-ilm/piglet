@@ -128,7 +128,13 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   /* -------------------- Numbers --------------------- */
   it should "parse various kinds of numbers" in {
-    parseScript("a = filter b by $1 > -1 and $1 < 1.2345 and $1 > -1.234")
+    assert(parseScript("a = filter b by x > -1 and x < 1.2345 and y > -1.234;") ==
+      List(Filter(Pipe("a"), Pipe("b"),
+        And(
+          And(Gt(RefExpr(NamedField("x")), RefExpr(Value(-1))),
+            Lt(RefExpr(NamedField("x")), RefExpr(Value(1.2345)))),
+          Gt(RefExpr(NamedField("y")), RefExpr(Value(-1.234)))))
+      ))
   }
 
   /* -------------------- Comments -------------------- */
