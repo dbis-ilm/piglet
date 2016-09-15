@@ -105,7 +105,7 @@ object Dependencies {
   // Libraries
   val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.8"
   val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.8"
-  val scalaTest = "org.scalatest" %% "scalatest" % "3.0.0-RC4"
+  val scalaTest = "org.scalatest" %% "scalatest" % "3.0.0"
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
   val jline = "jline" % "jline" % "2.13"
