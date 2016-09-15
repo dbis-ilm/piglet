@@ -35,6 +35,10 @@ import java.net.URI
 case class TemplateException(msg: String) extends Exception(msg)
 
 
+/**
+  * Defines the interface to the actual code generator. For each backend a concrete
+  * class implementing this interface completely has to be provided.
+  */
 trait CodeGeneratorBase {
 
   /**
@@ -49,17 +53,15 @@ trait CodeGeneratorBase {
 
   /**
    * The set of _KV variables refering to RDDs which are created for joins.
-   *
    */
   val joinKeyVars = Set[String]()
 
   /**
-   * Generate code for a class representing a schema type.
+   * Generate code for classes representing schema types.
    *
-   * @param schema the schema for which we generate a class
+   * @param schemas the list of schemas for which we generate classes
    * @return a string representing the code
    */
-//  def emitSchemaClass(schema: Schema): String
   def emitSchemaHelpers(schemas: List[Schema]): String
 
   /**
@@ -73,9 +75,9 @@ trait CodeGeneratorBase {
   /**
    * Generate code needed for importing packages, classes, etc.
    *
+   * @param additionalImports a list of strings representing required imports
    * @return a string representing the import code
    */
-//  def emitImport(additionalImports: Option[String] = None): String
   def emitImport(additionalImports: Seq[String] = Seq.empty): String
 
   /**
@@ -83,11 +85,17 @@ trait CodeGeneratorBase {
    * e.g. defining the main object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
-   * @param additionalCode source code (Scala, C++) that was embedded into the script
    * @return a string representing the header code
    */
   def emitHeader1(scriptName: String): String
-  
+
+  /**
+    * Generate code for embedded code: usually this code is just copied
+    * to the generated file.
+    *
+    * @param additionalCode the code to be embedded
+    * @return a string representing the code
+    */
   def emitEmbeddedCode(additionalCode: String): String
 
   /**
@@ -95,7 +103,7 @@ trait CodeGeneratorBase {
    * the main class/object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
-   * @param enableProfiling add profiling code to the generated code
+   * @param profiling add profiling code to the generated code
    * @return a string representing the header code
    */
   def emitHeader2(scriptName: String, profiling: Option[URI]): String
@@ -103,6 +111,7 @@ trait CodeGeneratorBase {
   /**
    * Generate code needed for finishing the script.
    *
+   * @param plan the dataflow plan for which we generate the code
    * @return a string representing the end of the code.
    */
   def emitFooter(plan: DataflowPlan): String
@@ -116,6 +125,7 @@ trait CodeGeneratorBase {
   def emitHelperClass(node: PigOperator): String
   
   def emitStageIdentifier(line: Int, lineage: String): String
+
   /*------------------------------------------------------------------------------------------------- */
   /*                               template handling code                                             */
   /*------------------------------------------------------------------------------------------------- */

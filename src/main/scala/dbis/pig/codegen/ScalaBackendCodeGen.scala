@@ -32,9 +32,15 @@ import scala.collection.mutable.Set
 import dbis.pig.plan.DataflowPlan
 import dbis.pig.tools.Conf
 
-
-// import scala.collection.mutable.Map
-
+/**
+  * CodeGenContext provides a context object which is passed to the specific generator methods.
+  *
+  * @param schema the optional schema of the currently processed operator
+  * @param tuplePrefix a name prefix for generated tuple codes (default = "t")
+  * @param aggregate true if the current expression is an aggregate expression
+  * @param namedRef ??
+  * @param events ??
+  */
 case class CodeGenContext (
                      schema: Option[Schema] = None,
                      tuplePrefix: String = "t",
@@ -59,6 +65,11 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   /*                                           helper functions                                       */
   /*------------------------------------------------------------------------------------------------- */
 
+  /**
+    *
+    * @param name
+    * @return
+    */
   def schemaClassName(name: String) = s"_${name}_Tuple"
 
   /**
@@ -214,28 +225,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   }
 
   /**
-   * Generate Scala code for a predicate on expressions.
-   *
-   * @param schema the optional input schema of the operator where the expressions refer to.
-   * @param predicate the actual predicate
-   * @return a string representation of the generated Scala code
-   */
-  /*
-  def emitPredicate(schema: Option[Schema], predicate: Predicate): String = predicate match {
-    case Eq(left, right) => { s"${emitExpr(schema, left)} == ${emitExpr(schema, right)}"}
-    case Neq(left, right) => { s"${emitExpr(schema, left)} != ${emitExpr(schema, right)}"}
-    case Leq(left, right) => { s"${emitExpr(schema, left)} <= ${emitExpr(schema, right)}"}
-    case Lt(left, right) => { s"${emitExpr(schema, left)} < ${emitExpr(schema, right)}"}
-    case Geq(left, right) => { s"${emitExpr(schema, left)} >= ${emitExpr(schema, right)}"}
-    case Gt(left, right) => { s"${emitExpr(schema, left)} > ${emitExpr(schema, right)}"}
-    case And(left, right) => s"${emitPredicate(schema, left)} && ${emitPredicate(schema, right)}"
-    case Or(left, right) => s"${emitPredicate(schema, left)} || ${emitPredicate(schema, right)}"
-    case Not(pred) => s"!(${emitPredicate(schema, pred)})"
-    case PPredicate(pred) => s"(${emitPredicate(schema, pred)})"
-    case _ => { s"UNKNOWN PREDICATE: $predicate" }
-  }
-*/
-  /**
    * Generates Scala code for a grouping expression in GROUP BY. We construct code for map
    * in the form "map(t => {(t(0),t(1),...)}" if t(0), t(1) are grouping attributes.
    *
@@ -316,63 +305,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     }
   }
 
-  /**
-   *
-   * @param schema
-   * @param expr
-   * @return
-   */
-  /*
-  def emitExpr(schema: Option[Schema],
-               expr: ArithmeticExpr,
-               aggregate: Boolean = false,
-               namedRef: Boolean = false, inMatcher: Boolean = false): String = expr match {
-    case CastExpr(t, e) => {
-      // TODO: check for invalid type
-      val targetType = scalaTypeMappingTable(t)
-      s"${emitExpr(schema, e, namedRef = namedRef)}.to$targetType"
-    }
-    case PExpr(e) => s"(${emitExpr(schema, e, namedRef = namedRef)})"
-    case MSign(e) => s"-${emitExpr(schema, e, namedRef = namedRef)}"
-    case Add(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} + ${emitExpr(schema, e2, namedRef = namedRef)}"
-    case Minus(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} - ${emitExpr(schema, e2, namedRef = namedRef)}"
-    case Mult(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} * ${emitExpr(schema, e2, namedRef = namedRef)}"
-    case Div(e1, e2) => s"${emitExpr(schema, e1, namedRef = namedRef)} / ${emitExpr(schema, e2, namedRef = namedRef)}"
-    case RefExpr(e) => s"${emitRef(schema, e, "t", aggregate, namedRef = namedRef)}"
-    case Func(f, params) => emitFuncCall(f, params, schema, namedRef)
-    case FlattenExpr(e) => flattenExpr(schema, e)
-    case ConstructTupleExpr(exprs) => {
-      val exType = expr.resultType(schema).asInstanceOf[TupleType]
-      val s = Schema(new BagType(exType))
-      s"${schemaClassName(s.className)}(${exprs.map(e => emitExpr(schema, e, namedRef = namedRef)).mkString(",")})"
-    }
-    case ConstructBagExpr(exprs) => {
-      val exType = expr.resultType(schema).asInstanceOf[BagType]
-      val s = Schema(exType)
-      s"List(${exprs.map(e => s"${schemaClassName(s.className)}(${emitExpr(schema, e, namedRef = namedRef)})").mkString(",")})"
-    }
-    case ConstructMapExpr(exprs) => {
-      val exType = expr.resultType(schema).asInstanceOf[MapType]
-      val valType = exType.valueType
-      val exprList = exprs.map(e => emitExpr(schema, e, namedRef = namedRef))
-      // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
-      val mapStr = exprList.zip(exprList.tail).zipWithIndex.filter{
-        case (p, i) => i % 2 == 0
-      }.map{case (p, i) => s"${p._1} -> ${p._2}"}.mkString(",")
-      s"Map[String,${scalaTypeMappingTable(valType)}](${mapStr})"
-    }
-    case ConstructMatrixExpr(ty, rows, cols, expr) => {
-      val mType = if (ty.charAt(1) == 'i') "Int" else "Double"
-      s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(schema, expr, namedRef = namedRef)}.map(v => v._0).toArray)"
-    }
-    
-    case ConstructGeometryExpr(expr) => {
-      s"new WKTReader().read(${emitExpr(schema, expr, namedRef = namedRef)})"
-    }
-    
-    case _ => println("unsupported expression: " + expr); ""
-  }
-*/
   /**
    * Constructs the Scala code for flattening a tuple. We have to determine the field in the
    * input schema refering to a tuple type and extract all fields of this tuple type.
@@ -470,7 +402,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
 
   /**
    *
-   * @param schema
+   * @param ctx an object representing context information for code generation
    * @param orderSpec
    * @param out
    * @param in
@@ -653,6 +585,90 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     paramMap
   }
 
+  /**
+    * Generate Scala code for implementing a Pig expression.
+    *
+    * @param ctx an object representing additional information about the context
+    * @param expr the actual expression
+    * @return the the generated code representing the expression
+    */
+  def emitExpr(ctx: CodeGenContext,
+               expr: ArithmeticExpr): String = expr match {
+    case CastExpr(t, e) => {
+      // TODO: check for invalid type
+      val targetType = scalaTypeMappingTable(t)
+      s"${emitExpr(ctx, e)}.to$targetType"
+    }
+    case PExpr(e) => s"(${emitExpr(ctx, e)})"
+    case MSign(e) => s"-${emitExpr(ctx, e)}"
+    case Add(e1, e2) => s"${emitExpr(ctx, e1)} + ${emitExpr(ctx, e2)}"
+    case Minus(e1, e2) => s"${emitExpr(ctx, e1)} - ${emitExpr(ctx, e2)}"
+    case Mult(e1, e2) => s"${emitExpr(ctx, e1)} * ${emitExpr(ctx, e2)}"
+    case Div(e1, e2) => s"${emitExpr(ctx, e1)} / ${emitExpr(ctx, e2)}"
+    case RefExpr(e) => s"${emitRef(CodeGenContext(schema = ctx.schema, aggregate = ctx.aggregate, tuplePrefix = "t", namedRef = ctx.namedRef, events = ctx.events), e)}"
+    case Func(f, params) => emitFuncCall(ctx, f, params)
+    case FlattenExpr(e) => flattenExpr(ctx, e)
+    case ConstructTupleExpr(exprs) => {
+      val exType = expr.resultType(ctx.schema).asInstanceOf[TupleType]
+      val s = Schema(new BagType(exType))
+      s"${schemaClassName(s.className)}(${exprs.map(e => emitExpr(ctx, e)).mkString(",")})"
+    }
+    case ConstructBagExpr(exprs) => {
+      val exType = expr.resultType(ctx.schema).asInstanceOf[BagType]
+      val s = Schema(exType)
+      s"List(${exprs.map(e => s"${schemaClassName(s.className)}(${emitExpr(ctx, e)})").mkString(",")})"
+    }
+    case ConstructMapExpr(exprs) => {
+      val exType = expr.resultType(ctx.schema).asInstanceOf[MapType]
+      val valType = exType.valueType
+      val exprList = exprs.map(e => emitExpr(ctx, e))
+      // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
+      val mapStr = exprList.zip(exprList.tail).zipWithIndex.filter{
+        case (p, i) => i % 2 == 0
+      }.map{case (p, i) => s"${p._1} -> ${p._2}"}.mkString(",")
+      s"Map[String,${scalaTypeMappingTable(valType)}](${mapStr})"
+    }
+    case ConstructMatrixExpr(ty, rows, cols, expr) => {
+      val mType = if (ty.charAt(1) == 'i') "Int" else "Double"
+      s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(ctx, expr)}.map(v => v._0).toArray)"
+    }
+
+    case ConstructGeometryExpr(expr,time) => {
+      val timeStr = time.map { t => t match {
+        case Instant(value) => s"Instant(${emitExpr(ctx, value)})"
+        case Interval(s,Some(e)) => s"Interval(${emitExpr(ctx, s)}, ${emitExpr(ctx, e)})"
+        case Interval(s,None) => s"Interval(${emitExpr(ctx, s)}, None)"
+        case _ => logger.error(s"Unsupported temporal expression type $t"); ""
+      }
+      }
+
+      s"SpatialObject(new WKTReader().read(${emitExpr(ctx, expr)}) ${ if(timeStr.isDefined) s", $timeStr.get" else ""  } )"
+    }
+
+    case _ => println("unsupported expression: " + expr); ""
+  }
+
+  /**
+    * Generate Scala code for a predicate on expressions used e.g. in a MATCHER or SPLIT INTO statement.
+    *
+    * @param ctx an object representing additional information about the context
+    * @param predicate the actual predicate
+    * @return a string representation of the generated Scala code
+    */
+  def emitPredicate(ctx: CodeGenContext, predicate: Predicate): String =  predicate match {
+    case Eq(left, right) => { s"${emitExpr(ctx, left)} == ${emitExpr(ctx, right)}"}
+    case Neq(left, right) => { s"${emitExpr(ctx, left)} != ${emitExpr(ctx, right)}"}
+    case Leq(left, right) => { s"${emitExpr(ctx, left)} <= ${emitExpr(ctx, right)}"}
+    case Lt(left, right) => { s"${emitExpr(ctx, left)} < ${emitExpr(ctx, right)}"}
+    case Geq(left, right) => { s"${emitExpr(ctx, left)} >= ${emitExpr(ctx, right)}"}
+    case Gt(left, right) => { s"${emitExpr(ctx, left)} > ${emitExpr(ctx, right)}"}
+    case And(left, right) => s"${emitPredicate(ctx, left)} && ${emitPredicate(ctx, right)}"
+    case Or(left, right) => s"${emitPredicate(ctx, left)} || ${emitPredicate(ctx, right)}"
+    case Not(pred) => s"!(${emitPredicate(ctx, pred)})"
+    case PPredicate(pred) => s"(${emitPredicate(ctx, pred)})"
+    case _ => { s"UNKNOWN PREDICATE: $predicate" }
+  }
+
   /*------------------------------------------------------------------------------------------------- */
   /*                                   Node code generators                                           */
   /*------------------------------------------------------------------------------------------------- */
@@ -733,92 +749,6 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
           "params" -> emitParamList(CodeGenContext(schema = node.schema), node.params)))
   }
 
-  /**
-    *
-    * @param schema
-    * @param expr
-    * @return
-    */
-  def emitExpr(ctx: CodeGenContext,
-               expr: ArithmeticExpr): String = expr match {
-    case CastExpr(t, e) => {
-      // TODO: check for invalid type
-      val targetType = scalaTypeMappingTable(t)
-      s"${emitExpr(ctx, e)}.to$targetType"
-    }
-    case PExpr(e) => s"(${emitExpr(ctx, e)})"
-    case MSign(e) => s"-${emitExpr(ctx, e)}"
-    case Add(e1, e2) => s"${emitExpr(ctx, e1)} + ${emitExpr(ctx, e2)}"
-    case Minus(e1, e2) => s"${emitExpr(ctx, e1)} - ${emitExpr(ctx, e2)}"
-    case Mult(e1, e2) => s"${emitExpr(ctx, e1)} * ${emitExpr(ctx, e2)}"
-    case Div(e1, e2) => s"${emitExpr(ctx, e1)} / ${emitExpr(ctx, e2)}"
-    case RefExpr(e) => s"${emitRef(CodeGenContext(schema = ctx.schema, aggregate = ctx.aggregate, tuplePrefix = "t", namedRef = ctx.namedRef, events = ctx.events), e)}"
-    case Func(f, params) => emitFuncCall(ctx, f, params)
-    case FlattenExpr(e) => flattenExpr(ctx, e)
-    case ConstructTupleExpr(exprs) => {
-      val exType = expr.resultType(ctx.schema).asInstanceOf[TupleType]
-      val s = Schema(new BagType(exType))
-      s"${schemaClassName(s.className)}(${exprs.map(e => emitExpr(ctx, e)).mkString(",")})"
-    }
-    case ConstructBagExpr(exprs) => {
-      val exType = expr.resultType(ctx.schema).asInstanceOf[BagType]
-      val s = Schema(exType)
-      s"List(${exprs.map(e => s"${schemaClassName(s.className)}(${emitExpr(ctx, e)})").mkString(",")})"
-    }
-    case ConstructMapExpr(exprs) => {
-      val exType = expr.resultType(ctx.schema).asInstanceOf[MapType]
-      val valType = exType.valueType
-      val exprList = exprs.map(e => emitExpr(ctx, e))
-      // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
-      val mapStr = exprList.zip(exprList.tail).zipWithIndex.filter{
-        case (p, i) => i % 2 == 0
-      }.map{case (p, i) => s"${p._1} -> ${p._2}"}.mkString(",")
-      s"Map[String,${scalaTypeMappingTable(valType)}](${mapStr})"
-    }
-    case ConstructMatrixExpr(ty, rows, cols, expr) => {
-      val mType = if (ty.charAt(1) == 'i') "Int" else "Double"
-      s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(ctx, expr)}.map(v => v._0).toArray)"
-    }
-
-    case ConstructGeometryExpr(expr,time) => {
-      val timeStr = time.map { t => t match {
-        case Instant(value) => s"Instant(${emitExpr(ctx, value)})"
-        case Interval(s,Some(e)) => s"Interval(${emitExpr(ctx, s)}, ${emitExpr(ctx, e)})"
-        case Interval(s,None) => s"Interval(${emitExpr(ctx, s)}, None)"
-        case _ => logger.error(s"Unsupported temporal expression type $t"); ""
-        } 
-      }
-      
-      
-      
-      s"SpatialObject(new WKTReader().read(${emitExpr(ctx, expr)}) ${ if(timeStr.isDefined) s", $timeStr.get" else ""  } )"
-    }
-
-    case _ => println("unsupported expression: " + expr); ""
-  }
-
-  /**
-    * Generate Scala code for a predicate on expressions within a MATCHER statement.
-    *
-    * @param ctx an object representing additional information about the context
-    * @param predicate the actual predicate
-    * @return a string representation of the generated Scala code
-    */
-  def emitPredicate(ctx: CodeGenContext, predicate: Predicate): String =  predicate match {
-    case Eq(left, right) => { s"${emitExpr(ctx, left)} == ${emitExpr(ctx, right)}"}
-    case Neq(left, right) => { s"${emitExpr(ctx, left)} != ${emitExpr(ctx, right)}"}
-    case Leq(left, right) => { s"${emitExpr(ctx, left)} <= ${emitExpr(ctx, right)}"}
-    case Lt(left, right) => { s"${emitExpr(ctx, left)} < ${emitExpr(ctx, right)}"}
-    case Geq(left, right) => { s"${emitExpr(ctx, left)} >= ${emitExpr(ctx, right)}"}
-    case Gt(left, right) => { s"${emitExpr(ctx, left)} > ${emitExpr(ctx, right)}"}
-    case And(left, right) => s"${emitPredicate(ctx, left)} && ${emitPredicate(ctx, right)}"
-    case Or(left, right) => s"${emitPredicate(ctx, left)} || ${emitPredicate(ctx, right)}"
-    case Not(pred) => s"!(${emitPredicate(ctx, pred)})"
-    case PPredicate(pred) => s"(${emitPredicate(ctx, pred)})"
-    case _ => { s"UNKNOWN PREDICATE: $predicate" }
-  }
-
-
   def emitMatcherHelper(node: PigOperator, out: String, pattern: Pattern, events: CompEvent): String = {
     val filters = events.complex.map { f => f.simplePattern.asInstanceOf[SimplePattern].name }
     val predics = events.complex.map {
@@ -872,7 +802,75 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       })))
   }
 
-  
+  /*------------------------------------------------------------------------------------------------- */
+  /*                           helper methods for generating schema classes                           */
+  /*------------------------------------------------------------------------------------------------- */
+
+  /**
+    * Generate code for a class representing a schema type.
+    *
+    * @param values
+    * @return
+    */
+  private def emitSchemaClass(values: (String, String, String, String, String)): (String, String) = {
+    val (name, fieldNames, fieldTypes, fieldStr, toStr) = values
+
+    val code = callST("schema_class", Map("name" -> name,
+      "fieldNames" -> fieldNames,
+      "fieldTypes" -> fieldTypes,
+      "fields"   -> fieldStr,
+      "string_rep" -> toStr))
+
+    (name, code)
+  }
+
+  private def emitSchemaConverters(values: (String, String, String, String, String)): String = {
+    val (name, fieldNames, fieldTypes, _, _) = values
+
+    callST("schema_converters", Map("name" -> name,
+      "fieldNames" -> fieldNames,
+      "fieldTypes" -> fieldTypes
+    ))
+  }
+
+  private def createSchemaInfo(schema: Schema) = {
+    def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
+      case Some(n) => n
+      case None => f match {
+        // if we have a bag without a name then we assume that we have got
+        // a case class with _<field_name>_Tuple
+        case BagType(v) => s"Iterable[_${v.className}_Tuple]"
+        case TupleType(f, c) => schemaClassName(c)
+        case MapType(v) => s"Map[String,${scalaTypeMappingTable(v)}]"
+        case MatrixType(v, rows, cols, rep) => s"DenseMatrix[${if (v.tc == TypeCode.IntType) "Int" else "Double"}]"
+        case _ => f.descriptionString
+      }
+    }
+    val fieldList = schema.fields.toList
+    // build the list of field names (_0, ..., _n)
+    val fieldNames = if (fieldList.size==1) "t" else fieldList.indices.map(t => "t._"+(t+1)).mkString(", ")
+    val fieldTypes = fieldList.map(f => s"${typeName(f.fType, f.name)}").mkString(", ")
+    val fields = fieldList.zipWithIndex.map{ case (f, i) =>
+      (s"_$i", s"${typeName(f.fType, f.name)}")}
+    val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
+
+    // construct the mkString method
+    //   we have to handle the different types here:
+    //      TupleType -> ()
+    //      BagType -> {}
+    val toStr = fieldList.zipWithIndex.map{
+      case (f, i) => f.fType match {
+        case BagType(_) => s""""{" + _$i.mkString(",") + "}""""
+        case MapType(v) => s""""[" + _$i.map{ case (k,v) => s"$$k#$$v" }.mkString(",") + "]""""
+        case _ => s"_$i" + (if (f.fType.tc != TypeCode.CharArrayType && fields.length == 1) ".toString" else "")
+      }
+    }.mkString(" + _c + ")
+
+    val name = schemaClassName(schema.className)
+
+    (name, fieldNames, fieldTypes, fieldStr, toStr)
+  }
+
 
   /*------------------------------------------------------------------------------------------------- */
   /*                           implementation of the GenCodeBase interface                            */
@@ -912,74 +910,9 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     classCode + "\n" + converterCode
   }
   
-  /**
-   * Generate code for a class representing a schema type.
-   *
-   * @param schema the schema for which we generate a class
-   * @return a string representing the code
-   */
-  private def emitSchemaClass(values: (String, String, String, String, String)): (String, String) = {
-    val (name, fieldNames, fieldTypes, fieldStr, toStr) = values
-
-    val code = callST("schema_class", Map("name" -> name,
-                              "fieldNames" -> fieldNames,
-                              "fieldTypes" -> fieldTypes,
-                              "fields"   -> fieldStr,
-                              "string_rep" -> toStr))
-                              
-    (name, code)
-  }
-  
-  private def emitSchemaConverters(values: (String, String, String, String, String)): String = {
-    val (name, fieldNames, fieldTypes, _, _) = values
-
-    callST("schema_converters", Map("name" -> name,
-                              "fieldNames" -> fieldNames,
-                              "fieldTypes" -> fieldTypes
-                              ))
-  }
-  
-  private def createSchemaInfo(schema: Schema) = {
-    def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
-      case Some(n) => n
-      case None => f match {
-        // if we have a bag without a name then we assume that we have got
-        // a case class with _<field_name>_Tuple
-        case BagType(v) => s"Iterable[_${v.className}_Tuple]"
-        case TupleType(f, c) => schemaClassName(c)
-        case MapType(v) => s"Map[String,${scalaTypeMappingTable(v)}]"
-        case MatrixType(v, rows, cols, rep) => s"DenseMatrix[${if (v.tc == TypeCode.IntType) "Int" else "Double"}]"
-        case _ => f.descriptionString
-      }
-    }
-    val fieldList = schema.fields.toList
-    // build the list of field names (_0, ..., _n)
-    val fieldNames = if (fieldList.size==1) "t" else fieldList.indices.map(t => "t._"+(t+1)).mkString(", ")
-    val fieldTypes = fieldList.map(f => s"${typeName(f.fType, f.name)}").mkString(", ")
-    val fields = fieldList.zipWithIndex.map{ case (f, i) =>
-           (s"_$i", s"${typeName(f.fType, f.name)}")}
-    val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
-    
-    // construct the mkString method
-    //   we have to handle the different types here:
-    //      TupleType -> ()
-    //      BagType -> {}
-    val toStr = fieldList.zipWithIndex.map{
-      case (f, i) => f.fType match {
-        case BagType(_) => s""""{" + _$i.mkString(",") + "}""""
-        case MapType(v) => s""""[" + _$i.map{ case (k,v) => s"$$k#$$v" }.mkString(",") + "]""""
-        case _ => s"_$i" + (if (f.fType.tc != TypeCode.CharArrayType && fields.length == 1) ".toString" else "")
-      }
-    }.mkString(" + _c + ")
-    
-    val name = schemaClassName(schema.className)
-    
-    (name, fieldNames, fieldTypes, fieldStr, toStr)
-  }
-
-
-  /**
-   * Generate code for the given Pig operator.
+   /**
+   * Generate code for the given Pig operator. Here, only operators are handled which are mapped to the same
+   * code in batch as well as in streaming backends.
    *
    * @param node the operator (an instance of PigOperator)
    * @return a string representing the code
@@ -1031,6 +964,13 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   def emitHeader1(scriptName: String): String =
     callST("query_object", Map("name" -> scriptName))
 
+  /**
+    * Generate code for embedded code: usually this code is just copied
+    * to the generated file.
+    *
+    * @param additionalCode the code to be embedded
+    * @return a string representing the code
+    */
   def emitEmbeddedCode(additionalCode: String) =
     callST("embedded_code", Map("embedded_code" -> additionalCode))
         
@@ -1040,6 +980,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
    * the main class/object.
    *
    * @param scriptName the name of the script (e.g. used for the object)
+   * @param profiling add profiling code to the generated code
    * @return a string representing the header code
    */
   def emitHeader2(scriptName: String, profiling: Option[URI] = None): String = {
@@ -1055,6 +996,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
   /**
    * Generate code needed for finishing the script and starting the execution.
    *
+   * @param plan the dataflow plan for which we generate the code
    * @return a string representing the end of the code.
    */
   def emitFooter(plan: DataflowPlan): String = callST("end_query", Map("name" -> "Starting Query"))
