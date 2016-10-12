@@ -48,6 +48,7 @@ class SparkCompileIt extends FlatSpec with CompileIt{
     ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "spark"),
     ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "spark"),
     ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
+    ("cross.pig", "crossed.out", "truth/cross2.csv", false, "pig", "spark"),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "spark"),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "spark"),
     ("accumulate.pig", "accumulate.out", "truth/accumulate.data", false, "pig", "spark"),

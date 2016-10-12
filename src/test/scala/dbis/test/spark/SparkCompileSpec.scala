@@ -629,6 +629,29 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |val a = b.union(c).union(d)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
+  
+//  it should "contain code for a CROSS operator" in {
+//    // a = CROSS b, c;
+//    val op = Cross(Pipe("aa"), List(Pipe("bb"), Pipe("cc")))
+//    op.schema = Some(Schema(Array(Field("f1", Types.CharArrayType) )))
+//    val codeGenerator = new BatchCodeGen(templateFile)
+//    val generatedCode = cleanString(codeGenerator.emitNode(op))
+//    val expectedCode = cleanString("""
+//        |val aa = bb.cartesian(cc)""".stripMargin)
+//    
+//    generatedCode shouldBe expectedCode
+//  }
+//  
+//  ignore should "contain code for a CROSS operator on more than two relations" in {
+//    // a = CROSS b, c, d;
+//    val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
+//    val codeGenerator = new BatchCodeGen(templateFile)
+//    val generatedCode = cleanString(codeGenerator.emitNode(op))
+//    val expectedCode = cleanString("""
+//        |val a = b.cartesian(c).cartesian(d)""".stripMargin)
+//    
+//    generatedCode shouldBe expectedCode
+//  }
 
   it should "contain code for the sample operator with a literal value" in {
     // aa = SAMPLE bb 0.01;

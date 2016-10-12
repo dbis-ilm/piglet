@@ -148,9 +148,24 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
     * @return the Scala code implementing the CROSS operator
     */
 
-  def emitCross(node: PigOperator): String = {
+  def emitCross(node: Cross): String = {
     val rels = node.inputs
-    callST("cross", Map("out" -> node.outPipeName, "rel1" -> rels.head.name, "rel2" -> rels.tail.map(_.name)))
+    
+    val vsize = rels.head.inputSchema.get.fields.length
+    val fieldList = node.schema.get.fields.zipWithIndex
+      .map { case (f, i) => if (i < vsize) s"v._$i" else s"w._${i - vsize}" }.mkString(", ")
+  
+    val className = node.schema match {
+      case Some(s) => schemaClassName(s.className)
+      case None => schemaClassName(node.outPipeName)
+    }
+      
+    callST("cross", Map(
+        "out" -> node.outPipeName, 
+        "rel1" -> rels.head.name, 
+        "others" -> rels.tail.map(_.name),
+        "class" -> className,
+        "fields" -> fieldList))
   }
 
   /**
@@ -540,7 +555,7 @@ class BatchCodeGen(template: String) extends ScalaBackendCodeGen(template) {
        * NOTE: Don't use "out" here -> it refers only to initial constructor argument but isn't consistent
        *       after changing the pipe name. Instead, use node.outPipeName
        */
-      case Cross(out, rels, _) => emitCross(node)
+      case c: Cross => emitCross(c)
       case Distinct(out, in, _) => emitDistinct(node)
       case Filter(out, in, pred, _) => emitFilter(node, pred)
       case Foreach(out, in, gen, _) => emitForeach(node, gen)

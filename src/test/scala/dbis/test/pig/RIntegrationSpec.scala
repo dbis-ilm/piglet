@@ -36,7 +36,8 @@ class RIntegrationSpec extends FlatSpec with Matchers {
     }
   }
 
-  "The R integration" should "allow to invoke a R script" in {
+//  "The R integration" 
+  ignore should "allow to invoke a R script" in {
     if (checkForWorkingR) {
       val R = RInScala()
       R.x = Array(10.0, 20.0, 30.0)
@@ -50,7 +51,7 @@ class RIntegrationSpec extends FlatSpec with Matchers {
 
   }
 
-  it should "run DBSCAN in R" in {
+  ignore should "run DBSCAN in R" in {
     if (checkForWorkingR) {
     /**
      * Prepare the data in R as follows:
