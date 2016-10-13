@@ -60,7 +60,7 @@ object Piglet extends PigletLogging {
                             outDir: String = ".",
                             params: Map[String, String] = Map(),
                             backend: Option[String] = None,//Conf.defaultBackend,
-                            backendPath: String = ".",
+                            backendPath: Path = Paths.get("."),
                             languages: Seq[String] = Seq.empty,
                             updateConfig: Boolean = false,
                             showPlan: Boolean = false,
@@ -76,7 +76,7 @@ object Piglet extends PigletLogging {
 
   var master: String = "local"
   var backend: String = null
-  var backendPath: String = null
+  var backendPath: Path = null
   var languageFeatures = List(LanguageFeature.PlainPig)
   var logLevel: Option[String] = None
   var keepFiles = false
@@ -104,7 +104,7 @@ object Piglet extends PigletLogging {
       opt[URI]("profiling") optional() action { (x, c) => c.copy(profiling = Some(x)) } text ("Switch on profiling and write to DB. Provide the connection string as schema://host:port/dbname?user=username&pw=password")
       opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x) } text ("output directory for generated code")
       opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = Some(x) ) } text ("Target backend (spark, flink, sparks, ...)")
-      opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
+      opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = new File(x).toPath()) } text ("Path to the diretory containing the backend plugins")
       opt[Seq[String]]('l', "languages") optional() action { (x, c) => c.copy(languages = x) } text ("Accepted language dialects (pig = default, sparql, streaming, cep, all)")
       opt[Map[String, String]]('p', "params") valueName ("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text ("parameter(s) to subsitute")
       opt[File]("param-file") optional() action { (x,c) => c.copy( paramFile = Some(x) ) } text ("Path to a file containing parameter value pairs")
@@ -237,7 +237,7 @@ object Piglet extends PigletLogging {
 
   
   def run(inputFile: Path, outDir: Path, compileOnly: Boolean, master: String, backend: String,
-          langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String], backendPath: String,
+          langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String], backendPath: Path,
           backendArgs: Map[String, String], profiling: Option[URI], showPlan: Boolean, sequential: Boolean): Unit = timing("execution") {
     run(Seq(inputFile), outDir, compileOnly, master, backend, langFeatures, params, backendPath,
       backendArgs, profiling, showPlan, sequential)
@@ -248,7 +248,7 @@ object Piglet extends PigletLogging {
     */
   def run(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
           langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
-          backendPath: String, backendArgs: Map[String, String], profiling: Option[URI], 
+          backendPath: Path, backendArgs: Map[String, String], profiling: Option[URI], 
           showPlan: Boolean, sequential: Boolean): Unit = {
 
     try {
@@ -297,7 +297,7 @@ object Piglet extends PigletLogging {
 
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
                             langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
-                            backendPath: String, backendConf: BackendConf, backendArgs: Map[String, String],
+                            backendPath: Path, backendConf: BackendConf, backendArgs: Map[String, String],
                             profiling: Option[URI], showPlan: Boolean, sequential: Boolean): Unit = timing("run with generation") {
     logger.debug("start parsing input files")
     
@@ -384,7 +384,8 @@ object Piglet extends PigletLogging {
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")
 
-      PigletCompiler.compilePlan(newPlan, scriptName, outDir, Paths.get(backendPath,jarFile.toString),
+      
+      PigletCompiler.compilePlan(newPlan, scriptName, outDir, backendPath,
         templateFile, backend, profiling, keepFiles) match {
         // the file was created --> execute it
         case Some(jarFile) =>
@@ -415,7 +416,7 @@ object Piglet extends PigletLogging {
     * @param backendDir the directory where the backend-specific jars are located
     */
   def setConfig(master: String = "local", backend: String = "spark", language: String = "pig",
-                backendDir: String = "."): Unit = {
+                backendDir: Path = Paths.get(".")): Unit = {
     Piglet.master = master
     Piglet.backend = backend
     Piglet.backendPath = backendDir
@@ -481,7 +482,7 @@ object Piglet extends PigletLogging {
     val profiling: Option[URI] = None
     
     val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, 
-        Paths.get(backendPath,jarFile.toString), templateFile, backend, profiling, false) match {
+        backendPath, templateFile, backend, profiling, false) match {
       
       case Some(jarFile) => {
         val runner = backendConf.runnerClass

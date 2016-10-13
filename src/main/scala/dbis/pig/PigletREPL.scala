@@ -390,10 +390,10 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       }
 
       val templateFile = backendConf.templateFile
-      val jobJar = Paths.get(s"$backendPath/${Conf.backendJar(backend).toString}")
+//      val jobJar = Paths.get(s"$backendPath/${Conf.backendJar(backend).toString}")
 
       nextScriptName()
-      PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), jobJar, templateFile, backend, profiling, keepFiles) match {
+      PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), Paths.get(backendPath), templateFile, backend, profiling, keepFiles) match {
         case Some(jarFile) =>
           val runner = backendConf.runnerClass
           runner.execute(master, scriptName, jarFile, backendArgs)
