@@ -17,7 +17,7 @@ TARGET_DIR=$PIGLET_HOME/piglet-dist
 
 
 function checkfile {
-  echo "checking file $1"
+  # echo "checking file $1"
   if [ -r $1 ]; then
     FEXISTS=TRUE
   else
@@ -36,6 +36,7 @@ mkdir $TARGET_DIR
 
 for f in ${FILES[@]}
 do
+  echo -ne "\r copying $f                                                                                              "
   sourcefile=$PIGLET_HOME/$f
   checkfile $sourcefile
   if [ $FEXISTS == TRUE ]; then
@@ -47,3 +48,11 @@ do
     exit 1
   fi
 done
+echo -e "\rcopied files                                                                                                "
+
+echo -n "creating archive..."
+tar jcf ${TARGET_DIR}.tar.bz2 ${TARGET_DIR}
+echo -e "\rcreated archive at ${TARGET_DIR}.tar.bz2"
+
+echo "cleanup"
+rm -rf $TARGET_DIR

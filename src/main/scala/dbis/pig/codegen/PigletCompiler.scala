@@ -30,13 +30,14 @@ import scalax.file.{Path => xPath}
 import dbis.pig.parser.LanguageFeature
 import dbis.pig.schema.Schema
 import java.net.URI
+import scala.collection.mutable.ArrayBuffer
 
 
 object PigletCompiler extends PigletLogging {
-  
+
   /**
    * Helper method to parse the given file into a dataflow plan
-   * 
+   *
    * @param inputFile The file to parse
    * @param params Key value pairs to replace placeholders in the script
    * @param backend The name of the backend
@@ -89,7 +90,7 @@ object PigletCompiler extends PigletLogging {
 
   /**
    * Replace placeholders in the script with values provided by the given map
-   * 
+   *
    * @param line The line to process
    * @param params The map of placeholder key and the value to use as replacement
    */
@@ -98,7 +99,7 @@ object PigletCompiler extends PigletLogging {
     params.foreach{case (p, v) => s = s.replaceAll("\\$" + p, v)}
     s
   }
-  
+
   /**
    * Handle IMPORT statements by simply replacing the line containing IMPORT with the content
    * of the imported file.
@@ -106,7 +107,7 @@ object PigletCompiler extends PigletLogging {
    * @param lines the original script
    * @return the script where IMPORTs are replaced
    */
-   def resolveImports(lines: Iterator[String]): (Iterator[String], Map[String,String]) = {
+  def resolveImports(lines: Iterator[String]): (Iterator[String], Map[String,String]) = {
     var params = Map[String,String]()
     val buf = ListBuffer.empty[String]
     for (l <- lines) {
@@ -129,43 +130,42 @@ object PigletCompiler extends PigletLogging {
     (buf.toIterator, params)
   }
 
-   
-   
-/**
- * Create Scala code for the given backend from the source string.
- * This method is provided mainly for Zeppelin.
- *
- * @param source the Piglet script
- * @param backend the backend used to compile and execute
- * @return the generated Scala code
- */
-def createCodeFromInput(source: String, backend: String, languageFeatures: List[String] = List.empty): String = {
-  Schema.init()
-  val lf = languageFeatures.map { f => LanguageFeature.withName(f) }
-  var plan = new DataflowPlan(PigParser.parseScript(source, lf))
 
-  if (!plan.checkConnectivity) {
-    logger.error(s"dataflow plan not connected")
-    return ""
+  /**
+   * Create Scala code for the given backend from the source string.
+   * This method is provided mainly for Zeppelin.
+   *
+   * @param source the Piglet script
+   * @param backend the backend used to compile and execute
+   * @return the generated Scala code
+   */
+  def createCodeFromInput(source: String, backend: String, languageFeatures: List[String] = List.empty): String = {
+    Schema.init()
+    val lf = languageFeatures.map { f => LanguageFeature.withName(f) }
+    var plan = new DataflowPlan(PigParser.parseScript(source, lf))
+  
+    if (!plan.checkConnectivity) {
+      logger.error(s"dataflow plan not connected")
+      return ""
+    }
+  
+    logger.debug(s"successfully created dataflow plan")
+    plan = processPlan(plan)
+  
+    // compile it into Scala code for Spark
+      val generatorClass = Conf.backendGenerator(backend)
+    val extension = Conf.backendExtension(backend)
+    val backendConf = BackendManager.backend(backend)
+      BackendManager.backend = backendConf
+    val templateFile = backendConf.templateFile
+    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
+    val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
+  
+    // 5. generate the Scala code
+    val code = compiler.compile("blubs", plan, profiling = None, forREPL = true)
+    logger.debug("successfully generated scala program")
+    code
   }
-
-  logger.debug(s"successfully created dataflow plan")
-  plan = processPlan(plan)
-
-  // compile it into Scala code for Spark
-    val generatorClass = Conf.backendGenerator(backend)
-  val extension = Conf.backendExtension(backend)
-  val backendConf = BackendManager.backend(backend)
-    BackendManager.backend = backendConf
-  val templateFile = backendConf.templateFile
-  val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
-  val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
-
-  // 5. generate the Scala code
-  val code = compiler.compile("blubs", plan, profiling = None, forREPL = true)
-  logger.debug("successfully generated scala program")
-  code
-}
 
   // Same as above, but accepts a Java list. Used as interface for our Zeppelin interpreter which is written in Java
   def createCodeFromInput(source: String, backend: String, languageFeature: java.util.List[String]): String = {
@@ -177,19 +177,19 @@ def createCodeFromInput(source: String, backend: String, languageFeatures: List[
 
   /**
    * Compile the given plan into a executable program.
-   * 
+   *
    * @param plan The plan to compile
    * @param scriptName The name of the script (used as program and file name)
    * @param outDir The directory to write generated files to
-   * @param backendJar Path to the backend jar file
+   * @param backendPath Path to the base directory for backend library jar files
    * @param templateFile The template file to use for code generation
    * @param backend The name of the backend
    * @param profiling Flag indicating whether profiling code should be inserted
    * @param keepFiles Flag indicating whether generated source files should be deleted or kept
    */
-  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, backendJar: Path, 
+  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, backendPath: Path,
       templateFile: String, backend: String, profiling: Option[URI], keepFiles: Boolean): Option[Path] = timing("compile plan") {
-    
+
     // compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)
     logger.debug(s"using generator class: $generatorClass")
@@ -197,7 +197,7 @@ def createCodeFromInput(source: String, backend: String, languageFeatures: List[
     logger.debug(s"file extension for generated code: $extension")
     val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
     logger.debug(s"""arguments to generator class: "${args.mkString(",")}" """)
-    
+
     val codeGenerator = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
     logger.debug(s"successfully created code generator class $codeGenerator")
 
@@ -215,7 +215,7 @@ def createCodeFromInput(source: String, backend: String, languageFeatures: List[
     if (!Files.exists(outputDir)) {
       Files.createDirectories(outputDir)
     }
-    
+
 
     val outputDirectory = outputDir.resolve("out") //s"${outputDir.getCanonicalPath}${File.separator}out"
     logger.debug(s"outputDirectory: $outputDirectory")
@@ -231,29 +231,24 @@ def createCodeFromInput(source: String, backend: String, languageFeatures: List[
     writer.append(code)
     writer.close()
     if (extension.equalsIgnoreCase("scala")) {
+      
+      val libraryJars = ArrayBuffer(
+          backendPath.resolve(Conf.backendJar(backend)).toString, // the backend library (sparklib, flinklib, etc)
+          backendPath.resolve(Conf.commonJar).toString) // common lib
+      
       // extract all additional jar files to output
-      plan.additionalJars.foreach(jarFile => FileTools.extractJarToDir(jarFile, outputDirectory))
-
-      // copy the backend-specific library to output
-      val jobJar = backendJar.toAbsolutePath.toString
-      logger.info(s"add backend jar '${jobJar}' to job's jar file ...")
-      FileTools.extractJarToDir(jobJar, outputDirectory)
-
-      // copy the common library to output
-      val commonJars = xPath("common/target/scala-2.11/",'/')  ** "*.jar"
-      commonJars.foreach { jar => 
-        logger.info(s"add common jar '${jar.path}' to job's jar file ...")
-        FileTools.extractJarToDir(jar.path, outputDirectory)
+      (libraryJars ++= plan.additionalJars).foreach{jarFile => 
+        FileTools.extractJarToDir(jarFile, outputDirectory)
       }
 
-      val sources = ListBuffer(outputFile)
-      
+      val sources = List(outputFile)
+
       // compile the scala code
       if (!ScalaCompiler.compile(outputDirectory, sources))
         return None
 
       // build a jar file
-      logger.info(s"creating job's jar file ...")
+      logger.info(s"creating job's jar file ... ")
       val jarFile = Paths.get(outDir.toAbsolutePath.toString, scriptName, s"$scriptName.jar")
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
         logger.info(s"created job's jar file at $jarFile")
@@ -298,7 +293,7 @@ def createCodeFromInput(source: String, backend: String, languageFeatures: List[
 	  val (sourceLines, declareParams) = resolveImports(source.getLines())
 	  if(declareParams.nonEmpty)
       logger.info("declared parameters: " + declareParams.mkString(", "))
-      
+
     val allParams = params ++ declareParams
 
 	  if (allParams.nonEmpty) {
