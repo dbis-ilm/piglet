@@ -52,7 +52,7 @@ echo -e "\rcopied files                                                         
 
 echo -n "creating archive..."
 tar jcf ${TARGET_DIR}.tar.bz2 ${TARGET_DIR}
-echo " finished --> ${TARGET_DIR}.tar.bz2"
+echo -e "\rcreated archive at ${TARGET_DIR}.tar.bz2"
 
 echo "cleanup"
 rm -rf $TARGET_DIR
