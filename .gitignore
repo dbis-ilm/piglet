@@ -30,6 +30,11 @@ lodhub_data
 __my_script*/
 
 #####
+
+piglet-dist*
+
+
+#####
 # ignore database
 db
 
