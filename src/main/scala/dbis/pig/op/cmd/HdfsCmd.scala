@@ -18,6 +18,8 @@
 package dbis.pig.op.cmd
 
 import dbis.pig.op.PigOperator
+import dbis.pig.tools.HDFSService
+import dbis.pig.tools.HdfsCommand
 
 
 /**
@@ -32,15 +34,7 @@ case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator(List()
 
   override def outPipeNames: List[String] = List()
 
-  def isValid: Boolean = cmd match {
-    case "copyFromLocal" => true
-    case "copyToRemote" => true
-    case "rm" => true
-    case "rmdir" => true
-    case "ls" => true
-    case "mkdir" => true
-    case _ => false
-  }
+  def isValid = HdfsCommand.values.map{v => v.toString().toLowerCase()}.exists { s => s.equalsIgnoreCase(cmd) }
 
   def paramString(): String = params.map(p => s""""$p"""").mkString(",")
 

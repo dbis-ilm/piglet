@@ -235,6 +235,18 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         |    dump <alias> - Compute the alias and writes the results to stdout.
         |    prettyprint - Prints the dataflow plan operator list.
         |    rewrite - Rewrites the current dataflow plan.
+        |    
+        |HDFS commands: fs <cmd> [args] , where <cmd> can be 
+        |    -ls [path] - list path content
+        |    -rm path - remove file/directory at path
+        |    -rmdir path - remove an empty directory at path
+        |    -mkdir path - create directory at path
+        |    -cat path - print the content of a file
+        |    -copyToRemote src dest - upload local src file to dst on DFS
+        |    -copyToLocal src dest - download HDFS src file to dst on local file system
+        |    -getmerge src dst - download all parts stored in directory src to local file dst
+        | All commands should accept same flags as their respective original HDFS command
+        |   
         |Utility Commands:
         |    help - Display this message.
         |    quit - Quit the Pig shell.
