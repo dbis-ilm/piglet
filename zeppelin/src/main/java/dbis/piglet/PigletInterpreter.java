@@ -2,13 +2,17 @@ package dbis.piglet;
 
 import org.apache.zeppelin.interpreter.*;
 import org.apache.zeppelin.interpreter.InterpreterResult.Code;
+
+import org.apache.spark.repl.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
-import org.apache.spark.repl.*;
-import dbis.pig.codegen.PigletCompiler;
+
+import dbis.pig.api.PigletInterpreterAPI;
+
 import scala.tools.nsc.settings.MutableSettings.BooleanSetting;
 
 public class PigletInterpreter extends Interpreter {
@@ -30,7 +34,7 @@ public class PigletInterpreter extends Interpreter {
 
     public void open() {
         logger.info("PigletInterpreter.open");
-        org.apache.spark.repl.Main.classServer().start();
+//        org.apache.spark.repl.Main.classServer().start();
         input = new BufferedReader(new StringReader(""));
         iLoop = new SparkILoop(input, new PrintWriter(out));
         BooleanSetting b = (BooleanSetting) settings.usejavacp();
@@ -41,7 +45,7 @@ public class PigletInterpreter extends Interpreter {
     public void close() {
         logger.info("PigletInterpreter.close");
         iLoop.closeInterpreter();
-        org.apache.spark.repl.Main.classServer().stop();
+//        org.apache.spark.repl.Main.classServer().stop();
     }
 
     public void cancel(InterpreterContext context) {
@@ -67,7 +71,7 @@ public class PigletInterpreter extends Interpreter {
         // TODO: add language feature COMPLETE here
         List<String> features = new LinkedList<String>();
         features.add("CompletePiglet");
-        String sparkCode = PigletCompiler.createCodeFromInput(line, "spark", features);
+        String sparkCode = PigletInterpreterAPI.createCodeFromInput(line, "spark", features);
         sparkCode += "\nsc.stop()";
         // sparkCode = "println(\"%table x\ty\\n1\t2\\n3\t4\\n\\n\")";
         logger.info("PigletInterpreter.interpret = " + sparkCode);
