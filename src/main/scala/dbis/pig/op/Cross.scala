@@ -32,6 +32,8 @@ case class Cross(
     timeWindow: Tuple2[Int,String]= null.asInstanceOf[Tuple2[Int,String]]
   ) extends PigOperator(List(out), in) {
 
+//  require(in.size == 2, "Only two inputs allowed for CROSS, currently!")
+  
   override def lineageString: String = {
     s"""CROSS%""" + super.lineageString
   }

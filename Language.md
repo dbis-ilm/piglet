@@ -1,6 +1,7 @@
 ## Supported Language Features ##
 
-Depending on the target backend Piglet supports different language features. For batch processing in Spark and Flink we support the following standard Pig Latin statements:
+Depending on the target backend Piglet supports different language features. For batch processing in Spark and Flink we support the following standard Pig Latin statements (see the official [Pig documentation]() for more information:
+
  * LOAD
  * STORE
  * DUMP
@@ -53,8 +54,17 @@ out = FOREACH in GENERATE dimatrix(2, 2, $0, $1, $2, $3);
 
 ### ACCUMULATE ###
 
- * ACCUMULATE - is used for incrementally calculating aggregates on (large) bags or streams of tuples.
-
+ * ACCUMULATE - is used for incrementally calculating aggregates on (large) bags or streams of tuples. In contrast to
+ the standard Pig Latin approach which requires to perform an expensive `GROUP ALL` + `FOREACH GENERATE` the `ACCUMULATE`
+ operator uses the underlying `aggregate` transformation provided by the Spark/Flink backends. Usage:
+  
+  ```
+  out = ACCUMULATE in GENERATE <ExprList> [ AS <Schema> ];
+  ```
+ 
+  Here, `<ExprList>` denotes a list of generator expressions as used in `FOREACH GENERATE`, but where each expression
+  represents an invocation of an aggregate function.
+  
 ### MATERIALIZE ###
 
  * MATERIALIZE - creates a materialization point, i.e. the bag is serialized into a HDFS file. Subsequent
