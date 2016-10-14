@@ -35,8 +35,7 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
 
   def cleanString(s: String): String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
 
-  val backendConf = BackendManager.backend("flinks")
-  BackendManager.backend = backendConf
+  val backendConf = BackendManager.init("flinks")
   val templateFile = backendConf.templateFile
 
   logger.debug(s"template file: $templateFile")

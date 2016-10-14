@@ -36,6 +36,18 @@ import java.net.ConnectException
 
 object FileTools extends PigletLogging {
   
+  def recursiveDelete(dir: Path): Unit = recursiveDelete(dir.toString()) 
+  def recursiveDelete(dir: String): Unit = {
+    val path = scalax.file.Path.fromString(dir)
+    try {
+      path.deleteRecursively(continueOnFailure = false)
+//      logger.debug(s"removed output directory at $dir")
+    }
+    catch {
+      case e: java.io.IOException => logger.debug(s"Could not remove result directory at ${path}: ${e.getMessage}")
+    }
+  }
+  
   def copyStream(istream: InputStream, ostream: OutputStream): Unit = {
     var bytes = new Array[Byte](1024)
     var len = -1

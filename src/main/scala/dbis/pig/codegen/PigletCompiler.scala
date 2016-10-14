@@ -64,31 +64,6 @@ object PigletCompiler extends PigletLogging {
   }
 
   /**
-    * Helper method to parse the given Piglet script from a string into a dataflow plan
-    *
-    * @param input The file to parse
-    * @param params Key value pairs to replace placeholders in the script
-    * @param backend The name of the backend
-    * @param langFeatures the Pig dialects used for parsing
-    */
-  def createDataflowPlan(input: String, params: Map[String,String], backend: String,
-                         langFeatures: List[LanguageFeature]): Option[DataflowPlan] = {
-    // 1. we prepare a source from the string
-    val source = Source.fromString(input.stripMargin)
-    // 2. then we parse it and construct a dataflow plan
-    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeatures))
-
-    if (!plan.checkConnectivity) {
-      logger.error("dataflow plan not connected")
-      None
-    }
-    else {
-      logger.debug("successfully created dataflow plan from input")
-      Some(plan)
-    }
-  }
-
-  /**
    * Replace placeholders in the script with values provided by the given map
    *
    * @param line The line to process
@@ -131,48 +106,48 @@ object PigletCompiler extends PigletLogging {
   }
 
 
-  /**
-   * Create Scala code for the given backend from the source string.
-   * This method is provided mainly for Zeppelin.
-   *
-   * @param source the Piglet script
-   * @param backend the backend used to compile and execute
-   * @return the generated Scala code
-   */
-  def createCodeFromInput(source: String, backend: String, languageFeatures: List[String] = List.empty): String = {
-    Schema.init()
-    val lf = languageFeatures.map { f => LanguageFeature.withName(f) }
-    var plan = new DataflowPlan(PigParser.parseScript(source, lf))
-  
-    if (!plan.checkConnectivity) {
-      logger.error(s"dataflow plan not connected")
-      return ""
-    }
-  
-    logger.debug(s"successfully created dataflow plan")
-    plan = processPlan(plan)
-  
-    // compile it into Scala code for Spark
-      val generatorClass = Conf.backendGenerator(backend)
-    val extension = Conf.backendExtension(backend)
-    val backendConf = BackendManager.backend(backend)
-      BackendManager.backend = backendConf
-    val templateFile = backendConf.templateFile
-    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
-    val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
-  
-    // 5. generate the Scala code
-    val code = compiler.compile("blubs", plan, profiling = None, forREPL = true)
-    logger.debug("successfully generated scala program")
-    code
-  }
-
-  // Same as above, but accepts a Java list. Used as interface for our Zeppelin interpreter which is written in Java
-  def createCodeFromInput(source: String, backend: String, languageFeature: java.util.List[String]): String = {
-	  import scala.collection.JavaConverters._
-	  val scalaList = languageFeature.asScala.toList
-	  createCodeFromInput(source, backend, scalaList)
-  }
+//  /**
+//   * Create Scala code for the given backend from the source string.
+//   * This method is provided mainly for Zeppelin.
+//   *
+//   * @param source the Piglet script
+//   * @param backend the backend used to compile and execute
+//   * @return the generated Scala code
+//   */
+//  def createCodeFromInput(source: String, backend: String, languageFeatures: List[String] = List.empty): String = {
+//    Schema.init()
+//    val lf = languageFeatures.map { f => LanguageFeature.withName(f) }
+//    var plan = new DataflowPlan(PigParser.parseScript(source, lf))
+//  
+//    if (!plan.checkConnectivity) {
+//      logger.error(s"dataflow plan not connected")
+//      return ""
+//    }
+//  
+//    logger.debug(s"successfully created dataflow plan")
+//    plan = processPlan(plan)
+//  
+//    // compile it into Scala code for Spark
+//      val generatorClass = Conf.backendGenerator(backend)
+//    val extension = Conf.backendExtension(backend)
+//    val backendConf = BackendManager.backend(backend)
+//      BackendManager.backend = backendConf
+//    val templateFile = backendConf.templateFile
+//    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
+//    val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
+//  
+//    // 5. generate the Scala code
+//    val code = compiler.compile("blubs", plan, profiling = None, forREPL = true)
+//    logger.debug("successfully generated scala program")
+//    code
+//  }
+//
+//  // Same as above, but accepts a Java list. Used as interface for our Zeppelin interpreter which is written in Java
+//  def createCodeFromInput(source: String, backend: String, languageFeature: java.util.List[String]): String = {
+//	  import scala.collection.JavaConverters._
+//	  val scalaList = languageFeature.asScala.toList
+//	  createCodeFromInput(source, backend, scalaList)
+//  }
 
 
   /**
@@ -256,7 +231,7 @@ object PigletCompiler extends PigletLogging {
         if(!keepFiles) {
           // remove directory $outputDirectory
           val p = Paths.get(outDir.toAbsolutePath().toString(), scriptName, "out")
-          cleanupResult(p)
+          FileTools.recursiveDelete(p)
         }
         Some(jarFile)
       } else
@@ -271,14 +246,14 @@ object PigletCompiler extends PigletLogging {
   }
 
   /**
-    * Load a Piglet script from the given file and return it as a Iterator on line strings.
-    *
-    * @param inputFile the path to the input file
-    * @return the text lines
-    */
+   * Load a Piglet script from the given file and return it as a Iterator on line strings.
+   *
+   * @param inputFile the path to the input file
+   * @return the text lines
+   */
   private def loadScript(inputFile: Path): Iterator[String] = Source.fromFile(inputFile.toFile).getLines()
 
- /**
+   /**
     * Invokes the PigParser to process the given source. In addition, parameters specified by the --param flag
     * are resolved.
     *
@@ -305,15 +280,6 @@ object PigletCompiler extends PigletLogging {
 	  }
   }
 
-  private def cleanupResult(dir: Path): Unit = {
-    val path = scalax.file.Path.fromString(dir.toString())
-    try {
-      path.deleteRecursively(continueOnFailure = false)
-      logger.debug(s"removed output directory at $dir")
-    }
-    catch {
-      case e: java.io.IOException => logger.debug(s"Could not remove result directory at ${path}: ${e.getMessage}")
-    }
-  }
+  
 
 }

@@ -51,6 +51,7 @@ import dbis.pig.tools.logging.LogLevel._
 import dbis.pig.plan.PlanMerger
 import dbis.setm.SETM
 import dbis.setm.SETM.timing
+import dbis.pig.plan.InvalidPlanException
 
 object Piglet extends PigletLogging {
 
@@ -253,10 +254,10 @@ object Piglet extends PigletLogging {
 
     try {
 
-      val backendConf = BackendManager.backend(backend)
-      BackendManager.backend = backendConf
+      
+      BackendManager.init(backend)
 
-      if (backendConf.raw) {
+      if (BackendManager.backend.raw) {
         if (compileOnly) {
           logger.error("Raw backends do not support compile-only mode! Aborting")
           return
@@ -267,11 +268,10 @@ object Piglet extends PigletLogging {
           return
         }
 
-        inputFiles.foreach { file => runRaw(file, master, backendConf, backendArgs) }
+        inputFiles.foreach { file => runRaw(file, master, backendArgs) }
 
       } else {
-        runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeatures, params, backendPath,
-          backendConf, backendArgs, profiling, showPlan, sequential)
+        runWithCodeGeneration(inputFiles, outDir, compileOnly, master, backend, langFeatures, params, backendPath, backendArgs, profiling, showPlan, sequential)
       }
 
     } catch {
@@ -289,26 +289,44 @@ object Piglet extends PigletLogging {
     * @param backendConf
     * @param backendArgs
     */
-  def runRaw(file: Path, master: String, backendConf: BackendConf, backendArgs: Map[String, String]) = timing("execute raw") {
-    logger.debug(s"executing in raw mode: $file with master $master for backend ${backendConf.name} with arguments ${backendArgs.mkString(" ")}")
-    val runner = backendConf.runnerClass
+  def runRaw(file: Path, master: String, backendArgs: Map[String, String]) = timing("execute raw") {
+    logger.debug(s"executing in raw mode: $file with master $master for backend ${BackendManager.backend.name} with arguments ${backendArgs.mkString(" ")}")
+    val runner = BackendManager.backend.runnerClass
     runner.executeRaw(file, master, backendArgs)
   }
 
+  
+  /**
+   * Run with the provided set of files using the specified backend, that is _not_ a raw backend.
+   * 
+   * @param inputFiles The list of files to execute
+   * @param outDir The target directory to write generated files to
+   * @param compileOnly Code generation and compilation only, but do not submit job
+   * @param master Master specification (local, yarn, mesos, ...)
+   * @param langFeature activated language features
+   * @param params Parameter substitutions 
+   * @param backendPath Base directory for backends
+   * @param backendArgs Parameters to pass to the backend runner (e.g., number of executors, ...)
+   * @param profiling Optional URL of the statistics listener, if NONE, statistics will not be collected
+   * @param showPlan Print the generated final plan to stdout
+   * @param sequential If multiple scripts are given, execute them sequentially and do _not_ try to merge them
+   * 
+   */
   def runWithCodeGeneration(inputFiles: Seq[Path], outDir: Path, compileOnly: Boolean, master: String, backend: String,
                             langFeatures: List[LanguageFeature.LanguageFeature], params: Map[String, String],
-                            backendPath: Path, backendConf: BackendConf, backendArgs: Map[String, String],
+                            backendPath: Path, backendArgs: Map[String, String],
                             profiling: Option[URI], showPlan: Boolean, sequential: Boolean): Unit = timing("run with generation") {
+    
     logger.debug("start parsing input files")
     
     var schedule = ListBuffer.empty[(DataflowPlan,Path)]
     
     for(file <- inputFiles) {
+      // foreach file, generate the data flow plan and store it in our schedule
       PigletCompiler.createDataflowPlan(file, params, backend, langFeatures) match {
         case Some(v) => schedule += ((v, file))
-        case None =>
-          logger.error(s"failed to create dataflow plan for $file - aborting")
-          return
+        case None => // in case of an error (no plan genrated for file) abort current execution
+          throw InvalidPlanException(s"failed to create dataflow plan for $file - aborting")
       }
     }
 
@@ -327,8 +345,7 @@ object Piglet extends PigletLogging {
       schedule = ListBuffer((mergedPlan, Paths.get(s"merged_${System.currentTimeMillis()}.pig")))  
     }
     
-    val templateFile = backendConf.templateFile
-		val jarFile = Conf.backendJar(backend)
+    val templateFile = BackendManager.backend.templateFile
 		
 		val profiler = profiling.map { u => new DataflowProfiler(Some(u)) }
 
@@ -385,13 +402,12 @@ object Piglet extends PigletLogging {
       logger.debug(s"using script name: $scriptName")
 
       
-      PigletCompiler.compilePlan(newPlan, scriptName, outDir, backendPath,
-        templateFile, backend, profiling, keepFiles) match {
+      PigletCompiler.compilePlan(newPlan, scriptName, outDir, backendPath, templateFile, backend, profiling, keepFiles) match {
         // the file was created --> execute it
         case Some(jarFile) =>
           if (!compileOnly) {
             // 4. and finally deploy/submit
-            val runner = backendConf.runnerClass
+            val runner = BackendManager.backend.runnerClass
             logger.debug(s"using runner class ${runner.getClass.toString()}")
 
             logger.info( s"""starting job at "$jarFile" using backend "$backend" """)
@@ -407,97 +423,86 @@ object Piglet extends PigletLogging {
   }
 
 
-  /**
-    * Sets the various configuration parameters to the given string values.
-    *
-    * @param master the master for Spark/Flink
-    * @param backend the backend used for execution (spark, flink, sparks, flinks, ...)
-    * @param language the Piglet dialect used for processing the script
-    * @param backendDir the directory where the backend-specific jars are located
-    */
-  def setConfig(master: String = "local", backend: String = "spark", language: String = "pig",
-                backendDir: Path = Paths.get(".")): Unit = {
-    Piglet.master = master
-    Piglet.backend = backend
-    Piglet.backendPath = backendDir
-    Piglet.languageFeatures = List(language match {
-      case "sparql" => LanguageFeature.SparqlPig
-      case "streaming" => LanguageFeature.StreamingPig
-      case "pig" => LanguageFeature.PlainPig
-      case _ => LanguageFeature.PlainPig
-    })
-    val backendConf = BackendManager.backend(backend)
-    BackendManager.backend = backendConf
-  }
+//  /**
+//    * Sets the various configuration parameters to the given string values.
+//    *
+//    * @param master the master for Spark/Flink
+//    * @param backend the backend used for execution (spark, flink, sparks, flinks, ...)
+//    * @param language the Piglet dialect used for processing the script
+//    * @param backendDir the directory where the backend-specific jars are located
+//    */
+//  def setConfig(master: String = "local", backend: String = "spark", language: String = "pig",
+//                backendDir: Path = Paths.get(".")): Unit = {
+//    Piglet.master = master
+//    Piglet.backend = backend
+//    Piglet.backendPath = backendDir
+//    Piglet.languageFeatures = List(language match {
+//      case "sparql" => LanguageFeature.SparqlPig
+//      case "streaming" => LanguageFeature.StreamingPig
+//      case "pig" => LanguageFeature.PlainPig
+//      case _ => LanguageFeature.PlainPig
+//    })
+//    val backendConf = BackendManager.backend(backend)
+//    BackendManager.backend = backendConf
+//  }
 
-  /**
-    * Compiles and executes the given Piglet script.
-    *
-    * @param fileName the file name of the Piglet script
-    */
-  def compileFile(fileName: String): Unit = {
-    val path = Paths.get(fileName)
-    PigletCompiler.createDataflowPlan(path, Map[String, String](), backend, languageFeatures) match {
-      case Some(p) => compileAndExecute(p)
-      case None => {}
-    }
-  }
+//  /**
+//    * Compiles and executes the given Piglet script.
+//    *
+//    * @param fileName the file name of the Piglet script
+//    */
+//  def compileFile(fileName: String): Unit = {
+//    val path = Paths.get(fileName)
+//    PigletCompiler.createDataflowPlan(path, Map[String, String](), backend, languageFeatures) match {
+//      case Some(p) => compileAndExecute(p)
+//      case None => {}
+//    }
+//  }
 
-  /**
-    * Compiles and executes the given Piglet script represented as string.
-    *
-    * @param source a string containing the Piglet code
-    */
-  def compile(source: String): List[Any] = {
-    PigletCompiler.createDataflowPlan(source, Map[String, String](), backend, languageFeatures) match {
-      case Some(p) => {
-        val res = compileAndExecute(p)
-        res.split("\n").toList.map(_.split(","))
-      }
-      case None => List()
-    }
-  }
+//  /**
+//    * Compiles and executes the given Piglet script represented as string.
+//    *
+//    * @param source a string containing the Piglet code
+//    */
+//  def compile(source: String): List[Any] = {
+//    PigletCompiler.createDataflowPlan(Paths.get(source), Map[String, String](), backend, languageFeatures) match {
+//      case Some(p) => {
+//        val res = compileAndExecute(p)
+//        res.split("\n").toList.map(_.split(","))
+//      }
+//      case None => List()
+//    }
+//  }
 
-  private def compileAndExecute(p: DataflowPlan): String = {
-    def cleanup(s: String): Unit = {
-      import scalax.file.Path
-
-      val path: Path = Path(s)
-      try {
-        path.deleteRecursively(continueOnFailure = false)
-      }
-      catch {
-        case e: java.io.IOException => // some file could not be deleted
-      }
-    }
-
-    val plan = processPlan(p)
-    plan.checkSchemaConformance
-
-    val backendConf = BackendManager.backend
-    val outDir = Paths.get(".")
-    val scriptName = "__r_piglet"
-    val templateFile = backendConf.templateFile
-    val jarFile = Conf.backendJar(backend)
-    val profiling: Option[URI] = None
-    
-    val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, 
-        backendPath, templateFile, backend, profiling, false) match {
-      
-      case Some(jarFile) => {
-        val runner = backendConf.runnerClass
-        logger.debug(s"using runner class ${runner.getClass.toString()}")
-
-        logger.info( s"""starting job at "$jarFile" using backend "$backend" """)
-        val resStream = new java.io.ByteArrayOutputStream
-        Console.withOut(resStream)(runner.execute(master, scriptName, jarFile, Map[String, String]()))
-        resStream.toString
-      }
-      case None => ""
-    }
-    cleanup(scriptName)
-    res
-  }
+//  private def compileAndExecute(p: DataflowPlan): String = {
+//
+//    val plan = processPlan(p)
+//    plan.checkSchemaConformance
+//
+//    val backendConf = BackendManager.backend
+//    val outDir = Paths.get(".")
+//    val scriptName = "__r_piglet"
+//    val templateFile = backendConf.templateFile
+//    val jarFile = Conf.backendJar(backend)
+//    val profiling: Option[URI] = None
+//    
+//    val res: String = PigletCompiler.compilePlan(plan, scriptName, outDir, 
+//        backendPath, templateFile, backend, profiling, false) match {
+//      
+//      case Some(jarFile) => {
+//        val runner = backendConf.runnerClass
+//        logger.debug(s"using runner class ${runner.getClass.toString()}")
+//
+//        logger.info( s"""starting job at "$jarFile" using backend "$backend" """)
+//        val resStream = new java.io.ByteArrayOutputStream
+//        Console.withOut(resStream)(runner.execute(master, scriptName, jarFile, Map[String, String]()))
+//        resStream.toString
+//      }
+//      case None => ""
+//    }
+//    FileTools.recursiveDelete(scriptName)
+//    res
+//  }
 
   def startCollectStats(enable: Boolean) = if(enable) SETM.enable else SETM.disable
   def collectStats = SETM.collect()

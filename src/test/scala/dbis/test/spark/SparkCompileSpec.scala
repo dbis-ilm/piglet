@@ -39,8 +39,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
   
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val backendConf = BackendManager.backend("spark") 
-  BackendManager.backend = backendConf 
+  val backendConf = BackendManager.init("spark") 
   val templateFile = backendConf.templateFile
 
   "The compiler output" should "contain the Spark header & footer" in {

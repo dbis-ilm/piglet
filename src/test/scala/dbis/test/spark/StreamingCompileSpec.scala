@@ -42,8 +42,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
 
   def cleanString(s: String): String = s.stripLineEnd.replaceAll( """\s+""", " ").trim
 
-  val backendConf = BackendManager.backend("sparks")
-  BackendManager.backend = backendConf
+  val backendConf = BackendManager.init("sparks")
   val templateFile = backendConf.templateFile
 
   "The compiler output" should "contain the Spark Streaming header & footer" in {

@@ -4,6 +4,9 @@ import dbis.pig.tools.Conf
 import dbis.pig.tools.logging.PigletLogging
 import java.net.URLClassLoader
 
+case class NotInitializedException(msg: String) extends Exception(msg)
+
+case class AlreadyInitializedException(msg: String) extends Exception(msg)
 
 /**
  * Manages the available backends. 
@@ -15,23 +18,42 @@ object BackendManager extends PigletLogging {
    */
   private var _backend: BackendConf = _
 
-  def backend = _backend
+  /**
+   * Check if the BackendManager has already been initialized for a backend
+   * 
+   * @see [[BackendManager.init]]
+   */
+  def isInitialized = _backend != null
+  
+  /**
+   * Get the current backend configuration
+   * 
+   * @throws [[NotInitializedException]] if BackendManager has not been initialized yet.
+   */
+  def backend = if(isInitialized) _backend else throw NotInitializedException("BackendManager not initialized yet")
 
-  def backend_= (conf: BackendConf) = _backend = conf
 
   /**
-   * Get the runner class for the backend with the given name
+   * Initialized the manager for the current backend, that is, load the [[BackendConf]] from the FQN
+   * as given in Piglet's config file. 
+   * 
    * 
    * @param backend The name of the backend. 
-   * @return Returns a new instance of the runner class (whose FQN was specified in Piglet config file)
+   * @return Returns a new instance of the [[BakcendConf]] (whose FQN was specified in Piglet config file)
    */
-  def backend(backend: String): BackendConf = {
+  def init(backendName: String): BackendConf = {
     
-    val className = Conf.backendConf(backend)
+    if(isInitialized)
+      logger.info(s"BackendManager already initialized as ${backend.toString()}")
+//      throw AlreadyInitializedException(s"BackendManager already initialized as ${backend.toString()}")
     
-    logger.debug(s"""loading runner class for backend "$backend" with name: $className""")
+    val className = Conf.backendConf(backendName)
     
-    Class.forName(className).newInstance().asInstanceOf[BackendConf]
+    logger.debug(s"""loading runner class for backend "$backendName" with name: $className""")
+    
+    _backend = Class.forName(className).newInstance().asInstanceOf[BackendConf]
+    
+    backend
   }
 
 }

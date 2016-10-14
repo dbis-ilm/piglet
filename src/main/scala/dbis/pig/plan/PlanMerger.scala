@@ -9,6 +9,10 @@ object PlanMerger extends PigletLogging {
 
   
 	def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = timing("merge plans") {
+	  require(schedule.size > 0, "schedule must not be empty")
+	  
+	  if(schedule.size == 1)
+	    return schedule.head
 	  
 	  val indexedSchedule = schedule.zipWithIndex
 	  

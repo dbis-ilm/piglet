@@ -104,23 +104,6 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
   }
 
   /**
-    * Deletes all files generated while executing the script.
-    *
-    * @param dir the directory of the script
-    */
-  def cleanupResult(dir: String): Unit = {
-    import scalax.file.Path
-
-    val path: Path = Path(dir)
-    try {
-      path.deleteRecursively(continueOnFailure = false)
-    }
-    catch {
-      case e: java.io.IOException => // some file could not be deleted
-    }
-  }
-
-  /**
     * Checks if the given string contains a unbalanced number of strings. This is needed
     * to determine whether we can finish the statement.
     *
@@ -234,7 +217,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       }
     } finally {
       // remove directory $defaultScriptName
-      cleanupResult(defaultScriptName)
+      FileTools.recursiveDelete(defaultScriptName)
       logger.debug("flushing history file")
       consoleReader.getHistory.asInstanceOf[FileHistory].flush()
     }
@@ -397,7 +380,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
         case Some(jarFile) =>
           val runner = backendConf.runnerClass
           runner.execute(master, scriptName, jarFile, backendArgs)
-          cleanupResult(scriptName)
+          FileTools.recursiveDelete(scriptName)
 
         case None => Console.err.println("failed to build jar file for job")
       }
@@ -406,7 +389,7 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
       case e: Throwable =>
         Console.err.println(s"error while executing: ${e.getMessage}")
         e.printStackTrace(Console.err)
-        cleanupResult(scriptName)
+        FileTools.recursiveDelete(scriptName)
     }
 
     // buf.clear()
@@ -500,12 +483,12 @@ object PigletREPL extends dbis.pig.tools.logging.PigletLogging {
     
     logger debug s"""Running REPL with backend "$backend" """
 
-    backendConf = BackendManager.backend(backend)
+    backendConf = BackendManager.init(backend)
     if (backendConf.raw)
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
 
 
-    BackendManager.backend = backendConf
+//    BackendManager.backend = backendConf
     
     if(profiling.isDefined) {
       val reachable = FileTools.checkHttpServer(profiling.get)

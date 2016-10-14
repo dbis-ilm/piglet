@@ -26,6 +26,10 @@ import org.ddahl.jvmr.RInScala
 
 import scala.io.Source
 
+import org.scalatest.Tag
+
+object RTest extends Tag("R")
+
 class RIntegrationSpec extends FlatSpec with Matchers {
   def checkForWorkingR(): Boolean = {
     try {
@@ -37,7 +41,7 @@ class RIntegrationSpec extends FlatSpec with Matchers {
   }
 
 //  "The R integration" 
-  ignore should "allow to invoke a R script" in {
+  it should "allow to invoke a R script" taggedAs(RTest) in {
     if (checkForWorkingR) {
       val R = RInScala()
       R.x = Array(10.0, 20.0, 30.0)
@@ -51,7 +55,7 @@ class RIntegrationSpec extends FlatSpec with Matchers {
 
   }
 
-  ignore should "run DBSCAN in R" in {
+  it should "run DBSCAN in R" taggedAs(RTest) in {
     if (checkForWorkingR) {
     /**
      * Prepare the data in R as follows:
@@ -83,7 +87,8 @@ class RIntegrationSpec extends FlatSpec with Matchers {
       assume(false, "R not enabled, no test performed")
   }
 
-  "The parser" should "accept the SCRIPT statement" in  {
+//  "The parser"
+  it should "accept the SCRIPT statement" taggedAs(RTest) in  {
     parseScript("""a = RSCRIPT b USING 'library(fpc); res <- dbscan($_, eps=0.42, MinPts=5)';""")
   }
 

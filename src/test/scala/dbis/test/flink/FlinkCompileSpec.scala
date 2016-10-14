@@ -40,8 +40,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   def cleanString(s: String): String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val backendConf = BackendManager.backend("flink")
-  BackendManager.backend = backendConf
+  val backendConf = BackendManager.init("flink")
+//  BackendManager.backend = backendConf
   val templateFile = backendConf.templateFile
 
   "The compiler output" should "contain the Flink header & footer" in {
