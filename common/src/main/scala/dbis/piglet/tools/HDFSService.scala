@@ -42,9 +42,10 @@ object HDFSService extends PigletLogging {
 
   
   
-  def process(cmd: String, params: List[String]): Unit = {
+  def process(cmd: HdfsCommand.HdfsCommand, params: List[String]): Unit = {
     logger.debug(s"HDFSService: process '${cmd}' with parameters ${params.mkString(",")}")
-    HdfsCommand.withName(cmd.toUpperCase()) match {
+//    HdfsCommand.withName(cmd.toUpperCase())
+    cmd match {
       case HdfsCommand.COPYTOLOCAL => copyToLocal(params(0), params(1))
       case HdfsCommand.COPYTOREMOTE => copyToRemote(params(0), params(1))
       case HdfsCommand.RM => if (params.head == "-r") removeDirectory(params(1), true) else removeFile(params.head)

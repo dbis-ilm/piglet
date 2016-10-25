@@ -25,16 +25,16 @@ import dbis.piglet.tools.HdfsCommand
 /**
  * HdfsCmd represents a pseudo operator for HDFS commands.
  */
-case class HdfsCmd(cmd: String, params: List[String]) extends PigOperator(List(), List())
+case class HdfsCmd(cmd: HdfsCommand.HdfsCommand, params: List[String]) extends PigOperator(List(), List())
 {
 
-  if (!isValid)
-    throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
+//  if (!isValid)
+//    throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
 
 
   override def outPipeNames: List[String] = List()
 
-  def isValid = HdfsCommand.values.map{v => v.toString().toLowerCase()}.exists { s => s.equalsIgnoreCase(cmd) }
+//  def isValid = HdfsCommand.values.map{v => v.toString().toLowerCase()}.exists { s => s.equalsIgnoreCase(cmd) }
 
   def paramString(): String = params.map(p => s""""$p"""").mkString(",")
 

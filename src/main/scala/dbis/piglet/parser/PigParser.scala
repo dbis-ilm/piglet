@@ -46,6 +46,7 @@ object LanguageFeature extends Enumeration {
 }
 
 import dbis.piglet.parser.LanguageFeature._
+import dbis.piglet.tools.HdfsCommand
 
 /**
  * A parser for the (extended) Pig language.
@@ -659,10 +660,19 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   /*
    * fs -cmd params
    */
-  def fsCmd: Parser[String] = ("""-[a-zA-Z]*""").r ^^ { s => s.substring(1) }
+  def fsCmd: Parser[HdfsCommand.HdfsCommand] = ("""-[a-zA-Z]*""").r ^^ { s => 
+    try {
+      HdfsCommand.withName(s.substring(1).toUpperCase())
+    } catch {
+      case ex: NoSuchElementException => throw new IllegalArgumentException(s"No such HDFS command: $s")
+    }
+    
+  }
   def fsParam: Parser[String] = ("""[^;][/\w\.\-]*""").r
 
-  def fsStmt: Parser[PigOperator] = fsKeyword ~ fsCmd ~ rep(fsParam) ^^ { case _ ~ cmd ~ params => HdfsCmd(cmd, params)}
+  def fsStmt: Parser[PigOperator] = fsKeyword ~ fsCmd ~ rep(fsParam) ^^ { 
+    case _ ~ cmd ~ params => HdfsCmd(cmd, params)
+  }
 
   def code = ("""(?s)(.*?)""")
 
@@ -939,7 +949,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     )
 
   def pigScript: Parser[List[PigOperator]] = rep(pigStmt)
-
+  
   def parseScript(input: CharSequenceReader): List[PigOperator] = {
     phrase(pigScript)(input) match {
   	  case Success(t, _) => t
@@ -947,6 +957,8 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   	  throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
 	  }
   }
+  
+  
 
 }
 

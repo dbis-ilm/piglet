@@ -5,6 +5,7 @@ import java.io.File
 import dbis.piglet.tools.HDFSService
 import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.Tag
+import dbis.piglet.tools.HdfsCommand
 
 object HdfsTest extends Tag("hdfs")
 
@@ -53,16 +54,16 @@ class HDFSSpec extends FlatSpec with Matchers {
 
   it should "process HDFS commands" taggedAs(HdfsTest) in {
     if (HDFSService.isInitialized) {
-      HDFSService.process("mkdir", List("/data/blubs"))
+      HDFSService.process(HdfsCommand.MKDIR, List("/data/blubs"))
       HDFSService.exists("/data/blubs") should be(true)
 
-      HDFSService.process("copyToRemote", List("LICENSE", "/data/blubs/LICENSE"))
+      HDFSService.process(HdfsCommand.COPYTOREMOTE, List("LICENSE", "/data/blubs/LICENSE"))
       HDFSService.exists("/data/blubs/LICENSE") should be(true)
 
-      HDFSService.process("copyToLocal", List("/data/blubs/LICENSE", "LICENSE-COPY"))
+      HDFSService.process(HdfsCommand.COPYTOLOCAL, List("/data/blubs/LICENSE", "LICENSE-COPY"))
       val localFile = new File("LICENSE-COPY")
       localFile.exists() should be(true)
-      HDFSService.process("rm", List("-r", "/data/blubs"))
+      HDFSService.process(HdfsCommand.RM, List("-r", "/data/blubs"))
       localFile.delete()
       HDFSService.exists("/data/blubs") should be(false)
 

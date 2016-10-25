@@ -44,6 +44,7 @@ import dbis.piglet.plan.rewriting.Rewriter
 
 import scopt.OptionParser
 import java.net.URI
+import dbis.piglet.op.cmd.HdfsCmd
 
 sealed trait JLineEvent
 
@@ -136,27 +137,36 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @return true if the execution was successful
     */
   private def processFsCmd(s: String): Boolean = {
-    val sList = s.split(" ")
-    val cmdList = sList.slice(1, sList.length)
-    if (cmdList.head.startsWith("-")) {
-      val paramList =
-        if (cmdList.length == 1)
-          List()
-        else {
-          val last = cmdList.last
-          cmdList.slice(1, cmdList.length - 1).toList :::
-            List(if (last.endsWith(";")) last.substring(0, last.length - 1) else last)
-        }
-      try {
-        HDFSService.process(cmdList.head.substring(1), paramList)
-      }
-      catch {
-        case ex: Throwable => println(s"error while executing fs command: ${ex.getMessage}")
-      }
+//    val sList = s.split(" ")
+//    val cmdList = sList.slice(1, sList.length)
+//    if (cmdList.head.startsWith("-")) {
+//      val paramList =
+//        if (cmdList.length == 1)
+//          List()
+//        else {
+//          val last = cmdList.last
+//          cmdList.slice(1, cmdList.length - 1).toList :::
+//            List(if (last.endsWith(";")) last.substring(0, last.length - 1) else last)
+//        }
+//      try {
+//        HDFSService.process(cmdList.head.substring(1), paramList)
+//      }
+//      catch {
+//        case ex: Throwable => println(s"error while executing fs command: ${ex.getMessage}")
+//      }
+//    }
+//    else
+//      println(s"invalid fs command '${cmdList.head}'")
+    
+    
+	  val op = PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = true).head.asInstanceOf[HdfsCmd]
+
+	  try {
+	    HDFSService.process(op.cmd, op.params)  	    
+    } catch {
+      case ex: Throwable => println(s"error while executing fs command: ${ex.getMessage}")
     }
-    else
-      println(s"invalid fs command '${cmdList.head}'")
-    false
+	  false
   }
 
   /**
@@ -523,7 +533,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
         s.toLowerCase.startsWith(s"display ") ||
         s.toLowerCase.startsWith(s"store ") ||
         s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf, profiling)
-      case Line(s, buf) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
+      case Line(s, _) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
       case Line(s, buf) => try {
         buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = false)
         eliminateDuplicatePipes(buf)

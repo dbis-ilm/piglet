@@ -32,6 +32,7 @@ import dbis.piglet.schema._
 import org.scalatest.{Matchers, OptionValues, FlatSpec}
 
 import scala.util.Random
+import dbis.piglet.tools.HdfsCommand
 
 class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   "The parser" should "handle language feature sets" in {
@@ -782,11 +783,11 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   it should "parse HDFS commands" in {
     assert(parseScript("fs -copyToRemote /usr/local/file /hdfs/data/file;")
-      == List(HdfsCmd("copyToRemote", List("/usr/local/file", "/hdfs/data/file"))))
-    assert(parseScript("fs -copyFromLocal /hdfs/data/file /usr/local/file;")
-      == List(HdfsCmd("copyFromLocal", List("/hdfs/data/file", "/usr/local/file"))))
+      == List(HdfsCmd(HdfsCommand.COPYTOREMOTE, List("/usr/local/file", "/hdfs/data/file"))))
+    assert(parseScript("fs -copyToLocal /hdfs/data/file /usr/local/file;")
+      == List(HdfsCmd(HdfsCommand.COPYTOLOCAL, List("/hdfs/data/file", "/usr/local/file"))))
     assert(parseScript("fs -rmdir /hdfs/data;")
-      == List(HdfsCmd("rmdir", List("/hdfs/data"))))
+      == List(HdfsCmd(HdfsCommand.RMDIR, List("/hdfs/data"))))
 
     intercept[java.lang.IllegalArgumentException] {
       parseScript("fs -unknownCmd something;")
