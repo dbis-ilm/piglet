@@ -11,8 +11,7 @@ object PigBuild extends Build {
   lazy val commonSettings = Seq(
     version := "0.3",
     scalaVersion := "2.11.8",
-    organization := "dbis",
-    unmanagedJars in Compile += file("lib_unmanaged/jvmr_2.11-2.11.2.1.jar")
+    organization := "dbis"
   )
 
   /*
@@ -46,6 +45,7 @@ object PigBuild extends Build {
 
   lazy val sparklib = (project in file("sparklib")).
     settings(commonSettings: _*).
+    settings(unmanagedJars in Compile += file(s"./lib_unmanaged/jvmr_2.11-2.11.2.1.jar")).
     dependsOn(common).
     disablePlugins(sbtassembly.AssemblyPlugin)
 
