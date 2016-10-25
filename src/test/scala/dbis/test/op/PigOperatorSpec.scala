@@ -16,13 +16,13 @@
  */
 package dbis.test.op
 
-//import dbis.pig.Piglet._
-import dbis.pig.parser.PigParser.parseScript
-import dbis.pig.op.cmd.EmbedCmd
-import dbis.pig.op.Foreach
-import dbis.pig.plan._
-import dbis.pig.schema._
-import dbis.pig.udf.UDF
+//import dbis.piglet.Piglet._
+import dbis.piglet.parser.PigParser.parseScript
+import dbis.piglet.op.cmd.EmbedCmd
+import dbis.piglet.op.Foreach
+import dbis.piglet.plan._
+import dbis.piglet.schema._
+import dbis.piglet.udf.UDF
 import org.scalatest.OptionValues._
 import org.scalatest.{FlatSpec, Matchers}
 import java.net.URI

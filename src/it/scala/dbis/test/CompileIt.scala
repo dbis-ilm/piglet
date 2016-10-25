@@ -18,8 +18,8 @@
 package dbis.test
 
 import org.scalatest.{ Matchers, FlatSpec }
-import dbis.pig.Piglet
-import dbis.pig.backends.BackendManager
+import dbis.piglet.Piglet
+import dbis.piglet.backends.BackendManager
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.prop.TableFor6
 import scala.io.Source

@@ -16,21 +16,21 @@
  */
 package dbis.test.spark
 
-import dbis.pig.backends.BackendManager
-import dbis.pig.codegen.spark.BatchCodeGen
-import dbis.pig.codegen.spark.StreamingCodeGen
-import dbis.pig.expr._
-import dbis.pig.parser.LanguageFeature
-import dbis.pig.parser.PigParser.parseScript
-import dbis.pig.backends.BackendManager
-import dbis.pig.codegen.spark.{StreamingCodeGen, BatchCodeGen}
-import dbis.pig.op._
-import dbis.pig.plan.DataflowPlan
-import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.Rules
-import dbis.pig.plan.rewriting.Rules
-import dbis.pig.schema._
-import dbis.pig.udf.UDFTable
+import dbis.piglet.backends.BackendManager
+import dbis.piglet.codegen.spark.BatchCodeGen
+import dbis.piglet.codegen.spark.StreamingCodeGen
+import dbis.piglet.expr._
+import dbis.piglet.parser.LanguageFeature
+import dbis.piglet.parser.PigParser.parseScript
+import dbis.piglet.backends.BackendManager
+import dbis.piglet.codegen.spark.{StreamingCodeGen, BatchCodeGen}
+import dbis.piglet.op._
+import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.plan.rewriting.Rewriter._
+import dbis.piglet.plan.rewriting.Rules
+import dbis.piglet.plan.rewriting.Rules
+import dbis.piglet.schema._
+import dbis.piglet.udf.UDFTable
 import dbis.test.TestTools._
 import org.scalatest.{Matchers, BeforeAndAfterAll, FlatSpec}
 
@@ -55,9 +55,9 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
       """
         |import org.apache.spark._
         |import org.apache.spark.streaming._
-        |import dbis.pig.backends.{SchemaClass, Record}
-        |import dbis.pig.tools._
-        |import dbis.pig.backends.spark._
+        |import dbis.piglet.backends.{SchemaClass, Record}
+        |import dbis.piglet.tools._
+        |import dbis.piglet.backends.spark._
         |
         |object SECONDS {
         |  def apply(p: Long) = Seconds(p)
