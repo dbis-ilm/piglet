@@ -62,27 +62,16 @@ object CliParams {
     opt[Unit]('k',"keep") optional() action { (x,c) => c.copy(keepFiles = true) } text ("keep generated files")
     opt[Unit]("show-stats") optional() action { (_,c) => c.copy(showStats = true) } text ("print detailed timing stats at the end")
     opt[Map[String, String]]("backend-args") valueName ("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to substitute")
+    opt[Unit]('q',"quiet") optional() action { (_,c) => c } text ("Don't print header output (does not affect logging and error output)")
+    opt[Unit]('i', "interactive") action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
     help("help") text ("prints this usage text")
     version("version") text ("prints this version info")
     arg[File]("<file>...") unbounded() optional() action { (x, c) => c.copy(inputFiles = c.inputFiles :+ x.toPath()) } text ("Pig script files to execute")
   }
   
-  def parse(args: Array[String]): CliParams = optparser.parse(args, CliParams()).getOrElse(throw new IllegalStateException("error parsing cli parameters"))
-//    {
-    // parser.parse returns Option[C]
-//    val c = optparser.parse(args, CliParams())  match {
-//      case Some(config) => {
-//        // do stuff
-//        config
-//      }
-//      case None =>
-//        // arguments are bad, error message will have been displayed
-////        return
-//        throw new IllegalArgumentException("blubb")
-//    }
-//    
-//    c
-//    
-//  }
+  def parse(args: Array[String]): CliParams = optparser.parse(args, CliParams()).getOrElse{
+    System.exit(1)
+    CliParams() // we won't get here. This is just to satisfy the return type.
+  }
   
 }

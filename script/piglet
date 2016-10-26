@@ -6,6 +6,7 @@ FALSE=1
 local=$TRUE        # will be set by isLocalMode function
 backend=""         # will be set by getBackend function
 interactive=false
+quiet=true
 
 ##############################################################
 # printLogo - function to print the logo
@@ -44,7 +45,7 @@ echo '
 
 ##############################################################
 # isLocalMode - check if the option --master local was given
-# @params: $@ all parameters 
+# @params: $@ all parameters
 ##############################################################
 function isLocalMode {
 
@@ -77,7 +78,7 @@ function isLocalMode {
 
 ##############################################################
 # getBackend - determine the specified backend
-# @params: $@ all parameters 
+# @params: $@ all parameters
 ##############################################################
 function getBackend {
     short_backend="-b"
@@ -168,6 +169,30 @@ function checkJobManager {
 }
 
 ##############################################################
+# isQuietMode  - test if we are allowed to print header
+##############################################################
+function isQuietMode {
+  short_quiet="-q"
+  long_quiet="--quiet"
+
+  pos=1 # start with 1 so it points to element after $i in the array
+
+  args=("$@") # store the arguments in the args array - just for convenience
+
+  for i in "$@" # iterate over arguments
+  do
+      if [ "$i" == "$short_quiet" ] || [ "$i" == "$long_quiet" ]; then # if we found the quiet option
+          # we found what we needed - stop the loop
+          quiet=true
+          break
+      fi
+
+      ((pos += 1))
+
+  done
+}
+
+##############################################################
 
 ## search for the master option
 isLocalMode $*
@@ -183,11 +208,14 @@ if [ "$backend" == "" ] && [[ ! $@ =~ .*--help.* ]] ; then
 fi
 
 checkInteractiveShell $*
+isQuietMode $*
 
-if $interactive; then
-    printLogo "shell"
-else
-    printLogo $backend
+if ! $quiet; then
+  if $interactive; then
+      printLogo "shell"
+  else
+      printLogo $backend
+  fi
 fi
 
 # TODO: we should find our jar file the same way we do for spark
