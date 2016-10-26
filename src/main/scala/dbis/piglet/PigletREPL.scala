@@ -45,6 +45,7 @@ import dbis.piglet.plan.rewriting.Rewriter
 import scopt.OptionParser
 import java.net.URI
 import dbis.piglet.op.cmd.HdfsCmd
+import dbis.piglet.tools.CliParams
 
 sealed trait JLineEvent
 
@@ -59,26 +60,9 @@ case object EOF extends JLineEvent
   */
 object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
 
-  case class REPLConfig(master: String = "local",
-                        outDir: String = ".",
-                        backend: String = Conf.defaultBackend,
-                        backendPath: String = ".",
-                        interactive: Boolean = true,
-                        profiling: Option[URI] = None,
-                        backendArgs: Map[String, String] = Map(),
-                        loglevel: Option[String] = None)
-
-
-  val keepFiles = false
   val defaultScriptName = "__my_script"
 
   private val consoleReader = new ConsoleReader()
-
-  var backend: String = Conf.defaultBackend
-  var backendPath: String = "."
-  var backendArgs: Map[String, String] = null
-  var backendConf: BackendConf = null
-  var master: String = "local"
 
   /**
     * A counter to make script names unique - it will be
@@ -137,28 +121,9 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @return true if the execution was successful
     */
   private def processFsCmd(s: String): Boolean = {
-//    val sList = s.split(" ")
-//    val cmdList = sList.slice(1, sList.length)
-//    if (cmdList.head.startsWith("-")) {
-//      val paramList =
-//        if (cmdList.length == 1)
-//          List()
-//        else {
-//          val last = cmdList.last
-//          cmdList.slice(1, cmdList.length - 1).toList :::
-//            List(if (last.endsWith(";")) last.substring(0, last.length - 1) else last)
-//        }
-//      try {
-//        HDFSService.process(cmdList.head.substring(1), paramList)
-//      }
-//      catch {
-//        case ex: Throwable => println(s"error while executing fs command: ${ex.getMessage}")
-//      }
-//    }
-//    else
-//      println(s"invalid fs command '${cmdList.head}'")
-    
-    
+    /* use the parser to obtain the HDFS command object
+     * The processFsCmd method is called only 
+     */
 	  val op = PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = true).head.asInstanceOf[HdfsCmd]
 
 	  try {
@@ -354,29 +319,37 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return false
     */
-  def executeScript(s: String, buf: ListBuffer[PigOperator], profiling: Option[URI]): Boolean = {
+  def executeScript(s: String, buf: ListBuffer[PigOperator], c: CliParams): Boolean = {
     try {
       if (s.toLowerCase.startsWith("dump ")) {
         // if we have multiple dumps in our script then only the first one
         // is executed. Thus, we have to remove all other DUMP statements in
         // our list of operators.
         val dumps = buf.filter(p => p.isInstanceOf[Dump])
+        
+        if(dumps.size > 1)
+          logger.warn(s"Found ${dumps.size} DUMP commands - executing only the first one!")
+        
         dumps.foreach(d => d.inputs.head.removeConsumer(d))
         buf --= dumps
       }
       // the same for DISPLAY
       if (s.toLowerCase.startsWith("display ")) {
         val displays = buf.filter(p => p.isInstanceOf[Display])
+        
+        if(displays.size > 1)
+          logger.warn(s"Found ${displays.size} DISPLAY commands - executing only the first one!")
+          
         displays.foreach(d => d.inputs.head.removeConsumer(d))
         buf --= displays
       }
 
-      buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = false)
+      buf ++= PigParser.parseScript(s, c.languages, resetSchema = false)
       var plan = new DataflowPlan(buf.toList)
       logger.debug("plan created.")
 
-      if(profiling.isDefined) {
-        val mm = new MaterializationManager(Conf.materializationBaseDir, profiling.get)
+      if(c.profiling.isDefined) {
+        val mm = new MaterializationManager(Conf.materializationBaseDir, c.profiling.get)
         plan = processMaterializations(plan, mm)
       }
 
@@ -394,14 +367,15 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
         }
       }
 
-      val templateFile = backendConf.templateFile
+      val templateFile = BackendManager.backend.templateFile
 //      val jobJar = Paths.get(s"$backendPath/${Conf.backendJar(backend).toString}")
 
       nextScriptName()
-      PigletCompiler.compilePlan(plan, scriptName, Paths.get("."), Paths.get(backendPath), templateFile, backend, profiling, keepFiles) match {
+      
+      PigletCompiler.compilePlan(plan, scriptName, templateFile, c) match {
         case Some(jarFile) =>
-          val runner = backendConf.runnerClass
-          runner.execute(master, scriptName, jarFile, backendArgs)
+          val runner = BackendManager.backend.runnerClass
+          runner.execute(c.master, scriptName, jarFile, c.backendArgs)
           FileTools.recursiveDelete(scriptName)
 
         case None => Console.err.println("failed to build jar file for job")
@@ -461,62 +435,26 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
   }
 
   def main(args: Array[String]): Unit = {
-    var outDir: Path = null
-    var interactive: Boolean = true
-    var profiling: Option[URI] = None
-    var logLevel: Option[String] = None
-    val parser = new OptionParser[REPLConfig]("PigREPL") {
-      head("PigletREPL", BuildInfo.version)
-      opt[Unit]('i', "interactive") hidden() action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
-      opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
-      opt[String]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x) } text ("output directory for generated code")
-      opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = x) } text ("Target backend (spark, flink, ...)")
-      opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = x) } text ("Path to the diretory containing the backend plugins")
-      opt[URI]("profiling") optional() action { (x, c) => c.copy(profiling = Some(x) ) } text ("Switch on profiling")
-      opt[String]('g', "log-level") optional() action { (x,c) => c.copy(loglevel = Some(x.toUpperCase()))} text ("Set the log level: DEBUG, INFO, WARN, ERROR")
-      opt[Map[String, String]]("<backend-arguments>...") optional() action { (x, c) => c.copy(backendArgs = x) } text ("Pig script files to execute")
-      help("help") text ("prints this usage text")
-      version("version") text ("prints this version info")
-    }
-    parser.parse(args, REPLConfig()) match {
-      case Some(config) => {
-        // do stuff
-        master = config.master
-        outDir = Paths.get(config.outDir)
-        profiling = config.profiling
-        backend = config.backend
-        backendPath = config.backendPath
-        backendArgs = config.backendArgs
-        logLevel = config.loglevel
-      }
-      case None =>
-        // arguments are bad, error message will have been displayed
-        return
-    }
 
+    // parse cli params
+    val c = CliParams.parse(args)
+    
     println(s"Welcome to PigREPL ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
-    if(logLevel.isDefined) {
-      try {
-        logger.setLevel(LogLevel.withName(logLevel.get))
-      } catch {
-        case e: NoSuchElementException => println(s"ERROR: invalid log level ${logLevel} - continue with default")
-      }
-    }
+    
+    logger.setLevel(c.logLevel)
+    
+    logger debug s"""Running REPL with backend "${c.backend}" """
 
-    logger debug s"""Running REPL with backend "$backend" """
-
-    backendConf = BackendManager.init(backend)
-    if (backendConf.raw)
+    BackendManager.init(c.backend)
+    if (BackendManager.backend.raw)
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
 
 
-//    BackendManager.backend = backendConf
-
-    if(profiling.isDefined) {
-      val reachable = FileTools.checkHttpServer(profiling.get)
+    if(c.profiling.isDefined) {
+      val reachable = FileTools.checkHttpServer(c.profiling.get)
 
       if(! reachable) {
-        logger.error(s"Statistics management server is not reachable at ${profiling.get}. Aborting")
+        logger.error(s"Statistics management server is not reachable at ${c.profiling.get}. Aborting")
         return
       }
     }
@@ -526,16 +464,16 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
       case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
-      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf, profiling)
+      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf, c.profiling)
       case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => handleRewrite(buf)
-      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf, profiling)
+      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf, c.profiling)
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
         s.toLowerCase.startsWith(s"display ") ||
         s.toLowerCase.startsWith(s"store ") ||
-        s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf, profiling)
+        s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf, c)
       case Line(s, _) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
       case Line(s, buf) => try {
-        buf ++= PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = false)
+        buf ++= PigParser.parseScript(s,c.languages, resetSchema = false)
         eliminateDuplicatePipes(buf)
         false
       } catch {

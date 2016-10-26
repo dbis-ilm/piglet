@@ -980,11 +980,11 @@ object PigParser {
       features.filter(_ != PlainPig) ::: List(PlainPig)
   }
 
-  def parseScript(s: CharSequence, featureList: List[LanguageFeature] = List(PlainPig),
+  def parseScript(s: CharSequence, featureList: Seq[LanguageFeature] = List(PlainPig),
                   resetSchema: Boolean = true): List[PigOperator] = {
     if (resetSchema)
       Schema.init()
-    val parser = new PigParser(handleFeatureSet(featureList))
+    val parser = new PigParser(handleFeatureSet(featureList.toList))
     parser.parseScript(new CharSequenceReader(s))
   }
 

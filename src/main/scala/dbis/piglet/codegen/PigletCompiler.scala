@@ -31,6 +31,7 @@ import dbis.piglet.parser.LanguageFeature
 import dbis.piglet.schema.Schema
 import java.net.URI
 import scala.collection.mutable.ArrayBuffer
+import dbis.piglet.tools.CliParams
 
 
 object PigletCompiler extends PigletLogging {
@@ -44,7 +45,7 @@ object PigletCompiler extends PigletLogging {
    * @param langFeatures the Pig dialects used for parsing
    */
   def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String,
-                         langFeatures: List[LanguageFeature]): Option[DataflowPlan] = timing("create DFP") {
+                         langFeatures: Seq[LanguageFeature]): Option[DataflowPlan] = timing("create DFP") {
     // 1. we read the Pig file
     val source = Source.fromFile(inputFile.toFile)
 
@@ -111,35 +112,29 @@ object PigletCompiler extends PigletLogging {
    *
    * @param plan The plan to compile
    * @param scriptName The name of the script (used as program and file name)
-   * @param outDir The directory to write generated files to
-   * @param backendPath Path to the base directory for backend library jar files
-   * @param templateFile The template file to use for code generation
-   * @param backend The name of the backend
-   * @param profiling Flag indicating whether profiling code should be inserted
-   * @param keepFiles Flag indicating whether generated source files should be deleted or kept
+   * @param c Paramters
    */
-  def compilePlan(plan: DataflowPlan, scriptName: String, outDir: Path, backendPath: Path,
-      templateFile: String, backend: String, profiling: Option[URI], keepFiles: Boolean): Option[Path] = timing("compile plan") {
+  def compilePlan(plan: DataflowPlan, scriptName: String, templateFile: String, c: CliParams): Option[Path] = timing("compile plan") {
 
     // compile it into Scala code for Spark
-    val generatorClass = Conf.backendGenerator(backend)
+    val generatorClass = Conf.backendGenerator(c.backend)
     logger.debug(s"using generator class: $generatorClass")
-    val extension = Conf.backendExtension(backend)
+    val extension = Conf.backendExtension(c.backend)
     logger.debug(s"file extension for generated code: $extension")
-    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
-    logger.debug(s"""arguments to generator class: "${args.mkString(",")}" """)
+//    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
+//    logger.debug(s"""arguments to generator class: "${args.mkString(",")}" """)
 
-    val codeGenerator = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
+    val codeGenerator = Class.forName(generatorClass).getConstructors()(0).newInstance(templateFile).asInstanceOf[CodeGenerator]
     logger.debug(s"successfully created code generator class $codeGenerator")
 
     // generate the Scala code
-    val code = codeGenerator.compile(scriptName, plan, profiling)
+    val code = codeGenerator.compile(scriptName, plan, c.profiling)
 
-    logger.debug("successfully generated scala program")
+    logger.debug("successfully generated program source code")
 
     // write it to a file
 
-    val outputDir = outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
+    val outputDir = c.outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
 
     logger.debug(s"outputDir: $outputDir")
 
@@ -164,8 +159,8 @@ object PigletCompiler extends PigletLogging {
     if (extension.equalsIgnoreCase("scala")) {
       
       val libraryJars = ArrayBuffer(
-          backendPath.resolve(Conf.backendJar(backend)).toString, // the backend library (sparklib, flinklib, etc)
-          backendPath.resolve(Conf.commonJar).toString) // common lib
+          c.backendPath.resolve(Conf.backendJar(c.backend)).toString, // the backend library (sparklib, flinklib, etc)
+          c.backendPath.resolve(Conf.commonJar).toString) // common lib
       
       // extract all additional jar files to output
       (libraryJars ++= plan.additionalJars).foreach{jarFile => 
@@ -180,20 +175,19 @@ object PigletCompiler extends PigletLogging {
 
       // build a jar file
       logger.info(s"creating job's jar file ... ")
-      val jarFile = Paths.get(outDir.toAbsolutePath.toString, scriptName, s"$scriptName.jar")
+      val jarFile = outputDir.resolve(s"$scriptName.jar")
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
         logger.info(s"created job's jar file at $jarFile")
 
-        if(!keepFiles) {
+        if(!c.keepFiles) {
           // remove directory $outputDirectory
-          val p = Paths.get(outDir.toAbsolutePath().toString(), scriptName, "out")
-          FileTools.recursiveDelete(p)
+          FileTools.recursiveDelete(outputDirectory)
         }
         Some(jarFile)
       } else
         None
     }
-    else if (CppCompiler.compile(outputDirectory.toString, outputFile.toString, CppCompilerConf.cppConf(backend))) {
+    else if (CppCompiler.compile(outputDirectory.toString, outputFile.toString, CppCompilerConf.cppConf(c.backend))) {
       logger.info(s"created job's file at $outputFile")
       Some(outputFile)
     }
@@ -219,7 +213,7 @@ object PigletCompiler extends PigletLogging {
     * @return a list of PigOperators constructed from parsing the script
     */
   private def parseScriptFromSource(source: Source, params: Map[String,String],
-                  langFeatures: List[LanguageFeature]): List[PigOperator] = timing("parse script from source") {
+                  langFeatures: Seq[LanguageFeature]): List[PigOperator] = timing("parse script from source") {
     // Handle IMPORT and %DECLARE statements.
 	  val (sourceLines, declareParams) = resolveImports(source.getLines())
 	  if(declareParams.nonEmpty)
