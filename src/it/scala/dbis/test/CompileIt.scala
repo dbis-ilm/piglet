@@ -46,7 +46,7 @@ trait CompileIt extends Matchers {
         val resourcePath = getClass.getResource("").getPath + "../../../"
         // 2. compile and execute Pig script
         
-        print(s"\r--> [${i}/${scripts.size}] $script                                ")
+        print(s"\rTesting: [${"#"*i}${" "*(scripts.size - i)}] ${i}/${scripts.size} : $script                                        ")
         i += 1
         
         runCompiler(script, resourcePath, resultPath, lang, backend) should be(true)
