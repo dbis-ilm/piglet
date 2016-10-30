@@ -2,9 +2,9 @@
 init_code(additional_imports) ::= <<
 import org.apache.spark._
 import org.apache.spark.streaming._
-import dbis.pig.backends.{SchemaClass, Record}
-import dbis.pig.tools._
-import dbis.pig.backends.spark._
+import dbis.piglet.backends.{SchemaClass, Record}
+import dbis.piglet.tools._
+import dbis.piglet.backends.spark._
 <additional_imports>
 
 object SECONDS {

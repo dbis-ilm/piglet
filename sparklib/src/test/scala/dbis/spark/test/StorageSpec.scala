@@ -15,12 +15,12 @@
  * limitations under the License.
  */
 
-package dbis.pig.backends.spark.test
+package dbis.piglet.backends.spark.test
 
 import java.io.File
 
-import dbis.pig.backends.{SchemaClass, Record}
-import dbis.pig.backends.spark._
+import dbis.piglet.backends.{SchemaClass, Record}
+import dbis.piglet.backends.spark._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest._
 import org.apache.commons.io.FileUtils

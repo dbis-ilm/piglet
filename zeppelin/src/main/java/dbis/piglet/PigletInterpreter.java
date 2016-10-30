@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.util.*;
 
-import dbis.pig.api.PigletInterpreterAPI;
+import dbis.piglet.api.PigletInterpreterAPI;
 
 import scala.tools.nsc.settings.MutableSettings.BooleanSetting;
 

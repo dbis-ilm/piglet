@@ -19,15 +19,15 @@ package dbis.cep.test.flink
 
 import java.io.File
 
-import dbis.pig.backends.{ Record, SchemaClass }
+import dbis.piglet.backends.{ Record, SchemaClass }
 import org.apache.flink.api.scala.ExecutionEnvironment
 import org.scalatest._
 import org.apache.commons.io.FileUtils
 import org.apache.flink.api.scala._
-import dbis.pig.cep.nfa._
-import dbis.pig.cep.ops.SelectionStrategy._
-import dbis.pig.cep.ops.OutputStrategy._
-import dbis.pig.cep.flink.CustomDataSetMatcher._
+import dbis.piglet.cep.nfa._
+import dbis.piglet.cep.ops.SelectionStrategy._
+import dbis.piglet.cep.ops.OutputStrategy._
+import dbis.piglet.cep.flink.CustomDataSetMatcher._
 // import dbis.flink.test.FlinkBatchTestInit
 import scala.collection.mutable.ListBuffer
 

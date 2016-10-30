@@ -16,20 +16,20 @@
  */
 package dbis.test.flink
 
-import dbis.pig.Piglet._
-import dbis.pig.codegen.flink.FlinkStreamingCodeGen
-import dbis.pig.op._
-import dbis.pig.expr._
-import dbis.pig.plan.DataflowPlan
-import dbis.pig.schema._
+import dbis.piglet.Piglet._
+import dbis.piglet.codegen.flink.FlinkStreamingCodeGen
+import dbis.piglet.op._
+import dbis.piglet.expr._
+import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.schema._
 import org.scalatest.FlatSpec
 import java.net.URI
-import dbis.pig.tools.Conf
-import dbis.pig.backends.BackendManager
-import dbis.pig.tools.logging.PigletLogging
+import dbis.piglet.tools.Conf
+import dbis.piglet.backends.BackendManager
+import dbis.piglet.tools.logging.PigletLogging
 import dbis.test.CodeMatchers
 import org.scalatest.{ Matchers, BeforeAndAfterAll, FlatSpec }
-import dbis.pig.parser.PigParser.parseScript
+import dbis.piglet.parser.PigParser.parseScript
 
 class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers with PigletLogging {
 
@@ -51,8 +51,8 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
       + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
       |import org.apache.flink.streaming.api.scala._
-      |import dbis.pig.backends.flink._
-      |import dbis.pig.backends.flink.streaming._
+      |import dbis.piglet.backends.flink._
+      |import dbis.piglet.backends.flink.streaming._
       |import java.util.concurrent.TimeUnit
       |import org.apache.flink.util.Collector
       |import org.apache.flink.streaming.api.windowing.assigners._
@@ -61,7 +61,7 @@ class FlinksCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wi
       |import org.apache.flink.streaming.api.windowing.triggers._
       |import org.apache.flink.streaming.api.windowing.windows._
       |import org.apache.flink.streaming.api.TimeCharacteristic
-      |import dbis.pig.backends.{SchemaClass, Record}
+      |import dbis.piglet.backends.{SchemaClass, Record}
       |
       |object test {
       |    def main(args: Array[String]) {

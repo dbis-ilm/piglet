@@ -18,20 +18,20 @@ package dbis.test.flink
 
 import dbis.test.CodeMatchers
 import dbis.test.TestTools._
-import dbis.pig.parser.PigParser.parseScript
-import dbis.pig.Piglet._
-import dbis.pig.codegen.flink.FlinkBatchCodeGen
-import dbis.pig.op._
-import dbis.pig.expr._
-import dbis.pig.plan.DataflowPlan
-import dbis.pig.plan.rewriting.Rewriter._
-import dbis.pig.plan.rewriting.Rules
-import dbis.pig.schema._
-import dbis.pig.udf.UDFTable
+import dbis.piglet.parser.PigParser.parseScript
+import dbis.piglet.Piglet._
+import dbis.piglet.codegen.flink.FlinkBatchCodeGen
+import dbis.piglet.op._
+import dbis.piglet.expr._
+import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.plan.rewriting.Rewriter._
+import dbis.piglet.plan.rewriting.Rules
+import dbis.piglet.schema._
+import dbis.piglet.udf.UDFTable
 import org.scalatest.FlatSpec
-import dbis.pig.backends.BackendManager
+import dbis.piglet.backends.BackendManager
 import org.scalatest.{ Matchers, BeforeAndAfterAll, FlatSpec }
-import dbis.pig.plan.rewriting.Rules
+import dbis.piglet.plan.rewriting.Rules
 
 class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
   
@@ -52,11 +52,11 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       + codeGenerator.emitFooter(new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
       |import org.apache.flink.api.scala._
-      |import dbis.pig.backends.flink._
-      |import dbis.pig.backends.{SchemaClass, Record}
+      |import dbis.piglet.backends.flink._
+      |import dbis.piglet.backends.{SchemaClass, Record}
       |import org.apache.flink.util.Collector
       |import org.apache.flink.api.common.operators.Order
-      |import dbis.pig.backends.flink.Sampler._
+      |import dbis.piglet.backends.flink.Sampler._
       |
       |object test {
       |    def main(args: Array[String]) {

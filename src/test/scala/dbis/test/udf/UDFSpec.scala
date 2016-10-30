@@ -16,8 +16,8 @@
  */
 package dbis.test.udf
 
-import dbis.pig.schema._
-import dbis.pig.udf._
+import dbis.piglet.schema._
+import dbis.piglet.udf._
 import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.OptionValues._
 

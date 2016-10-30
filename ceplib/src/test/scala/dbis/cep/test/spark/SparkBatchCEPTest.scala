@@ -19,14 +19,14 @@ package dbis.cep.test.spark
 
 import java.io.File
 
-import dbis.pig.backends.{ SchemaClass, Record }
+import dbis.piglet.backends.{ SchemaClass, Record }
 import org.apache.spark.{ SparkConf, SparkContext }
 import org.scalatest._
 import org.apache.commons.io.FileUtils
-import dbis.pig.cep.nfa._
-import dbis.pig.cep.ops.SelectionStrategy._
-import dbis.pig.cep.ops.OutputStrategy._
-import dbis.pig.cep.spark.CustomRDDMatcher._
+import dbis.piglet.cep.nfa._
+import dbis.piglet.cep.ops.SelectionStrategy._
+import dbis.piglet.cep.ops.OutputStrategy._
+import dbis.piglet.cep.spark.CustomRDDMatcher._
 import scala.collection.mutable.ListBuffer
 
 import scala.collection.mutable.HashMap

@@ -18,8 +18,8 @@
 package dbis.test
 
 import org.scalatest.{ Matchers, FlatSpec }
-import dbis.pig.Piglet
-import dbis.pig.backends.BackendManager
+import dbis.piglet.Piglet
+import dbis.piglet.backends.BackendManager
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.prop.TableFor6
 import scala.io.Source
@@ -31,8 +31,12 @@ import java.nio.charset.MalformedInputException
 trait CompileIt extends Matchers {
   this: FlatSpec =>
 
+    
   def checkMatch(scripts: TableFor6[String, String, String, Boolean, String, String]) {
     "The Pig compiler" should "compile and execute the script" in {
+      
+      var i = 1
+      
       forEvery(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean, lang: String, backend: String) =>
         // 1. make sure the output directory is empty
         cleanupResult(resultDir)
@@ -41,6 +45,10 @@ trait CompileIt extends Matchers {
         val resultPath = Path.fromString(new java.io.File(".").getCanonicalPath)./(resultDir)
         val resourcePath = getClass.getResource("").getPath + "../../../"
         // 2. compile and execute Pig script
+        
+        print(s"\rTesting: [${"#"*i}${" "*(scripts.size - i)}] ${i}/${scripts.size} : $script                                        ")
+        i += 1
+        
         runCompiler(script, resourcePath, resultPath, lang, backend) should be(true)
 
         val result = getResult(resultPath)
@@ -96,10 +104,10 @@ trait CompileIt extends Matchers {
   }
 
   private def runCompiler(script: String, resourceName: String, resultPath: Path, lang: String, backend: String): Boolean = {
-    val executeLine = "| execute: " + script + " |"
-    var frame = ""
-    for (c <- 1 to executeLine.length()) frame += "-"
-    print("\n" + frame + "\n" + executeLine + "\n" + frame)
+//    val executeLine = "| execute: " + script + " |"
+//    var frame = ""
+//    for (c <- 1 to executeLine.length()) frame += "-"
+//    print("\n" + frame + "\n" + executeLine + "\n" + frame)
 
     val params = new java.util.HashMap[String, Object]()
     params.put("backend", backend)
@@ -122,6 +130,7 @@ trait CompileIt extends Matchers {
     cmdLine.addArgument("${params}")
     cmdLine.addArgument("--keep")
     cmdLine.addArgument("${script}")
+    cmdLine.addArgument("--quiet") // we don't want to see header output for tests
 
     cmdLine.setSubstitutionMap(params)
 

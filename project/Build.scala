@@ -11,10 +11,9 @@ object PigBuild extends Build {
   lazy val commonSettings = Seq(
     version := "0.3",
     scalaVersion := "2.11.8",
-    organization := "dbis",
-    unmanagedJars in Compile += file("lib_unmanaged/jvmr_2.11-2.11.2.1.jar")
+    organization := "dbis"
   )
-  
+
   /*
    * Projects *****************************************************************
    */
@@ -23,29 +22,30 @@ object PigBuild extends Build {
     settings(
       buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, buildInfoBuildNumber),
       buildInfoOptions += BuildInfoOption.BuildTime,
-      buildInfoPackage := "dbis.pig"
+      buildInfoPackage := "dbis.piglet"
     ).
     configs(IntegrationTest).
     settings(commonSettings: _*).
     settings(Defaults.itSettings: _*).
     dependsOn(common).
     dependsOn(sparklib % "test;it").
-    dependsOn(flinklib % "test;it"). 
+    dependsOn(flinklib % "test;it").
     dependsOn(mapreducelib % "test;it").
     dependsOn(ceplib % "test;it").
     dependsOn(setm).
 //    dependsOn(ProjectRef(uri("https://github.com/sthagedorn/setm.git#master"), "setm")).
     aggregate(common, sparklib, flinklib, mapreducelib, ceplib) // remove this if you don't want to automatically build these projects when building piglet
 
-  lazy val setm = (project in file("setm"))  
-    
-    
+  lazy val setm = (project in file("setm"))
+
+
   lazy val common = (project in file("common")).
     settings(commonSettings: _*).
     disablePlugins(sbtassembly.AssemblyPlugin)
 
   lazy val sparklib = (project in file("sparklib")).
     settings(commonSettings: _*).
+    settings(unmanagedJars in Compile += file(s"./lib_unmanaged/jvmr_2.11-2.11.2.1.jar")).
     dependsOn(common).
     disablePlugins(sbtassembly.AssemblyPlugin)
 
@@ -73,7 +73,7 @@ object PigBuild extends Build {
    * define the backend for the compiler: currently we support spark and flink
    */
   val backend = sys.props.getOrElse("backend", default="spark")
-  
+
   val itDeps = backend match {
     case "flink" | "flinks" => Seq(
        Dependencies.flinkScala % "test;it",
@@ -87,7 +87,7 @@ object PigBuild extends Build {
     case "mapreduce" => Seq(Dependencies.pig % "test;it")
     case _ => println(s"Unsupported backend: $backend ! I don't know which dependencies to include!"); Seq.empty[ModuleID]
   }
-  
+
   val itTests = backend match{
     case "flink" => Seq("dbis.test.flink.FlinkCompileIt")
     case "flinks" => Seq("dbis.test.flink.FlinksCompileIt")
@@ -102,6 +102,10 @@ object PigBuild extends Build {
  * Dependencies
  */
 object Dependencies {
+  
+  val sparkVersion = "2.0.1"
+  val flinkVersion = "1.0.1"
+  
   // Libraries
   val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.8"
   val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.8"
@@ -109,28 +113,30 @@ object Dependencies {
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
   val jline = "jline" % "jline" % "2.13"
-  val sparkCore = "org.apache.spark" %% "spark-core" % "2.0.0"
-  val sparkSql = "org.apache.spark" %% "spark-sql" % "2.0.0"
-  val sparkREPL = "org.apache.spark" %% "spark-repl" % "2.0.0"
-  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % "2.0.0"
-  val flinkScala = "org.apache.flink" %% "flink-scala" % "1.0.0"
-  val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % "1.0.0"
+  
+  val sparkCore = "org.apache.spark" %% "spark-core" % sparkVersion
+  val sparkSql = "org.apache.spark" %% "spark-sql" % sparkVersion
+  val sparkREPL = "org.apache.spark" %% "spark-repl" % sparkVersion
+  val sparkStreaming = "org.apache.spark" %% "spark-streaming" % sparkVersion
+  
+  val flinkScala = "org.apache.flink" %% "flink-scala" % flinkVersion
+  val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % flinkVersion
+  
+  val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
+  val pig = "org.apache.pig" % "pig" % "0.15.0"
+
   val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
   val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
   val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
   val kiama = "com.googlecode.kiama" %% "kiama" % "1.8.0"
   val typesafe = "com.typesafe" % "config" % "1.3.0"
-  val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
-  val pig = "org.apache.pig" % "pig" % "0.15.0"
   val commons = "org.apache.commons" % "commons-exec" % "1.3"
   val twitterUtil = "com.twitter" %% "util-eval" % "6.29.0"
-//  val scalikejdbc = "org.scalikejdbc" %% "scalikejdbc" % "2.2.7"
-//  val scalikejdbc_config = "org.scalikejdbc" %% "scalikejdbc-config" % "2.2.7"
   val jdbc = "com.h2database" % "h2" % "1.4.190"
-  // val jdbc = "org.postgresql" % "postgresql" % "9.4.1208"
+
   val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
   val log4j = "log4j" % "log4j" % "1.2.17"
-  
+
   val scalajhttp = "org.scalaj" % "scalaj-http_2.11" % "2.3.0"
   val json4s = "org.json4s" % "json4s-native_2.11" % "3.4.0"
 

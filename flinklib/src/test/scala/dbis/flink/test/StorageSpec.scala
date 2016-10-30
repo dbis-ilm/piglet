@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-package dbis.pig.backends.flink.test
+package dbis.piglet.backends.flink.test
 
 import java.io.File
 
-import dbis.pig.backends.flink.PigStorage
-import dbis.pig.backends.{Record, SchemaClass}
-import dbis.pig.backends.flink._
+import dbis.piglet.backends.flink.PigStorage
+import dbis.piglet.backends.{Record, SchemaClass}
+import dbis.piglet.backends.flink._
 import org.apache.flink.api.scala.ExecutionEnvironment
 import org.scalatest._
 import org.apache.commons.io.FileUtils
