@@ -866,8 +866,8 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
    */
   
   lazy val geometryTypeName = "geometry".ignoreCase
-  lazy val spatialJoinKeyword = "SPATIALJOIN".ignoreCase
-  lazy val spatialFilterKeyword = "SPATIALFILTER".ignoreCase
+  lazy val spatialJoinKeyword = "spatial_join".ignoreCase
+  lazy val spatialFilterKeyword = "spatial_filter".ignoreCase
   lazy val containsKeyword = "contains".ignoreCase
   lazy val containedByKeyword = "containedBy".ignoreCase
   lazy val intersectsKeyword = "intersects".ignoreCase
