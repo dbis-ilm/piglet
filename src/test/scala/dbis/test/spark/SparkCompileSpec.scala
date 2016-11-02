@@ -58,9 +58,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |import dbis.piglet.backends.spark._
         |
         |object test {
+        |    val conf = new SparkConf().setAppName("test_App")
+        |    val sc = new SparkContext(conf)
         |    def main(args: Array[String]) {
-        |      val conf = new SparkConf().setAppName("test_App")
-        |      val sc = new SparkContext(conf)
+        |      
         |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
         |      sc.addSparkListener(perfMon)
         |      sc.stop()
@@ -88,9 +89,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |import breeze.linalg._
                                      |
                                      |object test {
+                                     |    val conf = new SparkConf().setAppName("test_App")
+                                     |    val sc = new SparkContext(conf)
                                      |    def main(args: Array[String]) {
-                                     |      val conf = new SparkConf().setAppName("test_App")
-                                     |      val sc = new SparkContext(conf)
+                                     |      
                                      |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
                                      |      sc.addSparkListener(perfMon)
                                      |      sc.stop()
@@ -841,6 +843,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     assert(cleanString(theCode) ==
       cleanString("""
         |object test {
+        |  val conf = new SparkConf().setAppName("test_App")
+        |  val sc = new SparkContext(conf)
         |def someFunc(s: String): String = {
         | s
         |}
