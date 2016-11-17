@@ -30,7 +30,9 @@ implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
 // ----------------- BEGIN of code building and initializing the query --------
 query_object(name) ::= <<
 object <name> {
-
+  val conf = new SparkConf().setAppName("<name>_App")
+  val sc = new SparkContext(conf)
+  
 >>
 
 embedded_code(embedded_code) ::= <<
@@ -41,8 +43,7 @@ embedded_code(embedded_code) ::= <<
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
-        val conf = new SparkConf().setAppName("<name>_App")
-        val sc = new SparkContext(conf)
+        
         <if (profiling)>
     	val perfMon = new PerfMonitor("<name>_App","<profiling>")
     	sc.addSparkListener(perfMon)
