@@ -36,7 +36,6 @@ import dbis.piglet.codegen.PigletCompiler
 import dbis.piglet.mm.{DataflowProfiler, MaterializationPoint}
 import dbis.piglet.op.PigOperator
 import dbis.piglet.parser.PigParser
-import dbis.piglet.parser.LanguageFeature
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.plan.InvalidPlanException
 import dbis.piglet.plan.MaterializationManager
@@ -209,7 +208,7 @@ object Piglet extends PigletLogging {
 
     for(file <- c.inputFiles) {
       // foreach file, generate the data flow plan and store it in our schedule
-      PigletCompiler.createDataflowPlan(file, c.params, c.backend, c.languages) match {
+      PigletCompiler.createDataflowPlan(file, c.params, c.backend) match {
         case Some(v) => schedule += ((v, file))
         case None => // in case of an error (no plan genrated for file) abort current execution
           throw InvalidPlanException(s"failed to create dataflow plan for $file - aborting")
@@ -256,7 +255,7 @@ object Piglet extends PigletLogging {
 
 
       // rewrite WINDOW operators for Flink streaming
-      if (c.languages.contains(LanguageFeature.StreamingPig) && c.backend == "flinks")
+      if (c.backend == "flinks")
         newPlan = processWindows(newPlan)
 
       Rules.registerBackendRules(c.backend)

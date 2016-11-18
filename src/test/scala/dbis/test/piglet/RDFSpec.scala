@@ -21,7 +21,6 @@ import java.net.URI
 import dbis.piglet.op._
 import dbis.piglet.expr._
 import dbis.piglet.parser.PigParser.parseScript
-import dbis.piglet.parser.LanguageFeature
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.plan.rewriting.internals.RDF
 import dbis.piglet.schema._
@@ -53,7 +52,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       s"""A = RDFLOAD('file.rdf');
          |B = BGP_FILTER A by { ?b "firstName" "Wieland" . ?b "lastName" "Hoffmann" .  ?b "birthDate" ?a};
          |DUMP B;
-       """.stripMargin, List(LanguageFeature.SparqlPig)))
+       """.stripMargin))
     val bgpfilter = plan.findOperatorForAlias("B").value
     val shouldSchema: Some[Schema] = Some(
     Schema(
@@ -70,7 +69,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       s"""A = RDFLOAD('file.rdf');
          |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
          |DUMP B;
-       """.stripMargin, List(LanguageFeature.SparqlPig)))
+       """.stripMargin))
     val bgpfilter = plan.findOperatorForAlias("B").value
     bgpfilter.schema shouldBe RDFLoad.plainSchema
   }
@@ -87,7 +86,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       s"""A = RDFLOAD('file.rdf') grouped on $g;
         |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
         |DUMP B;
-      """.stripMargin, List(LanguageFeature.SparqlPig)))
+      """.stripMargin))
       val bgpfilter = plan.findOperatorForAlias("B").value
       bgpfilter.schema.value shouldBe RDFLoad.groupedSchemas(g)
     }
@@ -106,7 +105,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
         s"""A = Load 'file' $asSchema;
            |B = BGP_FILTER A by { ?a "firstName" "Wieland" };
            |DUMP B;
-        """.stripMargin, List(LanguageFeature.SparqlPig)) )
+        """.stripMargin) )
       val bgpfilter = plan.findOperatorForAlias("B").value
       bgpfilter.checkSchemaConformance shouldBe false
       }
@@ -117,7 +116,7 @@ class RDFSpec extends FlatSpec with Matchers with TableDrivenPropertyChecks with
       s"""A = Load 'file' as (subject: chararray, predicate: chararray, object: chararray);
          |B = BGP_FILTER A by { ?a "firstName" "Wieland". ?a "lastName" "Hoffmann" };
          |DUMP B;
-        """.stripMargin, List(LanguageFeature.SparqlPig)))
+        """.stripMargin))
     val bgpfilter = plan.findOperatorForAlias("B").value
     bgpfilter.checkSchemaConformance shouldBe true
   }

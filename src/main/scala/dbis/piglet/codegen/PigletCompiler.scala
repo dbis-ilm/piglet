@@ -2,7 +2,6 @@ package dbis.piglet.codegen
 
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.parser.LanguageFeature._
 import java.nio.file.Path
 
 import dbis.piglet.tools.logging.PigletLogging
@@ -27,7 +26,6 @@ import dbis.piglet.tools.Conf
 import dbis.setm.SETM.timing
 
 import scalax.file.{Path => xPath}
-import dbis.piglet.parser.LanguageFeature
 import dbis.piglet.schema.Schema
 import java.net.URI
 import scala.collection.mutable.ArrayBuffer
@@ -42,17 +40,15 @@ object PigletCompiler extends PigletLogging {
    * @param inputFile The file to parse
    * @param params Key value pairs to replace placeholders in the script
    * @param backend The name of the backend
-   * @param langFeatures the Pig dialects used for parsing
    */
-  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String,
-                         langFeatures: Seq[LanguageFeature]): Option[DataflowPlan] = timing("create DFP") {
+  def createDataflowPlan(inputFile: Path, params: Map[String,String], backend: String): Option[DataflowPlan] = timing("create DFP") {
     // 1. we read the Pig file
     val source = Source.fromFile(inputFile.toFile)
 
     logger.debug( s"""loaded pig script from "$inputFile" """)
 
     // 2. then we parse it and construct a dataflow plan
-    val plan = new DataflowPlan(parseScriptFromSource(source, params, langFeatures))
+    val plan = new DataflowPlan(parseScriptFromSource(source, params))
 
     if (!plan.checkConnectivity) {
       logger.error(s"dataflow plan not connected for $inputFile")
@@ -209,11 +205,9 @@ object PigletCompiler extends PigletLogging {
     *
     * @param source the source referring to the Piglet script
     * @param params a map of parameters
-    * @param langFeatures the language dialects used to parse the script
     * @return a list of PigOperators constructed from parsing the script
     */
-  private def parseScriptFromSource(source: Source, params: Map[String,String],
-                  langFeatures: Seq[LanguageFeature]): List[PigOperator] = timing("parse script from source") {
+  private def parseScriptFromSource(source: Source, params: Map[String,String]): List[PigOperator] = timing("parse script from source") {
     // Handle IMPORT and %DECLARE statements.
 	  val (sourceLines, declareParams) = resolveImports(source.getLines())
 	  if(declareParams.nonEmpty)
@@ -223,10 +217,10 @@ object PigletCompiler extends PigletLogging {
 
 	  if (allParams.nonEmpty) {
 	    // Replace placeholders by parameters.
-		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, allParams)).mkString("\n"), langFeatures)
+		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, allParams)).mkString("\n"))
 	  }
 	  else {
-		  PigParser.parseScript(sourceLines.mkString("\n"), langFeatures)
+		  PigParser.parseScript(sourceLines.mkString("\n"))
 	  }
   }
 

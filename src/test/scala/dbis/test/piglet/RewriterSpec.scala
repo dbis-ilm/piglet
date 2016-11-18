@@ -21,7 +21,7 @@ import java.net.URI
 import dbis.piglet.parser.PigParser.parseScript
 import dbis.piglet.op._
 import dbis.piglet.expr._
-import dbis.piglet.parser.{LanguageFeature, PigParser}
+import dbis.piglet.parser.PigParser
 import dbis.piglet.plan.rewriting.Extractors._
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.rewriting.Rules._
@@ -2147,7 +2147,7 @@ class RewriterSpec extends FlatSpec
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for
   // other test results :-)
   "Embedsupport" should "apply rules registered by embedded code" in {
-    
+
     val ops = PigParser.parseScript(
       """
         |<% def myFunc(s: String): String = {

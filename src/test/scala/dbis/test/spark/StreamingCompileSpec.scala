@@ -20,7 +20,6 @@ import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.spark.BatchCodeGen
 import dbis.piglet.codegen.spark.StreamingCodeGen
 import dbis.piglet.expr._
-import dbis.piglet.parser.LanguageFeature
 import dbis.piglet.parser.PigParser.parseScript
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.spark.{StreamingCodeGen, BatchCodeGen}
@@ -69,9 +68,9 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
         |object test {
         |    SparkStream.setAppName("test_App")
         |    val ssc = SparkStream.ssc
-        |    
+        |
         |    def main(args: Array[String]) {
-        |      
+        |
         |      ssc.start()
         |      ssc.awaitTermination()
         |   }
@@ -85,7 +84,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
       """
         |in = SOCKET_READ 'localhost:5555' USING PigStream(',') AS (s1: chararray, s2: int);
         |DUMP in;
-      """.stripMargin, List(LanguageFeature.StreamingPig))
+      """.stripMargin)
 
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
@@ -105,7 +104,7 @@ class StreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers
       """
         |in = LOAD 'file.csv' USING PigStream(',') AS (f1: int, f2: int);
         |DUMP in;
-      """.stripMargin, List(LanguageFeature.StreamingPig))
+      """.stripMargin)
 
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)

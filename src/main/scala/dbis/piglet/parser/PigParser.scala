@@ -31,27 +31,12 @@ import scala.util.parsing.input.CharSequenceReader
 import scala.language.implicitConversions
 import scala.language.postfixOps
 
-/**
- * An enumeration type representing the various language sets
- * supported by the Pig compiler.
- */
-object LanguageFeature extends Enumeration {
-  type LanguageFeature = Value
-  val PlainPig,    // standard Pig conforming to Apache Pig
-  SparqlPig,       // Pig + SPARQL extensions (TUPLIFY, BGP filter)
-  StreamingPig,    // Pig for data stream processing
-  ComplexEventPig, // Pig for complex event processing
-  CompletePiglet   // all dialects
-    = Value
-}
-
-import dbis.piglet.parser.LanguageFeature._
 import dbis.piglet.tools.HdfsCommand
 
 /**
  * A parser for the (extended) Pig language.
  */
-class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends JavaTokenParsers with PigletLogging {
+class PigParser extends JavaTokenParsers with PigletLogging {
 
   override protected val whiteSpace = """(\s|--.*)+""".r
 
@@ -114,10 +99,10 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
       case (x, "-" ~ i) => Minus(x,i)
     }
   }
-    
+
 //  literalField ^^ { f => RefExpr(f) }
-//    | func ^^ { f => f } 
-    
+//    | func ^^ { f => f }
+
 
   def term: Parser[ArithmeticExpr] = factor ~ rep("*" ~ factor | "/" ~ factor) ^^ {
     case l ~ list => list.foldLeft(l) {
@@ -170,9 +155,9 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def matrixConstructor: Parser[ArithmeticExpr] = matrixTypeName ~ "(" ~ num ~ "," ~ num ~ ", " ~ arithmExpr ~ ")" ^^{
     case s ~ _ ~ rows ~ _ ~ cols ~ _ ~ expr ~ _ => ConstructMatrixExpr(s.substring(0, 2).toLowerCase, rows, cols, expr)
   }
-  
-  
-  
+
+
+
   def typeConstructor: Parser[ArithmeticExpr] = (tupleConstructor | bagConstructor | mapConstructor | matrixConstructor | geometryConstructor)
 
   def comparisonExpr: Parser[Predicate] = arithmExpr ~ ("!=" | "<=" | ">=" | "==" | "<" | ">") ~ (arithmExpr |
@@ -290,13 +275,13 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   lazy val accumulateKeyword = "accumulate".ignoreCase
   lazy val timestampKeyword = "timestamp".ignoreCase
 
-  
-  
+
+
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
       | falseKeyword ^^ { _ => false }
     )
-  
+
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
    */
@@ -310,10 +295,10 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
       val rep = if (n.charAt(0) == 's' || n.charAt(0) == 'S') MatrixRep.SparseMatrix else MatrixRep.DenseMatrix
       MatrixType(t, rows, cols, rep)
   }
-  
+
 //  def geometryTypeSpec: Parser[GeometryType] = geometryTypeName ~ "(" ~ stringLiteral ~ ")" ^^ {
 //    case _ ~ _ ~ wkt ~ _ =>  GeometryType(wkt)
-//    
+//
 //  }
 
   def typeSpec: Parser[PigType] = (
@@ -359,26 +344,26 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def usingClause: Parser[(String, List[String])] = usingKeyword ~ ident ~ "(" ~ repsep(params, ",") ~ ")" ^^ {
     case _ ~ loader ~ _ ~ params ~ _ => (loader, params)
   }
-  
+
   def params: Parser[String] = kvParam | plainParams
-  
+
   def kvParam = ident ~ "=" ~ plainParams ^^ {
     case k ~ _ ~ v =>
       val v2 = if(v.startsWith("'") && v.endsWith("'"))
-                 s""""${unquote(v)}"""" 
-               else 
+                 s""""${unquote(v)}""""
+               else
                  v
-      
+
       s"$k=$v2"
   }
 
-  def plainParams = (boolLiteral | decimalNumber | num | pigStringLiteral) ^^ { 
+  def plainParams = (boolLiteral | decimalNumber | num | pigStringLiteral) ^^ {
     case p => p match {
       case p: BoolLiteral => p.b.toString()
       case _ => p.toString()
     }
   }
-  
+
   def fieldRef: Parser[Ref] = posField | namedFieldWithoutLineage
   def timestampClause: Parser[Ref] = timestampKeyword ~ "(" ~ fieldRef ~ ")" ^^ { case _ ~ _ ~ f ~ _ => f }
 
@@ -390,31 +375,31 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
         case PositionalField(p) => s.get.timestampField = p
         case _ => {}
       }
-      
+
       u match {
-        case Some(p) => 
-          val params = if (p._2.isEmpty) null // no params given 
+        case Some(p) =>
+          val params = if (p._2.isEmpty) null // no params given
             else {
               // transform given params to convert ' into " - if it's an unquoted param (e.g. int, boolean values) leave it as is
-              p._2.map(s => 
+              p._2.map(s =>
                 if(s.startsWith("'") && s.endsWith("'"))
-                  s""""${unquote(s)}"""" 
-                else 
+                  s""""${unquote(s)}""""
+                else
                   s
-              ) 
+              )
             }
-          
+
           val s2 = if(p._1.toLowerCase() == "textloader" && s.isEmpty) {
-              /* If no schema is given for text loader, create one implicitly. 
+              /* If no schema is given for text loader, create one implicitly.
                * The schema will be one field with name "line" and type chararray
                */
-              Some(Schema(BagType(TupleType(Array(Field("line", Types.CharArrayType)))))) 
+              Some(Schema(BagType(TupleType(Array(Field("line", Types.CharArrayType))))))
             }
-            else 
+            else
               s
-          
+
           new Load(Pipe(b), uri, s2, Some(p._1), params)
-            
+
         case None => new Load(Pipe(b), uri, s)
       }
   }
@@ -428,7 +413,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
    */
 
   def rdfLoadStmt: Parser[PigOperator] = bag ~ "=" ~ rdfLoadKeyword ~ "(" ~ fileName ~ ")" ~ (groupedOnClause?) ^^ {
-    case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped => 
+    case b ~ _ ~ _ ~ _ ~ filename ~ _ ~ grouped =>
       val uri = new URI(filename)
       new RDFLoad(Pipe(b), uri, grouped)
   }
@@ -446,8 +431,8 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   /*
    * STORE <A> INTO "<FileName>"
    */
-  def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ~ (usingClause?) ^^ { 
-    case _ ~ b ~  _ ~ f ~ u => 
+  def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ~ (usingClause?) ^^ {
+    case _ ~ b ~  _ ~ f ~ u =>
       val uri = new URI(f)
       u match {
         case Some(p) => new Store(Pipe(b), uri, Some(p._1), if(p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
@@ -542,7 +527,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def extractJoinFields(jList: List[(String, List[Ref])]): List[List[Ref]] = { jList.map{ case (alias, refs) => refs } }
   def joinStmt: Parser[PigOperator] = bag ~ "=" ~ joinKeyword ~ joinExprList ^^ {
     case out ~ _ ~ _ ~ jlist => new Join(Pipe(out), extractJoinRelation(jlist), extractJoinFields(jlist)) }
-  
+
   /*
    * <A> = CROSS <B>, <C>, ...
    */
@@ -660,17 +645,17 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   /*
    * fs -cmd params
    */
-  def fsCmd: Parser[HdfsCommand.HdfsCommand] = ("""-[a-zA-Z]*""").r ^^ { s => 
+  def fsCmd: Parser[HdfsCommand.HdfsCommand] = ("""-[a-zA-Z]*""").r ^^ { s =>
     try {
       HdfsCommand.withName(s.substring(1).toUpperCase())
     } catch {
       case ex: NoSuchElementException => throw new IllegalArgumentException(s"No such HDFS command: $s")
     }
-    
+
   }
   def fsParam: Parser[String] = ("""[^;][/\w\.\-]*""").r
 
-  def fsStmt: Parser[PigOperator] = fsKeyword ~ fsCmd ~ rep(fsParam) ^^ { 
+  def fsStmt: Parser[PigOperator] = fsKeyword ~ fsCmd ~ rep(fsParam) ^^ {
     case _ ~ cmd ~ params => HdfsCmd(cmd, params)
   }
 
@@ -688,10 +673,21 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   /*
    * A statement can be one of the above delimited by a semicolon.
    */
-  def delimStmt: Parser[PigOperator] = (loadStmt | indexStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
-    distinctStmt | spatialFilterStmt | spatialJoinStmt | joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | materializeStmt | rscriptStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt )
-
+  def delimStmt: Parser[PigOperator] =
+    /* streaming statements */
+    socketReadStmt | socketWriteStmt | windowStmt |
+    /* SPARQL statements */
+    tuplifyStmt | bgpFilterStmt | rdfLoadStmt |
+    /* CEP statement */
+    matcherStmt |
+    /* spatial statements */
+    spatialFilterStmt | spatialJoinStmt | indexStmt |
+    /* misc Pig Latin extensions */
+    materializeStmt | rscriptStmt |
+    /* standard Pig Latin statements */
+    loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
+    distinctStmt |  joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    splitStmt | fsStmt | defineStmt | setStmt | macroRefStmt | displayStmt
   /* ---------------------------------------------------------------------------------------------------------------- */
   /*
    * Pig extensions for processing RDF data and supporting SPARQL BGPs.
@@ -713,8 +709,6 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     byKeyword ~ "{" ~ repsep(bgPattern, ".") ~ "}" ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ _ ~ pattern ~ _ => new BGPFilter(Pipe(out), Pipe(in), pattern)
   }
-
-  def sparqlStmt: Parser[PigOperator] = (tuplifyStmt | bgpFilterStmt | rdfLoadStmt)
 
   /* ---------------------------------------------------------------------------------------------------------------- */
   /*
@@ -790,7 +784,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
       }
 
   /*
-   * SOCKET_WRITE <A> TO '<address>' [ MODE ZMQ ] 
+   * SOCKET_WRITE <A> TO '<address>' [ MODE ZMQ ]
    */
   def socketWriteStmt: Parser[PigOperator] =
     socketWriteKeyword ~ bag ~ toKeyword ~ inetAddress ~ (usingClause?) ^^ {
@@ -805,8 +799,6 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
           case None =>  new SocketWrite(Pipe(b), addr, mode)
         }
       }
-  
-  def streamingStmt: Parser[PigOperator] =  (socketReadStmt | socketWriteStmt | windowStmt)
 
   /* ---------------------------------------------------------------------------------------------------------------- */
 
@@ -832,7 +824,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def eventExpr: Parser[Predicate] = boolExpr
   def simpleEvent: Parser[SimpleEvent] = simplePattern ~ ":" ~ eventExpr ^^ { case s ~ _ ~ e => SimpleEvent(s, e) }
   def eventParam: Parser[CompEvent] = "(" ~ simpleEvent ~ rep( "," ~> simpleEvent) ~ ")" ^^ { case _ ~ s ~ c ~ _ => CompEvent(s :: c) }
-  
+
   def repeatPattern: Parser[List[Pattern]] = rep("," ~> patternParam)
   // or  def repeatPattern: Parser[List[Pattern]] = rep(","  ~ patternParam)  ^^ { case l => l.map(_._2) }
   def disjPattern: Parser[Pattern] = disjKeyword ~ "(" ~ patternParam ~ "," ~ patternParam ~ repeatPattern ~ ")" ^^ {
@@ -847,7 +839,7 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   def negPattern: Parser[Pattern] = negKeyword ~ "(" ~ simplePattern ~ ")" ^^ { case _ ~ _ ~ n ~ _ => NegPattern(n) }
   def simplePattern: Parser[Pattern] = ident ^^ { case s => SimplePattern(s) }
   def patternParam: Parser[Pattern] = (seqPattern | negPattern | conjPattern | disjPattern | simplePattern)
-  
+
   def withinParam: Parser[Tuple2[Int, String]] = withinKeyword ~ num ~ timeUnit ^^ { case _ ~ n ~ u => (n, u) }
   def modes: Parser[String] = (skipNextKeyword | skipAnyKeyword | firstMatchKeyword | recentMatchKeyword | cognitiveMatchKeyword)
   def modeParam: Parser[String] = modeKeyword ~ modes ^^ { case _ ~ n => n }
@@ -864,17 +856,15 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
     }
   }
 
-  def complexEventStmt: Parser[PigOperator] = matcherStmt
-
   /* ---------------------------------------------------------------------------------------------------------------- */
 
-  
+
 
   /* ------------------------------------------------------------ */
   /*        Pig extensions for spatial data
    * ------------------------------------------------------------
    */
-  
+
   lazy val geometryTypeName = "geometry".ignoreCase
   lazy val spatialJoinKeyword = "spatial_join".ignoreCase
   lazy val spatialFilterKeyword = "spatial_filter".ignoreCase
@@ -883,108 +873,69 @@ class PigParser(val featureList: List[LanguageFeature] = List(PlainPig)) extends
   lazy val intersectsKeyword = "intersects".ignoreCase
   lazy val indexKeyword = "index".ignoreCase
   lazy val rtreeKeyword = "rtree".ignoreCase
-  
-  
+
+
   def instant = arithmExpr  ^^ { case e => Instant(e) }
-  
+
   def interval = arithmExpr ~ "," ~ arithmExpr ^^ { case s ~ _ ~ e => Interval(s,Some(e)) }
-  
+
   def timeExp: Parser[TempEx] = "," ~ (interval | instant) ^^ { case _ ~ time => time }
-  
+
   def geometryConstructor = geometryTypeName ~ "(" ~ arithmExpr ~ (timeExp?) ~ ")" ^^ {
     case _ ~ _ ~ geo ~ time ~ _ => ConstructGeometryExpr(geo, time)
   }
-  
+
   def spatialJoinPredicate = (containsKeyword | intersectsKeyword | containedByKeyword) ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {
     case kw ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialJoinPredicate(r1,r2,  SpatialPredicateType.withName(kw.toUpperCase()))
   }
-  
+
   def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ (indexKeyword?) ~ "," ~ bag ~ onKeyword ~ spatialJoinPredicate  ^^ {
     case out ~ _ ~ _ ~ in1 ~ idx ~ _ ~ in2  ~ _ ~ expr => new SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr, idx.isDefined )
 
   }
-  
+
   def spatialFilterPredicate = (containsKeyword | intersectsKeyword | containedByKeyword) ~ "(" ~ ref ~ "," ~ geometryConstructor ~ ")" ^^ {
     case kw ~ _ ~ f ~ _ ~ expr ~ _ => new SpatialFilterPredicate(f, expr, SpatialPredicateType.withName(kw.toUpperCase()))
   }
-  
+
   def spatialFilterStmt = bag ~ "=" ~ spatialFilterKeyword ~ bag ~ byKeyword ~ spatialFilterPredicate ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ pred => new SpatialFilter(Pipe(out), Pipe(in), pred)
   }
-  
-  
+
+
   def indexMethod = rtreeKeyword ~ "(" ~ repsep(params, ",") ~ ")" ^^ {
     case method ~ _ ~ paramList ~ _ => (IndexMethod.withName(method.toUpperCase()), paramList)
   }
-  
-  
+
+
   def indexStmt: Parser[PigOperator] = bag ~ "=" ~ indexKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ indexMethod  ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ methodWithParams => IndexOp(Pipe(out), Pipe(in), field, methodWithParams._1, methodWithParams._2)
   }
-  
-  
-  /* ---------------------------------------------------------------------------------------------------------------- */
-  
-  
-  def langStmt(features: List[LanguageFeature]): Parser[PigOperator] = {
-    def parseStmt(feature: LanguageFeature) = {
-      feature match {
-        case PlainPig => delimStmt
-        case StreamingPig => streamingStmt
-        case SparqlPig => sparqlStmt
-        case ComplexEventPig => complexEventStmt
-      }
-    }
 
-    if (features.tail.isEmpty)
-      parseStmt(features.head)
-    else
-      parseStmt(features.head) | langStmt(features.tail)
-  }
+  /* ---------------------------------------------------------------------------------------------------------------- */
 
   def pigStmt: Parser[PigOperator] = (
     defineMacroStmt ^^{ case op => op}
       | embedStmt ^^{ case op => op}
-      | langStmt(featureList) ~ rep(";") ^^{ case op ~ _ => op}
+      | delimStmt ~ rep(";") ^^{ case op ~ _ => op}
     )
 
   def pigScript: Parser[List[PigOperator]] = rep(pigStmt)
-  
+
   def parseScript(input: CharSequenceReader): List[PigOperator] = {
     phrase(pigScript)(input) match {
   	  case Success(t, _) => t
-  	  case NoSuccess(msg, next) => 
+  	  case NoSuccess(msg, next) =>
   	  throw new IllegalArgumentException(s"Could not parse input string:\n${next.pos.longString} => $msg")
 	  }
   }
-  
-  
-
 }
 
 object PigParser {
-  /**
-    * Processes a list of language features accepted by the parser. It ensures that
-    * always PlainPig appears at the and of the list. Furthermore, the pseudo feature
-    * CompletePiglet is replaced by the list of all features.
-    *
-    * @param features the input feature list
-    * @return a correct feature list
-    */
-  def handleFeatureSet(features: List[LanguageFeature]): List[LanguageFeature] = {
-    if (features.contains(CompletePiglet))
-      List(ComplexEventPig, StreamingPig, SparqlPig, PlainPig)
-    else if (! features.contains(PlainPig))
-      features ::: List(PlainPig)
-    else
-      features.filter(_ != PlainPig) ::: List(PlainPig)
-  }
-
-  def parseScript(s: CharSequence, featureList: Seq[LanguageFeature] = List(PlainPig),
-                  resetSchema: Boolean = true): List[PigOperator] = {
+  def parseScript(s: CharSequence, resetSchema: Boolean = true): List[PigOperator] = {
     if (resetSchema)
       Schema.init()
-    val parser = new PigParser(handleFeatureSet(featureList.toList))
+    val parser = new PigParser()
     parser.parseScript(new CharSequenceReader(s))
   }
 

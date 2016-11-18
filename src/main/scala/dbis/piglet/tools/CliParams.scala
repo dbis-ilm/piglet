@@ -7,7 +7,6 @@ import java.nio.file.{Path,  Paths}
 import scopt.OptionParser
 
 import dbis.piglet.BuildInfo
-import dbis.piglet.parser.LanguageFeature
 import dbis.piglet.tools.logging.LogLevel
 import dbis.piglet.tools.logging.LogLevel._
 
@@ -21,7 +20,6 @@ import dbis.piglet.tools.logging.LogLevel._
  * @param params Mapping of parameter names used in the script
  * @param backend The name of the backend to use
  * @param backendPath The path to the library file of the used backend (sparklib, flinklib, ...)
- * @param languages The list of language features to enable
  * @param updateConfig Flag to indicate to just copy the config file to home directory and then stop
  * @param showPlan Print the final plan
  * @param backendArgs Additional arguments/parameters to pass to the backend
@@ -41,7 +39,6 @@ case class CliParams(
   params: Map[String, String] = Map.empty,
   backend: String = Conf.defaultBackend,
   backendPath: Path = Paths.get("."),
-  languages: Seq[LanguageFeature.LanguageFeature] = List(LanguageFeature.PlainPig),
   updateConfig: Boolean = false,
   showPlan: Boolean = false,
   backendArgs: Map[String, String] = Map.empty,
@@ -57,15 +54,7 @@ case class CliParams(
 }
 
 object CliParams {
-  
-  private def parseLangFeature(strings: Seq[String]) = strings.map { _ match {
-      case "sparql" => LanguageFeature.SparqlPig
-      case "streaming" => LanguageFeature.StreamingPig
-      case "pig" => LanguageFeature.PlainPig
-      case "all" => LanguageFeature.CompletePiglet
-    }
-  }
-  
+
   private lazy val optparser = new OptionParser[CliParams]("Piglet ") {
     head("Piglet", s"ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
     opt[Unit]('i', "interactive") action { (_, c) => c.copy(interactive = true) } text ("start an interactive REPL")
@@ -79,7 +68,6 @@ object CliParams {
     opt[File]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x.toPath()) } text ("output directory for generated code")
     opt[Unit]('k',"keep") optional() action { (x,c) => c.copy(keepFiles = true) } text ("keep generated files")
     opt[String]('g', "log-level") optional() action { (x, c) => c.copy(logLevel = LogLevel.withName(x.toUpperCase())) } text ("Set the log level: DEBUG, INFO, WARN, ERROR")
-    opt[Seq[String]]('l', "languages") optional() action { (x, c) => c.copy(languages = parseLangFeature(x)) } text ("Accepted language dialects (pig = default, sparql, streaming, cep, all)")
     opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text (s"show the execution plan")
     opt[URI]("profiling") optional() action { (x, c) => c.copy(profiling = Some(x)) } text ("Switch on profiling and write to DB. Provide the connection string as schema://host:port/dbname?user=username&pw=password")
     opt[Unit]("show-stats") optional() action { (_,c) => c.copy(showStats = true) } text ("print detailed timing stats at the end")

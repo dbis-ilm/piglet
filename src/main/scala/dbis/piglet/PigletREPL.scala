@@ -20,7 +20,7 @@ package dbis.piglet
 import java.io.{PrintStream, File}
 import dbis.piglet.Piglet._
 import dbis.piglet.op.{Display, PigOperator, Dump}
-import dbis.piglet.parser.{LanguageFeature, PigParser}
+import dbis.piglet.parser.PigParser
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.PrettyPrinter._
@@ -124,7 +124,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     /* use the parser to obtain the HDFS command object
      * The processFsCmd method is called only 
      */
-	  val op = PigParser.parseScript(s, List(LanguageFeature.CompletePiglet), resetSchema = true).head.asInstanceOf[HdfsCmd]
+	  val op = PigParser.parseScript(s, resetSchema = true).head.asInstanceOf[HdfsCmd]
 
 	  try {
 	    HDFSService.process(op.cmd, op.params)  	    
@@ -344,7 +344,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
         buf --= displays
       }
 
-      buf ++= PigParser.parseScript(s, c.languages, resetSchema = false)
+      buf ++= PigParser.parseScript(s, resetSchema = false)
       var plan = new DataflowPlan(buf.toList)
       logger.debug("plan created.")
 
@@ -473,7 +473,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
         s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf, c)
       case Line(s, _) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
       case Line(s, buf) => try {
-        buf ++= PigParser.parseScript(s,c.languages, resetSchema = false)
+        buf ++= PigParser.parseScript(s, resetSchema = false)
         eliminateDuplicatePipes(buf)
         false
       } catch {

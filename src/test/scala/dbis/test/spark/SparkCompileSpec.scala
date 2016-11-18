@@ -16,7 +16,6 @@
  */
 package dbis.test.spark
 
-import dbis.piglet.parser.LanguageFeature
 import dbis.piglet.parser.PigParser.parseScript
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.spark.BatchCodeGen
@@ -33,13 +32,13 @@ import org.scalatest.{Matchers, BeforeAndAfterAll, FlatSpec}
 import java.net.URI
 
 class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
-  
+
   override def beforeAll()  {
     Rules.registerAllRules()
   }
-  
+
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
-  val backendConf = BackendManager.init("spark") 
+  val backendConf = BackendManager.init("spark")
   val templateFile = backendConf.templateFile
 
   "The compiler output" should "contain the Spark header & footer" in {
@@ -61,11 +60,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    val conf = new SparkConf().setAppName("test_App")
         |    val sc = new SparkContext(conf)
         |    def main(args: Array[String]) {
-        |      
+        |
         |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
         |      sc.addSparkListener(perfMon)
         |      sc.stop()
-        |      
+        |
         |    }
         |}
       """.stripMargin)
@@ -92,7 +91,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |    val conf = new SparkConf().setAppName("test_App")
                                      |    val sc = new SparkContext(conf)
                                      |    def main(args: Array[String]) {
-                                     |      
+                                     |
                                      |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
                                      |      sc.addSparkListener(perfMon)
                                      |      sc.stop()
@@ -104,9 +103,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for LOAD" in {
-    
+
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
-    
+
     val op = Load(Pipe("a"), file)
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -127,9 +126,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for LOAD with PigStorage" in {
-    
+
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
-    
+
     val op = Load(Pipe("a"), file, None, Some("PigStorage"), List("""",""""))
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -159,7 +158,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     Schema.init()
 
     val file = new java.io.File(".").getCanonicalPath + "/file.n3"
-    
+
     val op = Load(Pipe("a"), file, None, Some("RDFFileStorage"))
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -198,7 +197,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val expectedCode = cleanString("val a = b.filter(t => {aFunc(t.get(0),t.get(1)) > 0})")
     assert(generatedCode == expectedCode)
   }
-  
+
   it should "contain code for a filter with a function expression and boolean" in {
     Schema.init()
     val op =  Filter(Pipe("a"),Pipe("b"),And(
@@ -241,7 +240,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for STORE" in {
     Schema.init()
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
-    
+
     val op = Store(Pipe("A"), file)
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
@@ -266,7 +265,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
          |PigStorage[_t$1_Tuple]().write("input/file.csv", A)""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
-  
+
   it should "contain code for STORE with delimiter" in {
     Schema.init()
     val op = Store(Pipe("A"), "input/file.csv", Some("PigStorage"), List(""""#""""))
@@ -281,21 +280,21 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
          |PigStorage[_t$1_Tuple]().write("input/file.csv", A, "#")""".stripMargin)
    generatedCode should matchSnippet(expectedCode)
   }
-  
+
   it should "contain code for STORE with using clause" in {
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
-    
+
     val op = Store(Pipe("A"), file, Some("BinStorage"))
     val codeGenerator = new BatchCodeGen(templateFile)
     val generatedCode = cleanString(codeGenerator.emitNode(op))
-    
+
     val expectedCode = cleanString(
       s"""
          |BinStorage[Record]().write("$file", A)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
-  
+
   it should "contain code for GROUP BY ALL" in {
     val ops = parseScript(
       """
@@ -630,7 +629,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |val a = b.union(c).union(d)""".stripMargin)
     assert(generatedCode == expectedCode)
   }
-  
+
 //  it should "contain code for a CROSS operator" in {
 //    // a = CROSS b, c;
 //    val op = Cross(Pipe("aa"), List(Pipe("bb"), Pipe("cc")))
@@ -639,10 +638,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 //    val generatedCode = cleanString(codeGenerator.emitNode(op))
 //    val expectedCode = cleanString("""
 //        |val aa = bb.cartesian(cc)""".stripMargin)
-//    
+//
 //    generatedCode shouldBe expectedCode
 //  }
-//  
+//
 //  ignore should "contain code for a CROSS operator on more than two relations" in {
 //    // a = CROSS b, c, d;
 //    val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
@@ -650,7 +649,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 //    val generatedCode = cleanString(codeGenerator.emitNode(op))
 //    val expectedCode = cleanString("""
 //        |val a = b.cartesian(c).cartesian(d)""".stripMargin)
-//    
+//
 //    generatedCode shouldBe expectedCode
 //  }
 
@@ -1108,7 +1107,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     Schema.init()
     val ops = parseScript("""
                             |b =  match_event b pattern SEQ (A, B) with (A: t1 == 1, B: t2 == 2);
-                            |""".stripMargin, List(LanguageFeature.ComplexEventPig))
+                            |""".stripMargin)
     val schema = Schema(Array(Field("t1", Types.IntType),
       Field("t2", Types.IntType),
       Field("t3", Types.IntType)))
@@ -1147,7 +1146,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     Schema.init()
     val ops = parseScript("""
                             |b =  match_event b pattern SEQ (A, B) with (A: t1 == 1, B: t2 == 2 AND t3 == A.t3);
-                            |""".stripMargin, List(LanguageFeature.ComplexEventPig))
+                            |""".stripMargin)
     val schema = Schema(Array(Field("t1", Types.IntType),
       Field("t2", Types.IntType),
       Field("t3", Types.IntType)))
@@ -1174,8 +1173,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    val BEdge = bOurNFA.createAndGetForwardState(filterB)
         |    bOurNFA.createForwardTransition(StartState, AEdge, AState)
         |    bOurNFA.createForwardTransition(AState, BEdge, BState)
-        |    bOurNFA 
-        |  } 
+        |    bOurNFA
+        |  }
         |}""".stripMargin)
     // println("helper: " + generatedHelperClass)
     generatedCode should matchSnippet(expectedCode)

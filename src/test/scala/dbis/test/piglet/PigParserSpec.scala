@@ -25,7 +25,6 @@ import dbis.test.TestTools._
 import dbis.piglet.expr._
 import dbis.piglet.op._
 import dbis.piglet.op.cmd._
-import dbis.piglet.parser.LanguageFeature
 import dbis.piglet.parser.PigParser.parseScript
 import dbis.piglet.parser.PigParser
 import dbis.piglet.schema._
@@ -35,29 +34,8 @@ import scala.util.Random
 import dbis.piglet.tools.HdfsCommand
 
 class PigParserSpec extends FlatSpec with OptionValues with Matchers {
-  "The parser" should "handle language feature sets" in {
-    PigParser.handleFeatureSet(List(LanguageFeature.CompletePiglet)) should contain theSameElementsAs(
-      List(LanguageFeature.SparqlPig,
-        LanguageFeature.StreamingPig,
-        LanguageFeature.ComplexEventPig,
-        LanguageFeature.PlainPig))
-
-    PigParser.handleFeatureSet(List(LanguageFeature.StreamingPig)) should contain theSameElementsAs(
-      List(LanguageFeature.StreamingPig, LanguageFeature.PlainPig))
-
-    PigParser.handleFeatureSet(List(LanguageFeature.PlainPig,
-      LanguageFeature.StreamingPig)) should contain theSameElementsInOrderAs(
-      List(LanguageFeature.StreamingPig, LanguageFeature.PlainPig))
-
-    PigParser.handleFeatureSet(List(LanguageFeature.PlainPig)) should contain theSameElementsAs(
-      List(LanguageFeature.PlainPig))
-
-    PigParser.handleFeatureSet(List()) should contain theSameElementsAs(
-      List(LanguageFeature.PlainPig))
-  }
-
   /* -------------------- LOAD -------------------- */
-  it should "parse a simple load statement" in  {
+  "The parser"  should "parse a simple load statement" in  {
     val uri = new URI("file.csv")
     assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), uri)))
   }
@@ -555,39 +533,39 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a socket read statement in standard mode" in {
-    assert(parseScript("a = socket_read '127.0.0.1:5555';", List(LanguageFeature.StreamingPig))
+    assert(parseScript("a = socket_read '127.0.0.1:5555';")
       == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
   }
 
   it should "parse a socket read statement in standard mode with using clause" in {
-    assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');", List(LanguageFeature.StreamingPig))
+    assert(parseScript("a = socket_read '127.0.0.1:5555' using PigStream(',');")
       == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("PigStream"),List("""",""""))))
-    assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();", List(LanguageFeature.StreamingPig))
+    assert(parseScript("a = socket_read '127.0.0.1:5555' using RDFStream();")
       == List(SocketRead(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "", None, Some("RDFStream"))))
   }
 
   it should "parse a socket read statement in zmq mode" in {
-    assert(parseScript("a = socket_read 'tcp://127.0.0.1:5555' mode zmq;", List(LanguageFeature.StreamingPig))
+    assert(parseScript("a = socket_read 'tcp://127.0.0.1:5555' mode zmq;")
       == List(SocketRead(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
   }
 
   it should "parse a socket write statement in standard mode" in {
-    assert(parseScript("socket_write a to '127.0.0.1:5555';", List(LanguageFeature.StreamingPig))
+    assert(parseScript("socket_write a to '127.0.0.1:5555';")
       == List(SocketWrite(Pipe("a"), SocketAddress("","127.0.0.1","5555"), "")))
   }
 
   it should "parse a socket write statement in zmq mode" in {
-    assert(parseScript("socket_write a to 'tcp://127.0.0.1:5555' mode zmq;", List(LanguageFeature.StreamingPig))
+    assert(parseScript("socket_write a to 'tcp://127.0.0.1:5555' mode zmq;")
       == List(SocketWrite(Pipe("a"), SocketAddress("tcp://","127.0.0.1","5555"), "zmq")))
   }
 
   it should "parse a window statement using Rows for window and slider" in {
-    assert(parseScript("a = window b rows 100 slide rows 10;", List(LanguageFeature.StreamingPig))
+    assert(parseScript("a = window b rows 100 slide rows 10;")
       == List(Window(Pipe("a"), Pipe("b"), (100,""), (10,""))))
   }
 
   it should "parse a window statement using Range for window and slider" in {
-    assert(parseScript("a = window b range 100 SECONDS slide range 10 SECONDS;", List(LanguageFeature.StreamingPig))
+    assert(parseScript("a = window b range 100 SECONDS slide range 10 SECONDS;")
       == List(Window(Pipe("a"), Pipe("b"), (100,"SECONDS"), (10,"SECONDS"))))
   }
 
@@ -600,41 +578,34 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     ))))
   }
 
-  it should "reject statements not supported in the plain language feature" in {
-    intercept[java.lang.IllegalArgumentException] {
-      parseScript("a = TUPLIFY b ON $0;")
-    }
-  }
-
   it should "accept TUPLIFY in SparqlPig" in {
-    assert(parseScript("a = TUPLIFY b ON $0;", List(LanguageFeature.SparqlPig)) ==
+    assert(parseScript("a = TUPLIFY b ON $0;") ==
       List(Tuplify(Pipe("a"), Pipe("b"), PositionalField(0))))
   }
 
   it should "parse BGP_FILTER in SparqlPig" in {
-    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""", List(LanguageFeature.SparqlPig)) ==
+    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" };""") ==
       List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value
         ("\"Stefan\""))
       ))))
   }
 
   it should "parse BGP_FILTER with variables in SparqlPig" in {
-    assert(parseScript( """a = BGP_FILTER b BY { ?a "firstName" "Stefan" };""", List(LanguageFeature.SparqlPig)) ==
+    assert(parseScript( """a = BGP_FILTER b BY { ?a "firstName" "Stefan" };""") ==
       List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(NamedField("a"), Value("\"firstName\""), Value
         ("\"Stefan\""))
       ))))
   }
 
   it should "parse BGP_FILTER with a complex pattern" in {
-    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""",
-      List(LanguageFeature.SparqlPig)) ==
+    assert(parseScript( """a = BGP_FILTER b BY { $0 "firstName" "Stefan" . $0 "lastName" "Hage" };""") ==
       List(BGPFilter(Pipe("a"), Pipe("b"), List(TriplePattern(PositionalField(0), Value("\"firstName\""), Value("\"Stefan\"")),
         TriplePattern(PositionalField(0), Value("\"lastName\""), Value("\"Hage\""))))))
   }
 
   it should "parse RDFLoad operators for plain triples" in {
     val uri = new URI("rdftest.rdf")
-    val ungrouped = parseScript( """a = RDFLoad('rdftest.rdf');""", List(LanguageFeature.SparqlPig))
+    val ungrouped = parseScript( """a = RDFLoad('rdftest.rdf');""")
     assert(ungrouped == List(RDFLoad(Pipe("a"), uri, None)))
 
     val expected = Some(Schema(BagType(TupleType(Array(
@@ -654,9 +625,9 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   it should "parse RDFLoad operators for triple groups" in {
     val uri = new URI("rdftest.rdf")
-    val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on subject;""", List(LanguageFeature.SparqlPig))
-    val grouped_on_pred = parseScript( """a = RDFLoad('rdftest.rdf') grouped on predicate;""", List(LanguageFeature.SparqlPig))
-    val grouped_on_obj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on object;""", List(LanguageFeature.SparqlPig))
+    val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on subject;""")
+    val grouped_on_pred = parseScript( """a = RDFLoad('rdftest.rdf') grouped on predicate;""")
+    val grouped_on_obj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on object;""")
     assert(grouped_on_subj == List(RDFLoad(Pipe("a"), uri, Some("subject"))))
     assert(grouped_on_pred == List(RDFLoad(Pipe("a"), uri, Some("predicate"))))
     assert(grouped_on_obj == List(RDFLoad(Pipe("a"), uri, Some("object"))))
@@ -668,14 +639,12 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   it should "reject RDFLoad operators with unknown grouping column names" in {
     val colname = Random.nextString(10)
     intercept[IllegalArgumentException] {
-      val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on $colname;""",
-        List(LanguageFeature.SparqlPig))
+      val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on $colname;""")
     }
   }
 
   it should "parse a matcher statement using only mode" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0) MODE skip_till_next_match;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0) MODE skip_till_next_match;")
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -684,8 +653,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a matcher statement using skip_till_any_match mode" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0) MODE skip_till_any_match;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0) MODE skip_till_any_match;")
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -694,8 +662,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a matcher statement using only window" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0) WITHIN 30 SECONDS;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0) WITHIN 30 SECONDS;")
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -704,8 +671,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a matcher statement using a simple event" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN A WITH (A: x == 0) WITHIN 30 SECONDS;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN A WITH (A: x == 0) WITHIN 30 SECONDS;")
       == List(Matcher(Pipe("a"), Pipe("b"),
         SimplePattern("A"),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -713,8 +679,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         (30, "SECONDS"))))
   }
   it should "parse a matcher statement using a sequence and three events" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B, C) WITH (A: x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B, C) WITH (A: x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;")
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), SimplePattern("B"), SimplePattern("C"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -722,8 +687,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         (30, "SECONDS"))))
   }
   it should "parse a matcher statement using a sequence event with negation" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, neg(B), C) WITH (A: x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, neg(B), C) WITH (A: x == 0) MODE skip_till_next_match WITHIN 30 SECONDS;")
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))))),
@@ -732,8 +696,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a matcher statement using simple event definitions" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, neg(B), C) WITH (A: x == 0, C: x == 1) MODE skip_till_next_match WITHIN 30 SECONDS;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, neg(B), C) WITH (A: x == 0, C: x == 1) MODE skip_till_next_match WITHIN 30 SECONDS;")
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"), NegPattern(SimplePattern("B")), SimplePattern("C"))),
         CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))),
@@ -743,8 +706,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a matcher statement using composite sequence pattern" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, seq(B, D), C) WITH (A: x == 0, C: x == 1, D: y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, seq(B, D), C) WITH (A: x == 0, C: x == 1, D: y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;")
       == List(Matcher(Pipe("a"), Pipe("b"),
         SeqPattern(List(SimplePattern("A"),
           SeqPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
@@ -756,8 +718,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a matcher statement using conjunction and disjunction" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN AND (A, OR(B, D), C) WITH (A: x == 0, C: x == 1, D: y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN AND (A, OR(B, D), C) WITH (A: x == 0, C: x == 1, D: y == (x / 10)) MODE skip_till_next_match WITHIN 30 SECONDS;")
       == List(Matcher(Pipe("a"), Pipe("b"),
         ConjPattern(List(SimplePattern("A"),
           DisjPattern(List(SimplePattern("B"), SimplePattern("D"))), SimplePattern("C"))),
@@ -769,8 +730,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a matcher statement with sequence pattern" in {
-    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0, B: x == 1 AND y == A.y) WITHIN 30 SECONDS;",
-      List(LanguageFeature.ComplexEventPig))
+    assert(parseScript("a = MATCH_EVENT b PATTERN seq (A, B) WITH (A: x == 0, B: x == 1 AND y == A.y) WITHIN 30 SECONDS;")
       == List(Matcher(Pipe("a"), Pipe("b"),
       SeqPattern(List(SimplePattern("A"), SimplePattern("B"))),
       CompEvent(List(SimpleEvent(SimplePattern("A"), Eq(RefExpr(NamedField("x")), RefExpr(Value(0)))),
@@ -902,8 +862,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     val schema = Schema(Array(Field("f1", Types.LongType),
       Field("f2", Types.CharArrayType)))
     schema.timestampField = 0
-    assert(parseScript("a = SOCKET_READ 'localhost:5555' AS (f1: long, f2: chararray) TIMESTAMP(f1);",
-      List(LanguageFeature.StreamingPig))
+    assert(parseScript("a = SOCKET_READ 'localhost:5555' AS (f1: long, f2: chararray) TIMESTAMP(f1);")
       == List(SocketRead(Pipe("a"), SocketAddress("","localhost","5555"), "", Some(schema))))
   }
 
