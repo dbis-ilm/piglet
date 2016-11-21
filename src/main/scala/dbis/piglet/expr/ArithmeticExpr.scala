@@ -167,7 +167,7 @@ case class MSign(a: ArithmeticExpr) extends ArithmeticExpr {
 
 case class Add(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
   override def resultType(schema: Option[Schema]): PigType = {
-    val res = Types.escalateTypes(left.resultType(schema), right.resultType(schema))
+    val res = if(left.resultType(schema) == Types.CharArrayType || right.resultType(schema) == Types.CharArrayType) Types.CharArrayType else Types.escalateTypes(left.resultType(schema), right.resultType(schema))
     if (res == Types.ByteArrayType) Types.DoubleType else res
   }
 }
