@@ -66,6 +66,8 @@ trait CompileIt extends Matchers {
         cleanupResult(resultDir)
         cleanupResult(script.replace(".pig", ""))
       }
+      
+      println
     }
   }
   private def cleanupResult(dir: String): Unit = {
@@ -122,8 +124,8 @@ trait CompileIt extends Matchers {
     cmdLine.addArgument("${backend}")
     cmdLine.addArgument("--master")
     cmdLine.addArgument("${master}")
-    cmdLine.addArgument("--languages")
-    cmdLine.addArgument("${languages}")
+//    cmdLine.addArgument("--languages")
+//    cmdLine.addArgument("${languages}")
     cmdLine.addArgument("--outdir")
     cmdLine.addArgument("${outdir}")
     cmdLine.addArgument("--params")
