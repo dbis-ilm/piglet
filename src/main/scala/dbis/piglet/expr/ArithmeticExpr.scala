@@ -301,7 +301,7 @@ case class ConstructGeometryExpr(ex: ArithmeticExpr, time: Option[TempEx]) exten
   
   override def resultType(schema: Option[Schema]): PigType = {
     if(ex.resultType(schema).tc != TypeCode.CharArrayType)
-      throw new SchemaException(s"geometry construction requires a string parameter")
+      throw new SchemaException(s"geometry construction requires a string parameter, but is ${ex.resultType(schema).tc}")
     
     GeometryType()
   }

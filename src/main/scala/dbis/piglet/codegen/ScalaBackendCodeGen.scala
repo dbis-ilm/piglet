@@ -642,7 +642,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       }
       }
 
-      s"SpatialObject(new WKTReader().read(${emitExpr(ctx, expr)}) ${ if(timeStr.isDefined) s", $timeStr.get" else ""  } )"
+      s"STObject(new WKTReader().read(${emitExpr(ctx, expr)}) ${ if(timeStr.isDefined) s", $timeStr.get" else ""  } )"
     }
 
     case _ => println("unsupported expression: " + expr); ""
