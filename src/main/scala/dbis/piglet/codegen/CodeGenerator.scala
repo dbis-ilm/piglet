@@ -202,8 +202,8 @@ trait CodeGenerator {
     if(plan.checkExpressions(Expr.containsGeometryType)) {
       additionalImports ++= Seq(
           "import com.vividsolutions.jts.io.WKTReader",
-          "import dbis.stark.{SpatialObject, Instant, Interval}",
-          "import dbis.stark.SpatialObject._",
+          "import dbis.stark.{STObject, Instant, Interval}",
+          "import dbis.stark.STObject._",
           "import dbis.stark.spatial.SpatialRDD._")
     }
     
