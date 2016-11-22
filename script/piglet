@@ -6,7 +6,7 @@ FALSE=1
 local=$TRUE        # will be set by isLocalMode function
 backend=""         # will be set by getBackend function
 interactive=false
-quiet=true
+quiet=false
 
 ##############################################################
 # printLogo - function to print the logo

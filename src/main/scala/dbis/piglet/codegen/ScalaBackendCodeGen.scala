@@ -642,7 +642,7 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
       }
       }
 
-      s"SpatialObject(new WKTReader().read(${emitExpr(ctx, expr)}) ${ if(timeStr.isDefined) s", $timeStr.get" else ""  } )"
+      s"STObject(new WKTReader().read(${emitExpr(ctx, expr)}) ${ if(timeStr.isDefined) s", $timeStr.get" else ""  } )"
     }
 
     case _ => println("unsupported expression: " + expr); ""
@@ -734,10 +734,15 @@ abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase w
     */
   def emitStreamThrough(node: StreamOp): String = {
     // TODO: how to handle cases where no schema was given??
+    
+    if(node.schema.isEmpty) {
+      throw new SchemaException("Schema must be set for STREAM THROUGH operator")
+    }
+    
     val className = schemaClassName(node.schema.get.className)
 
     val inFields = node.inputSchema.get.fields.zipWithIndex.map{ case (f, i) => s"t._$i"}.mkString(", ")
-    val outFields = node.schema.get.fields.zipWithIndex.map{ case (f, i) => s"t($i)"}.mkString(", ")
+    val outFields = node.schema.get.fields.zipWithIndex.map{ case (f, i) => s"t($i).asInstanceOf[${scalaTypeMappingTable(f.fType)}]"}.mkString(", ")
 
     callST("streamOp",
       Map("out" -> node.outPipeName,

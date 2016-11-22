@@ -71,7 +71,7 @@ case class GeometryType() extends PigType with java.io.Serializable {
   
   override def tc = TypeCode.GeometryType
 //  override def name = "Geometry"
-  override def name = "SpatialObject"
+  override def name = "STObject"
 
   override def encode: String = "g"
 
