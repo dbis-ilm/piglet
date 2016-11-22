@@ -48,9 +48,12 @@ case class CliParams(
   keepFiles: Boolean = false,
   showStats: Boolean = false,
   paramFile: Option[Path] = None,
-  interactive: Boolean = false
+  interactive: Boolean = false,
+  quiet: Boolean = false
 ) {
   
+  require(!showPlan || (showPlan && !quiet), "show-plan and quiet cannot be active at the same time" )
+  require(!showStats || (showStats && !quiet), "show-stats and quiet cannot be active at the same time" )
 }
 
 object CliParams {
@@ -73,7 +76,7 @@ object CliParams {
     opt[Unit]("show-stats") optional() action { (_,c) => c.copy(showStats = true) } text ("print detailed timing stats at the end")
     opt[Unit]("sequential") optional() action{ (_,c) => c.copy(sequential = true) } text ("sequential execution (do not merge plans)")
     opt[Unit]('u', "update-config") optional() action { (_, c) => c.copy(updateConfig = true) } text (s"update config file in program home (see config file)")
-    opt[Unit]('q',"quiet") optional() action { (_,c) => c } text ("Don't print header output (does not affect logging and error output)")
+    opt[Unit]('q',"quiet") optional() action { (_,c) => c.copy(quiet = true) } text ("Don't print header output (does not affect logging and error output)")
     help("help") text ("prints this usage text")
     version("version") text ("prints this version info")
     arg[File]("<file>...") unbounded() optional() action { (x, c) => c.copy(inputFiles = c.inputFiles :+ x.toPath()) } text ("Pig script files to execute")

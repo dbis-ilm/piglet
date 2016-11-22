@@ -65,7 +65,8 @@ object Piglet extends PigletLogging {
 
     
     // start statistics collector SETM if needed
-    startCollectStats(c.showStats)
+    startCollectStats(c.showStats, c.quiet)
+    
 
     // set the log level as defined in the parameters
 		logger.setLevel(c.logLevel)
@@ -297,6 +298,10 @@ object Piglet extends PigletLogging {
 
             logger.info( s"""starting job at "$jarFile" using backend "${c.backend}" """)
             timing("job execution") {
+              
+              if(!c.quiet)
+                println // needed so that job output (DUMP) starts at a new line
+                
               runner.execute(c.master, scriptName, jarFile, c.backendArgs)
             }
           } else
@@ -307,7 +312,15 @@ object Piglet extends PigletLogging {
     }
   }
 
-  def startCollectStats(enable: Boolean) = if(enable) SETM.enable else SETM.disable
+  def startCollectStats(enable: Boolean, quiet: Boolean) = {
+    if(enable) 
+      SETM.enable 
+    else 
+      SETM.disable
+      
+    SETM.quiet = quiet
+  }
+  
   def collectStats = SETM.collect()
 
 }
