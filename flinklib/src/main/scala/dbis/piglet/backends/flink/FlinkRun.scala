@@ -25,9 +25,6 @@ import com.typesafe.config.ConfigFactory
 import dbis.piglet.backends.BackendConf
 import java.nio.file.Path
 import java.io.File
-import org.apache.flink.client.program.Client
-import org.apache.flink.client.program.PackagedProgram
-import org.apache.flink.client.program.ProgramInvocationException
 import org.apache.flink.configuration.ConfigConstants
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.configuration.GlobalConfiguration
@@ -44,61 +41,13 @@ class FlinkRun extends PigletBackend with PigletLogging {
     val args = backendArgs.map {case (k, v) => (Array(k) ++ Array(v))}.flatten
     if (master.startsWith("local") && !master.startsWith("localhost")){  
       val cli = new CliFrontend
-      val ret = cli.parseParameters(Array("run") ++ args ++ Array("--class", className, jarFile.toString()) ++ args)
-      //submitJar("localhost:6123", jarFile, backendArgs, className)
+      val ret = cli.parseParameters(Array("run", "-q") ++ args ++ Array("--class", className, jarFile.toString()) ++ args)
     }
     else {
       val cli = new CliFrontend
-      val ret = cli.parseParameters(Array("run", "--jobmanager", master) ++ args ++ Array("--class", className, jarFile.toString()))
-      //submitJar(master, jarFile, backendArgs, className)
+      val ret = cli.parseParameters(Array("run", "-q", "--jobmanager", master) ++ args ++ Array("--class", className, jarFile.toString()))
     }
   }
 
   override def executeRaw(file: Path, master: String, backendArgs: Map[String,String]) = ???
-  
-  def submitJar(master: String, path: Path, backendArgs: Map[String,String], className: String, args: String*) = {
-
-    val file = path.toFile().getAbsoluteFile()
-    
-    val parallelism = backendArgs.getOrElse("parallelism", "1").toInt
-    
-    try { 
-
-      logger.debug(s"submitting $file")
-
-      val program = new PackagedProgram(file, className, args:_*)
-      
-      val configuration = new Configuration()
-      val jobManagerAddress = getInetFromHostport(master)
-      logger.debug(s"using job manager at $jobManagerAddress for name $master")
-      configuration.setString(ConfigConstants.JOB_MANAGER_IPC_ADDRESS_KEY, jobManagerAddress.getHostName())
-      configuration.setInteger(ConfigConstants.JOB_MANAGER_IPC_PORT_KEY, jobManagerAddress.getPort())
-
-      val client = new Client(configuration,  1)
-      logger.debug(s"created job client: $client")
-      println(s"Executing ${path.toString}") 
-      client.runBlocking(program, parallelism)
-
-    } catch {
-      case e: ProgramInvocationException => e.printStackTrace()
-    }   
-  }
-
-  def getInetFromHostport(hostport: String) = {
-    // from http://stackoverflow.com/questions/2345063/java-common-way-to-validate-and-convert-       hostport-to-inetsocketaddress
-    var uri = null.asInstanceOf[URI]
-    try {
-      uri = new URI("my://" + hostport)
-    } catch {
-      case e: URISyntaxException =>
-        throw new RuntimeException("Could not identify hostname and port in '" + hostport + "'.", e)
-    }       
-    val host = uri.getHost()
-    val port = uri.getPort()
-    if (host == null || port == -1) {
-      throw new RuntimeException("Could not identify hostname and port in '" + hostport + "'.")
-    }
-    new InetSocketAddress(host, port)
-
-  }
 }

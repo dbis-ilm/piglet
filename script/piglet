@@ -160,9 +160,9 @@ function checkJobManager {
         pid=` ps aux | grep $jobmanager | grep -v "grep" | awk '{print $2}'`
         if [[ ! -z $pid ]]
         then
-            echo "The flink job manager is working with PID=$pid. Continue ..."
+            echo -e "\nThe flink job manager is working with PID=$pid. Continue ..."
         else
-            echo "The flink job manager is not working. Please, run it from the flink bin folder (i.e., start-local). Piglet will exit now ..."
+            echo -e "\nThe flink job manager is not working. Please, run it from the flink bin folder (i.e., start-local). Piglet will exit now ..."
             exit 1
         fi
     fi

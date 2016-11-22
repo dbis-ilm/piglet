@@ -40,8 +40,8 @@ embedded_code(embedded_code) ::= <<
 
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name,profiling) ::= <<
-        def main(args: Array[String]) {
-        val env = ExecutionEnvironment.getExecutionEnvironment<\n>
+	def main(args: Array[String]) {
+		val env = ExecutionEnvironment.getExecutionEnvironment<\n>
 >>
 
 // ----------------- LOAD text file -------------------------------------------
