@@ -114,7 +114,7 @@ trait CompileIt extends Matchers {
     val params = new java.util.HashMap[String, Object]()
     params.put("backend", backend)
     params.put("languages", lang)
-    params.put("master", "local[2]")
+    params.put("master", s"local[${Runtime.getRuntime.availableProcessors()}]")
     params.put("outdir", ".")
     params.put("params", s"inbase=$resourceName,outfile=${resultPath.path}")
     params.put("script", resourceName + script)
