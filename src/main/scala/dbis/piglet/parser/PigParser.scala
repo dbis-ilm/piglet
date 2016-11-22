@@ -879,6 +879,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
   def interval = arithmExpr ~ "," ~ arithmExpr ^^ { case s ~ _ ~ e => Interval(s,Some(e)) }
 
+                            // the comma has to be here because it's also optional
   def timeExp: Parser[TempEx] = "," ~ (interval | instant) ^^ { case _ ~ time => time }
 
   def geometryConstructor = geometryTypeName ~ "(" ~ arithmExpr ~ (timeExp?) ~ ")" ^^ {

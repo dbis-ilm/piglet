@@ -340,7 +340,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
-        |val res = myOp(env, data_helper).map(t => _t$1_Tuple(t(0), t(1)))
+        |val res = myOp(env, data_helper).map(t => _t$1_Tuple(t(0).asInstanceOf[Int], t(1).asInstanceOf[Int]))
         |""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
@@ -356,7 +356,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
-        |val res = package.myOp(env, data_helper,1,42.0).map(t => _t1_Tuple(t(0), t(1)))
+        |val res = package.myOp(env, data_helper,1,42.0).map(t => _t1_Tuple(t(0).asInstanceOf[Int], t(1).asInstanceOf[Int]))
         |""".stripMargin)
     assert(generatedCode == expectedCode)
   }
