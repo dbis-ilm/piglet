@@ -20,7 +20,10 @@ object PigBuild extends Build {
   lazy val piglet = (project in file(".")).
     enablePlugins(BuildInfoPlugin).
     settings(
-      buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, buildInfoBuildNumber),
+      buildInfoKeys := Seq[BuildInfoKey](
+        name, version, scalaVersion, sbtVersion, buildInfoBuildNumber,
+        "master" -> sys.props.getOrElse("master", default=s"local[${java.lang.Runtime.getRuntime.availableProcessors()}]")
+      ),
       buildInfoOptions += BuildInfoOption.BuildTime,
       buildInfoPackage := "dbis.piglet"
     ).
