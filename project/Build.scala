@@ -103,8 +103,8 @@ object PigBuild extends Build {
  */
 object Dependencies {
   
-  val sparkVersion = "2.0.1"
-  val flinkVersion = "1.0.1"
+  val sparkVersion = "2.0.2"
+  val flinkVersion = "1.1.3"
   
   // Libraries
   val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.8"
