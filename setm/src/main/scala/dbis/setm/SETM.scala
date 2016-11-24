@@ -39,7 +39,7 @@ object SETM {
   def timing[T](name: String)(f: => T) = {
     val p = monitor.createPoint(name)
     if(!quiet)
-      print(s"\r==> $name                                                           ")
+      print(s"==> $name                                                           \r")
       
     try {
       f

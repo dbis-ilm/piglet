@@ -2,7 +2,10 @@ package dbis.piglet.tools
 
 import java.net.URI
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.{Path,  Paths}
+
+import scala.collection.JavaConverters._
 
 import scopt.OptionParser
 
@@ -64,8 +67,29 @@ object CliParams {
     opt[String]('m', "master") optional() action { (x, c) => c.copy(master = x) } text ("spark://host:port, mesos://host:port, yarn, or local.")
     opt[String]('b', "backend") optional() action { (x, c) => c.copy(backend = x ) } text ("Target backend (spark, flink, sparks, ...)")
     opt[String]("backend_dir") optional() action { (x, c) => c.copy(backendPath = new File(x).toPath()) } text ("Path to the diretory containing the backend plugins")
-    opt[Map[String, String]]('p', "params") valueName ("name1=value1,name2=value2...") action { (x, c) => c.copy(params = x) } text ("parameter(s) to subsitute")
-    opt[File]("param-file") optional() action { (x,c) => c.copy( paramFile = Some(x.toPath()) ) } text ("Path to a file containing parameter value pairs")
+    opt[Map[String, String]]('p', "params") valueName ("name1=value1,name2=value2...") action { (x, c) => 
+        val prevAndNew = c.params ++ x
+        c.copy(params = prevAndNew) 
+      } text ("parameter(s) to subsitute")
+    opt[File]("param-file") optional() action { (x,c) => 
+        var newC = c.copy( paramFile = Some(x.toPath()) )
+        
+
+        /*
+         * If the parameter file is given, read each line, split it by = and add
+         * the mapping to the parameters list
+         */
+        val fileParams = Files.readAllLines(x.toPath()).asScala
+            .map { line => line.split("=", 2) } // 2 tells split to apply the regex 1 time (n-1) - the result array will be of size 2 (n)
+            .map { arr => (arr(0) -> arr(1) )}.toMap 
+            
+        val allParams = fileParams ++ newC.params
+        newC = newC.copy(params = allParams)
+            
+            
+        newC
+        
+      } text ("Path to a file containing parameter value pairs")
     opt[Map[String, String]]("backend-args") valueName ("key1=value1,key2=value2...") action { (x, c) => c.copy(backendArgs = x) } text ("parameter(s) to substitute")
     opt[Unit]('c', "compile") action { (_, c) => c.copy(compileOnly = true) } text ("compile only (don't execute the script)")
     opt[File]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x.toPath()) } text ("output directory for generated code")

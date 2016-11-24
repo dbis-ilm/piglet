@@ -213,8 +213,9 @@ object PigletCompiler extends PigletLogging {
 	  if(declareParams.nonEmpty)
       logger.info("declared parameters: " + declareParams.mkString(", "))
 
+      
     val allParams = params ++ declareParams
-
+    
 	  if (allParams.nonEmpty) {
 	    // Replace placeholders by parameters.
 		  PigParser.parseScript(sourceLines.map(line => replaceParameters(line, allParams)).mkString("\n"))

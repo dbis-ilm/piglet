@@ -19,8 +19,6 @@ package dbis.piglet
 
 import scala.io.Source
 import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.{Map => MutableMap}
-import scala.collection.JavaConverters._
 
 import scopt.OptionParser
 
@@ -95,27 +93,14 @@ object Piglet extends PigletLogging {
       sys.exit(-1)
     }
 
-    val paramMap = MutableMap.empty[String, String]
-
-    /*
-     * If the parameter file is given, read each line, split it by = and add
-     * the mapping to the parameters list
-     */
-    if(c.paramFile.isDefined) {
-      val s = Files.readAllLines(c.paramFile.get).asScala
-          .map { line => line.split("=", 2) } // 2 tells split to apply the regex 1 time (n-1) - the result array will be of size 2 (n)
-          .map { arr => (arr(0) -> arr(1) )}
-
-      paramMap ++= s
-    }
+    
 
     /* add the parameters supplied via CLI to the paramMap after we read the file
      * this way, we can override the values in the file via CLI
      */
-    paramMap ++= c.params
 
-    if(paramMap.nonEmpty)
-    	logger.info(s"provided parameters: ${paramMap.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
+    if(c.params.nonEmpty)
+    	logger.info(s"provided parameters: ${c.params.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
 
 
     /* if profiling is enabled, check the HTTP server
@@ -297,11 +282,8 @@ object Piglet extends PigletLogging {
             logger.debug(s"using runner class ${runner.getClass.toString()}")
 
             logger.info( s"""starting job at "$jarFile" using backend "${c.backend}" """)
+
             timing("job execution") {
-              
-              if(!c.quiet)
-                println // needed so that job output (DUMP) starts at a new line
-                
               runner.execute(c.master, scriptName, jarFile, c.backendArgs)
             }
           } else
