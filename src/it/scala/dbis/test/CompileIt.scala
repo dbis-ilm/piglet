@@ -20,6 +20,7 @@ package dbis.test
 import org.scalatest.{ Matchers, FlatSpec }
 import dbis.piglet.Piglet
 import dbis.piglet.backends.BackendManager
+import dbis.piglet.BuildInfo
 import org.scalatest.prop.TableDrivenPropertyChecks._
 import org.scalatest.prop.TableFor6
 import scala.io.Source
@@ -114,7 +115,7 @@ trait CompileIt extends Matchers {
     val params = new java.util.HashMap[String, Object]()
     params.put("backend", backend)
     params.put("languages", lang)
-    params.put("master", s"local[${Runtime.getRuntime.availableProcessors()}]")
+    params.put("master", BuildInfo.master)
     params.put("outdir", ".")
     params.put("params", s"inbase=$resourceName,outfile=${resultPath.path}")
     params.put("script", resourceName + script)
