@@ -58,7 +58,7 @@ case class CodeGenContext (
  *
  * @param template the name of the backend-specific template fle
  */
-abstract class ScalaBackendCodeGen(template: String) extends CodeGeneratorBase with PigletLogging {
+abstract class ScalaBackendCodeGen(template: String) extends CodeGenStrategy with PigletLogging {
 
   templateFile = template 
   /*------------------------------------------------------------------------------------------------- */

@@ -39,7 +39,7 @@ case class TemplateException(msg: String) extends Exception(msg)
   * Defines the interface to the actual code generator. For each backend a concrete
   * class implementing this interface completely has to be provided.
   */
-trait CodeGeneratorBase {
+trait CodeGenStrategy {
 
   /**
    * The name of the template file used for code generation.
@@ -173,7 +173,7 @@ trait CodeGenerator {
    *
    * @return an instance of the code generator.
    */
-  def codeGen: CodeGeneratorBase
+  def codeGen: CodeGenStrategy
 
   /**
    * Generates a string containing the code for the given dataflow plan.

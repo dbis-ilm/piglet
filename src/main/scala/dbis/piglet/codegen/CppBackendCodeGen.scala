@@ -41,7 +41,7 @@ object LoadFuncs extends Enumeration {
 import LoadFuncs._
 import java.net.URI
 
-class CppBackendCodeGen(template: String) extends CodeGeneratorBase {
+class CppBackendCodeGen(template: String) extends CodeGenStrategy {
 
   templateFile = template
 
