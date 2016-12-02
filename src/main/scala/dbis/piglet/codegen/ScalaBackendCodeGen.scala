@@ -33,22 +33,6 @@ import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.Conf
 
 /**
-  * CodeGenContext provides a context object which is passed to the specific generator methods.
-  *
-  * @param schema the optional schema of the currently processed operator
-  * @param tuplePrefix a name prefix for generated tuple codes (default = "t")
-  * @param aggregate true if the current expression is an aggregate expression
-  * @param namedRef ??
-  * @param events ??
-  */
-case class CodeGenContext (
-                     schema: Option[Schema] = None,
-                     tuplePrefix: String = "t",
-                     aggregate: Boolean = false,
-                     namedRef: Boolean = false,
-                     events: Option[CompEvent] = None
-                     )
-/**
  * Implements a code generator for Scala-based backends such as Spark or Flink which use
  * a template file for the backend-specific code.
  *

@@ -28,8 +28,11 @@ import dbis.piglet.schema._
 import dbis.piglet.udf.UDFTable
 import dbis.test.CodeMatchers
 import dbis.test.TestTools._
-import org.scalatest.{Matchers, BeforeAndAfterAll, FlatSpec}
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import java.net.URI
+
+import dbis.piglet.codegen.CodeGenerator
+import dbis.piglet.codegen.scala.ScalaCodeGenStrategy
 
 class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
 
@@ -42,7 +45,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   val templateFile = backendConf.templateFile
 
   "The compiler output" should "contain the Spark header & footer" in {
-    val codeGenerator = new BatchCodeGen(templateFile)
+    val codeGenerator = new ScalaCodeGenStrategy()
+
     val generatedCode = cleanString(codeGenerator.emitImport()
       + codeGenerator.emitHeader1("test")
       + codeGenerator.emitHeader2("test",Some(new URI("http://localhost:5555/exectimes")))
