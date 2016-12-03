@@ -17,8 +17,9 @@
 
 package dbis.piglet.tools
 
-import java.io.{ File, FileOutputStream, FileWriter, InputStream, OutputStream, FileInputStream }
+import java.io.{File, FileInputStream, FileOutputStream, FileWriter, InputStream, OutputStream}
 import java.util.jar.JarFile
+
 import dbis.piglet._
 import dbis.piglet.codegen._
 import dbis.piglet.plan.DataflowPlan
@@ -28,9 +29,8 @@ import dbis.piglet.backends.BackendConf
 import java.nio.file.Path
 import java.nio.file.Files
 import java.nio.file.Paths
-import dbis.setm.SETM.timing
 
-import scala.collection.mutable.ListBuffer
+import dbis.setm.SETM.timing
 import java.net.URI
 import java.net.ConnectException
 

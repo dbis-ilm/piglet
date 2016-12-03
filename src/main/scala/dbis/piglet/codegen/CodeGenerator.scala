@@ -19,12 +19,12 @@ package dbis.piglet.codegen
 import dbis.piglet.op.PigOperator
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema.Schema
-import scala.collection.immutable.Map
-import scala.collection.mutable.Set
+//import scala.collection.immutable.Map
+//import scala.collection.mutable.Set
 import org.clapper.scalasti.STGroupFile
 import dbis.piglet.expr.{Expr, Value}
 import dbis.setm.SETM.timing
-import scala.collection.mutable.ListBuffer
+// import scala.collection.mutable.ListBuffer
 import java.net.URI
 
 

@@ -43,7 +43,7 @@ object PigletInterpreterAPI extends PigletLogging {
     val compiler = Class.forName(generatorClass).getConstructors()(0).newInstance(args: _*).asInstanceOf[CodeGenerator]
 
     // 5. generate the Scala code
-    val code = compiler.compile("blubs", plan, profiling = None, forREPL = true)
+    val code = compiler.generate("blubs", plan, profiling = None, forREPL = true)
     logger.debug("successfully generated scala program")
     code
   }

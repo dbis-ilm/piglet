@@ -7,16 +7,8 @@ import java.nio.file.Path
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.parser.PigParser
 import dbis.piglet.plan.rewriting.Rewriter._
-
-import scala.collection.mutable
-import scala.io.Source
-import scala.collection.mutable.ListBuffer
 import dbis.piglet.parser.PigParser
 import dbis.piglet.op.PigOperator
-import java.nio.file.Paths
-import java.nio.file.Files
-import java.io.FileWriter
-
 import dbis.piglet.tools.FileTools
 import dbis.piglet.tools.ScalaCompiler
 import dbis.piglet.tools.JarBuilder
@@ -24,11 +16,16 @@ import dbis.piglet.tools.CppCompiler
 import dbis.piglet.tools.CppCompilerConf
 import dbis.piglet.tools.Conf
 import dbis.setm.SETM.timing
+import java.nio.file.Paths
+import java.nio.file.Files
+import java.io.FileWriter
+
+import scala.io.Source
 
 import scalax.file.{Path => xPath}
 import dbis.piglet.schema.Schema
 import java.net.URI
-import scala.collection.mutable.ArrayBuffer
+
 import dbis.piglet.tools.CliParams
 
 
@@ -81,7 +78,7 @@ object PigletCompiler extends PigletLogging {
    */
   def resolveImports(lines: Iterator[String]): (Iterator[String], Map[String,String]) = {
     var params = Map[String,String]()
-    val buf = ListBuffer.empty[String]
+    val buf = collection.mutable.ListBuffer.empty[String]
     for (l <- lines) {
       if (l.matches("""[ \t]*[iI][mM][pP][oO][rR][tT][ \t]*'([^'\p{Cntrl}\\]|\\[\\"bfnrt]|\\u[a-fA-F0-9]{4})*'[ \t\n]*;""")) {
         val s = l.split(" ")(1)
@@ -124,7 +121,7 @@ object PigletCompiler extends PigletLogging {
     logger.debug(s"successfully created code generator class $codeGenerator")
 
     // generate the Scala code
-    val code = codeGenerator.compile(scriptName, plan, c.profiling)
+    val code = codeGenerator.generate(scriptName, plan, c.profiling)
 
     logger.debug("successfully generated program source code")
 
@@ -154,7 +151,7 @@ object PigletCompiler extends PigletLogging {
     writer.close()
     if (extension.equalsIgnoreCase("scala")) {
       
-      val libraryJars = ArrayBuffer(
+      val libraryJars = collection.mutable.ArrayBuffer(
           c.backendPath.resolve(Conf.backendJar(c.backend)).toString, // the backend library (sparklib, flinklib, etc)
           c.backendPath.resolve(Conf.commonJar).toString) // common lib
       

@@ -2,7 +2,6 @@ package dbis.piglet.codegen
 
 import dbis.piglet.schema.Schema
 
-
 object CodeGenTarget extends Enumeration {
   val Unknown, Spark, SparkStreaming, Flink, FlinkStreaming, PipeFabric = Value
 }
@@ -14,7 +13,7 @@ object CodeGenTarget extends Enumeration {
   * @param target the id of the target platform
   * @param udfAliases a map of alias names for user-defined functions
   */
-case class CodeGenContext (var params: Map[String, Any],
+case class CodeGenContext (var params: collection.mutable.Map[String, Any],
                       target: CodeGenTarget.Value,
                       udfAliases: Option[Map[String, (String, List[Any])]] = None) {
   def apply(n: String) = params(n)
@@ -37,12 +36,12 @@ case class CodeGenContext (var params: Map[String, Any],
 object CodeGenContext {
   def apply(t: CodeGenTarget.Value,
                      aliases: Option[Map[String, (String, List[Any])]] = None) =
-    new CodeGenContext(Map(), t, aliases)
+    new CodeGenContext(collection.mutable.Map[String, Any](), t, aliases)
 
   def apply(ctx: CodeGenContext) =
-    new CodeGenContext(Map(ctx.params), ctx.target, ctx.udfAliases)
+    new CodeGenContext(collection.mutable.Map[String, Any]() ++= ctx.params, ctx.target, ctx.udfAliases)
 
   def apply(ctx: CodeGenContext, m: Map[String, Any]) =
-    new CodeGenContext(Map(ctx.params ++= m), ctx.target, ctx.udfAliases)
+    new CodeGenContext(collection.mutable.Map[String, Any]() ++= ctx.params ++= m, ctx.target, ctx.udfAliases)
 
 }
