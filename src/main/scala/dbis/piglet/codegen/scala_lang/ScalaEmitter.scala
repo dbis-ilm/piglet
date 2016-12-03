@@ -1,4 +1,4 @@
-package dbis.piglet.codegen.scala
+package dbis.piglet.codegen.scala_lang
 
 import dbis.piglet.codegen._
 import dbis.piglet.expr._

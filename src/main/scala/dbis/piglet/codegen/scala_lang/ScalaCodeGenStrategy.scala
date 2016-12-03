@@ -1,4 +1,4 @@
-package dbis.piglet.codegen.scala
+package dbis.piglet.codegen.scala_lang
 
 import java.net.URI
 
@@ -6,6 +6,7 @@ import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenStrategy, CodeGe
 import dbis.piglet.expr.Expr
 import dbis.piglet.op.PigOperator
 import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.schema.Schema
 import dbis.piglet.tools.Conf
 
 import scala.collection.mutable.ListBuffer
@@ -16,8 +17,16 @@ import scala.collection.mutable.ListBuffer
 class ScalaCodeGenStrategy  extends CodeGenStrategy {
   // initialize target and emitters
   val target = CodeGenTarget.Spark
+  val pkg = "dbis.piglet.op"
 
-  val emitters: Map[String, CodeEmitter] = Map[String, CodeEmitter]("Filter" -> new FilterEmitter)
+  val emitters: Map[String, CodeEmitter] = Map[String, CodeEmitter](
+    s"$pkg.Load" -> new LoadEmitter,
+    s"$pkg.Filter" -> new FilterEmitter,
+    s"$pkg.Limit" -> new LimitEmitter,
+    s"$pkg.Distinct" -> new DistinctEmitter,
+    s"$pkg.Sample" -> new SampleEmitter,
+    s"$pkg.Union" -> new UnionEmitter
+  )
 
   override def collectAdditionalImports(plan: DataflowPlan) = {
     val additionalImports = ListBuffer.empty[String]
@@ -126,4 +135,23 @@ class ScalaCodeGenStrategy  extends CodeGenStrategy {
     code
   }
 
+  /**
+    * Generate code for classes representing schema types.
+    *
+    * @param schemas the list of schemas for which we generate classes
+    * @return a string representing the code
+    */
+  override def emitSchemaHelpers(ctx: CodeGenContext, schemas: List[Schema]): String = ""
+
+  /**
+    * Generate code for any helper class/function if needed by the given operator.
+    *
+    * @param node the Pig operator requiring helper code
+    * @return a string representing the helper code
+    */
+  override def emitHelperClass(ctx: CodeGenContext, node: PigOperator): String = {
+    val emitter: CodeEmitter = emitterForNode(node.getClass.getName)
+
+    emitter.helper(ctx, node)
+  }
 }

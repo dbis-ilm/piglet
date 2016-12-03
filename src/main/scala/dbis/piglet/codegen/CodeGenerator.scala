@@ -19,12 +19,12 @@ package dbis.piglet.codegen
 import dbis.piglet.op.PigOperator
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema.Schema
-//import scala.collection.immutable.Map
+import scala.collection.immutable.Map
 //import scala.collection.mutable.Set
 import org.clapper.scalasti.STGroupFile
 import dbis.piglet.expr.{Expr, Value}
 import dbis.setm.SETM.timing
-// import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.ListBuffer
 import java.net.URI
 
 
@@ -170,7 +170,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
       code = code + codeGen.emitHeader2(ctx, scriptName, profiling)
 
     for (n <- plan.operators) {
-      val generatedCode = codeGen.emitNode(ctx, n)
+      val generatedCode = codeGen.emitNode(CodeGenContext(ctx, Map("schema" -> n.schema)), n)
 
       if(profiling.isDefined) {
         /* count the generated lines

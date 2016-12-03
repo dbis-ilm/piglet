@@ -18,7 +18,10 @@ case class CodeGenContext (var params: collection.mutable.Map[String, Any],
                       udfAliases: Option[Map[String, (String, List[Any])]] = None) {
   def apply(n: String) = params(n)
 
-  def asBoolean(n: String) = params(n).asInstanceOf[Boolean]
+  def asBoolean(n: String) = params.get(n) match {
+    case None => false
+    case Some(v) => v.asInstanceOf[Boolean]
+  }
 
   def asString(n: String) = params(n).asInstanceOf[String]
 
@@ -26,17 +29,20 @@ case class CodeGenContext (var params: collection.mutable.Map[String, Any],
 
   def set(n: String, v: Any) = this.params += (n -> v)
 
-  def schema: Option[Schema] = params("schema") match {
-    case None => throw new CodeGenException("unkown schema in context")
-    case Some(s) => Some(s.asInstanceOf[Schema])
+  def schema: Option[Schema] = params.get("schema") match {
+    case Some(s) => s.asInstanceOf[Option[Schema]]
+    case None => None
   }
 
 }
 
 object CodeGenContext {
   def apply(t: CodeGenTarget.Value,
-                     aliases: Option[Map[String, (String, List[Any])]] = None) =
+                     aliases: Option[Map[String, (String, List[Any])]]) =
     new CodeGenContext(collection.mutable.Map[String, Any](), t, aliases)
+
+  def apply(t: CodeGenTarget.Value) =
+    new CodeGenContext(collection.mutable.Map[String, Any](), t, None)
 
   def apply(ctx: CodeGenContext) =
     new CodeGenContext(collection.mutable.Map[String, Any]() ++= ctx.params, ctx.target, ctx.udfAliases)
