@@ -14,7 +14,7 @@ import scala.collection.mutable.ListBuffer
 /**
   * Created by kai on 02.12.16.
   */
-class ScalaCodeGenStrategy  extends CodeGenStrategy {
+class ScalaCodeGenStrategy extends CodeGenStrategy {
   // initialize target and emitters
   val target = CodeGenTarget.Spark
   val pkg = "dbis.piglet.op"
