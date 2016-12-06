@@ -174,6 +174,27 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     assert(generatedCode == expectedCode)
   }
 
+  it should "contain code to handle LOAD with PigStorage but without an explicit schema" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
+    val ops = parseScript(
+      """
+        |in = load 'file' using PigStorage(':');
+        |out = filter in by $1 == "root";
+        |dump out;
+      """.stripMargin)
+    val plan = new DataflowPlan(ops)
+    val rewrittenPlan = processPlan(plan)
+    val op = rewrittenPlan.findOperatorForAlias("out").get
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
+    val expectedCode = cleanString(
+      """
+        |val out = in.filter(t => {t.get(1) == "root"})
+      """.stripMargin)
+    assert (generatedCode == expectedCode)
+  }
+
+
   it should "contain code for FILTER" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
 
@@ -239,23 +260,23 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     assert(generatedCode == expectedCode)
   }
 
-/*
   it should "contain code for DUMP" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     val op = Dump(Pipe("a"))
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-//    val expectedCode = cleanString("""a.collect.map(t => println(t.mkString()))""")
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""a.collect.foreach(t => println(t.mkString()))""")
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for STORE" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     Schema.init()
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
 
     val op = Store(Pipe("A"), file)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
 //    |val A_helper = A.coalesce(1, true)
     val expectedCode = cleanString(
       s"""
@@ -264,14 +285,15 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for STORE with a known schema" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     Schema.init()
     val op = Store(Pipe("A"), "input/file.csv")
     op.schema = Some(Schema(Array(
       Field("f1", Types.IntType),
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))))
 
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """
          |PigStorage[_t$1_Tuple]().write("input/file.csv", A)""".stripMargin)
@@ -279,14 +301,15 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for STORE with delimiter" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     Schema.init()
     val op = Store(Pipe("A"), "input/file.csv", Some("PigStorage"), List(""""#""""))
     op.schema = Some(Schema(Array(
       Field("f1", Types.IntType),
       Field("f2", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))))
 
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """
          |PigStorage[_t$1_Tuple]().write("input/file.csv", A, "#")""".stripMargin)
@@ -294,11 +317,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for STORE with using clause" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
 
     val op = Store(Pipe("A"), file, Some("BinStorage"))
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
 
     val expectedCode = cleanString(
       s"""
@@ -306,7 +329,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     assert(generatedCode == expectedCode)
   }
 
-
+  /*
   it should "contain code for GROUP BY ALL" in {
     val ops = parseScript(
       """
@@ -1027,26 +1050,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code to handle LOAD with PigStorage but without an explicit schema" in {
-    val ops = parseScript(
-    """
-      |in = load 'file' using PigStorage(':');
-      |out = filter in by $1 == "root";
-      |dump out;
-    """.stripMargin)
-    val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val op = rewrittenPlan.findOperatorForAlias("out").get
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
-    val expectedCode = cleanString(
-    """
-      |val out = in.filter(t => {t.get(1) == "root"})
-    """.stripMargin)
-    assert (generatedCode == expectedCode)
-  }
-
-  it should "contain correct code for a function call with bytearray parameters" in {
+   it should "contain correct code for a function call with bytearray parameters" in {
     val ops = parseScript(
     """
       |in = load 'file' as (x, y);

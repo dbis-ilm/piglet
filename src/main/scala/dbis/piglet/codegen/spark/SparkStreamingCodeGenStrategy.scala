@@ -4,6 +4,7 @@ import java.net.URI
 
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
 import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
+import dbis.piglet.op.Load
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.Conf
 

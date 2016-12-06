@@ -25,7 +25,9 @@ class ScalaCodeGenStrategy extends CodeGenStrategy {
     s"$pkg.Limit" -> new LimitEmitter,
     s"$pkg.Distinct" -> new DistinctEmitter,
     s"$pkg.Sample" -> new SampleEmitter,
-    s"$pkg.Union" -> new UnionEmitter
+    s"$pkg.Union" -> new UnionEmitter,
+    s"$pkg.Dump" -> new DumpEmitter,
+    s"$pkg.Store" -> new StoreEmitter
   )
 
   override def collectAdditionalImports(plan: DataflowPlan) = {
