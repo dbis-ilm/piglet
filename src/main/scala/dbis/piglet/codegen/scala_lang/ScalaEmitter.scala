@@ -64,9 +64,35 @@ object ScalaEmitter {
         s"${ctx.asString("tuplePrefix")}.get($pos)"
     }
     case Value(v) => v.toString
-    // case DerefTuple(r1, r2) => s"${emitRef(schema, r1)}.asInstanceOf[List[Any]]${emitRef(schema, r2, "")}"
-    // case DerefTuple(r1, r2) => s"${emitRef(schema, r1, "t", false)}.asInstanceOf[List[Any]]${emitRef(tupleSchema(schema, r1), r2, "", false)}"
     case DerefMap(m, k) => s"${emitRef(ctx, m)}(${k})"
+    case DerefTuple(r1, r2) =>
+      if (ctx.asBoolean("aggregate"))
+        s"${emitRef(CodeGenContext(ctx, Map("tuplePrefix" -> "t")), r1)}.map(e => e${emitRef(CodeGenContext(ctx, Map("schema" -> tupleSchema(ctx.schema, r1), "tuplePrefix" -> "")), r2)})"
+      else {/*
+        ctx.events match {
+          case Some(evs) => {
+            // we try to find r1 in the specification of the events and retrieve the position (or -1 if not found)
+            val res = evs.complex.zipWithIndex.filter{ case (e, pos)  => e.simplePattern.asInstanceOf[SimplePattern].name == r1.toString  }
+            if (res.length != 1)
+              s"${emitRef(CodeGenContext(schema = ctx.schema, tuplePrefix = "t", events = ctx.events), r1)}${emitRef(CodeGenContext(schema = tupleSchema(ctx.schema, r1), tuplePrefix = "", aggregate = ctx.aggregate, namedRef = ctx.namedRef, events = ctx.events), r2)}"
+            else {
+              val p = r2 match {
+                case nf @ NamedField(f, _) => ctx.schema.get.indexOfField(nf)
+                case PositionalField (pos) => pos
+                case _ => 0
+              }
+              if (p == -1)
+                throw new CodeGenException(s"invalid field name $r2 in event ${r1.toString}")
+
+              s"rvalues.events(${res(0)._2})._$p)"  //TODO: work more on other related values
+            }
+          }
+          case None =>
+          */
+          s"${emitRef(CodeGenContext(ctx, Map("tuplePrefix" -> "t")), r1)}${emitRef(CodeGenContext(ctx, Map("schema" -> tupleSchema(ctx.schema, r1), "tuplePrefix" -> "")), r2)}"
+
+        }
+
     case _ => { "" }
   }
 
@@ -245,5 +271,28 @@ object ScalaEmitter {
       throw new CodeGenException("invalid flatten expression: argument doesn't refer to a tuple or bag")
   }
 
+  /**
+    *
+    * @param schema
+    * @param ref
+    * @return
+    */
+  def tupleSchema(schema: Option[Schema], ref: Ref): Option[Schema] = {
+    val tp = ref match {
+      case nf @ NamedField(f, _) => schema match {
+        case Some(s) => if (f == s.element.name) s.element.valueType else s.field(nf).fType
+        case None => throw new SchemaException(s"unknown schema for field $f")
+      }
+      case PositionalField(p) => schema match {
+        case Some(s) => s.field(p).fType
+        case None => None
+      }
+      case _ => None
+    }
+    if (tp == None)
+      None
+    else
+      Some(new Schema( if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType(tp.asInstanceOf[TupleType])))
+  }
 
 }

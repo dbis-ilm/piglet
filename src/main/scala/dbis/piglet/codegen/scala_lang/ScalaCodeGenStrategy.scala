@@ -23,6 +23,7 @@ class ScalaCodeGenStrategy extends CodeGenStrategy {
     s"$pkg.Load" -> new LoadEmitter,
     s"$pkg.Filter" -> new FilterEmitter,
     s"$pkg.Limit" -> new LimitEmitter,
+    s"$pkg.Foreach" -> new ForeachEmitter,
     s"$pkg.Distinct" -> new DistinctEmitter,
     s"$pkg.Sample" -> new SampleEmitter,
     s"$pkg.Union" -> new UnionEmitter,

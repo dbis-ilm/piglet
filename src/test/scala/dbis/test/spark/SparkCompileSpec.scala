@@ -506,8 +506,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode3 should matchSnippet(expectedCode3)
 
   }
+  */
 
-  it should "contain code a foreach statement with function expressions" in {
+  it should "contain code a FOREACH statement with function expressions" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     Schema.init()
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
     val op = Foreach(Pipe("aa"), Pipe("bb"), GeneratorList(List(
@@ -518,13 +521,14 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         RefExpr(PositionalField(1)))))
     )))
     op.constructSchema
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(PigFuncs.toMap(\"field1\",t.get(0),\"field2\",t.get(1))))")
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code for a foreach statement with another function expression" in {
+  it should "contain code for a FOREACH statement with another function expression" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     Schema.init()
     // a = FOREACH b GENERATE $0, COUNT($1) AS CNT;
     val op = Foreach(Pipe("aa"), Pipe("bb"), GeneratorList(List(
@@ -532,13 +536,14 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType)))
       )))
     op.constructSchema
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t.get(0), PigFuncs.count(t.get(1))))")
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code for a foreach statement with a UDF expression" in {
+  it should "contain code for a FOREACH statement with a UDF expression" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     // aa = FOREACH bb GENERATE $0, distance($1, $2, 1.0, 2.0) AS dist;
     val ops = parseScript(
       """
@@ -547,13 +552,12 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """.stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code for a foreach statement with a UDF alias expression" in {
+  it should "contain code for a FOREACH statement with a UDF alias expression" in {
     // aa = FOREACH bb GENERATE $0, distance($1, $2, 1.0, 2.0) AS dist;
     val ops = parseScript(
       """bb = LOAD 'data.csv' AS (t1: int, t2: int, t3: int, t4: int);
@@ -563,15 +567,18 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
     // op.constructSchema
-    val codeGenerator = new BatchCodeGen(templateFile)
     // this is just a hack for this test: normally, the udfAliases map is set in compile
-    codeGenerator.udfAliases = Some(plan.udfAliases.toMap)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val ctx = CodeGenContext(CodeGenTarget.Spark, Some(plan.udfAliases.toMap))
+
+    // codeGenerator.udfAliases = Some(plan.udfAliases.toMap)
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code for deref operator on maps in foreach statement" in {
+  it should "contain code for deref operator on maps in FOREACH statement" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     val ops = parseScript(
     """
       |in = LOAD 'file' AS (s1: chararray, s2: chararray);
@@ -581,14 +588,15 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("a").get
 
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val a = b.map(t => _t$1_Tuple(t._0("k1"), t._1("k2")))""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code for deref operator on tuple in foreach statement" in {
+  it should "contain code for deref operator on tuple in FOREACH statement" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     val ops = parseScript(
       """
         |in = LOAD 'file' AS (s1: int, s2: int, s3: int);
@@ -598,14 +606,15 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("a").get
 
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val a = b.map(t => _t$1_Tuple(t._0._1, t._2._0))""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code for a nested foreach statement" in {
+  it should "contain code for a nested FOREACH statement" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     val ops = parseScript(
       """daily = load 'data.csv' as (exchange, symbol);
         |grpd  = group daily by exchange;
@@ -617,8 +626,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val foreachOp = plan.findOperatorForAlias("uniqcnt").get
     //println("schema = " + foreachOp.schema)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(foreachOp))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, foreachOp))
     val expectedCode = cleanString(
       """val uniqcnt = grpd.map(t => {
         |val sym = t._1.map(l => l._1).toList
@@ -626,19 +634,20 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |_t$1_Tuple(t._0, PigFuncs.count(uniq_sym))})""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(foreachOp.schema.get)))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(foreachOp.schema.get)))
   }
 
-  it should "contain code for a foreach statement with constructors for tuple, bag, and map" in {
+  it should "contain code for a FOREACH statement with constructors for tuple, bag, and map" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
     val ops = parseScript(
       """data = load 'file' as (f1: int, f2: int, name:chararray);
         |out = foreach data generate (f1, f2), {f1, f2}, [name, f1];""".stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchCodeGen(templateFile)
     val op = plan.findOperatorForAlias("out").get
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get)))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)))
 
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     //println("schema class = " + schemaClassCode)
 
     val expectedCode = cleanString(
@@ -647,7 +656,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     generatedCode should matchSnippet(expectedCode)
   }
-  */
+
   it should "contain code for a UNION operator on two relations" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
 
