@@ -2,7 +2,7 @@ package dbis.piglet.codegen.scala_lang
 
 import dbis.piglet.codegen._
 import dbis.piglet.expr._
-import dbis.piglet.op.PigOperator
+import dbis.piglet.op.{GroupingExpression, PigOperator}
 import dbis.piglet.schema._
 import dbis.piglet.udf.UDFTable
 import org.clapper.scalasti.ST
@@ -232,6 +232,21 @@ object ScalaEmitter {
         }
       }
     }
+  }
+
+  /**
+    * Generates Scala code for a grouping expression in GROUP BY. We construct code for map
+    * in the form "map(t => {(t(0),t(1),...)}" if t(0), t(1) are grouping attributes.
+    *
+    * @param ctx an object representing context information for code generation
+    * @param groupingExpr the actual grouping expression object
+    * @return a string representation of the generated Scala code
+    */
+  def emitGroupExpr(ctx: CodeGenContext, groupingExpr: GroupingExpression): String = {
+    if (groupingExpr.keyList.size == 1)
+      groupingExpr.keyList.map(e => emitRef(ctx, e)).mkString
+    else
+      "(" + groupingExpr.keyList.map(e => emitRef(ctx, e)).mkString(",") + ")"
   }
 
   /**

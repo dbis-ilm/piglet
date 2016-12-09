@@ -46,7 +46,7 @@ class ForeachEmitter extends CodeEmitter {
     gen match {
       case GeneratorList(expr) => {
         if (requiresFlatMap)
-          emitBagFlattenGenerator(ctx, node, expr)
+          emitBagFlattenGenerator(CodeGenContext(ctx, Map("schema" -> node.inputSchema)), node, expr)
         else
           emitGenerator(CodeGenContext(ctx, Map("schema" -> node.inputSchema)), expr)
       }

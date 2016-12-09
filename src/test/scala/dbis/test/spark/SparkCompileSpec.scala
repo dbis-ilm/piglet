@@ -329,8 +329,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     assert(generatedCode == expectedCode)
   }
 
-  /*
   it should "contain code for GROUP BY ALL" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
       """
         |bb = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
@@ -339,12 +339,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map(t => _t2_Tuple("all", t))""")
     assert(generatedCode == expectedCode)
 
-    val schemaCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get)))
+    val schemaCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)))
     val expectedSchemaCode =
       cleanString("""
          |case class _t$1_Tuple (_0: String, _1: Iterable[_t$2_Tuple]) extends java.io.Serializable with SchemaClass {
@@ -356,6 +355,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for GROUP BY $0" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
       """
         |bb = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
@@ -364,13 +364,13 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.groupBy(t => {t._0}).map{case (k,v) => _t$1_Tuple(k,v)}")
     generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for GROUP BY with multiple keys" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
       """
         |bb = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
@@ -379,14 +379,13 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """val aa = bb.groupBy(t => {(t._0,t._1)}).map{case (k,v) => _t$1_Tuple(_t$2_Tuple(k._1, k._2),v)}""")
     // val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(op.schema.get))
     generatedCode should matchSnippet(expectedCode)
   }
- */
+
   it should "contain code for DISTINCT" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
 
@@ -794,9 +793,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |}""".stripMargin)
     assert(generatedHelperCode == expectedHelperCode)
   }
-
+*/
   it should "contain code for flattening a tuple in FOREACH" in {
-    Schema.init()
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+   Schema.init()
     val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
     val schema = Schema(Array(
       Field("f1", Types.CharArrayType),
@@ -805,40 +805,40 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         Field("f4", Types.CharArrayType))))))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
         |val a = b.map(t => _t$1_Tuple(t._0, t._1._0, t._1._1))""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for flattening a bag function in FOREACH" in {
-    val ops = parseScript("""
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+   val ops = parseScript("""
                          |b = load 'file';
                          |a = foreach b generate flatten(tokenize($0));""".stripMargin)
     val schema = Schema(Array(Field("f1", Types.CharArrayType)))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
         |val a = b.flatMap(t => PigFuncs.tokenize(t._0).map(_t$1_Tuple(_)).map(t => _t$2_Tuple(t._0)))""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for flattening a bag in FOREACH" in {
-    val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+   val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
     val schema = Schema(Array(Field("f1", Types.CharArrayType),
       Field("f2", BagType(TupleType(Array(Field("ff1", Types.IntType)))))))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("a").get))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, plan.findOperatorForAlias("a").get))
     val expectedCode = cleanString("""
         |val a = b.flatMap(t => t._1.map(s => _t$1_Tuple(t._0, s)))""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
+  /*
   it should "contain code for a simple accumulate statement" in {
     val ops = parseScript("b = load 'file'; a = ACCUMULATE b GENERATE COUNT($0), AVG($1), SUM($2);")
     val schema = Schema(Array(Field("t1", Types.IntType),
@@ -871,14 +871,14 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
 
   }
-
+*/
   it should "not contain code for EMPTY operators" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val op = Empty(Pipe("_"))
-    val codeGenerator = new BatchCodeGen(templateFile)
 
-    assert(codeGenerator.emitNode(op) == "")
+    assert(codeGenerator.emitNode(ctx, op) == "")
   }
-
+  /*
   it should "contain embedded code" in {
     val ops = parseScript(
       """
@@ -1058,8 +1058,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     generatedCode should matchSnippet(expectedCode)
   }
-
+*/
    it should "contain correct code for a function call with bytearray parameters" in {
+     val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
     """
       |in = load 'file' as (x, y);
@@ -1069,9 +1070,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """.stripMargin)
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
     val op = rewrittenPlan.findOperatorForAlias("out").get
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """
         |val out = in2.map(t => _t$2_Tuple(PigFuncs.tokenize(t._0.asInstanceOf[String]).map(_t$1_Tuple(_))))
@@ -1080,6 +1080,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "generate code for GROUP BY with group name" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val plan = new DataflowPlan(parseScript(
       """
         |A = LOAD 'file' AS (name, value: double);
@@ -1088,9 +1089,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |DUMP C;
       """.stripMargin))
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
     val op = rewrittenPlan.findOperatorForAlias("C").get
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """
         |val C = B.map(t => _t$1_Tuple(t._0, PigFuncs.average(t._1.map(e => e._1))))
@@ -1099,6 +1099,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "generate code for matrix construction" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val plan = new DataflowPlan(parseScript(
       """
         |A = LOAD 'file' AS (v11: double, v12: double, v21: double, v22: double, v31: double, v32: double);
@@ -1106,9 +1107,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |DUMP B;
       """.stripMargin))
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
     val op = rewrittenPlan.findOperatorForAlias("B").get
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """
         |val B = A.map(t => _t$1_Tuple(new DenseMatrix[Double](2, 3, List(_t$2_Tuple(t._0),_t$2_Tuple(t._1),_t$2_Tuple(t._2),_t$2_Tuple(t._3),_t$2_Tuple(t._4),_t$2_Tuple(t._5)).map(v => v._0).toArray)))
@@ -1117,6 +1117,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "generate code for constructing a matrix from a bag" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val plan = new DataflowPlan(parseScript(
       """
         |A = LOAD 'file' AS (v11: double, v12: double, v21: double, v22: double, v31: double, v32: double);
@@ -1125,9 +1126,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |DUMP C;
       """.stripMargin))
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
     val op = rewrittenPlan.findOperatorForAlias("C").get
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """
         |val C = B.map(t => _t$1_Tuple(new DenseMatrix[Double](2, 3, t._0.map(v => v._0).toArray)))
@@ -1135,7 +1135,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
 
   }
-
+/*
   it should "contain code for match_event with a pattern SEQ (A, B)" in {
     Schema.init()
     val ops = parseScript("""
