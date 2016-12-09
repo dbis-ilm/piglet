@@ -28,6 +28,7 @@ class ScalaCodeGenStrategy extends CodeGenStrategy {
     s"$pkg.Sample" -> new SampleEmitter,
     s"$pkg.Union" -> new UnionEmitter,
     s"$pkg.Grouping" -> new GroupingEmitter,
+    s"$pkg.OrderBy" -> new OrderByEmitter,
     s"$pkg.Dump" -> new DumpEmitter,
     s"$pkg.Empty" -> new EmptyEmitter,
     s"$pkg.Store" -> new StoreEmitter
@@ -140,75 +141,6 @@ class ScalaCodeGenStrategy extends CodeGenStrategy {
     code
   }
 
-  /**
-    * Generate code for a class representing a schema type.
-    *
-    * @param values
-    * @return
-    */
-  private def emitSchemaClass(values: (String, String, String, String, String)): (String, String) = {
-    val (name, fieldNames, fieldTypes, fieldStr, toStr) = values
-
-    val code = CodeEmitter.render("""case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
-                                    |  override def mkString(_c: String = ",") = <string_rep>
-                                    |}
-                                    |""".stripMargin, Map("name" -> name,
-      "fieldNames" -> fieldNames,
-      "fieldTypes" -> fieldTypes,
-      "fields"   -> fieldStr,
-      "string_rep" -> toStr))
-
-    (name, code)
-  }
-
-  private def emitSchemaConverters(values: (String, String, String, String, String)): String = {
-    val (name, fieldNames, fieldTypes, _, _) = values
-
-    CodeEmitter.render("""<if (fieldNames)>
-                         |implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
-                         |<endif>""".stripMargin, Map("name" -> name,
-      "fieldNames" -> fieldNames,
-      "fieldTypes" -> fieldTypes
-    ))
-  }
-
-  private def createSchemaInfo(schema: Schema) = {
-    def typeName(f: PigType, n: String) = ScalaEmitter.scalaTypeMappingTable.get(f) match {
-      case Some(n) => n
-      case None => f match {
-        // if we have a bag without a name then we assume that we have got
-        // a case class with _<field_name>_Tuple
-        case BagType(v) => s"Iterable[_${v.className}_Tuple]"
-        case TupleType(f, c) => ScalaEmitter.schemaClassName(c)
-        case MapType(v) => s"Map[String,${ScalaEmitter.scalaTypeMappingTable(v)}]"
-        case MatrixType(v, rows, cols, rep) => s"DenseMatrix[${if (v.tc == TypeCode.IntType) "Int" else "Double"}]"
-        case _ => f.descriptionString
-      }
-    }
-    val fieldList = schema.fields.toList
-    // build the list of field names (_0, ..., _n)
-    val fieldNames = if (fieldList.size==1) "t" else fieldList.indices.map(t => "t._"+(t+1)).mkString(", ")
-    val fieldTypes = fieldList.map(f => s"${typeName(f.fType, f.name)}").mkString(", ")
-    val fields = fieldList.zipWithIndex.map{ case (f, i) =>
-      (s"_$i", s"${typeName(f.fType, f.name)}")}
-    val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
-
-    // construct the mkString method
-    //   we have to handle the different types here:
-    //      TupleType -> ()
-    //      BagType -> {}
-    val toStr = fieldList.zipWithIndex.map{
-      case (f, i) => f.fType match {
-        case BagType(_) => s""""{" + _$i.mkString(",") + "}""""
-        case MapType(v) => s""""[" + _$i.map{ case (k,v) => s"$$k#$$v" }.mkString(",") + "]""""
-        case _ => s"_$i" + (if (f.fType.tc != TypeCode.CharArrayType && fields.length == 1) ".toString" else "")
-      }
-    }.mkString(" + _c + ")
-
-    val name = ScalaEmitter.schemaClassName(schema.className)
-
-    (name, fieldNames, fieldTypes, fieldStr, toStr)
-  }
 
   /**
     * Generate code for classes representing schema types.
@@ -222,10 +154,10 @@ class ScalaCodeGenStrategy extends CodeGenStrategy {
     val classes = ListBuffer.empty[(String, String)]
 
     for (schema <- schemas) {
-      val values = createSchemaInfo(schema)
+      val values = ScalaEmitter.createSchemaInfo(schema)
 
-      classes += emitSchemaClass(values)
-      converterCode += emitSchemaConverters(values)
+      classes += ScalaEmitter.emitSchemaClass(values)
+      converterCode += ScalaEmitter.emitSchemaConverters(values)
     }
 
     val p = "_t([0-9]+)_Tuple".r

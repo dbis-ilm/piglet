@@ -755,18 +755,19 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
-
+  */
   it should "contain code for simple ORDER BY" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     // aa = ORDER bb BY $0
     val op = OrderBy(Pipe("aa"), Pipe("bb"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val aa = bb.keyBy(t => t.get(0)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
   it should "contain code for complex ORDER BY" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     Schema.init()
     // a = ORDER b BY f1, f3
     val op = OrderBy(Pipe("a"), Pipe("b"), List(OrderBySpec(NamedField("f1"), OrderByDirection.AscendingOrder),
@@ -776,13 +777,12 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                                               Field("f3", Types.IntType)))
 
     op.schema = Some(schema)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val a = b.keyBy(t => custKey_a_b(t._0,t._2)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
     assert(generatedCode == expectedCode)
 
-    val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(op))
+    val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(ctx, op))
     val expectedHelperCode = cleanString("""
         |case class custKey_a_b(c1: String, c2: Int) extends Ordered[custKey_a_b] {
         |  def compare(that: custKey_a_b) = { if (this.c1 == that.c1) {
@@ -793,7 +793,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |}""".stripMargin)
     assert(generatedHelperCode == expectedHelperCode)
   }
-*/
+
   it should "contain code for flattening a tuple in FOREACH" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
    Schema.init()
@@ -991,8 +991,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |""".stripMargin)
     assert(generatedCode2 == expectedCode2)
   }
+  */
 
   it should "contain code for schema classes" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
     """
       |A = LOAD 'file' AS (f1: int, f2: chararray, f3: double);
@@ -1003,11 +1005,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
-      code = code + codeGenerator.emitSchemaHelpers(List(schema))
+      code = code + codeGenerator.emitSchemaHelpers(ctx, List(schema))
     }
 
     val generatedCode = cleanString(code)
@@ -1027,6 +1028,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for nested schema classes" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
       """
         |daily = load 'file' using PigStorage(',') as (exchange: chararray, symbol: chararray);
@@ -1036,11 +1038,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
-      code = code + codeGenerator.emitSchemaHelpers(List(schema))
+      code = code + codeGenerator.emitSchemaHelpers(ctx, List(schema))
     }
 
     val generatedCode = cleanString(code)
@@ -1058,7 +1059,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     generatedCode should matchSnippet(expectedCode)
   }
-*/
+
    it should "contain correct code for a function call with bytearray parameters" in {
      val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(

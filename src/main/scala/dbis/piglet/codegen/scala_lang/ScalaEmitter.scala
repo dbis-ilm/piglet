@@ -21,6 +21,27 @@ object ScalaEmitter {
     Types.AnyType -> "String") //TODO: check this
 
   /**
+    * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
+    * bytearray which is mapped to String.
+    *
+    * @param field a Ref representing the field (positional or named=
+    * @param schema the schema of the field
+    * @return the name of the Scala type
+    */
+  def scalaTypeOfField(field: Ref, schema: Option[Schema]) : String = {
+    schema match {
+      case Some(s) => {
+        field match {
+          case PositionalField(f) => scalaTypeMappingTable(s.field(f).fType)
+          case nf @ NamedField(_, _) => scalaTypeMappingTable(s.field(nf).fType)
+          case _ => "String"
+        }
+      }
+      case None => "String"
+    }
+  }
+
+  /**
     *
     * @param name
     * @return
@@ -308,6 +329,76 @@ object ScalaEmitter {
       None
     else
       Some(new Schema( if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType(tp.asInstanceOf[TupleType])))
+  }
+
+  /**
+    * Generate code for a class representing a schema type.
+    *
+    * @param values
+    * @return
+    */
+  def emitSchemaClass(values: (String, String, String, String, String)): (String, String) = {
+    val (name, fieldNames, fieldTypes, fieldStr, toStr) = values
+
+    val code = CodeEmitter.render("""case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+                                    |  override def mkString(_c: String = ",") = <string_rep>
+                                    |}
+                                    |""".stripMargin, Map("name" -> name,
+      "fieldNames" -> fieldNames,
+      "fieldTypes" -> fieldTypes,
+      "fields"   -> fieldStr,
+      "string_rep" -> toStr))
+
+    (name, code)
+  }
+
+  def emitSchemaConverters(values: (String, String, String, String, String)): String = {
+    val (name, fieldNames, fieldTypes, _, _) = values
+
+    CodeEmitter.render("""<if (fieldNames)>
+                         |implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
+                         |<endif>""".stripMargin, Map("name" -> name,
+      "fieldNames" -> fieldNames,
+      "fieldTypes" -> fieldTypes
+    ))
+  }
+
+  def createSchemaInfo(schema: Schema) = {
+    def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
+      case Some(n) => n
+      case None => f match {
+        // if we have a bag without a name then we assume that we have got
+        // a case class with _<field_name>_Tuple
+        case BagType(v) => s"Iterable[_${v.className}_Tuple]"
+        case TupleType(f, c) => schemaClassName(c)
+        case MapType(v) => s"Map[String,${scalaTypeMappingTable(v)}]"
+        case MatrixType(v, rows, cols, rep) => s"DenseMatrix[${if (v.tc == TypeCode.IntType) "Int" else "Double"}]"
+        case _ => f.descriptionString
+      }
+    }
+    val fieldList = schema.fields.toList
+    // build the list of field names (_0, ..., _n)
+    val fieldNames = if (fieldList.size==1) "t" else fieldList.indices.map(t => "t._"+(t+1)).mkString(", ")
+    val fieldTypes = fieldList.map(f => s"${typeName(f.fType, f.name)}").mkString(", ")
+    val fields = fieldList.zipWithIndex.map{ case (f, i) =>
+      (s"_$i", s"${typeName(f.fType, f.name)}")}
+    val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
+
+    // construct the mkString method
+    //   we have to handle the different types here:
+    //      TupleType -> ()
+    //      BagType -> {}
+    val toStr = fieldList.zipWithIndex.map{
+      case (f, i) => f.fType match {
+        case BagType(_) => s""""{" + _$i.mkString(",") + "}""""
+        case MapType(v) => s""""[" + _$i.map{ case (k,v) => s"$$k#$$v" }.mkString(",") + "]""""
+        case _ => s"_$i" + (if (f.fType.tc != TypeCode.CharArrayType && fields.length == 1) ".toString" else "")
+      }
+    }.mkString(" + _c + ")
+
+    val name = schemaClassName(schema.className)
+
+    (name, fieldNames, fieldTypes, fieldStr, toStr)
   }
 
 }
