@@ -107,7 +107,7 @@ object PigletCompiler extends PigletLogging {
    * @param scriptName The name of the script (used as program and file name)
    * @param c Paramters
    */
-  def compilePlan(plan: DataflowPlan, scriptName: String, templateFile: String, c: CliParams): Option[Path] = timing("compile plan") {
+  def compilePlan(plan: DataflowPlan, scriptName: String, c: CliParams): Option[Path] = timing("compile plan") {
 
     // compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(c.backend)
@@ -117,7 +117,9 @@ object PigletCompiler extends PigletLogging {
 //    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
 //    logger.debug(s"""arguments to generator class: "${args.mkString(",")}" """)
 
-    val codeGenerator = Class.forName(generatorClass).getConstructors()(0).newInstance(templateFile).asInstanceOf[CodeGenerator]
+    val codeGenStrategy = Class.forName(generatorClass).getConstructors()(0).newInstance().asInstanceOf[CodeGenStrategy]
+    val codeGenerator = CodeGenerator(codeGenStrategy)
+
     logger.debug(s"successfully created code generator class $codeGenerator")
 
     // generate the Scala code

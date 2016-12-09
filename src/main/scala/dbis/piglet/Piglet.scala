@@ -216,7 +216,7 @@ object Piglet extends PigletLogging {
       schedule = ListBuffer((mergedPlan, Paths.get(s"merged_${System.currentTimeMillis()}.pig")))
     }
 
-    val templateFile = BackendManager.backend.templateFile
+   // val templateFile = BackendManager.backend.templateFile
 
 		val profiler = c.profiling.map { u => new DataflowProfiler(Some(u)) }
 
@@ -273,7 +273,7 @@ object Piglet extends PigletLogging {
       logger.debug(s"using script name: $scriptName")
 
 
-      PigletCompiler.compilePlan(newPlan, scriptName, templateFile, c) match {
+      PigletCompiler.compilePlan(newPlan, scriptName, c) match {
         // the file was created --> execute it
         case Some(jarFile) =>
           if (!c.compileOnly) {

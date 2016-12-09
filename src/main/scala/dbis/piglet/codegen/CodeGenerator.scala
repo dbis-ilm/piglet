@@ -181,6 +181,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
         val lines = scala.io.Source.fromBytes((code + generatedCode).getBytes).getLines().size + 1
         ctx.set("lines", lines)
       }
+      code =  code + generatedCode + "\n"
     }
 
     // generate the cleanup code
