@@ -896,7 +896,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for flattening a bag in FOREACH" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-   val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
+    val ops = parseScript("b = load 'file'; a = foreach b generate $0, flatten($1);")
     val schema = Schema(Array(Field("f1", Types.CharArrayType),
       Field("f2", BagType(TupleType(Array(Field("ff1", Types.IntType)))))))
     ops.head.schema = Some(schema)
@@ -907,8 +907,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
   }
 
-  /*
   it should "contain code for a simple accumulate statement" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript("b = load 'file'; a = ACCUMULATE b GENERATE COUNT($0), AVG($1), SUM($2);")
     val schema = Schema(Array(Field("t1", Types.IntType),
                               Field("t2", Types.IntType),
@@ -916,8 +916,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("a").get
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """
         |def aggr_a_seq(acc: _t$2_HelperTuple, v: _t$2_HelperTuple): _t$2_HelperTuple =
@@ -931,7 +930,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |val a = sc.parallelize(Array(_t$2_Tuple(a_fold._0, a_fold._1sum.toDouble / a_fold._1cnt.toDouble, a_fold._2)))
         |""".stripMargin)
 
-    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
+    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(ctx, op))
     val expectedHelperClass = cleanString(
     """case class _t$2_HelperTuple (_t: _t$1_Tuple = null, _0: Long = 0, _1sum: Long = 0, _1cnt: Long = 0, _2: Int = 0)
       |extends java.io.Serializable with SchemaClass { override def mkString(_c: String = ",") = "" }
@@ -940,7 +939,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
 
   }
-*/
+
   it should "not contain code for EMPTY operators" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     val op = Empty(Pipe("_"))
