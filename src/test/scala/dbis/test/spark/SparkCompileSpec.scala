@@ -16,23 +16,56 @@
  */
 package dbis.test.spark
 
-import dbis.piglet.parser.PigParser.parseScript
-import dbis.piglet.backends.BackendManager
-// import dbis.piglet.codegen.spark.BatchCodeGen
-import dbis.piglet.op._
-import dbis.piglet.expr._
-import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.plan.rewriting.Rewriter._
-import dbis.piglet.plan.rewriting.Rules
-import dbis.piglet.schema._
-import dbis.piglet.udf.UDFTable
-import dbis.test.CodeMatchers
-import dbis.test.TestTools._
-import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 import java.net.URI
 
-import dbis.piglet.codegen.{CodeGenContext, CodeGenTarget, CodeGenerator}
-import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.Finders
+import org.scalatest.FlatSpec
+import org.scalatest.Matchers
+
+import dbis.piglet.backends.BackendManager
+import dbis.piglet.codegen.CodeGenContext
+import dbis.piglet.codegen.CodeGenTarget
+import dbis.piglet.codegen.spark.SparkCodeGenStrategy
+import dbis.piglet.expr.And
+import dbis.piglet.expr.Div
+import dbis.piglet.expr.Eq
+import dbis.piglet.expr.Func
+import dbis.piglet.expr.Geq
+import dbis.piglet.expr.Gt
+import dbis.piglet.expr.Lt
+import dbis.piglet.expr.NamedField
+import dbis.piglet.expr.PositionalField
+import dbis.piglet.expr.RefExpr
+import dbis.piglet.expr.Value
+import dbis.piglet.op.Distinct
+import dbis.piglet.op.Dump
+import dbis.piglet.op.Empty
+import dbis.piglet.op.Filter
+import dbis.piglet.op.Foreach
+import dbis.piglet.op.GeneratorExpr
+import dbis.piglet.op.GeneratorList
+import dbis.piglet.op.Limit
+import dbis.piglet.op.Load
+import dbis.piglet.op.OrderBy
+import dbis.piglet.op.OrderByDirection
+import dbis.piglet.op.OrderBySpec
+import dbis.piglet.op.PigOperator
+import dbis.piglet.op.Pipe
+import dbis.piglet.op.Sample
+import dbis.piglet.op.Store
+import dbis.piglet.op.Union
+import dbis.piglet.parser.PigParser.parseScript
+import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.plan.rewriting.Rewriter.processPlan
+import dbis.piglet.plan.rewriting.Rules
+import dbis.piglet.schema.BagType
+import dbis.piglet.schema.Field
+import dbis.piglet.schema.Schema
+import dbis.piglet.schema.TupleType
+import dbis.piglet.schema.Types
+import dbis.test.CodeMatchers
+import dbis.test.TestTools.strToUri
 
 class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
 
@@ -42,7 +75,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   def cleanString(s: String) : String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
 
-  val codeGenerator = new ScalaCodeGenStrategy()
+  val codeGenerator = new SparkCodeGenStrategy()
   val backendConf = BackendManager.init("spark")
 
   "The compiler output" should "contain the Spark header & footer" in {

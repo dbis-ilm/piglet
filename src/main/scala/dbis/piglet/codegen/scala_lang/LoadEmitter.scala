@@ -10,8 +10,8 @@ import dbis.piglet.schema.Schema
   */
 class LoadEmitter extends CodeEmitter {
   override def template: String =
-    """val <out> =
-      |<func>[<class>]().load(sc, "<file>", <extractor><if (params)>, <params><endif>)""".stripMargin
+    """    val <out> =
+      |      <func>[<class>]().load(sc, "<file>", <extractor><if (params)>, <params><endif>)""".stripMargin
 
 
   /**

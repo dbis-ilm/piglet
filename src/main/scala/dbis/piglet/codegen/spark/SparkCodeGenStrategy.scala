@@ -12,16 +12,8 @@ import dbis.piglet.codegen.scala_lang.LoadEmitter
 import dbis.piglet.codegen.scala_lang.StoreEmitter
 import dbis.piglet.codegen.scala_lang.DumpEmitter
 
-/**
-  * Created by kai on 05.12.16.
-  */
-class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
-  override val target = CodeGenTarget.SparkStreaming
-  override val emitters = super.emitters + (
-      s"$pkg.Load" -> new SparkStreamingLoadEmitter,
-      s"$pkg.Dump" -> new SparkStreamingDumpEmitter,
-      s"$pkg.Store" -> new SparkStreamingStoreEmitter
-    )
+class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
+  override val target = CodeGenTarget.Spark
 
   /**
     * Generate code needed for importing required Scala packages.
@@ -29,22 +21,16 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
     * @return a string representing the import code
     */
   override def emitImport(ctx: CodeGenContext, additionalImports: Seq[String] = Seq.empty): String =
-    CodeEmitter.render("""import org.apache.spark._
-                         |import org.apache.spark.streaming._
+    CodeEmitter.render("""import org.apache.spark.SparkContext
+                         |import org.apache.spark.SparkContext._
+                         |import org.apache.spark.SparkConf
+                         |import org.apache.spark.rdd._
                          |import dbis.piglet.backends.{SchemaClass, Record}
                          |import dbis.piglet.tools._
                          |import dbis.piglet.backends.spark._
                          |<additional_imports>
-                         |
-                         |object SECONDS {
-                         |  def apply(p: Long) = Seconds(p)
-                         |}
-                         |object MINUTES {
-                         |  def apply(p: Long) = Minutes(p)
-                         |}
-                         |<\n>
                          |""".stripMargin,
-      Map("additional_imports" -> additionalImports.mkString("\n")))
+    Map("additional_imports" -> additionalImports.mkString("\n")))
 
 
   /**
@@ -57,8 +43,8 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
   override def emitHeader1(ctx: CodeGenContext, scriptName: String): String =
     CodeEmitter.render(
       """object <name> {
-        |  SparkStream.setAppName("<name>_App")
-        |  val ssc = SparkStream.ssc
+        |val conf = new SparkConf().setAppName("<name>_App")
+        |val sc = new SparkContext(conf)
         |""".stripMargin, Map("name" -> scriptName))
 
 
@@ -81,25 +67,16 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
     CodeEmitter.render("""  def main(args: Array[String]) {
                          |
                          |<if (profiling)>
-                         |    val perfMon = new PerfMonitor("<name>_App")
-                         |    ssc.sparkContext.addSparkListener(perfMon)
+                         |    val perfMon = new PerfMonitor("<name>_App","<profiling>")
+                         |    sc.addSparkListener(perfMon)
                          |<endif>
                          |""".stripMargin, map)
   }
 
   override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan): String = {
-    /*
-     * We want to force the termination with the help of a timeout,
-     * if all source nodes are Load operators as text files are not continuous.
-     */
-    var forceTermin = if(plan.operators.isEmpty) false else true
-    plan.sourceNodes.foreach(op => forceTermin &= op.isInstanceOf[Load])
-    var params = Map("name" -> "Starting Query")
-    if (forceTermin) params += ("forceTermin" -> forceTermin.toString())
-    CodeEmitter.render("""    ssc.start()
-                         |	  ssc.awaitTermination<if (forceTermin)>OrTimeout(5000)<else>()<endif>
+      CodeEmitter.render("""    sc.stop()
                          |  }
-                         |}""".stripMargin, params)
+                         |}""".stripMargin, Map("name" -> "Starting Query"))
 
   }
 }
@@ -109,14 +86,14 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
 /*                                SparkStreaming-specific emitters                                  */
 /*------------------------------------------------------------------------------------------------- */
 
-class SparkStreamingLoadEmitter extends LoadEmitter {
+class StreamLoadEmitter extends LoadEmitter {
   override def template: String = """    val <out> = <func>[<class>]().loadStream(ssc, "<file>", <extractor><if (params)>, <params><endif>)""".stripMargin
 }
 
-class SparkStreamingStoreEmitter extends StoreEmitter {
+class StreamStoreEmitter extends StoreEmitter {
   override def template: String = """    <func>[<class>]().writeStream("<file>", <in><if (params)>, <params><endif>)""".stripMargin
 }
 
-class SparkStreamingDumpEmitter extends DumpEmitter {
+class StreamDumpEmitter extends DumpEmitter {
   override def template: String = """    <in>.foreachRDD(rdd => rdd.foreach(elem => println(elem.mkString())))""".stripMargin
 }
