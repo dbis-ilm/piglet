@@ -14,12 +14,13 @@ import dbis.piglet.codegen.CodeGenTarget
   */
 class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.SparkStreaming
+
   override val emitters = super.emitters + (
     s"$pkg.Load" -> new StreamLoadEmitter,
     s"$pkg.Dump" -> new StreamDumpEmitter,
-    s"$pkg.Store" -> new StreamStoreEmitter,
-    s"$pkg.Window" -> new StreamWindowEmitter,
-    s"$pkg.SocketRead" -> new StreamSocketReadEmitter
+    s"$pkg.Store" -> new StreamStoreEmitter
+ //   s"$pkg.Window" -> new StreamWindowEmitter,
+ //   s"$pkg.SocketRead" -> new StreamSocketReadEmitter
     )
 
   /**
