@@ -695,28 +695,38 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for a CROSS operator" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
 
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
+      Field("f2", Types.DoubleType),
+      Field("f3", Types.IntType)))))
+    val input1 = Pipe("bb",Load(Pipe("bb"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("cc",Load(Pipe("cc"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+
     // a = CROSS b, c;
-    // TODO: we need a schema for bb and cc
-    val op = Cross(Pipe("aa"), List(Pipe("bb"), Pipe("cc")))
-    op.schema = Some(Schema(Array(Field("f1", Types.CharArrayType) )))
+    val op = Cross(Pipe("aa"), List(input1, input2))
+    //op.schema = Some(Schema(Array(Field("f1", Types.CharArrayType) )))
+    op.constructSchema
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-        |val aa = bb.cartesian(cc)""".stripMargin)
+        |val aa = bb.cartesian(cc).map{ case (v,w) => _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) }""".stripMargin)
 
-    generatedCode shouldBe expectedCode
+    generatedCode should matchSnippet(expectedCode)
   }
 
-  ignore should "contain code for a CROSS operator on more than two relations" in {
+  it should "contain code for a CROSS operator on more than two relations" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
 
+    val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType)))))
+    val input1 = Pipe("b",Load(Pipe("b"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("c",Load(Pipe("c"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     // a = CROSS b, c, d;
-    // TODO: we need a schema for b, c, and d
-    val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
+    val op = Cross(Pipe("a"), List(input1, input2, input3))
+    op.constructSchema
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val a = b.cartesian(c).cartesian(d)""".stripMargin)
 
-    generatedCode shouldBe expectedCode
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for the SAMPLE operator with a literal value" in {
