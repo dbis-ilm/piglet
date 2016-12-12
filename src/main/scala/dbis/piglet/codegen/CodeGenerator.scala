@@ -170,7 +170,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
       code = code + codeGen.emitHeader2(ctx, scriptName, profiling)
 
     for (n <- plan.operators) {
-      val generatedCode = codeGen.emitNode(CodeGenContext(ctx, Map("schema" -> n.schema)), n)
+      val generatedCode = codeGen.emitNode(CodeGenContext(ctx, Map("schema" -> n.schema, "tuplePrefix" -> "t")), n)
 
       if(profiling.isDefined) {
         /* count the generated lines

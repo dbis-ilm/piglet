@@ -40,7 +40,7 @@ class GroupingEmitter extends CodeEmitter {
           else "k" // the simple case: the key is a single field
 
           render(Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className,
-            "expr" -> ScalaEmitter.emitGroupExpr(CodeGenContext(ctx, Map("schema" -> node.inputSchema, "tuplePrefix" -> "t")), groupExpr),
+            "expr" -> ScalaEmitter.emitGroupExpr(CodeGenContext(ctx, Map("schema" -> node.inputSchema)), groupExpr),
             "keyExtr" -> keyExtr))
         }
       }

@@ -18,6 +18,8 @@ case class CodeGenContext (var params: collection.mutable.Map[String, Any],
                       udfAliases: Option[Map[String, (String, List[Any])]] = None) {
   def apply(n: String) = params(n)
 
+  def contains(n: String) = params.contains(n)
+
   def asBoolean(n: String) = params.get(n) match {
     case None => false
     case Some(v) => v.asInstanceOf[Boolean]
@@ -47,7 +49,11 @@ object CodeGenContext {
   def apply(ctx: CodeGenContext) =
     new CodeGenContext(collection.mutable.Map[String, Any]() ++= ctx.params, ctx.target, ctx.udfAliases)
 
-  def apply(ctx: CodeGenContext, m: Map[String, Any]) =
-    new CodeGenContext(collection.mutable.Map[String, Any]() ++= ctx.params ++= m, ctx.target, ctx.udfAliases)
+  def apply(ctx: CodeGenContext, m: Map[String, Any]) = {
+    val params = collection.mutable.Map[String, Any]()
+    params ++= ctx.params
+    params ++= m
+    new CodeGenContext(params, ctx.target, ctx.udfAliases)
+  }
 
 }
