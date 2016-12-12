@@ -79,7 +79,7 @@ class OrderByEmitter extends CodeEmitter {
 
       //Flink??
       params += "out" -> node.outPipeName
-      params += "key" -> orderSpec.map(r => ScalaEmitter.emitRef(CodeGenContext(ctx, Map("schema" -> node.schema)), r.field)).mkString(",")
+      params += "key" -> orderSpec.map(r => ScalaEmitter.emitRef(CodeGenContext(ctx, Map("schema" -> node.schema, "tuplePrefix" -> "t")), r.field)).mkString(",")
       if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
 
       CodeEmitter.render(helperTemplate, Map("params" -> params))
@@ -91,7 +91,7 @@ class OrderByEmitter extends CodeEmitter {
   override def code(ctx: CodeGenContext, node: PigOperator): String = {
     node match {
       case OrderBy(out, in, orderSpec, _) => {
-        val key = emitSortKey(CodeGenContext(ctx, Map("schema" -> node.schema, "tuplePrefix" -> "t")), orderSpec, node.outPipeName, node.inPipeName)
+        val key = emitSortKey(CodeGenContext(ctx, Map("schema" -> node.schema)), orderSpec, node.outPipeName, node.inPipeName)
         val asc = ascendingSortOrder(orderSpec.head)
         render(Map("out" -> node.outPipeName, "in" -> node.inPipeName, "key" -> key, "asc" -> asc))
 

@@ -13,7 +13,9 @@ import scala.collection.mutable.Set
 class JoinEmitter extends CodeEmitter {
   override def template: String = """val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)}""".stripMargin
   def mwayJoinTemplate: String = """val <out> = <rel1>_kv<rel2: {rel | .join(<rel>_kv)}>.map{case (k,<pairs>) => <class>(<fields>)}""".stripMargin
-  def keymapTemplate: String = """<rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t)) }>""".stripMargin
+  def keymapTemplate: String =
+    """<rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
+      | }>""".stripMargin
 
   /**
     *
@@ -43,8 +45,7 @@ class JoinEmitter extends CodeEmitter {
          * Thus, we build a list of 1 and 0's where 1 stands for a relation name for which we have already
          * created a _kv variable.
          */
-        val joinKeyVars = if (ctx.contains("joinkeys")) ctx.params("joinkeys").asInstanceOf[Set[String]] else Set[String]()
-        val duplicates = rels.map(r => if (joinKeyVars.contains(r.name)) 1 else 0)
+        val duplicates = rels.map(r => if (JoinEmitter.joinKeyVars.contains(r.name)) 1 else 0)
 
         /*
          * Now we build lists for rels and keys by removing the elements corresponding to 1's in the duplicate
@@ -56,7 +57,7 @@ class JoinEmitter extends CodeEmitter {
         /*
          * And finally, create the join kv vars for them...
          */
-        var str = CodeEmitter.render(keymapTemplate, Map("rels" -> drels.map(_.name), "keys" -> dkeys))
+        var str = CodeEmitter.render(keymapTemplate, Map("rels" -> drels.map(_.name), "keys" -> dkeys)) + "\n"
 
         /*
          * We construct a string v._0, v._1 ... w._0, w._1 ...
@@ -103,9 +104,8 @@ class JoinEmitter extends CodeEmitter {
               "pairs" -> pairs,
               "fields" -> fieldList.mkString(", "))) + "\n"
         }
-        joinKeyVars += rels.head.name
-        joinKeyVars ++= rels.tail.map(_.name)
-        ctx.set("joinkeys", joinKeyVars)
+        JoinEmitter.joinKeyVars += rels.head.name
+        JoinEmitter.joinKeyVars ++= rels.tail.map(_.name)
 
         str
       }
@@ -113,4 +113,9 @@ class JoinEmitter extends CodeEmitter {
     }
   }
 
+}
+
+
+object JoinEmitter {
+  val joinKeyVars = Set[String]()
 }
