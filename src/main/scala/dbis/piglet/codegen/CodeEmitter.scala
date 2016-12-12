@@ -4,6 +4,10 @@ import dbis.piglet.expr._
 import dbis.piglet.op.PigOperator
 import dbis.piglet.schema.{BagType, MapType, Schema, TupleType}
 import org.clapper.scalasti.ST
+import org.clapper.scalasti.STGroupString
+import org.stringtemplate.v4.NoIndentWriter
+import org.stringtemplate.v4.misc.ErrorBuffer
+import org.stringtemplate.v4.STWriter
 
 case class CodeGenException(msg: String) extends Exception(msg)
 
@@ -21,7 +25,7 @@ trait CodeEmitter {
     */
   def render(params: Map[String,Any]): String = CodeEmitter.render(template, params)
 
-    def helper(ctx: CodeGenContext, node: PigOperator): String = ""
+  def helper(ctx: CodeGenContext, node: PigOperator): String = ""
 
   def code(ctx: CodeGenContext, node: PigOperator): String
 
@@ -46,7 +50,11 @@ object CodeEmitter {
         attr => st.add(attr._1, attr._2)
       }
     }
-    st.render()
+    val out = new java.io.StringWriter
+    st.nativeTemplate.write(new NoIndentWriter(out), new ErrorBuffer())
+    out.flush()
+    //st.render()
+    out.toString()
   }
 
 

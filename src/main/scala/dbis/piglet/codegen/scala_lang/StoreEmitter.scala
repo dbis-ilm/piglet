@@ -8,7 +8,7 @@ import dbis.piglet.op.{PigOperator, Store}
   * Created by kai on 05.12.16.
   */
 class StoreEmitter extends CodeEmitter {
-  override def template: String = """<func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)""".stripMargin
+  override def template: String = """    <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)""".stripMargin
 
 
   override def code(ctx: CodeGenContext, node: PigOperator): String = {
