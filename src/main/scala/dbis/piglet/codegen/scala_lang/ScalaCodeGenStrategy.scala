@@ -30,6 +30,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy {
     s"$pkg.Grouping" -> new GroupingEmitter,
     s"$pkg.OrderBy" -> new OrderByEmitter,
     s"$pkg.Join" -> new JoinEmitter,
+    s"$pkg.Cross" -> new CrossEmitter,
     s"$pkg.Dump" -> new DumpEmitter,
     s"$pkg.Empty" -> new EmptyEmitter,
     s"$pkg.Store" -> new StoreEmitter
