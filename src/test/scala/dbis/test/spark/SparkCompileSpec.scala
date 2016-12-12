@@ -18,6 +18,7 @@ package dbis.test.spark
 
 import dbis.piglet.parser.PigParser.parseScript
 import dbis.piglet.backends.BackendManager
+import dbis.piglet.codegen.scala_lang.JoinEmitter
 // import dbis.piglet.codegen.spark.BatchCodeGen
 import dbis.piglet.op._
 import dbis.piglet.expr._
@@ -416,8 +417,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val schema = Schema(Array(Field("f1", Types.CharArrayType),
                                                               Field("f2", Types.DoubleType),
                                                               Field("f3", Types.IntType)))
-    val input1 = Pipe("bb",Load(Pipe("bb"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
-    val input2 = Pipe("cc",Load(Pipe("cc"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input1 = Pipe("bb", Load(Pipe("bb"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
+    val input2 = Pipe("cc", Load(Pipe("cc"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs = List(input1,input2)
     op.constructSchema
 
@@ -455,6 +456,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for a multiway JOIN statement" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     ctx.set("tuplePrefix", "t")
+    JoinEmitter.joinKeyVars.clear() // make sure we start generated names with a
 
     Schema.init()
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
@@ -479,6 +481,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for multiple joins" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     ctx.set("tuplePrefix", "t")
+    JoinEmitter.joinKeyVars.clear() // make sure we start generated names with a
 
     val ops = parseScript(
       """a = load 'file' as (a: chararray);
@@ -688,30 +691,34 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     assert(generatedCode == expectedCode)
   }
 
-  /*
-//  it should "contain code for a CROSS operator" in {
-//    // a = CROSS b, c;
-//    val op = Cross(Pipe("aa"), List(Pipe("bb"), Pipe("cc")))
-//    op.schema = Some(Schema(Array(Field("f1", Types.CharArrayType) )))
-//    val codeGenerator = new BatchCodeGen(templateFile)
-//    val generatedCode = cleanString(codeGenerator.emitNode(op))
-//    val expectedCode = cleanString("""
-//        |val aa = bb.cartesian(cc)""".stripMargin)
-//
-//    generatedCode shouldBe expectedCode
-//  }
-//
-//  ignore should "contain code for a CROSS operator on more than two relations" in {
-//    // a = CROSS b, c, d;
-//    val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
-//    val codeGenerator = new BatchCodeGen(templateFile)
-//    val generatedCode = cleanString(codeGenerator.emitNode(op))
-//    val expectedCode = cleanString("""
-//        |val a = b.cartesian(c).cartesian(d)""".stripMargin)
-//
-//    generatedCode shouldBe expectedCode
-//  }
-*/
+
+  it should "contain code for a CROSS operator" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
+    // a = CROSS b, c;
+    // TODO: we need a schema for bb and cc
+    val op = Cross(Pipe("aa"), List(Pipe("bb"), Pipe("cc")))
+    op.schema = Some(Schema(Array(Field("f1", Types.CharArrayType) )))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
+    val expectedCode = cleanString("""
+        |val aa = bb.cartesian(cc)""".stripMargin)
+
+    generatedCode shouldBe expectedCode
+  }
+
+  ignore should "contain code for a CROSS operator on more than two relations" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+
+    // a = CROSS b, c, d;
+    // TODO: we need a schema for b, c, and d
+    val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
+    val expectedCode = cleanString("""
+        |val a = b.cartesian(c).cartesian(d)""".stripMargin)
+
+    generatedCode shouldBe expectedCode
+  }
+
   it should "contain code for the SAMPLE operator with a literal value" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
 
@@ -892,8 +899,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     assert(codeGenerator.emitNode(ctx, op) == "")
   }
-  /*
+
   it should "contain embedded code" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
       """
         |<% def someFunc(s: String): String = {
@@ -903,8 +911,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |A = LOAD 'file.csv';
       """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val theCode = codeGenerator.emitHeader1("test") + codeGenerator.emitEmbeddedCode(plan.code)
+    val theCode = codeGenerator.emitHeader1(ctx, "test") + codeGenerator.emitEmbeddedCode(ctx, plan.code)
     assert(cleanString(theCode) ==
       cleanString("""
         |object test {
@@ -917,7 +924,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val udf = UDFTable.findUDF("someFunc", Types.AnyType)
     udf shouldBe defined
   }
-
+  /*
   it should "contain code for macros" in {
     val ops = parseScript(
     """
