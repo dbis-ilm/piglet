@@ -1,9 +1,10 @@
 package dbis.piglet.codegen
 
-import dbis.piglet.expr._
-import dbis.piglet.op.PigOperator
-import dbis.piglet.schema.{BagType, MapType, Schema, TupleType}
 import org.clapper.scalasti.ST
+import org.stringtemplate.v4.NoIndentWriter
+import org.stringtemplate.v4.misc.ErrorBuffer
+
+import dbis.piglet.op.PigOperator
 
 case class CodeGenException(msg: String) extends Exception(msg)
 
@@ -21,7 +22,7 @@ trait CodeEmitter {
     */
   def render(params: Map[String,Any]): String = CodeEmitter.render(template, params)
 
-    def helper(ctx: CodeGenContext, node: PigOperator): String = ""
+  def helper(ctx: CodeGenContext, node: PigOperator): String = ""
 
   def code(ctx: CodeGenContext, node: PigOperator): String
 
@@ -46,7 +47,12 @@ object CodeEmitter {
         attr => st.add(attr._1, attr._2)
       }
     }
-    st.render()
+    //st.render()
+    // Ugly version to suppress warnings such as "attribute isn't defined":
+    val out = new java.io.StringWriter
+    st.nativeTemplate.write(new NoIndentWriter(out), new ErrorBuffer())
+    out.flush()
+    out.toString()
   }
 
 
