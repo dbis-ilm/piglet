@@ -91,7 +91,7 @@ class OrderByEmitter extends CodeEmitter {
   override def code(ctx: CodeGenContext, node: PigOperator): String = {
     node match {
       case OrderBy(out, in, orderSpec, _) => {
-        val key = emitSortKey(CodeGenContext(ctx, Map("schema" -> node.schema, "tuplePrefix" -> "t")), orderSpec, node.outPipeName, node.inPipeName)
+        val key = emitSortKey(CodeGenContext(ctx, Map("schema" -> node.schema)), orderSpec, node.outPipeName, node.inPipeName)
         val asc = ascendingSortOrder(orderSpec.head)
         render(Map("out" -> node.outPipeName, "in" -> node.inPipeName, "key" -> key, "asc" -> asc))
 

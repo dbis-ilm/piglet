@@ -389,6 +389,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for GROUP BY $0" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
+    ctx.set("tuplePrefix", "t")
     val ops = parseScript(
       """
         |bb = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
@@ -404,6 +405,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for GROUP BY with multiple keys" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
+    ctx.set("tuplePrefix", "t")
+
     val ops = parseScript(
       """
         |bb = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
@@ -437,8 +440,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     assert(generatedCode == expectedCode)
   }
 
-  /*
-  it should "contain code for a binary join statement with simple expression" in {
+  it should "contain code for a binary JOIN statement with simple expression" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+    ctx.set("tuplePrefix", "t")
+
     Schema.init()
     val op = Join(Pipe("aa"), List(Pipe("bb"), Pipe("cc")), List(List(PositionalField(0)), List(PositionalField(0))))
     val schema = Schema(Array(Field("f1", Types.CharArrayType),
@@ -449,8 +454,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     op.inputs = List(input1,input2)
     op.constructSchema
 
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val bb_kv = bb.map(t => (t._0,t))
       |val cc_kv = cc.map(t => (t._0,t))
@@ -458,7 +462,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code for a binary join statement with expression lists" in {
+  it should "contain code for a binary JOIN statement with expression lists" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+    ctx.set("tuplePrefix", "t")
+
     Schema.init()
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
       List(PositionalField(1), PositionalField(2))))
@@ -470,8 +477,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     op.inputs = List(input1,input2)
     op.constructSchema
 
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (Array(t._0,t._1).mkString,t))
       |val c_kv = c.map(t => (Array(t._1,t._2).mkString,t))
@@ -479,7 +485,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code for a multiway join statement" in {
+  it should "contain code for a multiway JOIN statement" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+    ctx.set("tuplePrefix", "t")
+
     Schema.init()
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
       List(PositionalField(0)), List(PositionalField(0))))
@@ -491,8 +500,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val input3 = Pipe("d",Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs = List(input1,input2,input3)
     op.constructSchema
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (t._0,t))
       |val c_kv = c.map(t => (t._0,t))
@@ -502,6 +510,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for multiple joins" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+    ctx.set("tuplePrefix", "t")
+
     val ops = parseScript(
       """a = load 'file' as (a: chararray);
         |b = load 'file' as (a: chararray);
@@ -511,14 +522,13 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |j = join j1 by $0, j2 by $0;
         |""".stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode1 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j1").get))
-    val generatedCode2 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j2").get))
-    val generatedCode3 = cleanString(codeGenerator.emitNode(plan.findOperatorForAlias("j").get))
+    val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, plan.findOperatorForAlias("j1").get))
+    val generatedCode2 = cleanString(codeGenerator.emitNode(ctx, plan.findOperatorForAlias("j2").get))
+    val generatedCode3 = cleanString(codeGenerator.emitNode(ctx, plan.findOperatorForAlias("j").get))
 
     val finalJoinOp = plan.findOperatorForAlias("j").get
     // TODO: Schema classes!!!!
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(List(finalJoinOp.schema.get)))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(finalJoinOp.schema.get)))
 
     val expectedCode1 = cleanString(
       """val a_kv = a.map(t => (t._0,t))
@@ -538,7 +548,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode3 should matchSnippet(expectedCode3)
 
   }
-  */
+
 
   it should "contain code a FOREACH statement with function expressions" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
@@ -791,6 +801,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   */
   it should "contain code for simple ORDER BY" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
+    ctx.set("tuplePrefix", "t")
+
     // aa = ORDER bb BY $0
     val op = OrderBy(Pipe("aa"), Pipe("bb"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
@@ -801,6 +813,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for complex ORDER BY" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
+    ctx.set("tuplePrefix", "t")
+
     Schema.init()
     // a = ORDER b BY f1, f3
     val op = OrderBy(Pipe("a"), Pipe("b"), List(OrderBySpec(NamedField("f1"), OrderByDirection.AscendingOrder),
