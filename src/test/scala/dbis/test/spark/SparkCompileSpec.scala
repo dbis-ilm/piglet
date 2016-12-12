@@ -972,8 +972,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val udf = UDFTable.findUDF("someFunc", Types.AnyType)
     udf shouldBe defined
   }
-  /*
+
   it should "contain code for macros" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
     """
       |DEFINE my_macro(in_alias, p) RETURNS out_alias {
@@ -987,8 +988,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode = cleanString(
       """
         |val out = in.map(t => _t$1_Tuple(t._0 + 42))
@@ -997,6 +997,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for multiple macros" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
       """
         |DEFINE my_macro(in_alias, p) RETURNS out_alias {
@@ -1016,14 +1017,13 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
         |val out = in.map(t => _t$1_Tuple(t._0 + 42, t._1))
         |""".stripMargin)
     generatedCode1 should matchSnippet(expectedCode1)
-    val generatedCode2 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out2").get))
+    val generatedCode2 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out2").get))
     val expectedCode2 = cleanString(
       """
         |val out2 = out.map(t => _t$1_Tuple(t._0, t._1 - 5))
@@ -1032,6 +1032,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for invoking a macro multiple times" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
       """
         |DEFINE my_macro(in_alias, p) RETURNS out_alias {
@@ -1046,21 +1047,19 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     )
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode1 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out").get))
+    val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
         |val out = in.map(t => _t3_Tuple(t._0 + 42))
         |""".stripMargin)
     assert(generatedCode1 == expectedCode1)
-    val generatedCode2 = cleanString(codeGenerator.emitNode(rewrittenPlan.findOperatorForAlias("out2").get))
+    val generatedCode2 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out2").get))
     val expectedCode2 = cleanString(
       """
         |val out2 = out.map(t => _t3_Tuple(t._0 + 43))
         |""".stripMargin)
     assert(generatedCode2 == expectedCode2)
   }
-  */
 
   it should "contain code for schema classes" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
