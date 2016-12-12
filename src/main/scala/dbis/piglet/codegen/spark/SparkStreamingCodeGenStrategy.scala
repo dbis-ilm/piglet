@@ -8,9 +8,6 @@ import dbis.piglet.op.Load
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.Conf
 import dbis.piglet.codegen.CodeGenTarget
-import dbis.piglet.codegen.scala_lang.LoadEmitter
-import dbis.piglet.codegen.scala_lang.StoreEmitter
-import dbis.piglet.codegen.scala_lang.DumpEmitter
 
 /**
   * Created by kai on 05.12.16.
@@ -18,9 +15,11 @@ import dbis.piglet.codegen.scala_lang.DumpEmitter
 class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.SparkStreaming
   override val emitters = super.emitters + (
-      s"$pkg.Load" -> new SparkStreamingLoadEmitter,
-      s"$pkg.Dump" -> new SparkStreamingDumpEmitter,
-      s"$pkg.Store" -> new SparkStreamingStoreEmitter
+    s"$pkg.Load" -> new StreamLoadEmitter,
+    s"$pkg.Dump" -> new StreamDumpEmitter,
+    s"$pkg.Store" -> new StreamStoreEmitter,
+    s"$pkg.Window" -> new StreamWindowEmitter,
+    s"$pkg.SocketRead" -> new StreamSocketReadEmitter
     )
 
   /**
@@ -102,21 +101,4 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
                          |}""".stripMargin, params)
 
   }
-}
-
-
-/*------------------------------------------------------------------------------------------------- */
-/*                                SparkStreaming-specific emitters                                  */
-/*------------------------------------------------------------------------------------------------- */
-
-class SparkStreamingLoadEmitter extends LoadEmitter {
-  override def template: String = """    val <out> = <func>[<class>]().loadStream(ssc, "<file>", <extractor><if (params)>, <params><endif>)""".stripMargin
-}
-
-class SparkStreamingStoreEmitter extends StoreEmitter {
-  override def template: String = """    <func>[<class>]().writeStream("<file>", <in><if (params)>, <params><endif>)""".stripMargin
-}
-
-class SparkStreamingDumpEmitter extends DumpEmitter {
-  override def template: String = """    <in>.foreachRDD(rdd => rdd.foreach(elem => println(elem.mkString())))""".stripMargin
 }
