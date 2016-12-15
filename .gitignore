@@ -1,4 +1,6 @@
-*~
+#########################################
+# File with contents to be ignored by git
+#########################################
 logs
 project/project
 project/target
@@ -34,11 +36,14 @@ __my_script*/
 piglet-dist*
 
 
-#####
+#################
 # ignore database
+#################
 db
 
+##############
 # sbt specific
+##############
 .cache
 .cache-*
 .history
@@ -57,3 +62,10 @@ buildinfo.properties
 .worksheet
 
 .LICENSE-COPY.crc
+
+################################
+# Operating Systems
+################################
+*~
+*.swp
+.DS_Store
