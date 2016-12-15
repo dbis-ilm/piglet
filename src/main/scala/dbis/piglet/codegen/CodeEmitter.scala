@@ -1,7 +1,7 @@
 package dbis.piglet.codegen
 
 import org.clapper.scalasti.ST
-import org.stringtemplate.v4.NoIndentWriter
+import org.stringtemplate.v4.AutoIndentWriter
 import org.stringtemplate.v4.misc.ErrorBuffer
 
 import dbis.piglet.op.PigOperator
@@ -14,13 +14,13 @@ trait CodeEmitter {
   def render: String = CodeEmitter.render(template, Map[String, Any]())
 
   /**
-    * Invoke a given string template with a map of key-value pairs used for replacing
-    * the keys in the template by the string values.
-    *
-    * @param params the map of key-value pairs
-    * @return the text from the template
-    */
-  def render(params: Map[String,Any]): String = CodeEmitter.render(template, params)
+   * Invoke a given string template with a map of key-value pairs used for replacing
+   * the keys in the template by the string values.
+   *
+   * @param params the map of key-value pairs
+   * @return the text from the template
+   */
+  def render(params: Map[String, Any]): String = CodeEmitter.render(template, params)
 
   def helper(ctx: CodeGenContext, node: PigOperator): String = ""
 
@@ -33,14 +33,17 @@ trait CodeEmitter {
 }
 
 object CodeEmitter {
-   /**
-    * Invoke a given string template with a map of key-value pairs used for replacing
-    * the keys in the template by the string values.
-    *
-    * @param params the map of key-value pairs
-    * @return the text from the template
-    */
-  def render(template: String, params: Map[String,Any]): String = {
+  val sw = new java.io.StringWriter
+
+  /**
+   * Invoke a given string template with a map of key-value pairs used for replacing
+   * the keys in the template by the string values.
+   *
+   * @param params the map of key-value pairs
+   * @return the text from the template
+   */
+  def render(template: String, params: Map[String, Any]): String = {
+
     val st = ST(template)
     if (params.nonEmpty) {
       params.foreach {
@@ -49,11 +52,10 @@ object CodeEmitter {
     }
     //st.render()
     // Ugly version to suppress warnings such as "attribute isn't defined":
-    val out = new java.io.StringWriter
-    st.nativeTemplate.write(new NoIndentWriter(out), new ErrorBuffer())
-    out.flush()
-    out.toString()
+    sw.getBuffer.setLength(0)
+    st.nativeTemplate.write(new AutoIndentWriter(sw), new ErrorBuffer())
+    sw.flush()
+    sw.toString()
   }
-
 
 }
