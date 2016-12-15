@@ -254,7 +254,43 @@ object ScalaEmitter {
       }
     }
   }
+  
+  /**
+    * Construct the extract function for source operators.
+    *
+    * @param node the PigOperator for loading data
+    * @param loaderFunc the loader function
+    * @return a parameter map with class and extractor elements
+    */
+  def emitExtractorFunc(node: PigOperator, loaderFunc: Option[String]): Map[String, Any] = {
+    def schemaExtractor(schema: Schema): String =
+      schema.fields.zipWithIndex.map{case (f, i) =>
+        // we cannot perform a "toAny" - therefore, we treat bytearray as String here
+        val t = ScalaEmitter.scalaTypeMappingTable(f.fType); s"data($i).to${if (t == "Any") "String" else t}"
+      }.mkString(", ")
 
+    def jdbcSchemaExtractor(schema: Schema): String =
+      schema.fields.zipWithIndex.map{case (f, i) => s"data.get${ScalaEmitter.scalaTypeMappingTable(f.fType)}($i)"}.mkString(", ")
+
+    var paramMap = Map[String, Any]()
+    node.schema match {
+      case Some(s) => if (loaderFunc.nonEmpty && loaderFunc.get == "JdbcStorage")
+      // JdbcStorage provides already types results, therefore we need an extractor which calls
+      // only the appropriate get functions on sql.Row
+        paramMap += ("extractor" ->
+          s"""(data: org.apache.spark.sql.Row) => ${ScalaEmitter.schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
+          "class" -> ScalaEmitter.schemaClassName(s.className))
+      else
+        paramMap += ("extractor" ->
+          s"""(data: Array[String]) => ${ScalaEmitter.schemaClassName(s.className)}(${schemaExtractor(s)})""",
+          "class" -> ScalaEmitter.schemaClassName(s.className))
+      case None => {
+        paramMap += ("extractor" -> "(data: Array[String]) => Record(data)", "class" -> "Record")
+      }
+    }
+    paramMap
+  }
+  
   /**
     * Generates Scala code for a grouping expression in GROUP BY. We construct code for map
     * in the form "map(t => {(t(0),t(1),...)}" if t(0), t(1) are grouping attributes.
@@ -340,9 +376,9 @@ object ScalaEmitter {
   def emitSchemaClass(values: (String, String, String, String, String)): (String, String) = {
     val (name, fieldNames, fieldTypes, fieldStr, toStr) = values
 
-    val code = CodeEmitter.render("""case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
-                                    |  override def mkString(_c: String = ",") = <string_rep>
-                                    |}
+    val code = CodeEmitter.render("""  case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+                                    |    override def mkString(_c: String = ",") = <string_rep>
+                                    |  }
                                     |""".stripMargin, Map("name" -> name,
       "fieldNames" -> fieldNames,
       "fieldTypes" -> fieldTypes,
@@ -356,7 +392,7 @@ object ScalaEmitter {
     val (name, fieldNames, fieldTypes, _, _) = values
 
     CodeEmitter.render("""<if (fieldNames)>
-                         |implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
+                         |  implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
                          |<endif>""".stripMargin, Map("name" -> name,
       "fieldNames" -> fieldNames,
       "fieldTypes" -> fieldTypes

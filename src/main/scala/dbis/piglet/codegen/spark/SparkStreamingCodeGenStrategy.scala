@@ -1,3 +1,19 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package dbis.piglet.codegen.spark
 
 import java.net.URI
@@ -9,18 +25,18 @@ import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.Conf
 import dbis.piglet.codegen.CodeGenTarget
 
-/**
-  * Created by kai on 05.12.16.
-  */
 class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.SparkStreaming
 
   override val emitters = super.emitters + (
     s"$pkg.Load" -> new StreamLoadEmitter,
     s"$pkg.Dump" -> new StreamDumpEmitter,
-    s"$pkg.Store" -> new StreamStoreEmitter
- //   s"$pkg.Window" -> new StreamWindowEmitter,
- //   s"$pkg.SocketRead" -> new StreamSocketReadEmitter
+    s"$pkg.Store" -> new StreamStoreEmitter,
+    s"$pkg.Grouping" -> new StreamGroupingEmitter,
+    s"$pkg.OrderBy" -> new StreamOrderByEmitter,
+    s"$pkg.Distinct" -> new StreamDistinctEmitter,
+    s"$pkg.Window" -> new StreamWindowEmitter,
+    s"$pkg.SocketRead" -> new StreamSocketReadEmitter
     )
 
   /**
@@ -78,8 +94,8 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
       .foreach { s => map += ("profiling" -> s) }
 
 
-    CodeEmitter.render("""  def main(args: Array[String]) {
-                         |
+    CodeEmitter.render("""<\n>
+                         |  def main(args: Array[String]) {
                          |<if (profiling)>
                          |    val perfMon = new PerfMonitor("<name>_App")
                          |    ssc.sparkContext.addSparkListener(perfMon)
@@ -97,7 +113,7 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
     var params = Map("name" -> "Starting Query")
     if (forceTermin) params += ("forceTermin" -> forceTermin.toString())
     CodeEmitter.render("""    ssc.start()
-                         |	  ssc.awaitTermination<if (forceTermin)>OrTimeout(5000)<else>()<endif>
+                         |	  ssc.awaitTermination<if (forceTermin)>OrTimeout(10000)<else>()<endif>
                          |  }
                          |}""".stripMargin, params)
 
