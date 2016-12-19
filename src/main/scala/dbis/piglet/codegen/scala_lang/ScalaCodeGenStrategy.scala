@@ -26,30 +26,49 @@ import dbis.piglet.schema._
 import dbis.piglet.tools.Conf
 
 import scala.collection.mutable.ListBuffer
+import dbis.piglet.op.Load
+import dbis.piglet.op.Filter
+import dbis.piglet.op.Limit
+import dbis.piglet.tools.logging.PigletLogging
+import dbis.piglet.op.Foreach
+import dbis.piglet.op.Distinct
+import dbis.piglet.op.Sample
+import dbis.piglet.op.Grouping
+import dbis.piglet.op.Union
+import dbis.piglet.op.OrderBy
+import dbis.piglet.op.Top
+import dbis.piglet.op.Accumulate
+import dbis.piglet.op.Join
+import dbis.piglet.op.Cross
+import dbis.piglet.op.Dump
+import dbis.piglet.op.Empty
+import dbis.piglet.op.Store
+import dbis.piglet.op.SpatialJoin
 
-abstract class ScalaCodeGenStrategy extends CodeGenStrategy {
+abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
   // initialize target and emitters
   val target = CodeGenTarget.Unknown
   val pkg = "dbis.piglet.op"
 
-  def emitters: Map[String, CodeEmitter] = Map[String, CodeEmitter](
-    s"$pkg.Load" -> new LoadEmitter,
-    s"$pkg.Filter" -> new FilterEmitter,
-    s"$pkg.Limit" -> new LimitEmitter,
-    s"$pkg.Foreach" -> new ForeachEmitter,
-    s"$pkg.Distinct" -> new DistinctEmitter,
-    s"$pkg.Sample" -> new SampleEmitter,
-    s"$pkg.Union" -> new UnionEmitter,
-    s"$pkg.Grouping" -> new GroupingEmitter,
-    s"$pkg.OrderBy" -> new OrderByEmitter,
-    s"$pkg.Top" -> new TopEmitter,
-    s"$pkg.Accumulate" -> new AccumulateEmitter,
-    s"$pkg.Join" -> new JoinEmitter,
-    s"$pkg.Cross" -> new CrossEmitter,
-    s"$pkg.Dump" -> new DumpEmitter,
-    s"$pkg.Empty" -> new EmptyEmitter,
-    s"$pkg.Store" -> new StoreEmitter
-  )
+//  def emitters[O <: PigOperator]: Map[String, CodeEmitter[O]] = Map[String, CodeEmitter[O]](
+//    s"$pkg.Load" -> new LoadEmitter,
+//    s"$pkg.Filter" -> new FilterEmitter,
+//    s"$pkg.Limit" -> new LimitEmitter,
+//    s"$pkg.Foreach" -> new ForeachEmitter,
+//    s"$pkg.Distinct" -> new DistinctEmitter,
+//    s"$pkg.Sample" -> new SampleEmitter,
+//    s"$pkg.Union" -> new UnionEmitter,
+//    s"$pkg.Grouping" -> new GroupingEmitter,
+//    s"$pkg.OrderBy" -> new OrderByEmitter,
+//    s"$pkg.Top" -> new TopEmitter,
+//    s"$pkg.Accumulate" -> new AccumulateEmitter,
+//    s"$pkg.Join" -> new JoinEmitter,
+//    s"$pkg.Cross" -> new CrossEmitter,
+//    s"$pkg.Dump" -> new DumpEmitter,
+//    s"$pkg.Empty" -> new EmptyEmitter,
+//    s"$pkg.Store" -> new StoreEmitter
+//  )
+  
 
   override def collectAdditionalImports(plan: DataflowPlan) = {
     val additionalImports = ListBuffer.empty[String]
@@ -67,6 +86,30 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy {
     additionalImports
   }
 
+  def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
+    val em = op match {
+      case _: Load => new LoadEmitter
+      case _: Filter => new FilterEmitter
+      case _: Limit => new LimitEmitter
+      case _: Foreach => new ForeachEmitter
+      case _: Distinct => new DistinctEmitter
+      case _: Sample => new SampleEmitter
+      case _: Union => new UnionEmitter
+      case _: Grouping => new GroupingEmitter
+      case _: OrderBy => new OrderByEmitter
+      case _: Top => new TopEmitter
+      case _: Accumulate => new AccumulateEmitter
+      case _: Join => new JoinEmitter
+      case _: Cross => new CrossEmitter
+      case _: Dump => new DumpEmitter
+      case _: Empty => new EmptyEmitter
+      case _: Store => new StoreEmitter
+//      case _: SpatialJoin => new SpatialJoinEmitter
+      case _ => throw new IllegalArgumentException(s"no emitter for $op")      
+    }
+  
+    em.asInstanceOf[CodeEmitter[O]]
+  }
 
   /**
     * Generate code for embedded code: usually this code is just copied
@@ -77,9 +120,13 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy {
     */
   def emitEmbeddedCode(ctx: CodeGenContext, additionalCode: String) = additionalCode
 
-  def emitNode(ctx: CodeGenContext, node: PigOperator): String = {
-    val emitter: CodeEmitter = emitterForNode(node.getClass.getName)
-
+  def emitNode[O <: PigOperator](ctx: CodeGenContext, node: O): String = {
+    val className = node.getClass.getName
+    
+    val emitter = emitterForNode(node)
+    
+    logger.debug(s"using ${emitter.getClass.getName} for op $className")
+    
     var code = emitter.beforeCode(ctx, node)
     if (code.length > 0) code += "\n"
 
@@ -139,7 +186,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy {
     * @return a string representing the helper code
     */
   override def emitHelperClass(ctx: CodeGenContext, node: PigOperator): String = {
-    val emitter: CodeEmitter = emitterForNode(node.getClass.getName)
+    val emitter = emitterForNode(node)
 
     emitter.helper(ctx, node)
   }

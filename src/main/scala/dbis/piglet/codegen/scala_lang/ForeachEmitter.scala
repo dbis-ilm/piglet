@@ -9,50 +9,46 @@ import dbis.piglet.schema.Schema
 /**
   * Created by kai on 06.12.16.
   */
-class ForeachEmitter extends CodeEmitter {
+class ForeachEmitter extends CodeEmitter[Foreach] {
   override def template: String = """val <out> = <in>.map(t => <class>(<expr>))""".stripMargin
   def templateNested: String = """val <out> = <in>.map(t => <expr>)""".stripMargin
   def templateFlatMap: String = """val <out> = <in>.flatMap(t => <expr>)""".stripMargin
 
-  override def code(ctx: CodeGenContext, node: PigOperator): String = {
-    node match {
-      case Foreach(out, in, gen, _) => {
-        if (!node.schema.isDefined)
-          throw CodeGenException("FOREACH requires a schema definition")
-        val className: String = ScalaEmitter.schemaClassName(node.schema.get.className)
-        val expr = emitForeachExpr(ctx, node, gen)
-        // in case of a nested FOREACH the tuples are creates as part of the GENERATE clause
-        // -> no need to give the schema class
-        if (gen.isInstanceOf[GeneratorPlan]) {
-          CodeEmitter.render(templateNested, Map("out" -> node.outPipeName, "in" -> node.inPipeName, "expr" -> expr))
-        }
-        else {
-          // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
-          val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
-          if (requiresFlatMap)
-            CodeEmitter.render(templateFlatMap, Map("out" -> node.outPipeName, "in" -> node.inPipeName, "expr" -> expr))
-          else
-            render(Map("out" -> node.outPipeName, "in" -> node.inPipeName, "class" -> className, "expr" -> expr))
-        }
-      }
-      case _ => throw CodeGenException(s"unexpected operator: $node")
+  override def code(ctx: CodeGenContext, op: Foreach): String = {
+    if (!op.schema.isDefined)
+      throw CodeGenException("FOREACH requires a schema definition")
+    
+    val className: String = ScalaEmitter.schemaClassName(op.schema.get.className)
+    val expr = emitForeachExpr(ctx, op)
+    // in case of a nested FOREACH the tuples are creates as part of the GENERATE clause
+    // -> no need to give the schema class
+    if (op.generator.isInstanceOf[GeneratorPlan]) {
+      CodeEmitter.render(templateNested, Map("out" -> op.outPipeName, "in" -> op.inPipeName, "expr" -> expr))
+    }
+    else {
+      // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
+      val requiresFlatMap = op.containsFlatten(onBag = true)
+      if (requiresFlatMap)
+        CodeEmitter.render(templateFlatMap, Map("out" -> op.outPipeName, "in" -> op.inPipeName, "expr" -> expr))
+      else
+        render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "class" -> className, "expr" -> expr))
     }
   }
 
-  def emitForeachExpr(ctx: CodeGenContext, node: PigOperator, gen: ForeachGenerator): String = {
+  def emitForeachExpr(ctx: CodeGenContext, op: Foreach): String = {
     // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
-    // val requiresPlainFlatten =  node.asInstanceOf[Foreach].containsFlatten(onBag = false)
-    val requiresFlatMap = node.asInstanceOf[Foreach].containsFlatten(onBag = true)
-    gen match {
+    // val requiresPlainFlatten =  op.asInstanceOf[Foreach].containsFlatten(onBag = false)
+    val requiresFlatMap = op.containsFlatten(onBag = true)
+    op.generator match {
       case GeneratorList(expr) => {
         if (requiresFlatMap)
-          emitBagFlattenGenerator(CodeGenContext(ctx, Map("schema" -> node.inputSchema)), node, expr)
+          emitBagFlattenGenerator(CodeGenContext(ctx, Map("schema" -> op.inputSchema)), op, expr)
         else
-          emitGenerator(CodeGenContext(ctx, Map("schema" -> node.inputSchema)), expr)
+          emitGenerator(CodeGenContext(ctx, Map("schema" -> op.inputSchema)), expr)
       }
       case GeneratorPlan(plan) => {
-        val subPlan = node.asInstanceOf[Foreach].subPlan.get
-        emitNestedPlan(ctx, parent = node, plan = subPlan)
+        val subPlan = op.subPlan.get
+        emitNestedPlan(ctx, parent = op, plan = subPlan)
       }
     }
   }
@@ -74,21 +70,21 @@ class ForeachEmitter extends CodeEmitter {
     * Creates the Scala code needed for a flatten expression where the argument is a bag.
     * It requires a flatMap transformation.
     *
-    * @param node the FOREACH operator containing the flatten in the GENERATE clause
+    * @param op the FOREACH operator containing the flatten in the GENERATE clause
     * @param genExprs the list of generator expressions
     * @return a string representation of the Scala code
     */
-  def emitBagFlattenGenerator(ctx: CodeGenContext, node: PigOperator, genExprs: List[GeneratorExpr]): String = {
-    require(node.schema.isDefined)
-    val className = ScalaEmitter.schemaClassName(node.schema.get.className)
+  def emitBagFlattenGenerator(ctx: CodeGenContext, op: Foreach, genExprs: List[GeneratorExpr]): String = {
+    require(op.schema.isDefined)
+    val className = ScalaEmitter.schemaClassName(op.schema.get.className)
     // extract the flatten expression from the generator list
-    val flattenExprs = genExprs.filter(e => e.expr.traverseOr(node.inputSchema.getOrElse(null), Expr.containsFlattenOnBag))
+    val flattenExprs = genExprs.filter(e => e.expr.traverseOr(op.inputSchema.getOrElse(null), Expr.containsFlattenOnBag))
     // determine the remaining expressions
     val otherExprs = genExprs.diff(flattenExprs)
     if (flattenExprs.size == 1) {
       // there is only a single flatten expression
       val ex: FlattenExpr = flattenExprs.head.expr.asInstanceOf[FlattenExpr]
-      val ctx2 = CodeGenContext(ctx, Map("schema" -> node.inputSchema))
+      val ctx2 = CodeGenContext(ctx, Map("schema" -> op.inputSchema))
       if (otherExprs.nonEmpty) {
         // we have to cross join the flatten expression with the others:
         // t._1.map(s => <class>(<expr))
@@ -112,7 +108,7 @@ class ForeachEmitter extends CodeEmitter {
     * @param plan the dataflow plan representing the nested statements
     * @return the generated code
     */
-  def emitNestedPlan(ctx: CodeGenContext, parent: PigOperator, plan: DataflowPlan): String = {
+  def emitNestedPlan(ctx: CodeGenContext, parent: Foreach, plan: DataflowPlan): String = {
     val schema = parent.inputSchema
     require(parent.schema.isDefined)
     val className = ScalaEmitter.schemaClassName(parent.schema.get.className)

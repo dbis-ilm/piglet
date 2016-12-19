@@ -26,6 +26,7 @@ import dbis.piglet.expr.{Expr, Value}
 import dbis.setm.SETM.timing
 import scala.collection.mutable.ListBuffer
 import java.net.URI
+import dbis.piglet.codegen.scala_lang.LoadEmitter
 
 
 /**
@@ -39,13 +40,15 @@ trait CodeGenStrategy {
     */
   def target: CodeGenTarget.Value
 
-  def emitters: Map[String, CodeEmitter]
-
-  def emitterForNode(node: String): CodeEmitter = {
-    if (!emitters.contains(node))
-      throw new CodeGenException(s"invalid plan operator: $node")
-    emitters(node)
-  }
+//  def emitters: Map[String, CodeEmitter[PigOperator]]
+//
+//  def emitterForNode(node: String): CodeEmitter[PigOperator] = {
+//    if (!emitters.contains(node))
+//      throw new CodeGenException(s"invalid plan operator: $node")
+//    emitters(node)
+//  }
+  
+  def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O]
 
   def collectAdditionalImports(plan: DataflowPlan): Seq[String]
 
@@ -63,7 +66,7 @@ trait CodeGenStrategy {
    * @param node the operator (an instance of PigOperator)
    * @return a string representing the code
    */
-  def emitNode(ctx: CodeGenContext, node: PigOperator): String
+  def emitNode[O <: PigOperator](ctx: CodeGenContext, node: O): String
 
   /**
    * Generate code needed for importing packages, classes, etc.

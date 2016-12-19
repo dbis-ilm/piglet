@@ -7,7 +7,7 @@ import dbis.piglet.schema.Types
 /**
   * Created by kai on 09.12.16.
   */
-class OrderByEmitter extends CodeEmitter {
+class OrderByEmitter extends CodeEmitter[OrderBy] {
   override def template: String = """val <out> = <in>.keyBy(t => <key>).sortByKey(<asc>).map{case (k,v) => v}""".stripMargin
   def helperTemplate: String = """case class <params.cname>(<params.fields>) extends Ordered[<params.cname>] {
                                  |        def compare(that: <params.cname>) = <params.cmpExpr>
@@ -36,23 +36,22 @@ class OrderByEmitter extends CodeEmitter {
       s"custKey_${out}_${in}(${orderSpec.map(r => ScalaEmitter.emitRef(ctx, r.field)).mkString(",")})"
   }
 
-  override def helper(ctx: CodeGenContext, node: PigOperator): String = node match {
-    case OrderBy(out, in, orderSpec, _) => {
-      /**
+  override def helper(ctx: CodeGenContext, op: OrderBy): String = {
+      /*
         * Bytearray fields need special handling: they are mapped to Any which is not comparable.
         * Thus we add ".toString" in this case.
         *
         * @param col the column used in comparison
         * @return ".toString" or ""
         */
-      def genImplicitCast(col: Int): String = node.schema match {
+      def genImplicitCast(col: Int): String = op.schema match {
         case Some(s) => if (s.field(col).fType == Types.ByteArrayType) ".toString" else ""
         case None => ".toString"
       }
 
-      val num = orderSpec.length
+      val num = op.orderSpec.length
 
-      /**
+      /*
         * Emit the comparison expression used in in the orderHelper class
         *
         * @param col the current position of the comparison field
@@ -60,7 +59,7 @@ class OrderByEmitter extends CodeEmitter {
         */
       def genCmpExpr(col: Int): String = {
         val cast = genImplicitCast(col - 1)
-        val cmpStr = if (orderSpec(col - 1).dir == OrderByDirection.AscendingOrder)
+        val cmpStr = if (op.orderSpec(col - 1).dir == OrderByDirection.AscendingOrder)
           s"this.c$col$cast compare that.c$col$cast"
         else s"that.c$col$cast compare this.c$col$cast"
         if (col == num) s"{ $cmpStr }"
@@ -69,35 +68,28 @@ class OrderByEmitter extends CodeEmitter {
 
       var params = Map[String, Any]()
       //Spark
-      params += "cname" -> s"custKey_${node.outPipeName}_${node.inPipeName}"
+      params += "cname" -> s"custKey_${op.outPipeName}_${op.inPipeName}"
       var col = 0
-      params += "fields" -> orderSpec.map(o => {
+      params += "fields" -> op.orderSpec.map(o => {
         col += 1;
-        s"c$col: ${ScalaEmitter.scalaTypeOfField(o.field, node.schema)}"
+        s"c$col: ${ScalaEmitter.scalaTypeOfField(o.field, op.schema)}"
       }).mkString(", ")
       params += "cmpExpr" -> genCmpExpr(1)
 
       //Flink??
-      params += "out" -> node.outPipeName
-      params += "key" -> orderSpec.map(r => ScalaEmitter.emitRef(CodeGenContext(ctx, Map("schema" -> node.schema, "tuplePrefix" -> "t")), r.field)).mkString(",")
-      if (ascendingSortOrder(orderSpec.head) == "false") params += "reverse" -> true
+      params += "out" -> op.outPipeName
+      params += "key" -> op.orderSpec.map(r => ScalaEmitter.emitRef(CodeGenContext(ctx, Map("schema" -> op.schema, "tuplePrefix" -> "t")), r.field)).mkString(",")
+      if (ascendingSortOrder(op.orderSpec.head) == "false") params += "reverse" -> true
 
       CodeEmitter.render(helperTemplate, Map("params" -> params))
-    }
 
   }
 
 
-  override def code(ctx: CodeGenContext, node: PigOperator): String = {
-    node match {
-      case OrderBy(out, in, orderSpec, _) => {
-        val key = emitSortKey(CodeGenContext(ctx, Map("schema" -> node.schema)), orderSpec, node.outPipeName, node.inPipeName)
-        val asc = ascendingSortOrder(orderSpec.head)
-        render(Map("out" -> node.outPipeName, "in" -> node.inPipeName, "key" -> key, "asc" -> asc))
-
-      }
-      case _ => throw CodeGenException(s"unexpected operator: $node")
-    }
+  override def code(ctx: CodeGenContext, op: OrderBy): String = {
+    val key = emitSortKey(CodeGenContext(ctx, Map("schema" -> op.schema)), op.orderSpec, op.outPipeName, op.inPipeName)
+    val asc = ascendingSortOrder(op.orderSpec.head)
+    render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "key" -> key, "asc" -> asc))
   }
 
 }

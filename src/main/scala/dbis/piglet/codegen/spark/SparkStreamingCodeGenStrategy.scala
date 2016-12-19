@@ -24,20 +24,45 @@ import dbis.piglet.op.Load
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.Conf
 import dbis.piglet.codegen.CodeGenTarget
+import dbis.piglet.op.PigOperator
+import dbis.piglet.op.Distinct
+import dbis.piglet.op.Window
+import dbis.piglet.op.SocketRead
+import dbis.piglet.op.OrderBy
+import dbis.piglet.op.Grouping
+import dbis.piglet.op.Store
+import dbis.piglet.op.Dump
 
 class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.SparkStreaming
 
-  override val emitters = super.emitters + (
-    s"$pkg.Load" -> new StreamLoadEmitter,
-    s"$pkg.Dump" -> new StreamDumpEmitter,
-    s"$pkg.Store" -> new StreamStoreEmitter,
-    s"$pkg.Grouping" -> new StreamGroupingEmitter,
-    s"$pkg.OrderBy" -> new StreamOrderByEmitter,
-    s"$pkg.Distinct" -> new StreamDistinctEmitter,
-    s"$pkg.Window" -> new StreamWindowEmitter,
-    s"$pkg.SocketRead" -> new StreamSocketReadEmitter
-    )
+//  override val emitters = super.emitters + (
+//    s"$pkg.Load" -> new StreamLoadEmitter,
+//    s"$pkg.Dump" -> new StreamDumpEmitter,
+//    s"$pkg.Store" -> new StreamStoreEmitter,
+//    s"$pkg.Grouping" -> new StreamGroupingEmitter,
+//    s"$pkg.OrderBy" -> new StreamOrderByEmitter,
+//    s"$pkg.Distinct" -> new StreamDistinctEmitter,
+//    s"$pkg.Window" -> new StreamWindowEmitter,
+//    s"$pkg.SocketRead" -> new StreamSocketReadEmitter
+//    )
+  
+  override def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
+    
+    val emitter = op match {
+      case _: Load => new StreamLoadEmitter
+      case _: Dump => new StreamDumpEmitter
+      case _: Store => new StreamStoreEmitter
+      case _: Grouping => new StreamGroupingEmitter
+      case _: OrderBy => new StreamOrderByEmitter
+      case _: Distinct => new StreamDistinctEmitter
+      case _: Window => new StreamWindowEmitter
+      case _: SocketRead => new StreamSocketReadEmitter
+      case _ => super.emitterForNode(op)
+    }
+    
+    emitter.asInstanceOf[CodeEmitter[O]]
+  }
 
   /**
     * Generate code needed for importing required Scala packages.

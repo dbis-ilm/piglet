@@ -22,22 +22,17 @@ import dbis.piglet.codegen.CodeGenException
 import dbis.piglet.codegen.CodeGenContext
 import dbis.piglet.op.Window
 
-class StreamWindowEmitter extends CodeEmitter {
+class StreamWindowEmitter extends CodeEmitter[Window] {
   override def template: String =
     """    val <out> = <in>.window(<wUnit>(<window>)<if (sUnit)>, <sUnit>(<slider>)<endif>)""".stripMargin
 
-  override def code(ctx: CodeGenContext, node: PigOperator): String = {
-    node match {
-      case Window(out, in, window, slide) => {
-        if (window._2 == "") {
-          if (slide._2 == "") render(Map("out" -> out.name, "in" -> in.name, "window" -> window._1, "slider" -> slide._1))
-          else render(Map("out" -> out.name, "in" -> in.name, "window" -> window._1, "slider" -> slide._1, "sUnit" -> slide._2.toUpperCase))
+  override def code(ctx: CodeGenContext, op: Window): String = {
+        if (op.window._2 == "") {
+          if (op.slide._2 == "") render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "window" -> op.window._1, "slider" -> op.slide._1))
+          else render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "window" -> op.window._1, "slider" -> op.slide._1, "sUnit" -> op.slide._2.toUpperCase))
         } else {
-          if (slide._2 == "") render(Map("out" -> out.name, "in" -> in.name, "window" -> window._1, "wUnit" -> window._2.toUpperCase, "slider" -> slide._1))
-          else render(Map("out" -> out.name, "in" -> in.name, "window" -> window._1, "wUnit" -> window._2.toUpperCase, "slider" -> slide._1, "sUnit" -> slide._2.toUpperCase))
+          if (op.slide._2 == "") render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "window" -> op.window._1, "wUnit" -> op.window._2.toUpperCase, "slider" -> op.slide._1))
+          else render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "window" -> op.window._1, "wUnit" -> op.window._2.toUpperCase, "slider" -> op.slide._1, "sUnit" -> op.slide._2.toUpperCase))
         }
-      }
-      case _ => throw CodeGenException(s"unexpected operator: $node")
-    }
   }
 }

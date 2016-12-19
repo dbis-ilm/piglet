@@ -8,7 +8,7 @@ import dbis.piglet.op.PigOperator
 
 case class CodeGenException(msg: String) extends Exception(msg)
 
-trait CodeEmitter {
+abstract class CodeEmitter[O <: PigOperator] {
   def template: String
 
   def render: String = CodeEmitter.render(template, Map[String, Any]())
@@ -22,13 +22,13 @@ trait CodeEmitter {
    */
   def render(params: Map[String, Any]): String = CodeEmitter.render(template, params)
 
-  def helper(ctx: CodeGenContext, node: PigOperator): String = ""
+  def helper(ctx: CodeGenContext, node: O): String = ""
 
-  def code(ctx: CodeGenContext, node: PigOperator): String
+  def code(ctx: CodeGenContext, node: O): String
 
-  def beforeCode(ctx: CodeGenContext, node: PigOperator): String = ""
+  def beforeCode(ctx: CodeGenContext, node: O): String = ""
 
-  def afterCode(ctx: CodeGenContext, node: PigOperator): String = ""
+  def afterCode(ctx: CodeGenContext, node: O): String = ""
 
 }
 

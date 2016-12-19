@@ -11,14 +11,31 @@ import dbis.piglet.codegen.CodeGenTarget
 import dbis.piglet.codegen.scala_lang.DumpEmitter
 import dbis.piglet.codegen.scala_lang.LoadEmitter
 import dbis.piglet.codegen.scala_lang.StoreEmitter
+import dbis.piglet.op.PigOperator
+import dbis.piglet.op.Dump
+import dbis.piglet.op.Store
 
 class FlinkCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.FlinkStreaming
-  override val emitters = super.emitters + (
-    s"$pkg.Load" -> new FlinkLoadEmitter,
-    s"$pkg.Dump" -> new FlinkDumpEmitter,
-    s"$pkg.Store" -> new FlinkStoreEmitter
-  )
+//  override val emitters = super.emitters + (
+//    s"$pkg.Load" -> new FlinkLoadEmitter,
+//    s"$pkg.Dump" -> new FlinkDumpEmitter,
+//    s"$pkg.Store" -> new FlinkStoreEmitter
+//  )
+  
+  
+  override def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
+    
+    val emitter = op match {
+      case _: Load => new FlinkLoadEmitter
+      case _: Dump => new FlinkDumpEmitter
+      case _: Store => new FlinkStoreEmitter
+      case _ => super.emitterForNode(op)
+    }
+    
+    emitter.asInstanceOf[CodeEmitter[O]]
+  }
+  
   /**
    * Generate code needed for importing required Scala packages.
    *

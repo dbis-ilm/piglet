@@ -24,32 +24,27 @@ import dbis.piglet.op.PigOperator
 import dbis.piglet.codegen.CodeEmitter
 import dbis.piglet.codegen.scala_lang.ScalaEmitter
 
-class StreamSocketReadEmitter extends CodeEmitter {
+class StreamSocketReadEmitter extends CodeEmitter[SocketRead] {
   override def template: String =
     """        val <out> = <func>[<class>]().receiveStream(ssc, "<addr_hostname>", <addr_port>, <extractor><if (params)><params><endif>)""".stripMargin
 
-  override def code(ctx: CodeGenContext, node: PigOperator): String = {
-    node match {
-      case SocketRead(out, address, mode, schema, streamFunc, streamParams) => {
-        var paramMap = ScalaEmitter.emitExtractorFunc(node, streamFunc)
+  override def code(ctx: CodeGenContext, op: SocketRead): String = {
+        var paramMap = ScalaEmitter.emitExtractorFunc(op, op.streamFunc)
 
-        node.schema match {
+        op.schema match {
           case Some(s) => paramMap += ("class" -> ScalaEmitter.schemaClassName(s.className))
           case None => paramMap += ("class" -> "Record")
         }
 
-        val params = if (streamParams != null && streamParams.nonEmpty) ", " + streamParams.mkString(",") else ""
-        val func = streamFunc.getOrElse(BackendManager.backend.defaultConnector)
-        paramMap ++= Map("out" -> node.outPipeName, 
-                         "addr_hostname" -> address.hostname,
-                         "addr_port" -> address.port,
+        val params = if (op.streamParams != null && op.streamParams.nonEmpty) ", " + op.streamParams.mkString(",") else ""
+        val func = op.streamFunc.getOrElse(BackendManager.backend.defaultConnector)
+        paramMap ++= Map("out" -> op.outPipeName, 
+                         "addr_hostname" -> op.addr.hostname,
+                         "addr_port" -> op.addr.port,
                          "func" -> func, 
                          "params" -> params)
-        if (mode != "")
-          paramMap += ("mode" -> mode)
+        if (op.mode != "")
+          paramMap += ("mode" -> op.mode)
         render(paramMap)
-      }
-      case _ => throw CodeGenException(s"unexpected operator: $node")
-    }
   }
 }
