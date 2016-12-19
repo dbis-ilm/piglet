@@ -44,13 +44,16 @@ import dbis.piglet.op.Dump
 import dbis.piglet.op.Empty
 import dbis.piglet.op.Store
 import dbis.piglet.op.SpatialJoin
+import dbis.piglet.op.SpatialFilter
+import dbis.piglet.codegen.spark.SpatialFilterEmitter
+import dbis.piglet.codegen.spark.SpatialJoinEmitter
 
 abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
   // initialize target and emitters
   val target = CodeGenTarget.Unknown
-  val pkg = "dbis.piglet.op"
 
-//  def emitters[O <: PigOperator]: Map[String, CodeEmitter[O]] = Map[String, CodeEmitter[O]](
+//  val pkg = "dbis.piglet.op"
+//  def emitters[O <: PigOperator]: Map[String, CodeEmitter[PigOperator]] = Map[String, CodeEmitter[PigOperator]](
 //    s"$pkg.Load" -> new LoadEmitter,
 //    s"$pkg.Filter" -> new FilterEmitter,
 //    s"$pkg.Limit" -> new LimitEmitter,
@@ -76,35 +79,27 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
       additionalImports += "import breeze.linalg._"
     }
 
-    if (plan.checkExpressions(Expr.containsGeometryType)) {
-      additionalImports ++= Seq(
-        "import com.vividsolutions.jts.io.WKTReader",
-        "import dbis.stark.{STObject, Instant, Interval}",
-        "import dbis.stark.STObject._",
-        "import dbis.stark.spatial.SpatialRDD._")
-    }
     additionalImports
   }
 
   def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
     val em = op match {
-      case Load => new LoadEmitter
-      case Filter => new FilterEmitter
-      case Limit => new LimitEmitter
-      case Foreach => new ForeachEmitter
-      case Distinct => new DistinctEmitter
-      case Sample => new SampleEmitter
-      case Union => new UnionEmitter
-      case Grouping => new GroupingEmitter
-      case OrderBy => new OrderByEmitter
-      case Top => new TopEmitter
-      case Accumulate => new AccumulateEmitter
-      case Join => new JoinEmitter
-      case Cross => new CrossEmitter
-      case Dump => new DumpEmitter
-      case Empty => new EmptyEmitter
-      case Store => new StoreEmitter
-//      case _: SpatialJoin => new SpatialJoinEmitter
+      case _: Load => new LoadEmitter
+      case _: Filter => new FilterEmitter
+      case _: Limit => new LimitEmitter
+      case _: Foreach => new ForeachEmitter
+      case _: Distinct => new DistinctEmitter
+      case _: Sample => new SampleEmitter
+      case _: Union => new UnionEmitter
+      case _: Grouping => new GroupingEmitter
+      case _: OrderBy => new OrderByEmitter
+      case _: Top => new TopEmitter
+      case _: Accumulate => new AccumulateEmitter
+      case _: Join => new JoinEmitter
+      case _: Cross => new CrossEmitter
+      case _: Dump => new DumpEmitter
+      case _: Empty => new EmptyEmitter
+      case _: Store => new StoreEmitter
       case _ => throw new IllegalArgumentException(s"no emitter for $op")      
     }
   

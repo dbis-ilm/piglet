@@ -11,10 +11,40 @@ import dbis.piglet.codegen.CodeGenTarget
 import dbis.piglet.codegen.scala_lang.LoadEmitter
 import dbis.piglet.codegen.scala_lang.StoreEmitter
 import dbis.piglet.codegen.scala_lang.DumpEmitter
+import dbis.piglet.op.PigOperator
+import dbis.piglet.op.SpatialFilter
+import dbis.piglet.op.SpatialJoin
+import scala.collection.mutable.ListBuffer
+import dbis.piglet.expr.Expr
 
 class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.Spark
 
+
+  override def collectAdditionalImports(plan: DataflowPlan) = {
+    val additionalImports = super.collectAdditionalImports(plan)
+
+    if (plan.checkExpressions(Expr.containsGeometryType)) {
+      additionalImports ++= Seq(
+        "import com.vividsolutions.jts.io.WKTReader",
+        "import dbis.stark.{STObject, Instant, Interval}",
+        "import dbis.stark.STObject._",
+        "import dbis.stark.spatial.SpatialRDD._")
+    }
+    additionalImports
+  }
+  
+  override def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
+    val emitter = op match {
+      case _: SpatialFilter => new SpatialFilterEmitter
+      case _: SpatialJoin => new SpatialJoinEmitter
+      case _ => super.emitterForNode(op)      
+    }
+  
+    emitter.asInstanceOf[CodeEmitter[O]]
+  }
+  
+  
   /**
     * Generate code needed for importing required Scala packages.
     *
