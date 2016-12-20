@@ -73,11 +73,11 @@ trait CompileIt extends Matchers {
   }
   private def cleanupResult(dir: String): Unit = {
     import scalax.file.Path
-    val path: Path = Path(dir)
+    val path: Path = Path.fromString(dir)
     try {
       path.deleteRecursively(continueOnFailure = false)
     } catch {
-      case e: java.io.IOException => // some file could not be deleted
+      case e: java.io.IOException => println("WARNING: " + e.getMessage)// some file could not be deleted
 
     }
 

@@ -2,40 +2,45 @@ package dbis.piglet.codegen.flink
 
 import java.net.URI
 
-import dbis.piglet.codegen.{ CodeEmitter, CodeGenContext }
-import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
-import dbis.piglet.op.Load
-import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.tools.Conf
+import dbis.piglet.codegen.CodeEmitter
+import dbis.piglet.codegen.CodeGenContext
 import dbis.piglet.codegen.CodeGenTarget
-import dbis.piglet.codegen.scala_lang.DumpEmitter
-import dbis.piglet.codegen.scala_lang.LoadEmitter
-import dbis.piglet.codegen.scala_lang.StoreEmitter
-import dbis.piglet.op.PigOperator
-import dbis.piglet.op.Dump
-import dbis.piglet.op.Store
+import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.op._
+import dbis.piglet.codegen.flink.emitter._
+import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
+import dbis.piglet.codegen.CodeGenException
+import dbis.piglet.expr.NamedField
+import dbis.piglet.expr.PositionalField
+import dbis.piglet.schema.Schema
+import dbis.piglet.expr.Ref
 
 class FlinkCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.FlinkStreaming
-//  override val emitters = super.emitters + (
-//    s"$pkg.Load" -> new FlinkLoadEmitter,
-//    s"$pkg.Dump" -> new FlinkDumpEmitter,
-//    s"$pkg.Store" -> new FlinkStoreEmitter
-//  )
-  
-  
+  //  override val emitters = super.emitters + (
+  //    s"$pkg.Load" -> new FlinkLoadEmitter,
+  //    s"$pkg.Dump" -> new FlinkDumpEmitter,
+  //    s"$pkg.Store" -> new FlinkStoreEmitter
+  //  )
+
   override def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
-    
+
     val emitter = op match {
-      case _: Load => new FlinkLoadEmitter
-      case _: Dump => new FlinkDumpEmitter
-      case _: Store => new FlinkStoreEmitter
+      case _: Load => new LoadEmitter
+      case _: Dump => new DumpEmitter
+      case _: Store => new StoreEmitter
+      case _: Grouping => new GroupingEmitter
+      case _: OrderBy => new OrderByEmitter
+      case _: Join => new JoinEmitter
+      case _: Limit => new LimitEmitter
+      case _: StreamOp => new StreamOpEmitter
+      case _: Accumulate => new AccumulateEmitter
       case _ => super.emitterForNode(op)
     }
-    
+
     emitter.asInstanceOf[CodeEmitter[O]]
   }
-  
+
   /**
    * Generate code needed for importing required Scala packages.
    *
@@ -91,21 +96,4 @@ class FlinkCodeGenStrategy extends ScalaCodeGenStrategy {
                          |}""".stripMargin, params)
 
   }
-}
-
-/*------------------------------------------------------------------------------------------------- */
-/*                                FlinkStreaming-specific emitters                                  */
-/*------------------------------------------------------------------------------------------------- */
-
-class FlinkLoadEmitter extends LoadEmitter {
-  override def template: String = """    val <out> = <func>[<class>]().load(env, "<file>", <extractor><if (params)>, <params><endif>)""".stripMargin
-}
-
-class FlinkStoreEmitter extends StoreEmitter {
-  override def template: String = """    <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)
-                                    |    env.execute("Starting Query")""".stripMargin
-}
-
-class FlinkDumpEmitter extends DumpEmitter {
-  override def template: String = """    <in>.map(_.mkString()).print""".stripMargin
 }

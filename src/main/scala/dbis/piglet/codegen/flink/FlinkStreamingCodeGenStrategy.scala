@@ -2,39 +2,47 @@ package dbis.piglet.codegen.flink
 
 import java.net.URI
 
-import dbis.piglet.codegen.{ CodeEmitter, CodeGenContext }
-import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
-import dbis.piglet.op.Load
-import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.tools.Conf
+import dbis.piglet.op._
+import dbis.piglet.codegen.CodeEmitter
+import dbis.piglet.codegen.CodeGenContext
 import dbis.piglet.codegen.CodeGenTarget
-import dbis.piglet.codegen.scala_lang.DumpEmitter
-import dbis.piglet.codegen.scala_lang.LoadEmitter
-import dbis.piglet.codegen.scala_lang.StoreEmitter
-import dbis.piglet.op.PigOperator
-import dbis.piglet.op.Dump
-import dbis.piglet.op.Store
+import dbis.piglet.codegen.flink.emitter._
+import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
+import dbis.piglet.plan.DataflowPlan
 
-class FlinkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
+
+class FlinkStreamingCodeGenStrategy extends FlinkCodeGenStrategy {
   override val target = CodeGenTarget.FlinkStreaming
-//  override val emitters = super.emitters + (
-//    s"$pkg.Load" -> new FlinkStreamingLoadEmitter,
-//    s"$pkg.Dump" -> new FlinkStreamingDumpEmitter,
-//    s"$pkg.Store" -> new FlinkStreamingStoreEmitter
-//  )
-  
+  //  override val emitters = super.emitters + (
+  //    s"$pkg.Load" -> new FlinkStreamingLoadEmitter,
+  //    s"$pkg.Dump" -> new FlinkStreamingDumpEmitter,
+  //    s"$pkg.Store" -> new FlinkStreamingStoreEmitter
+  //  )
+
   override def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
-    
+
     val emitter = op match {
-      case _: Load => new FlinkStreamingLoadEmitter
-      case _: Dump => new FlinkStreamingDumpEmitter
-      case _: Store => new FlinkStreamingStoreEmitter
+      case _: Load => new StreamLoadEmitter
+      case _: Store => new StreamStoreEmitter
+      case _: SocketRead => new SocketReadEmitter
+      case _: SocketWrite => new SocketWriteEmitter
+      case _: Filter => new StreamFilterEmitter
+      case _: Foreach => new StreamForeachEmitter
+      case _: Grouping => new StreamGroupingEmitter
+      case _: OrderBy => new StreamOrderByEmitter
+      case _: Accumulate => new StreamAccumulateEmitter
+      case _: Join => new StreamJoinEmitter
+      case _: Cross => new StreamCrossEmitter
+      case _: Window => new StreamWindowEmitter
+      case _: WindowApply => new StreamWindowApplyEmitter
+      case _: Distinct => new StreamDistinctEmitter
+      case _: Sample => new StreamSampleEmitter
       case _ => super.emitterForNode(op)
     }
-    
+
     emitter.asInstanceOf[CodeEmitter[O]]
   }
-  
+
   /**
    * Generate code needed for importing required Scala packages.
    *
@@ -97,20 +105,4 @@ class FlinkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
                          |}""".stripMargin, params)
 
   }
-}
-
-/*------------------------------------------------------------------------------------------------- */
-/*                                FlinkStreaming-specific emitters                                  */
-/*------------------------------------------------------------------------------------------------- */
-
-class FlinkStreamingLoadEmitter extends LoadEmitter {
-  override def template: String = """    val <out> = <func>[<class>]().loadStream(env, "<file>", <extractor><if (params)>, <params><endif>)""".stripMargin
-}
-
-class FlinkStreamingStoreEmitter extends StoreEmitter {
-  override def template: String = """    <func>[<class>]().writeStream("<file>", <in><if (params)>, <params><endif>)""".stripMargin
-}
-
-class FlinkStreamingDumpEmitter extends DumpEmitter {
-  override def template: String = """    <in>.map(_.mkString()).print""".stripMargin
 }
