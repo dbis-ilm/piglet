@@ -20,13 +20,12 @@ import java.net.URI
 
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenStrategy, CodeGenTarget}
 import dbis.piglet.expr.Expr
-import dbis.piglet.op.PigOperator
+import dbis.piglet.op._
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema._
 import dbis.piglet.tools.Conf
 
 import scala.collection.mutable.ListBuffer
-import dbis.piglet.op._
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.codegen.spark.SpatialFilterEmitter
 import dbis.piglet.codegen.spark.SpatialJoinEmitter

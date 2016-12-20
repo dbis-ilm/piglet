@@ -788,16 +788,16 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |val a = b.sample(false, 100 / t.get(3))""".stripMargin)
     assert(generatedCode == expectedCode)
   }
-  /*
-  it should "contain code for the stream through statement without parameters" in {
+
+  it should "contain code for the STREAM THROUGH statement without parameters" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
       """data = load 'data.csv' as (f1: int, f2: int);
         |res = STREAM data THROUGH myOp();""".stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("res").get
 
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
         |val res = myOp(sc, data_helper).map(t => _t$1_Tuple(t(0).asInstanceOf[Int], t(1).asInstanceOf[Int]))
@@ -805,22 +805,22 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "contain code for the stream through statement with parameters" in {
+  it should "contain code for the STREAM THROUGH statement with parameters" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     val ops = parseScript(
       """data = load 'data.csv' as (f1: int, f2: int);
         |res = STREAM data THROUGH package.myOp(1, 42.0);""".stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("res").get
 
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
         |val res = package.myOp(sc, data_helper,1,42.0).map(t => _t$1_Tuple(t(0).asInstanceOf[Int], t(1).asInstanceOf[Int]))
         |""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
-  */
+
   it should "contain code for simple ORDER BY" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     ctx.set("tuplePrefix", "t")
