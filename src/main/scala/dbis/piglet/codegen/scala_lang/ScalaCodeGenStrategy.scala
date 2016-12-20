@@ -20,31 +20,13 @@ import java.net.URI
 
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenStrategy, CodeGenTarget}
 import dbis.piglet.expr.Expr
-import dbis.piglet.op.PigOperator
+import dbis.piglet.op._
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema._
 import dbis.piglet.tools.Conf
 
 import scala.collection.mutable.ListBuffer
-import dbis.piglet.op.Load
-import dbis.piglet.op.Filter
-import dbis.piglet.op.Limit
 import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.op.Foreach
-import dbis.piglet.op.Distinct
-import dbis.piglet.op.Sample
-import dbis.piglet.op.Grouping
-import dbis.piglet.op.Union
-import dbis.piglet.op.OrderBy
-import dbis.piglet.op.Top
-import dbis.piglet.op.Accumulate
-import dbis.piglet.op.Join
-import dbis.piglet.op.Cross
-import dbis.piglet.op.Dump
-import dbis.piglet.op.Empty
-import dbis.piglet.op.Store
-import dbis.piglet.op.SpatialJoin
-import dbis.piglet.op.SpatialFilter
 import dbis.piglet.codegen.spark.SpatialFilterEmitter
 import dbis.piglet.codegen.spark.SpatialJoinEmitter
 
@@ -100,6 +82,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
       case _: Dump => new DumpEmitter
       case _: Empty => new EmptyEmitter
       case _: Store => new StoreEmitter
+      case _: StreamOp => new StreamOpEmitter
       case _ => throw new IllegalArgumentException(s"no emitter for $op")      
     }
   

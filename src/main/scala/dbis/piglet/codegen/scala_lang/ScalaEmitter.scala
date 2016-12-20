@@ -437,4 +437,15 @@ object ScalaEmitter {
     (name, fieldNames, fieldTypes, fieldStr, toStr)
   }
 
+  /**
+    *
+    * @param ctx an object representing context information for code generation
+    * @param params the list of parameters (as Refs)
+    * @return the generated code
+    */
+  def emitParamList(ctx: CodeGenContext, params: Option[List[Ref]]): String = params match {
+    case Some(refList) => if (refList.nonEmpty) s",${refList.map(r => emitRef(ctx, r)).mkString(",")}" else ""
+    case None => ""
+  }
+
 }
