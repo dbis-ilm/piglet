@@ -98,6 +98,9 @@ object Conf extends PigletLogging {
   def hdfsHdfsSiteFile = Paths.get(appconf.getString("hdfs.hdfssite"))
 
   def commonJar = Paths.get(appconf.getString("common.jar"))
+  
+  def spatialJar = Paths.get(appconf.getString("features.spatial.jar"))
+  
 //  def langfeatureImports(feature: String) = appconf.getStringList(s"langfeature.$feature.imports").asScala
 //  def langfeatureAdditionalJars(feature: String) = appconf.getStringList(s"langfeature.$feature.jars")
 

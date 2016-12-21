@@ -1,5 +1,3 @@
-REGISTER '/home/hage/code/stark/target/scala-2.11/stark.jar';
-
 a1 = load '$inbase/input/events.csv' using PigStorage(',') as (name: chararray, lat: double, lon: chararray);
 b1 = foreach a1 GENERATE  name, geometry("POINT("+lat+" "+lon+")") as loc;
 
