@@ -864,6 +864,8 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   /************************/
   /* Tests for SPLIT INTO */
   /************************/
+  /* Split is rewritten to multiple filters, so no emitter for split into
+   * 
   it should "contain code for SPLIT a INTO b IF f1==2, c IF f2>3" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
     val ops = parseScript(
@@ -879,6 +881,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
       |""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
+  */
 
   /********************/
   /* Tests for SAMPLE */
