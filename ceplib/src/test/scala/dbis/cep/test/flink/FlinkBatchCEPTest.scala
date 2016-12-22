@@ -73,6 +73,7 @@ class FlinkBatchCEPTest extends FlatSpec with Matchers {
   
   "Flink CEP" should "detect the pattern SEQ(A, B, C) with first match" in {
     val env = ExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurBatchNFA.createNFA, FirstMatch)
     val result = res.collect()
@@ -87,6 +88,7 @@ class FlinkBatchCEPTest extends FlatSpec with Matchers {
 
   it should "detect the pattern SEQ(A, B, C) with any match" in {
     val env = ExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurBatchNFA.createNFA, AllMatches)
     val result = res.collect()
@@ -101,6 +103,7 @@ class FlinkBatchCEPTest extends FlatSpec with Matchers {
 
   it should "detect the pattern SEQ(A, B, C) with next match" in {
     val env = ExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurBatchNFA.createNFA, NextMatches)
     val result = res.collect()
@@ -117,6 +120,7 @@ class FlinkBatchCEPTest extends FlatSpec with Matchers {
 
   it should "detect the pattern SEQ(A, B, C) with contiguity match" in {
     val env = ExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurBatchNFA.createNFA, ContiguityMatches)
     val result = res.collect()
