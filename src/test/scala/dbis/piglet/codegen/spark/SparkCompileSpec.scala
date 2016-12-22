@@ -35,7 +35,7 @@ import dbis.piglet.codegen.spark.SparkCodeGenStrategy
 import dbis.piglet.parser.PigParser.parseScript
 
 import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.plan.rewriting.Rewriter.processPlan
+import dbis.piglet.plan.rewriting.Rewriter.rewritePlan
 import dbis.piglet.plan.rewriting.Rules
 import dbis.piglet.schema._
 import dbis.piglet.tools.CodeMatchers
@@ -74,8 +74,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    val sc = new SparkContext(conf)
         |    def main(args: Array[String]) {
         |
-        |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
-        |      sc.addSparkListener(perfMon)
+        |      //val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
+        |      //sc.addSparkListener(perfMon)
+        |      val url = "http://localhost:5555/exectimes"
         |      sc.stop()
         |
         |    }
@@ -106,8 +107,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |    val sc = new SparkContext(conf)
                                      |    def main(args: Array[String]) {
                                      |
-                                     |      val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
-                                     |      sc.addSparkListener(perfMon)
+                                     |      //val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
+                                     |      //sc.addSparkListener(perfMon)
+                                     |      val url = "http://localhost:5555/exectimes"
                                      |      sc.stop()
                                      |
                                      |    }
@@ -191,7 +193,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |dump out;
       """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val op = rewrittenPlan.findOperatorForAlias("out").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
@@ -956,7 +958,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode = cleanString(
       """
@@ -985,7 +987,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
@@ -1015,7 +1017,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
@@ -1041,7 +1043,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
@@ -1074,7 +1076,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
@@ -1107,7 +1109,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       |dump out;
     """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val op = rewrittenPlan.findOperatorForAlias("out").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
@@ -1126,7 +1128,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |C = FOREACH B GENERATE A.name, AVG(A.value);
         |DUMP C;
       """.stripMargin))
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val op = rewrittenPlan.findOperatorForAlias("C").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
@@ -1144,7 +1146,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |B = FOREACH A GENERATE ddmatrix(2, 3, {v11, v12, v21, v22, v31, v32});
         |DUMP B;
       """.stripMargin))
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val op = rewrittenPlan.findOperatorForAlias("B").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
@@ -1163,7 +1165,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |C = FOREACH B GENERATE ddmatrix(2, 3, myBag);
         |DUMP C;
       """.stripMargin))
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val op = rewrittenPlan.findOperatorForAlias("C").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(

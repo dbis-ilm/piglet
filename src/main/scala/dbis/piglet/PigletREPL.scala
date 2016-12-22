@@ -258,7 +258,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
 			plan = processMaterializations(plan, mm)
     }
 
-    plan = processPlan(plan)
+    plan = rewritePlan(plan)
 
     plan.printPlan(0)
     false
@@ -287,7 +287,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
         case Some(str) =>
           val alias = str.split(" ")(1)
           val op = plan.findOperatorForAlias(alias)
-          plan = processPlan(plan)
+          plan = rewritePlan(plan)
           val op_after_rewriting = plan.findOperatorForAlias(alias)
           op match {
             case Some(o) => println(o.schemaToString)
@@ -354,7 +354,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       }
 
 
-      plan = processPlan(plan)
+      plan = rewritePlan(plan)
       logger.debug("plan rewritten.")
 
       try {

@@ -37,14 +37,14 @@ case class RewriterException(msg: String) extends Exception(msg)
   * Kiamas [[org.kiama.rewriting.Rewriter]] and [[org.kiama.rewriting.Strategy]] objects.
   *
   * This object keeps an internal [[Strategy]] object that holds all strategies added via [[addStrategy]]. Calling
-  * [[processPlan]] with a [[DataflowPlan]] will apply ```all``` those strategies to the plan until none applies
+  * [[rewritePlan]] with a [[DataflowPlan]] will apply ```all``` those strategies to the plan until none applies
   * anymore.
   *
   * ==Low-level methods==
   *
   * Methods that directly handle Strategies are provided:
   *
-  * - [[addStrategy]] adds a single strategy to this object. Later calls to [[processPlan]] will then use this
+  * - [[addStrategy]] adds a single strategy to this object. Later calls to [[rewritePlan]] will then use this
   * strategy in addition to all other ones added via this method.
   *
   * - [[addBinaryPigOperatorStrategy]] turns a function operating on two operators of specific subtypes of
@@ -55,7 +55,7 @@ case class RewriterException(msg: String) extends Exception(msg)
   *
   * - [[buildRemovalStrategy]] builds a strategy to remove an operator from a [[DataflowPlan]]
   *
-  * - [[processPlan]] applies a single strategy to a [[DataflowPlan]].
+  * - [[rewritePlan]] applies a single strategy to a [[DataflowPlan]].
   *
   * ==Higher-level methods==
   *
@@ -102,6 +102,7 @@ object Rewriter extends PigletLogging
                 with WindowSupport
                 with EmbedSupport
                 with MaterializationSupport
+                with ProfilingSupport
                 with Fixers
                 with FastStrategyAdder
                 with RewriterDSL {
@@ -160,15 +161,15 @@ object Rewriter extends PigletLogging
     * @param plan The plan to process.
     * @return A rewritten [[dbis.piglet.plan.DataflowPlan]]
     */
-  def processPlan(plan: DataflowPlan): DataflowPlan = timing("rewriting plan") {
+  def rewritePlan(plan: DataflowPlan): DataflowPlan = timing("rewriting plan") {
     evalExtraRuleCode(plan.extraRuleCode)
     val forewriter = buildTypedCaseWrapper(foreachRecursively)
     val fostrat = manybu(strategyf(t => forewriter(t)))
     val rewriter = ior(outermost(ourStrategy), fostrat)
-    processPlan(plan, rewriter)
+    rewritePlan(plan, rewriter)
   }
   
-  def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
+  def rewritePlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan = {
     evalExtraRuleCode(plan.extraRuleCode)
 
     // This looks innocent, but this is where the rewriting happens.

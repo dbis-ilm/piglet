@@ -90,7 +90,7 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
       """.stripMargin)
 
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("in").get))
     val expectedCode = cleanString(
       """
@@ -109,7 +109,7 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
       """.stripMargin)
 
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("in").get))
     val expectedCode = cleanString(
       """

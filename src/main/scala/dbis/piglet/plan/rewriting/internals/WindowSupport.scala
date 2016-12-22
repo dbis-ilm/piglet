@@ -33,7 +33,7 @@ import scala.collection.mutable.ListBuffer
   *
   */
 trait WindowSupport extends PigletLogging {
-  def processPlan(newPlan: DataflowPlan, strategy: Strategy): DataflowPlan
+  def rewritePlan(newPlan: DataflowPlan, strategy: Strategy): DataflowPlan
 
   def processWindows(plan: DataflowPlan): DataflowPlan = timing("process windows") {
     require(plan != null, "Plan must not be null")
@@ -182,7 +182,7 @@ trait WindowSupport extends PigletLogging {
           None
         }
       }
-      newPlan = processPlan(newPlan, strategyf(t => strategy(t)))
+      newPlan = rewritePlan(newPlan, strategyf(t => strategy(t)))
     }
     newPlan
   }

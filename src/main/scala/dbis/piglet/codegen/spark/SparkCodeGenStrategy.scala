@@ -102,8 +102,9 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
     CodeEmitter.render("""  def main(args: Array[String]) {
                          |
                          |<if (profiling)>
-                         |    val perfMon = new PerfMonitor("<name>_App","<profiling>")
-                         |    sc.addSparkListener(perfMon)
+                         |    //val perfMon = new PerfMonitor("<name>_App","<profiling>")
+                         |    //sc.addSparkListener(perfMon)
+                         |    val url = "<profiling>"
                          |<endif>
                          |""".stripMargin, map)
   }

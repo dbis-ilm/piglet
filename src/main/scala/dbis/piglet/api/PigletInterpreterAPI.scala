@@ -31,7 +31,7 @@ object PigletInterpreterAPI extends PigletLogging {
     }
 
     logger.debug(s"successfully created dataflow plan")
-    plan = processPlan(plan)
+    plan = rewritePlan(plan)
 
     // compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(backend)

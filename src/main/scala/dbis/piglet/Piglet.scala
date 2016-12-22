@@ -245,8 +245,15 @@ object Piglet extends PigletLogging {
         newPlan = processWindows(newPlan)
 
       Rules.registerBackendRules(c.backend)
-      newPlan = processPlan(newPlan)
+      newPlan = rewritePlan(newPlan)
 
+      
+      // after rewriting the plan, add the timing operations
+      if(c.profiling.isDefined) {
+        newPlan = insertTimings(newPlan, c.profiling.get)
+      }
+      
+      
       // find materialization points
       profiler.foreach { p => p.addMaterializationPoints(newPlan) }
 

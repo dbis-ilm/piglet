@@ -623,7 +623,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       |DUMP out;
     """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode = cleanString(
       """
@@ -651,7 +651,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |DUMP out2;
       """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
@@ -680,7 +680,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |DUMP out2;
       """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
@@ -705,7 +705,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       |DUMP C;
     """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
@@ -736,7 +736,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |DUMP grpd;
       """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
@@ -767,7 +767,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       |dump out;
     """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val op = rewrittenPlan.findOperatorForAlias("out").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
@@ -787,7 +787,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       |dump out;
     """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = processPlan(plan)
+    val rewrittenPlan = rewritePlan(plan)
     val op = rewrittenPlan.findOperatorForAlias("out").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(

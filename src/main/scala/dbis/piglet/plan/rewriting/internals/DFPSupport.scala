@@ -27,7 +27,7 @@ import scala.reflect.ClassTag
  *
  */
 trait DFPSupport {
-  def processPlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan
+  def rewritePlan(plan: DataflowPlan, strategy: Strategy): DataflowPlan
 
   def buildRemovalStrategy(rem: PigOperator): Strategy
 
@@ -69,7 +69,7 @@ trait DFPSupport {
         None
       }
     }
-    processPlan(plan, manybu(strategyf(t => strategy(t))))
+    rewritePlan(plan, manybu(strategyf(t => strategy(t))))
   }
 
   /** Insert `newOp` between `in` and `out` in `plan`.
@@ -85,7 +85,7 @@ trait DFPSupport {
     require(inOp.outputs.flatMap(_.consumer).contains(outOp), "The input Operator must be directly connected to the output Operator")
     require(outOp.inputs.map(_.producer).contains(inOp), "The output Operator must be directly connected to the input Operator")
 
-    //TODO:Outsource DISCONNECT, difficult since processPlan deletes Nodes with no output Pipe
+    //TODO:Outsource DISCONNECT, difficult since rewritePlan deletes Nodes with no output Pipe
     val outIdx = inOp.outputs.indexWhere(_.name == newOp.inputs.head.name)
     inOp.outputs(outIdx).consumer = inOp.outputs(outIdx).consumer.filterNot(_ == outOp)
     outOp.inputs = outOp.inputs.filterNot(_.producer == inOp)
@@ -146,7 +146,7 @@ trait DFPSupport {
         None
       }
     }
-    processPlan(plan, manybu(strategyf(t => strategy(t))))
+    rewritePlan(plan, manybu(strategyf(t => strategy(t))))
   }
 
 
@@ -170,7 +170,7 @@ trait DFPSupport {
     } else {
       var strat = manybu(buildRemovalStrategy(rem))
 
-      newPlan = processPlan(plan, strat)
+      newPlan = rewritePlan(plan, strat)
     }
 
     if (removePredecessors) {
@@ -187,7 +187,7 @@ trait DFPSupport {
       }
 
       newPlan = nodes.filterNot(_.isInstanceOf[Load]).foldLeft(newPlan)((p: DataflowPlan, op: PigOperator) =>
-        processPlan(p, manybu(buildRemovalStrategy(op))))
+        rewritePlan(p, manybu(buildRemovalStrategy(op))))
       loads = loads ++ nodes.filter(_.isInstanceOf[Load])
     }
     loads.toList.asInstanceOf[List[Load]].foreach ({ l: Load =>
@@ -216,6 +216,6 @@ trait DFPSupport {
       }
     }
 
-    processPlan(plan, manybu(buildBinaryPigOperatorStrategy(strategy)))
+    rewritePlan(plan, manybu(buildBinaryPigOperatorStrategy(strategy)))
   }
 }
