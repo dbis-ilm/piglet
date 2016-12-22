@@ -681,7 +681,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     /* CEP statement */
     matcherStmt |
     /* spatial statements */
-    spatialFilterStmt | spatialJoinStmt | indexStmt |
+    spatialFilterStmt | spatialJoinStmt | /*indexStmt |*/ partitionStmt | 
     /* misc Pig Latin extensions */
     materializeStmt | rscriptStmt |
     /* standard Pig Latin statements */
@@ -886,12 +886,18 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     case _ ~ _ ~ geo ~ time ~ _ => ConstructGeometryExpr(geo, time)
   }
 
+  def withIndexClause = usingKeyword ~ indexKeyword ~ indexMethod ^^ {
+    case _ ~ _ ~ method => method
+  }
+  
+  
+  
   def spatialJoinPredicate = (containsKeyword | intersectsKeyword | containedByKeyword) ~ "(" ~ ref ~ "," ~ ref ~ ")" ^^ {
     case kw ~ _ ~ r1 ~ _ ~ r2 ~ _ => new SpatialJoinPredicate(r1,r2,  SpatialPredicateType.withName(kw.toUpperCase()))
   }
 
-  def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ (indexKeyword?) ~ "," ~ bag ~ onKeyword ~ spatialJoinPredicate  ^^ {
-    case out ~ _ ~ _ ~ in1 ~ idx ~ _ ~ in2  ~ _ ~ expr => new SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr, idx.isDefined )
+  def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ "," ~ bag ~ onKeyword ~ spatialJoinPredicate ~ (withIndexClause?)  ^^ {
+    case out ~ _ ~ _ ~ in1 ~ _ ~ in2  ~ _ ~ expr ~ idx => new SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr, idx )
 
   }
 
@@ -899,8 +905,10 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     case kw ~ _ ~ f ~ _ ~ expr ~ _ => new SpatialFilterPredicate(f, expr, SpatialPredicateType.withName(kw.toUpperCase()))
   }
 
-  def spatialFilterStmt = bag ~ "=" ~ spatialFilterKeyword ~ bag ~ byKeyword ~ spatialFilterPredicate ^^ {
-    case out ~ _ ~ _ ~ in ~ _ ~ pred => new SpatialFilter(Pipe(out), Pipe(in), pred)
+  
+  
+  def spatialFilterStmt = bag ~ "=" ~ spatialFilterKeyword ~ bag ~ byKeyword ~ spatialFilterPredicate ~ (withIndexClause?) ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ pred ~ idx => new SpatialFilter(Pipe(out), Pipe(in), pred, idx)
   }
 
 
@@ -912,6 +920,18 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   def indexStmt: Parser[PigOperator] = bag ~ "=" ~ indexKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ indexMethod  ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ methodWithParams => IndexOp(Pipe(out), Pipe(in), field, methodWithParams._1, methodWithParams._2)
   }
+  
+  lazy val partitionKeyword = "partition".ignoreCase
+  lazy val gridKeyword = "grid".ignoreCase
+  lazy val bspKeyword = "bsp".ignoreCase
+  
+  def partitionMethod = (gridKeyword | bspKeyword) ~ "(" ~ repsep(params, ",") ~ ")" ^^ {
+    case method ~ _ ~ paramList ~ _ => (PartitionMethod.withName(method.toUpperCase()), paramList)
+  }
+  
+  def partitionStmt = bag ~ "=" ~ partitionKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ partitionMethod ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ ((method, params)) => Partition(Pipe(out), Pipe(in), field, method, params)
+  } 
 
   /* ---------------------------------------------------------------------------------------------------------------- */
 

@@ -16,6 +16,8 @@ import dbis.piglet.op.SpatialFilter
 import dbis.piglet.op.SpatialJoin
 import scala.collection.mutable.ListBuffer
 import dbis.piglet.expr.Expr
+import dbis.piglet.op.IndexOp
+import dbis.piglet.op.Partition
 
 class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.Spark
@@ -29,6 +31,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
         "import com.vividsolutions.jts.io.WKTReader",
         "import dbis.stark.{STObject, Instant, Interval}",
         "import dbis.stark.STObject._",
+        "import dbis.stark.spatial._",
         "import dbis.stark.spatial.SpatialRDD._")
     }
     additionalImports
@@ -38,6 +41,8 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
     val emitter = op match {
       case _: SpatialFilter => new SpatialFilterEmitter
       case _: SpatialJoin => new SpatialJoinEmitter
+      case _: IndexOp => new SpatialIndexEmitter
+      case _: Partition => new PartitionerEmitter
       case _ => super.emitterForNode(op)      
     }
   

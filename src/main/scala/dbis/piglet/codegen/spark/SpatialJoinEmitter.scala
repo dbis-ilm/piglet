@@ -5,17 +5,23 @@ import dbis.piglet.op.SpatialJoin
 import dbis.piglet.codegen.CodeGenContext
 import dbis.piglet.schema.SchemaException
 import dbis.piglet.codegen.scala_lang.ScalaEmitter
+import dbis.piglet.op.IndexMethod.IndexMethod
 
 
 class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
   
-  override def template = s"""val <out> = <rel1>.join(
-                    |   <rel2>.keyBy(<tuplePrefix> => <rightfield>),
-                    |   dbis.stark.spatial.Predicates.<predicate> _
+  override def template = s"""val <out> = <rel1><keyby1><liveindex>.join(
+                    |   <rel2><keyby2>,
+                    |   dbis.stark.spatial.JoinPredicate.<predicate>
                     | ).map{ case (v,w) => 
                     |     <className>(<fields>) 
                     |\\}""".stripMargin
   
+  def indexTemplate(idxConfig: Option[(IndexMethod, List[String])]) = idxConfig match {
+    case Some((indexMethod, params)) => CodeEmitter.render(".liveIndex(<params>)", Map("params" -> params.mkString(",")))
+    case None => ""
+  }                    
+                    
   def code(ctx: CodeGenContext, op: SpatialJoin): String = {
     
     if(op.schema.isEmpty)
@@ -30,16 +36,15 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
     val params = Map(
       "out" -> op.outPipeName,
       "className" -> ScalaEmitter.schemaClassName(op.schema.get.className),
-      "tuplePrefix" -> ctx.asString("tuplePrefix"),
       "fields" -> fieldList,
-      "predicate" -> op.predicate.predicateType.toString().toLowerCase(),
+      "predicate" -> op.predicate.predicateType.toString().toUpperCase(),
+      "rel1" -> op.inPipeNames(0),
       "rel2" -> op.inPipeNames(1),
-      "rightfield" -> ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs(1).inputSchema)), op.predicate.right),
-      "rel1" -> {if(op.withIndex) {
-                  op.inPipeNames(0)
-                } else {
-                  s"${op.inPipeNames(0)}.keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs(0).inputSchema)), op.predicate.left)})"
-                }}
+      "keyby1" -> {if(SpatialEmitterHelper.geomIsFirstPos(op.predicate.left, op)) "" 
+                   else s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs(0).inputSchema)), op.predicate.left)})"},
+      "keyby2" -> {if(SpatialEmitterHelper.geomIsFirstPos(op.predicate.right, op)) "" 
+                   else s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs(1).inputSchema)), op.predicate.right)})"},
+      "liveindex" -> indexTemplate(op.index)
     )
 
     render(params)

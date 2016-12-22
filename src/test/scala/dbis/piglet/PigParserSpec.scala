@@ -900,4 +900,25 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     val s = parseScript("crossed = CROSS a,b,c,d,e,f,g")
     s should contain only (Cross(Pipe("crossed"), List(Pipe("a"),Pipe("b"),Pipe("c"),Pipe("d"),Pipe("e"),Pipe("f"),Pipe("g"))))
   }
+  
+  it should "parse a script with PARTITION" in {
+    val s = parseScript("""a = load 'abc.txt' using PigStorage(';') as (id: int, lat: double, lon: double);
+      |b = FOREACH a GENERATE id, geometry("POINT("+lat+" "+lon+")") as loc;
+      |c = Partition b on loc using GRID(partitionsPerDimension=3);""".stripMargin)
+    assert(s(2) == Partition(Pipe("c"), Pipe("b"), NamedField("loc"), PartitionMethod.GRID, List("partitionsPerDimension=3")))
+  }
+  
+  ignore should "parse a script with INDEX" in {
+    val s = parseScript("""a = load 'abc.txt' using PigStorage(';') as (id: int, lat: double, lon: double);
+      |b = FOREACH a GENERATE id, geometry("POINT("+lat+" "+lon+")") as loc;
+      |c = index b on loc using RTree(order=2);""".stripMargin)
+    s(2) shouldBe IndexOp(Pipe("c"), Pipe("b"), NamedField("loc"), IndexMethod.RTREE, List("order=2")) 
+  }
+  
+  it should "reject a script with unknown index method" in 
+    assertThrows[Exception] {
+      val s = parseScript("""a = load 'abc.txt' using PigStorage(';') as (id: int, lat: double, lon: double);
+      |b = FOREACH a GENERATE id, geometry("POINT("+lat+" "+lon+")") as loc;
+      |c = index b on loc using bla(order=2);""".stripMargin)
+    }
 }

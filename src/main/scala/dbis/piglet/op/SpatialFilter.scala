@@ -22,6 +22,7 @@ import dbis.piglet.expr.Predicate
 import dbis.piglet.expr.Ref
 import dbis.piglet.expr.Expr
 import dbis.piglet.expr.SpatialFilterPredicate
+import dbis.piglet.op.IndexMethod.IndexMethod
 
 /**
  * SpatialFilter represents the SPATIALFILTER operator.
@@ -33,7 +34,8 @@ import dbis.piglet.expr.SpatialFilterPredicate
 case class SpatialFilter(
     private val out: Pipe, 
     private val in: Pipe, 
-    pred: SpatialFilterPredicate 
+    pred: SpatialFilterPredicate,
+    idx: Option[(IndexMethod, List[String])]
   ) extends PigOperator(out, in) {
 
   /**
@@ -42,7 +44,7 @@ case class SpatialFilter(
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""SPATIALFILTER%${pred}%""" + super.lineageString
+    s"""SPATIALFILTER%${pred}%${idx}""" + super.lineageString
   }
 
   override def resolveReferences(mapping: Map[String, Ref]): Unit = pred.resolveReferences(mapping)
@@ -65,6 +67,7 @@ case class SpatialFilter(
     println(indent(tab + 2) + "inSchema = " + inputSchema)
     println(indent(tab + 2) + "outSchema = " + schema)
     println(indent(tab + 2) + "expr = " + pred)
+    println(indent(tab + 2) + s"withIdx = $idx")
   }
 
 }

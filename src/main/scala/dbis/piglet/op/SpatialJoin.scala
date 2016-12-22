@@ -8,6 +8,7 @@ import dbis.piglet.schema.BagType
 import dbis.piglet.schema.TupleType
 import dbis.piglet.schema.Types
 import dbis.piglet.expr.SpatialJoinPredicate
+import dbis.piglet.op.IndexMethod.IndexMethod
 
 
 
@@ -15,12 +16,12 @@ case class SpatialJoin(
     private val out: Pipe, 
     private val in: List[Pipe], 
     predicate: SpatialJoinPredicate,
-    withIndex: Boolean
+    index: Option[(IndexMethod, List[String])]
   ) extends PigOperator(List(out), in) {
   
   
   override def lineageString: String = {
-    s"""JOIN%${predicate.toString()}%index=${withIndex}%""" + super.lineageString
+    s"""JOIN%${predicate.toString()}%index=${index}%""" + super.lineageString
   }
 
   override def constructSchema: Option[Schema] = {
@@ -40,6 +41,7 @@ case class SpatialJoin(
     println(indent(tab + 2) + s"predicate: ${predicate.toString()}")
     println(indent(tab + 2) + "inSchema = {}")
     println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab + 2) + s"index = $index")
   }
   
   
