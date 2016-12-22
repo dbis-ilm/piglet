@@ -417,6 +417,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for a binary JOIN statement with simple expression" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     ctx.set("tuplePrefix", "t")
+    JoinEmitter.joinKeyVars.clear() // make sure we start generated names with a
 
     Schema.init()
     val op = Join(Pipe("aa"), List(Pipe("bb"), Pipe("cc")), List(List(PositionalField(0)), List(PositionalField(0))))
@@ -439,6 +440,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for a binary JOIN statement with expression lists" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     ctx.set("tuplePrefix", "t")
+    JoinEmitter.joinKeyVars.clear() // make sure we start generated names with a
 
     Schema.init()
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
@@ -713,7 +715,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     op.constructSchema
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-        |val aa = bb.cartesian(cc).map{ case (v,w) => _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) }""".stripMargin)
+        |val aa = bb.cartesian(cc).map{ case (v,w) => (v._0,v._1,v._2,w._0,w._1,w._2) }.map{case l => convert_t$1_Tuple(l) }""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
   }
@@ -730,7 +732,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     op.constructSchema
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-        |val a = b.cartesian(c).cartesian(d)""".stripMargin)
+        |val a = b.cartesian(c).map{ case (v,w) => (v._0,w._0) }.cartesian(d).map{ case (v,w) => (v._1,v._2,w._0) }.map{case l => convert_t$1_Tuple(l) }""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
   }
