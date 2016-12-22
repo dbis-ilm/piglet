@@ -22,7 +22,7 @@ class FirstMatch[T <: Event: ClassTag](nfaController: NFAController[T], collecto
       currenStr.addEvent(event, currenStr.getCurrentState.asInstanceOf[NormalState[T]].getEdgeByIndex(result))
       if (currenStr.complete) { //final state
         statics += 1
-        println("complete")
+        //println("complete")
         collector + currenStr
         runningStructursPool.clear()
       }

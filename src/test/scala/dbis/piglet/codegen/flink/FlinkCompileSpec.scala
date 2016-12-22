@@ -40,13 +40,12 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     Rules.registerAllRules()
   }
   def cleanString(s: String): String = s.stripLineEnd.replaceAll("""\s+""", " ").trim
+  
   val backendConf = BackendManager.init("flink")
-  //  BackendManager.backend = backendConf
-  val templateFile = backendConf.templateFile
+  val codeGenerator = new FlinkCodeGenStrategy()
 
   "The compiler output" should "contain the Flink header & footer" in {
     val ctx = CodeGenContext(CodeGenTarget.Flink)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitImport(ctx)
       + codeGenerator.emitHeader1(ctx, "test")
       + codeGenerator.emitHeader2(ctx, "test")
@@ -74,7 +73,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
 
     val op = Load(Pipe("a"), file)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(s"""val a = PigStorage[Record]().load(env, "$file", (data: Array[String]) => Record(data))""")
     assert(generatedCode == expectedCode)
@@ -85,7 +83,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
 
     val op = Load(Pipe("a"), file, None, Some("PigStorage"), List("""','"""))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(s"""val a = PigStorage[Record]().load(env, "$file", (data: Array[String]) => Record(data), ',')""")
     assert(generatedCode == expectedCode)
@@ -96,7 +93,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val file = new java.io.File(".").getCanonicalPath + "/file.n3"
     
     val op = Load(Pipe("a"), file, None, Some("RDFFileStorage"))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     
     val expectedCode = cleanString(s"""val a = RDFFileStorage().load(env, "${file}")""")
@@ -105,7 +101,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for FILTER" in { 
     val op = Filter(Pipe("a"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))) 
-    val codeGenerator = new FlinkCodeGenStrategy() 
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op)) 
     val expectedCode = cleanString("val a = b.filter(t => {t(1) < 42})") 
     assert(generatedCode == expectedCode) 
@@ -114,7 +109,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for DUMP" in {
     val ctx = CodeGenContext(CodeGenTarget.Flink)
     val op = Dump(Pipe("a"))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""a.map(_.mkString()).print""")
     assert(generatedCode == expectedCode)
@@ -124,7 +118,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val ctx = CodeGenContext(CodeGenTarget.Flink)
     val file = new java.io.File(".").getCanonicalPath + "/file.csv"
     val op = Store(Pipe("A"), file)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       s"""PigStorage[Record]().write("$file", A) env.execute("Starting Query")""".stripMargin)
@@ -134,7 +127,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for FILTER" in {
     val ctx = CodeGenContext(CodeGenTarget.Flink)
     val op = Filter(Pipe("aa"), Pipe("bb"), Lt(RefExpr(PositionalField(1)), RefExpr(Value(42))))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.filter(t => {t.get(1) < 42})")
     assert(generatedCode == expectedCode)
@@ -147,7 +139,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |c = FILTER b BY x > 0 AND (y < 0 OR (NOT z1 == z2));""".stripMargin)
     val plan = new DataflowPlan(ops)
     val op = ops(1)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val c = b.filter(t => {t._0 > 0 && (t._1 < 0 || (!(t._2 == t._3)))})")
     assert(generatedCode == expectedCode)
@@ -159,7 +150,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val op = Filter(Pipe("a"), Pipe("b"), Gt(
       Func("aFunc", List(RefExpr(PositionalField(0)), RefExpr(PositionalField(1)))),
       RefExpr(Value("0"))))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val a = b.filter(t => {aFunc(t.get(0),t.get(1)) > 0})")
     assert(generatedCode == expectedCode)
@@ -173,7 +163,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       Geq(Func("cFunc", List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))), RefExpr(NamedField("x")))), false)
     op.schema = Some(Schema(Array(Field("x", Types.IntType),
       Field("y", Types.DoubleType))))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val a = b.filter(t => {aFunc(t._0,t._1) == true && cFunc(t._0,t._1) >= t._0})
@@ -184,7 +173,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for DISTINCT" in {
     val ctx = CodeGenContext(CodeGenTarget.Flink)
     val op = Distinct(Pipe("a"), Pipe("b"))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val a = b.distinct")
     assert(generatedCode == expectedCode)
@@ -192,7 +180,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain code for LIMIT" in {
     val ctx = CodeGenContext(CodeGenTarget.Flink)
     val op = Limit(Pipe("a"), Pipe("b"), 10)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val a = b.first(10)")
     assert(generatedCode == expectedCode)
@@ -209,7 +196,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         RefExpr(Value("\"field2\"")),
         RefExpr(PositionalField(1))))))))
     op.constructSchema
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(PigFuncs.toMap(\"field1\",t.get(0),\"field2\",t.get(1))))")
     generatedCode should matchSnippet(expectedCode)
@@ -223,7 +209,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       GeneratorExpr(RefExpr(PositionalField(0))),
       GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType))))))
     op.constructSchema
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t.get(0), PigFuncs.count(t.get(1))))")
     generatedCode should matchSnippet(expectedCode)
@@ -239,7 +224,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """.stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
     generatedCode should matchSnippet(expectedCode)
@@ -256,7 +240,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val op = plan.findOperatorForAlias("aa").get
     val ctx = CodeGenContext(CodeGenTarget.Flink, Some(plan.udfAliases.toMap))
     // op.constructSchema
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("val aa = bb.map(t => _t$1_Tuple(t._0, Distances.spatialDistance(t._1,t._2,1.0,2.0)))")
     generatedCode should matchSnippet(expectedCode)
@@ -273,7 +256,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("a").get
 
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val a = b.map(t => _t$1_Tuple(t._0("k1"), t._1("k2")))""".stripMargin)
@@ -291,7 +273,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("a").get
 
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val a = b.map(t => _t$1_Tuple(t._0._1, t._2._0))""".stripMargin)
@@ -311,7 +292,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val foreachOp = plan.findOperatorForAlias("uniqcnt").get
     //println("schema = " + foreachOp.schema)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, foreachOp))
 
     val expectedCode = cleanString(
@@ -330,7 +310,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """data = load 'file' as (f1: int, f2: int, name:chararray);
         |out = foreach data generate (f1, f2), {f1, f2}, [name, f1];""".stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val op = plan.findOperatorForAlias("out").get
     val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)))
 
@@ -352,7 +331,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("res").get
 
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
@@ -369,7 +347,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("res").get
 
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
@@ -382,7 +359,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val ctx = CodeGenContext(CodeGenTarget.Flink)
     // a = UNION b, c;
     val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c")))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val a = b.union(c)""".stripMargin)
@@ -393,7 +369,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val ctx = CodeGenContext(CodeGenTarget.Flink)
     // a = UNION b, c, d;
     val op = Union(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val a = b.union(c).union(d)""".stripMargin)
@@ -409,7 +384,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""val aa = bb.setParallelism(1).mapPartition( (in, out: Collector[_t2_Tuple]) =>  out.collect(_t2_Tuple("all", in.toIterable)))""")
     assert(generatedCode == expectedCode)
@@ -435,7 +409,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val aa = bb.groupBy(t => t._0).reduceGroup{ (in, out: Collector[_t2_Tuple]) => val itr = in.toIterable; out.collect(_t2_Tuple(itr.head._0, itr)) }""".stripMargin)
@@ -452,7 +425,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val aa = bb.groupBy(t => (t._0,t._1)).reduceGroup{ (in, out: Collector[_t3_Tuple]) => val itr = in.toIterable; out.collect(_t3_Tuple(_t2_Tuple(itr.head._0,itr.head._1), itr)) }""".stripMargin)
@@ -468,7 +440,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       Field("f3", Types.IntType)))
 
     op.schema = Some(schema)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val aa = bb.setParallelism(1).sortPartition(0, Order.ASCENDING)""".stripMargin)
@@ -486,7 +457,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       Field("f3", Types.IntType)))
 
     op.schema = Some(schema)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val a = b.setParallelism(1).sortPartition(0, Order.DESCENDING).sortPartition(2, Order.ASCENDING)""".stripMargin)
@@ -497,7 +467,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val ctx = CodeGenContext(CodeGenTarget.Flink)
     // aa = SAMPLE bb 0.01;
     val op = Sample(Pipe("aa"), Pipe("bb"), RefExpr(Value(0.01)))
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
         |val aa = bb.sample(false, 0.01)""".stripMargin)
@@ -516,7 +485,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     op.inputs = List(input1, input2)
     op.constructSchema
 
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val aa = bb.join(cc).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2) }""".stripMargin)
@@ -536,7 +504,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     op.inputs = List(input1, input2)
     op.constructSchema
 
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
      |val a = b.join(c).where("_0","_1").equalTo("_1","_2").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2) }""".stripMargin)
@@ -556,7 +523,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val input3 = Pipe("d", Load(Pipe("d"), "input/file.csv", Some(schema), Some("PigStorage"), List("\",\"")))
     op.inputs = List(input1, input2, input3)
     op.constructSchema
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
       |val a = b.join(c).where("_0").equalTo("_0").join(d).where("_1._0").equalTo("_0").map{ t => val ((v1,v2),v3) = t _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2) }""".stripMargin)
@@ -575,7 +541,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |j = join j1 by $0, j2 by $0;
         |""".stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, plan.findOperatorForAlias("j1").get))
     val generatedCode2 = cleanString(codeGenerator.emitNode(ctx, plan.findOperatorForAlias("j2").get))
     val generatedCode3 = cleanString(codeGenerator.emitNode(ctx, plan.findOperatorForAlias("j").get))
@@ -606,7 +571,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("a").get
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
        |val a = b.aggregate(Aggregations.COUNT,0).and(Aggregations.AVG,1).and(Aggregations.SUM,2)""".stripMargin)
@@ -618,7 +582,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "not contain code for EMPTY operators" in {
     val ctx = CodeGenContext(CodeGenTarget.Flink)
     val op = Empty(Pipe("_"))
-    val codeGenerator = new FlinkCodeGenStrategy()
 
     assert(codeGenerator.emitNode(ctx, op) == "")
   }
@@ -634,7 +597,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |A = LOAD 'file.csv';
       """.stripMargin)
     val plan = new DataflowPlan(ops)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val theCode = codeGenerator.emitHeader1(ctx, "test") + codeGenerator.emitEmbeddedCode(ctx, plan.code)
     assert(cleanString(theCode) ==
       cleanString("""
@@ -662,7 +624,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """.stripMargin)
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode = cleanString(
       """
@@ -691,7 +652,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
@@ -721,7 +681,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
@@ -747,7 +706,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """.stripMargin)
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new FlinkCodeGenStrategy()
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
@@ -779,7 +737,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """.stripMargin)
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new FlinkCodeGenStrategy()
 
     var code: String = ""
     for (schema <- Schema.schemaList) {
@@ -811,7 +768,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """.stripMargin)
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val op = rewrittenPlan.findOperatorForAlias("out").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
@@ -832,7 +788,6 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """.stripMargin)
     val plan = new DataflowPlan(ops)
     val rewrittenPlan = processPlan(plan)
-    val codeGenerator = new FlinkCodeGenStrategy()
     val op = rewrittenPlan.findOperatorForAlias("out").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(

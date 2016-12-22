@@ -76,24 +76,28 @@ class FlinkStreamingCEPTest extends FlatSpec with Matchers with BeforeAndAfterEa
       
   "Flink Streaming CEP" should "detect the pattern SEQ(A, B, C) with first match" in {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurStreamingNFA.createNFA, env, FirstMatch)
   }
 
   it should "detect the pattern SEQ(A, B, C) with any match" in {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurStreamingNFA.createNFA, env, AllMatches)
   }
 
   it should "detect the pattern SEQ(A, B, C) with next match" in {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurStreamingNFA.createNFA, env, NextMatches)
   }
 
   it should "detect the pattern SEQ(A, B, C) with contiguity match" in {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurStreamingNFA.createNFA, env, ContiguityMatches)
   }
