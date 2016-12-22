@@ -27,6 +27,7 @@ import dbis.piglet.schema.Schema
 import java.net.URI
 
 import dbis.piglet.tools.CliParams
+import dbis.piglet.expr.Expr
 
 
 object PigletCompiler extends PigletLogging {
@@ -148,15 +149,21 @@ object PigletCompiler extends PigletLogging {
 
     val outputFile = outputDirectory.resolve(s"$scriptName.$extension")
     logger.debug(s"outputFile: $outputFile")
+    
     val writer = new FileWriter(outputFile.toFile)
     writer.append(code)
     writer.close()
+    
     if (extension.equalsIgnoreCase("scala")) {
       
       val libraryJars = collection.mutable.ArrayBuffer(
           c.backendPath.resolve(Conf.backendJar(c.backend)).toString, // the backend library (sparklib, flinklib, etc)
           c.backendPath.resolve(Conf.commonJar).toString) // common lib
       
+      // if the plan contains geometry expressions, we need to add the spatial library           
+      if(plan.checkExpressions(Expr.containsGeometryType))
+        libraryJars += c.backendPath.resolve(Conf.spatialJar).toString
+          
       // extract all additional jar files to output
       (libraryJars ++= plan.additionalJars).foreach{jarFile => 
         FileTools.extractJarToDir(jarFile, outputDirectory)
@@ -170,6 +177,7 @@ object PigletCompiler extends PigletLogging {
 
       // build a jar file
       logger.info(s"creating job's jar file ... ")
+    
       val jarFile = outputDir.resolve(s"$scriptName.jar")
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
         logger.info(s"created job's jar file at $jarFile")

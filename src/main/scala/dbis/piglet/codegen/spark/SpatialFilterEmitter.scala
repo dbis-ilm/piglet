@@ -7,13 +7,14 @@ import dbis.piglet.codegen.scala_lang.ScalaEmitter
 
 class SpatialFilterEmitter extends CodeEmitter[SpatialFilter] {
   
-  override def template = "val <out> = <in>.keyBy(t => <field>).<predicate>(<other>).map{case (g,v) => v}"
+  override def template = "val <out> = <in>.keyBy(<tuplePrefix> => <field>).<predicate>(<other>).map{case (g,v) => v \\}"
   
   override def code(ctx: CodeGenContext, op: SpatialFilter): String = render(Map("out" -> op.outPipeName,
           "in" -> op.inPipeName,
           "predicate" -> op.pred.predicateType.toString().toLowerCase(),
           "field" -> ScalaEmitter.emitRef(ctx, op.pred.field),
-          "other" -> ScalaEmitter.emitExpr(ctx, op.pred.expr)
+          "other" -> ScalaEmitter.emitExpr(ctx, op.pred.expr),
+          "tuplePrefix" -> ctx.asString("tuplePrefix")
         ))
   
 }
