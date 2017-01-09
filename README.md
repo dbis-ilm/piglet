@@ -77,8 +77,6 @@ The following options are supported:
     * `flinks`: Apache Flink Streaming
     * `mapreduce`: Apache Hadoop (by simply passing the script to the original Pig compiler)
  * `--backend_dir dir`
- * `--languages l` specifies the language dialects accepted by the parser: pig (standard Pig), sparql (pig + SPARQL extensions),
-                  streaming (Pig + data stream extensions), cep (Pig + complex event processing extensions), all (all extensions)
  * `--params key=value, ...`
  * `--update-config`
  * `--show-plan` Print the resulting dataflow plan
