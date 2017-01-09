@@ -17,7 +17,7 @@ object ScalaEmitter {
     Types.FloatType -> "Float",
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",
-    Types.ByteArrayType -> "Any", //TODO: check this
+    Types.ByteArrayType -> "String", //TODO: check this - maybe this should be Any
     Types.AnyType -> "String") //TODO: check this
 
   /**
