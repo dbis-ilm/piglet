@@ -24,7 +24,6 @@ import dbis.test.CompileIt
 class SparkCompileIt extends FlatSpec with CompileIt{
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
-
     //SPARK
     ("load.pig", "result1.out", "truth/result1.data", true, "pig", "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "pig", "spark"),
@@ -49,6 +48,8 @@ class SparkCompileIt extends FlatSpec with CompileIt{
     ("bag.pig", "bag.out", "truth/bag.data", true, "pig", "spark"),
     ("construct.pig", "construct.out", "truth/construct.data", true, "pig", "spark"),
     ("union.pig", "united.out", "truth/united.data", true, "pig", "spark"),
+    ("cross.pig", "crossed.out", "truth/cross2.csv", false, "pig", "spark"),
+    ("crossmany.pig", "manycrossed.out", "truth/crossmany.csv", false, "pig", "spark"),
     ("aggregate.pig", "aggregate.out", "truth/aggregate.data", false, "pig", "spark"),
     ("sampling.pig", "sampling.out", "truth/sampling.data", false, "pig", "spark"),
     ("accumulate.pig", "accumulate.out", "truth/accumulate.data", false, "pig", "spark"),
@@ -67,8 +68,13 @@ class SparkCompileIt extends FlatSpec with CompileIt{
     ("simple_matrix.pig", "simple-matrix.out", "truth/simple-matrix-res.data", true, "pig", "spark"),
 
     ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false, "sparql", "spark"),
-    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false, "sparql", "spark")
+    ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false, "sparql", "spark"),
    // ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true, "plain", "spark")
+    ("two_joins.pig", "twojoins.out", "truth/twojoins.data", false, "pig", "spark"),
+    ("spatialfilter.pig", "spatialfilter.out", "truth/spatialfilter.data", false, "pig", "spark"),
+    ("spatialfilterwithindex.pig", "spatialfilterwithinex.out", "truth/spatialfilter.data", false, "pig", "spark"),
+    ("spatialjoin.pig", "spatialjoin.out", "truth/spatialjoin.data", false, "pig", "spark"),
+    ("spatialjoinwithindex.pig", "spatialjoinwithindex.out", "truth/spatialjoin.data", false, "pig", "spark")
 
   )
   //Note: checking the spark jar inclusion is done also in the piglet script

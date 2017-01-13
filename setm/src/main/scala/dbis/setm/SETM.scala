@@ -17,10 +17,9 @@ object SETM {
   // Start monitoring
   monitor.start()
 
-
+  var quiet: Boolean = false
   def enable = monitor.enableCollection()
   def disable = monitor.disableCollection()
-
   /*
    * Stop monitoring, collect results and render them
    *
@@ -39,6 +38,9 @@ object SETM {
    */
   def timing[T](name: String)(f: => T) = {
     val p = monitor.createPoint(name)
+    if(!quiet)
+      print(s"==> $name                                                           \r")
+      
     try {
       f
     } finally {

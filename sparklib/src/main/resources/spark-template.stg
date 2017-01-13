@@ -4,9 +4,9 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd._
-import dbis.pig.backends.{SchemaClass, Record}
-import dbis.pig.tools._
-import dbis.pig.backends.spark._
+import dbis.piglet.backends.{SchemaClass, Record}
+import dbis.piglet.tools._
+import dbis.piglet.backends.spark._
 <additional_imports>
 
 <\n>
@@ -30,7 +30,9 @@ implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
 // ----------------- BEGIN of code building and initializing the query --------
 query_object(name) ::= <<
 object <name> {
-
+  val conf = new SparkConf().setAppName("<name>_App")
+  val sc = new SparkContext(conf)
+  
 >>
 
 embedded_code(embedded_code) ::= <<
@@ -41,8 +43,7 @@ embedded_code(embedded_code) ::= <<
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
-        val conf = new SparkConf().setAppName("<name>_App")
-        val sc = new SparkContext(conf)
+        
         <if (profiling)>
     	val perfMon = new PerfMonitor("<name>_App","<profiling>")
     	sc.addSparkListener(perfMon)
@@ -57,7 +58,7 @@ loader(out, file, class, func, extractor, params) ::= <<
 
 // ------------------ DUMP results --------------------------------------------
 dump(in) ::=<<
-        <in>.collect.map(t => println(t.mkString()))
+        <in>.collect.foreach(t => println(t.mkString()))
 >>
 
 // ------------------ DISPLAY results in Zeppelin -----------------------------
@@ -66,10 +67,10 @@ display(in, tableHeader) ::=<<
 >>
 
 // ------------------ STORE Results on disk -----------------------------------
+// we had val <in>_helper = <in>.coalesce(1, true) 
 
-store(in, file, class, func, params) ::= <<
-    val <in>_helper = <in>.coalesce(1, true)
-    <func>[<class>]().write("<file>", <in>_helper<if (params)>, <params><endif>)
+store(in, file, class, func, params) ::= <<    
+    <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)
 >>
 
 // ------------------ FILTER for a predicate ----------------------------------
@@ -128,12 +129,21 @@ m_join(out, class, rel1, rel2, pairs, fields) ::=<<
 >>
 
 spatialJoin(out, rel1, rel2, predicate, fields, className) ::=<<
-        val <out> = <rel1>.join(<rel2>_kv).map{ case (k,(v,w)) => <className>(<fields>)\}
+        val <out> = <rel1>.join(<rel2>_kv,dbis.stark.spatial.Predicates.<predicate> _).map{ case (v,w) => <className>(<fields>)\}
 >>
+
+spatialfilter(out, in, predicate, other, field) ::=<<
+        val <out> = <in>.keyBy(t => <field>).<predicate>(<other>).map{case (g,v) => v}
+>>        
 
 index(out, in, field, method, params) ::=<<
         val <out> = <in>.keyBy(t => <field>).index(<params>) 
 >>        
+
+// ------------------ CROSS --------------------------------------------------
+cross(out,rel1,others, class, fields) ::=<<
+		val <out> = <rel1><others:{e | .cartesian(<e>).map{ case (v,w)  => <class>(<fields>) \} }>
+>>
 
 // ------------------ UNIONs multiple streams to one --------------------------
 union(out,in,others) ::=<<

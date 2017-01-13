@@ -2,9 +2,9 @@
 init_code(additional_imports) ::= <<
 import org.apache.spark._
 import org.apache.spark.streaming._
-import dbis.pig.backends.{SchemaClass, Record}
-import dbis.pig.tools._
-import dbis.pig.backends.spark._
+import dbis.piglet.backends.{SchemaClass, Record}
+import dbis.piglet.tools._
+import dbis.piglet.backends.spark._
 <additional_imports>
 
 object SECONDS {
@@ -28,6 +28,9 @@ implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
 // ----------------- BEGIN of code building and initializing the query --------
 query_object(name, embedded_code) ::= <<
 object <name> {
+    SparkStream.setAppName("<name>_App")
+    val ssc = SparkStream.ssc
+    
     <embedded_code>
 
 >>
@@ -35,8 +38,7 @@ object <name> {
 // ----------------- BEGIN of code building and initializing the query --------
 begin_query(name, profiling) ::= <<
     def main(args: Array[String]) {
-    	SparkStream.setAppName("<name>_App")
-    	val ssc = SparkStream.ssc
+    	
         <if (profiling)>
         val perfMon = new PerfMonitor("<name>_App")
         ssc.sparkContext.addSparkListener(perfMon)

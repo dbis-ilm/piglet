@@ -23,14 +23,14 @@ import org.scalatest.FlatSpec
 class FlinksCompileIt extends FlatSpec with CompileIt {
   val scripts = Table(
     ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
-    ("stream_load.pig",  "result1.out",   "truth/result1.data",   false, "pig", "flinks"),
-    ("stream_load2.pig", "result2.out",   "truth/result2.data",   false, "pig", "flinks"),
-    ("stream_foreach1.pig", "distances.out", "truth/distances.data", false, "pig", "flinks"),
-    ("stream_filter.pig", "filtered.out",  "truth/filtered.data",  false, "pig", "flinks"),
-    /*("construct.pig",     "result3.out", "truth/construct.data",   false),
-    ("union.pig",         "united.out",    "truth/united.data",    false),
-    ("aggregate.pig",     "aggregate.out", "truth/aggregate2.data",false),
-    ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false),*/
+    ("stream_load.pig",  "result1.out",   "truth/result1.data",   false, "streaming", "flinks"),
+    ("stream_load2.pig", "result2.out",   "truth/result2.data",   false, "streaming", "flinks"),
+    ("stream_foreach1.pig", "distances.out", "truth/distances.data", false, "streaming", "flinks"),
+    ("stream_filter.pig", "filtered.out",  "truth/filtered.data",  false, "streaming", "flinks"),
+//    ("construct.pig",     "result3.out", "truth/construct.data",   false, "streaming", "flinks"),
+//    ("union.pig",         "united.out",    "truth/united.data",    false, "streaming", "flinks"),
+    ("streaming/aggregate.pig",     "aggregate.out", "truth/aggregate2.data",false, "streaming", "flinks"),
+    ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false, "streaming", "flinks"),
     ("windowJoin.pig",    "joinedW.out",   "truth/joined.data",    false, "streaming", "flinks"),
     ("windowCross.pig",   "crossedW.out",  "truth/crossed.data",   false, "streaming", "flinks"),
     ("windowGrouping.pig","grouping.out",  "truth/grouping.data",  false, "streaming", "flinks"),

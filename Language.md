@@ -1,6 +1,7 @@
 ## Supported Language Features ##
 
-Depending on the target backend Piglet supports different language features. For batch processing in Spark and Flink we support the following standard Pig Latin statements:
+Depending on the target backend Piglet supports different language features. For batch processing in Spark and Flink we support the following standard Pig Latin statements (see the official [Pig documentation]() for more information:
+
  * LOAD
  * STORE
  * DUMP
@@ -53,7 +54,16 @@ out = FOREACH in GENERATE dimatrix(2, 2, $0, $1, $2, $3);
 
 ### ACCUMULATE ###
 
- * ACCUMULATE - is used for incrementally calculating aggregates on (large) bags or streams of tuples.
+ * ACCUMULATE - is used for incrementally calculating aggregates on (large) bags or streams of tuples. In contrast to
+ the standard Pig Latin approach which requires to perform an expensive `GROUP ALL` + `FOREACH GENERATE` the `ACCUMULATE`
+ operator uses the underlying `aggregate` transformation provided by the Spark/Flink backends. Usage:
+
+  ```
+  out = ACCUMULATE in GENERATE <ExprList> [ AS <Schema> ];
+  ```
+
+  Here, `<ExprList>` denotes a list of generator expressions as used in `FOREACH GENERATE`, but where each expression
+  represents an invocation of an aggregate function.
 
 ### MATERIALIZE ###
 
@@ -145,22 +155,23 @@ geoms = FOREACH raw GENERATE id, geometry("POINT("+x+" "+y+")") as geom;
 #### Spatial Join ####
 Two bags, `bag1` and `bag2` containing spatial fields as geometries, can be joined using spatial predicates:
 ```
-out = SPATIALJOIN bag1, bag2 ON <predicate>(geom1, geom2);
+out = SPATIAL_JOIN bag1, bag2 ON <predicate>(geom1, geom2);
 ```
 
 where `geom1` is of type `geometry` in `bag1` and `geom2` is of type `geometry` in `bag2`.
-Currently, two spatial predicates are supported:
-  * contains - `geom1` contains `geom2`
-  * intersects - `geom1` intersects with `geom2`
 
-Please note, although we defined the behavior of these predicates here, the actual meaning is determined by the implementing backend.
-
-#### Spatial Filter - *Not available yet - coming soon* ####
+#### Spatial Filter ####
 
 Filtering on a spatial column can be achieved by using a spatial filter operator:
 ```
-out = SPATIALFILTER in BY contains(geometry("POLYGON(...)", geom));
+out = SPATIAL_FILTER in BY contains(geom, geometry("POLYGON(...)"));
 ```
+
+*Note:* For spatial filter, the predicate is of the form `predicate(ref, geom-constructor)`, where
+
+  - `predicate` is one of `intersects`, `contains`, `containedBy`
+  - `ref` is a field reference in `in`
+  - `geom-constructor` is an expression from which a geometry can be constructed
 
 #### Indexing ####
 The spatial spark extension supports indexed data sets. To create an index for a bag, simply use the `INDEX` operator:

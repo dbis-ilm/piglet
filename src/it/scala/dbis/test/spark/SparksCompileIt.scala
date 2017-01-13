@@ -23,14 +23,14 @@ import org.scalatest.FlatSpec
 class SparksCompileIt extends FlatSpec with CompileIt {
   val scripts = Table(
    ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
-    ("stream_load.pig",  "result1.out",   "truth/result1.data",   false, "pig", "sparks"),
-    ("stream_load2.pig", "result2.out",   "truth/result2.data",   false, "pig", "sparks"),
-    ("stream_foreach1.pig", "distances.out", "truth/distances.data", false, "pig", "sparks"),
-    ("stream_filter.pig", "filtered.out",  "truth/filtered.data",  false, "pig", "sparks"),
-/*    ("construct.pig",     "result3.out", "truth/construct.data",   false, "pig", "sparks"),
-    ("union.pig",         "united.out",    "truth/united.data",    false, "pig", "sparks"),
-    ("aggregate.pig",     "aggregate.out", "truth/aggregate2.data",false, "pig", "sparks"),*/
-    ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false, "pig", "sparks"),
+    ("stream_load.pig",  "result1.out",   "truth/result1.data",   false, "streaming", "sparks"),
+    ("stream_load2.pig", "result2.out",   "truth/result2.data",   false, "streaming", "sparks"),
+    ("stream_foreach1.pig", "distances.out", "truth/distances.data", false, "streaming", "sparks"),
+    ("stream_filter.pig", "filtered.out",  "truth/filtered.data",  false, "streaming", "sparks"),
+/*    ("construct.pig",     "result3.out", "truth/construct.data",   false, "streaming", "sparks"),
+    ("union.pig",         "united.out",    "truth/united.data",    false, "streaming", "sparks"),
+    ("aggregate.pig",     "aggregate.out", "truth/aggregate2.data",false, "streaming", "sparks"),*/
+    ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false, "streaming", "sparks"),
     ("windowJoin.pig",    "joinedW.out",   "truth/joined.data",    false, "streaming", "sparks"),
 //    ("windowCross.pig",   "crossedW.out",  "truth/crossed.data",   false, "streaming", "sparks"),
     ("windowGrouping.pig","grouping.out",  "truth/grouping.data",  false, "streaming", "sparks"),

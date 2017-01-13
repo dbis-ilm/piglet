@@ -9,8 +9,6 @@ the official Pig compiler for Hadoop or its extensions such as PigSpork. Instead
  * Though, we are aiming at being compatible to the original Pig compiler we plan to integrate extensiblity features
    allowing to define and use user-defined operators (not only UDFs) and in this way being able to integrate extensions
    for graph processing or machine learning.
- * Finally, it is also a nice exercise in Scala programming resulting in a more compact code simplifying maintenance
-   and extensibility.
 
 ### Installation ###
 
@@ -79,8 +77,6 @@ The following options are supported:
     * `flinks`: Apache Flink Streaming
     * `mapreduce`: Apache Hadoop (by simply passing the script to the original Pig compiler)
  * `--backend_dir dir`
- * `--languages l` specifies the language dialects accepted by the parser: pig (standard Pig), sparql (pig + SPARQL extensions),
-                  streaming (Pig + data stream extensions), cep (Pig + complex event processing extensions), all (all extensions)
  * `--params key=value, ...`
  * `--update-config`
  * `--show-plan` Print the resulting dataflow plan

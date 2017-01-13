@@ -19,15 +19,15 @@ package dbis.cep.test.flink
 
 import java.io.File
 
-import dbis.pig.backends.{ Record, SchemaClass }
+import dbis.piglet.backends.{ Record, SchemaClass }
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.scalatest._
 import org.apache.commons.io.FileUtils
 import org.apache.flink.api.scala._
-import dbis.pig.cep.nfa._
-import dbis.pig.cep.ops.SelectionStrategy._
-import dbis.pig.cep.ops.OutputStrategy._
-import dbis.pig.cep.flink.CustomDataStreamMatcher._
+import dbis.piglet.cep.nfa._
+import dbis.piglet.cep.ops.SelectionStrategy._
+import dbis.piglet.cep.ops.OutputStrategy._
+import dbis.piglet.cep.flink.CustomDataStreamMatcher._
 import scala.collection.mutable.ArrayBuffer
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow
 import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows
@@ -76,24 +76,28 @@ class FlinkStreamingCEPTest extends FlatSpec with Matchers with BeforeAndAfterEa
       
   "Flink Streaming CEP" should "detect the pattern SEQ(A, B, C) with first match" in {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurStreamingNFA.createNFA, env, FirstMatch)
   }
 
   it should "detect the pattern SEQ(A, B, C) with any match" in {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurStreamingNFA.createNFA, env, AllMatches)
   }
 
   it should "detect the pattern SEQ(A, B, C) with next match" in {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurStreamingNFA.createNFA, env, NextMatches)
   }
 
   it should "detect the pattern SEQ(A, B, C) with contiguity match" in {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
     val data = env.fromCollection(sample)
     val res = data.matchNFA(OurStreamingNFA.createNFA, env, ContiguityMatches)
   }

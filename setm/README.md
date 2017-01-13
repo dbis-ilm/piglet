@@ -7,7 +7,7 @@ Simply wrap the timing function around the piece of code that you would like to
 monitor:
 
 ```Scala
-import de.tuilmenau.setm.SETM._
+import dbis.setm.SETM._
 
 object Main {
   def greeting(s: String) = timing("greeting func") {

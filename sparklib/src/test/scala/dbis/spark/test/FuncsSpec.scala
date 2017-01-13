@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package dbis.pig.backends.spark.test
+package dbis.piglet.backends.spark.test
 
-import dbis.pig.backends.spark.PigFuncs
+import dbis.piglet.backends.spark.PigFuncs
 import org.scalatest._
 
 class FuncsSpec extends FlatSpec with Matchers {

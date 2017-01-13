@@ -1,8 +1,8 @@
 // ----------------- header declaration ----------------- 
 init_code(additional_imports) ::= <<
 import org.apache.flink.streaming.api.scala._
-import dbis.pig.backends.flink._
-import dbis.pig.backends.flink.streaming._
+import dbis.piglet.backends.flink._
+import dbis.piglet.backends.flink.streaming._
 import java.util.concurrent.TimeUnit
 import org.apache.flink.util.Collector
 import org.apache.flink.streaming.api.windowing.assigners._
@@ -11,7 +11,7 @@ import org.apache.flink.streaming.api.windowing.time._
 import org.apache.flink.streaming.api.windowing.triggers._
 import org.apache.flink.streaming.api.windowing.windows._
 import org.apache.flink.streaming.api.TimeCharacteristic
-import dbis.pig.backends.{SchemaClass, Record}
+import dbis.piglet.backends.{SchemaClass, Record}
 <if (additional_imports)>
 <additional_imports>
 <endif>

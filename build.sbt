@@ -7,13 +7,13 @@ libraryDependencies ++= Dependencies.rootDeps
 
 libraryDependencies ++= itDeps
 
-mainClass in (Compile, packageBin) := Some("dbis.pig.PigletREPL")
+mainClass in (Compile, packageBin) := Some("dbis.piglet.PigletREPL")
 
-mainClass in (Compile, run) := Some("dbis.pig.PigletREPL")
+mainClass in (Compile, run) := Some("dbis.piglet.PigletREPL")
 
 assemblyJarName in assembly := "piglet.jar"
 
-mainClass in assembly := Some("dbis.pig.Piglet")
+mainClass in assembly := Some("dbis.piglet.Piglet")
 
 test in assembly := {}
 
@@ -39,7 +39,7 @@ testOptions in IntegrationTest := Seq(
 	Tests.Argument("-oDF")
 )
 
-coverageExcludedPackages := "<empty>;dbis.pig.Piglet;dbis.pig.plan.rewriting.internals.MaterializationSupport;dbis.pig.plan.rewriting.internals.WindowSupport"
+coverageExcludedPackages := "<empty>;dbis.piglet.Piglet;dbis.piglet.plan.rewriting.internals.MaterializationSupport;dbis.piglet.plan.rewriting.internals.WindowSupport"
 
 sourcesInBase := false
 EclipseKeys.skipParents in ThisBuild := false  // to enable piglet (parent not only children) eclispe import
