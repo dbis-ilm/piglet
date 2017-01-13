@@ -61,7 +61,7 @@ class DataflowProfiler(private val url: Option[URI]) extends PigletLogging {
     val result = scalaj.http.Http(u.toString()).asString
       
     if(result.isError) {
-      logger.warn(s"Could not retreive exectimes for $lineage: ${result.statusLine}")
+//      logger.warn(s"Could not retreive exectimes for $lineage: ${result.statusLine}")
       return None
     }
     

@@ -14,16 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.pig.plan
+package dbis.piglet.plan
 
-import dbis.pig.op._
-import dbis.pig.op.cmd._
-import dbis.pig.expr._
-import dbis.pig.plan.rewriting.Rewriter
-import dbis.pig.schema.{Types, PigType, Schema, SchemaException}
-import dbis.pig.udf.{UDFTable, UDF}
+import dbis.piglet.op._
+import dbis.piglet.op.cmd._
+import dbis.piglet.expr._
+import dbis.piglet.plan.rewriting.Rewriter
+import dbis.piglet.schema.{Types, PigType, Schema, SchemaException}
+import dbis.piglet.udf.{UDFTable, UDF}
 import scala.collection.mutable.{ListBuffer, Map}
-import dbis.pig.tools.logging.PigletLogging
+import dbis.piglet.tools.logging.PigletLogging
+import dbis.piglet.tools.BreadthFirstTopDownWalker
+import dbis.piglet.tools.TopoSort
 
 
 
@@ -107,6 +109,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
      *    Instead, for REGISTER and DEFINE we add their arguments to the additionalJars list and udfAliases map
      */
     ops.filter(_.isInstanceOf[RegisterCmd]).foreach(op => additionalJars += op.asInstanceOf[RegisterCmd].jarFile)
+    
     ops.filter(_.isInstanceOf[DefineCmd]).foreach { op =>
       val defineOp = op.asInstanceOf[DefineCmd]
       udfAliases += (defineOp.alias ->(defineOp.scalaName, defineOp.paramList))
@@ -418,7 +421,10 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    *
    * @param tab the number of whitespaces for indention
    */
-  def printPlan(tab: Int = 0): Unit = operators.foreach(_.printOperator(tab))
+  def printPlan(tab: Int = 0): Unit = {
+//    operators.foreach(_.printOperator(tab))
+    TopoSort.sort(this).foreach(_.printOperator(tab))
+  }
 
    /**
    * Swaps two successive operators in the dataflow plan. Both operators are unary operators and have to be already

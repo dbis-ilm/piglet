@@ -40,15 +40,12 @@ abstract class PigOperator(
   
   def this(out: Pipe, in: Pipe) = this(List(out), List(in), None)
   
+  def this(out: Pipe, in: Pipe, schema: Option[Schema]) = this(List(out), List(in), schema)
+  
   /**
    * A map of key-value pairs representing operator-specific parameters.
    */
   var configParams: Map[String, Any] = Map()
-
-  /**
-   * The (optional) schema describing the output produced by the operator.
-   */
-//  var schema: Option[Schema] = None
 
   /**
    * Getter method for the output pipes.
@@ -66,8 +63,19 @@ abstract class PigOperator(
   def outputs_=(o: List[Pipe]) {
     _outputs = o
     // 1. make sure we don't have multiple pipes with the same name
-    if (_outputs.map(p => p.name).distinct.size != _outputs.size)
-      throw InvalidPlanException("duplicate pipe names")
+    if (_outputs.map(p => p.name).distinct.size != _outputs.size) {
+      
+      // find the duplicate name
+      val duplicates = _outputs.map(_.name).groupBy(identity).collect{ case (x, List(_,_,_*)) => x}
+      
+      throw InvalidPlanException(s"""
+        |duplicate pipe names: ${duplicates.mkString(" and ")}
+        | in new outputs for $this
+        | outputs is = ${_outputs}
+      """.stripMargin
+        
+      )
+    }
 
     // 2. make sure that we are producer in all pipes
     _outputs.foreach(p => {
