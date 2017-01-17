@@ -6,12 +6,11 @@ import dbis.piglet.plan.PipeNameGenerator
 case class TimingOp (
     private[op] val out: Pipe, 
     private[op] val in: Pipe, 
-    operatorId: String) extends PigOperator(out, in, schema = in.inputSchema) {
-  
+    operatorId: String) extends PigOperator(out, in, in.producer.schema ) {
   
   override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"TIMING { out = ${outPipeName} , in = ${inPipeNames.mkString(",")} }")
-    println(indent(tab + 2) + "schema = " + inputSchema)
+    println(indent(tab)+s"TIMING { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")}")
+    println(indent(tab + 2) + "schema = " + schema)
   }
   
   override def equals(other: Any) = other match {
@@ -22,7 +21,7 @@ case class TimingOp (
   override def hashCode() = operatorId.hashCode()
   
   
-  
+  override def toString() = s"TIMING { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")}, schema = $schema }"
   
 //  override def lineageString: String = {
 //    s"""TIMING%%""" + super.lineageString

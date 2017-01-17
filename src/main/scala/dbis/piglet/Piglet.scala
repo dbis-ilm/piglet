@@ -161,7 +161,7 @@ object Piglet extends PigletLogging {
       // don't print full stack trace to error
       case e: Exception =>
         logger.error(s"An error occured: ${e.getMessage}")
-        logger.debug(e.getMessage, e)
+        logger.debug("Stackstrace: ", e)
     }
   }
 
@@ -270,6 +270,14 @@ object Piglet extends PigletLogging {
       }
 
       try {
+    	  newPlan.checkConsistency
+      } catch {
+        case e: InvalidPlanException => {
+      	  logger.error(s"inconsistent plan in ${e.getMessage}")
+      	  return
+        }
+      }
+      try {
         // if this does _not_ throw an exception, the schema is ok
         newPlan.checkSchemaConformance
       } catch {
@@ -278,6 +286,7 @@ object Piglet extends PigletLogging {
           return
         }
       }
+      
 
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")

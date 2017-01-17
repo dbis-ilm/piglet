@@ -7,8 +7,7 @@ import dbis.piglet.codegen.CodeGenContext
 
 class TimingEmitter extends CodeEmitter[TimingOp] {
   override def template = """val <out> = <in>.mapPartitionsWithIndex{ case (idx,iter) => 
-    |  val time = System.currentTimeMillis
-    |  val jsonString = s" { \"id\": \"$idx\" , \"time\": \"$time\" } " 
+    |  val jsonString = s" { 'id': '$idx' , 'time': '${System.currentTimeMillis}', 'lineage': '<lineage>' } " 
     |  val result = scalaj.http.Http(url+"/times").postData(jsonString).header("Content-Type", "application/json").header("Charset","UTF-8").asString
     |  iter
     \}""".stripMargin

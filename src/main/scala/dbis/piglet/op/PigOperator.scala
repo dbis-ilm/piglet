@@ -107,11 +107,11 @@ abstract class PigOperator(
 
   def outPipeName: String = if (outputs.nonEmpty) outputs.head.name else ""
 
-  def outPipeNames: List[String] = outputs.map(p => p.name)
+  def outPipeNames: List[String] = outputs.map(_.name)
 
   def inPipeName: String = if (inputs.nonEmpty) inputs.head.name else ""
 
-  def inPipeNames: List[String] = inputs.map(p => p.name)
+  def inPipeNames: List[String] = inputs.map(_.name)
 
   /**
    * Checks whether the pipe names are valid identifiers. If not an exception is raised.

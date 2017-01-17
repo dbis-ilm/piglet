@@ -182,6 +182,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
     val sortedOps = TopoSort.sort(plan)
       
     sortedOps.foreach { op =>
+//    for(op <- plan.operators) {
       
       try {
         
@@ -193,8 +194,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
         
       } catch {
       case e: CodeGenException => 
-        
-        plan.printPlan(2)
+        op.printOperator(2)
         throw new CodeGenException(s"error producing code for $op", e)
       }
     }

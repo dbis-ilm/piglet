@@ -15,6 +15,7 @@ import dbis.piglet.op.PigOperator
 import dbis.piglet.op.PigOperator
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.Map
+import dbis.piglet.tools.logging.PigletLogging
 
 /**
  * A general trait to be implemented by all walkers
@@ -149,7 +150,7 @@ class DepthFirstTopDownWalker extends Walker[PigOperator] {
   }
 }
 
-object TopoSort {
+object TopoSort extends PigletLogging {
 	
   def sort(plan: DataflowPlan) = {
     
@@ -161,15 +162,21 @@ object TopoSort {
     while(s.nonEmpty) {
       val n = s.dequeue()
       
-      l.append(n)
-      
+      if(!l.contains(n))
+    	  l.append(n)
+    	else {
+    	  logger.warn(s"$n was already added to result list before!")
+    	}
+    	  
       for(consumer <- n.outputs.flatMap(_.consumer)) {
         
         m(consumer) += 1
         if(m(consumer) >= consumer.inputs.size)
           s.enqueue(consumer)
       }
+     
     }
+    
     l
   }
 }

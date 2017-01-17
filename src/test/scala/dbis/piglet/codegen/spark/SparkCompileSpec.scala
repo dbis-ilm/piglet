@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package dbis.test.spark
+package dbis.piglet.codegen.spark
 
 import java.net.URI
 
@@ -31,7 +31,6 @@ import dbis.piglet.expr._
 
 import dbis.piglet.codegen.CodeGenContext
 import dbis.piglet.codegen.CodeGenTarget
-import dbis.piglet.codegen.spark.SparkCodeGenStrategy
 import dbis.piglet.parser.PigParser.parseScript
 
 import dbis.piglet.plan.DataflowPlan
@@ -40,7 +39,11 @@ import dbis.piglet.plan.rewriting.Rules
 import dbis.piglet.schema._
 import dbis.piglet.tools.CodeMatchers
 import dbis.piglet.tools.TestTools.strToUri
+import dbis.piglet.plan.rewriting.Rewriter
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
+//@RunWith(classOf[JUnitRunner])
 class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
 
   override def beforeAll()  {
@@ -488,6 +491,72 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
   }
 
+  it should "insert timing for join" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
+    ctx.set("tuplePrefix", "t")
+    JoinEmitter.joinKeyVars.clear() // make sure we start generated names with a
+
+    val s = """triples = RDFLOAD('$rdffile');
+              |<%
+              |def changeToDouble(str: String) : Double = {
+              |var s = str.replace("\"","")
+              |var v = s.toDouble
+              |return v
+              |}
+              |%>
+              |
+              |proc1 = FILTER triples by predicate == "<http://knoesis.wright.edu/ssw/ont/sensor-observation.owl#procedure>";
+              |typ1 = FILTER triples by predicate == "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>" AND object == "<http://knoesis.wright.edu/ssw/ont/weather.owl#RainfallObservation>";
+              |
+              |res1 = FILTER triples by predicate == "<http://knoesis.wright.edu/ssw/ont/sensor-observation.owl#result>";
+              |floatValue2 = FILTER triples by predicate == "<http://knoesis.wright.edu/ssw/ont/sensor-observation.owl#floatValue>";
+              |
+              |uom2 = FILTER triples by predicate == "<http://knoesis.wright.edu/ssw/ont/sensor-observation.owl#uom>";
+              |
+              |out100 = JOIN proc1 by subject, typ1 by subject, res1 by subject;
+              |out1= FOREACH out100 GENERATE proc1::subject as subject, proc1::object as sensor, res1::object as result;
+              |
+              |out200 = JOIN floatValue2 by subject, uom2 by subject;
+              |out2 = FOREACH out200 GENERATE floatValue2::subject as subject, floatValue2::object as val, uom2::object as uom ;
+              |
+              |out300 = JOIN out1 by result, out2 by subject;
+              |out3 = FOREACH out300 GENERATE out1::subject as subject, out1::sensor as sensor, out2::val as val, out2::uom as uom;
+              |
+              |out400 = FILTER out3 by isInRange(subject) == true;
+              |out40 = FOREACH out400 GENERATE sensor, val, uom;
+              |out4 = DISTINCT out40;
+              |
+              |dump out4;""".stripMargin
+    
+    
+//    val ops = parseScript(
+//      """triples = RDFLOAD('$rdffile');
+//        |proc1 = FILTER triples by predicate == "<http://knoesis.wright.edu/ssw/ont/sensor-observation.owl#procedure>";
+//        |floatValue2 = FILTER triples by predicate == "<http://knoesis.wright.edu/ssw/ont/sensor-observation.owl#floatValue>";
+//        |out1= FOREACH proc1 GENERATE subject, object as result;
+//        |out2 = FOREACH floatValue2 GENERATE subject, object as uom ;
+//        |j = join out1 by result, out2 by subject;
+//        |""".stripMargin)
+
+    
+    val ops = parseScript(s)
+    
+    val newPlan = Rewriter.insertTimings(new DataflowPlan(ops))
+        
+    val joinOp = newPlan.findOperatorForAlias("out300").get.inputs.head.producer
+    
+    joinOp.printOperator(0)
+    println(joinOp)
+    
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, joinOp))
+    println(generatedCode)
+    
+    println(s"inputSchema: ${joinOp.inputSchema}")
+    println(s"schema: ${joinOp.schema}")
+    println(s"schemaString: ${joinOp.schemaToString}")
+    
+  }
+  
   it should "contain code for multiple joins" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     ctx.set("tuplePrefix", "t")

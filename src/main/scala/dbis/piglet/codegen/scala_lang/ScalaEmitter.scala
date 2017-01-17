@@ -76,7 +76,6 @@ object ScalaEmitter {
       else {
         val pos = ctx.schema.get.indexOfField(nf)
         if (pos == -1) {
-        	println(s"ctx schema ${ctx.schema.get}")
           throw new CodeGenException(s"invalid field name $nf (field position not found)")
         }
         s"${ctx.asString("tuplePrefix")}._$pos" // s"$tuplePrefix.$f"
