@@ -187,7 +187,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
       try {
         
         val generatedCode = codeGen.emitNode(
-            CodeGenContext(ctx, Map("schema" -> op.schema, "tuplePrefix" -> "t")), 
+            CodeGenContext(ctx, Map("schema" -> op.schema, "tuplePrefix" -> "t")),
             op)
   
         code =  code + generatedCode + "\n"

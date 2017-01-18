@@ -42,6 +42,8 @@ import dbis.piglet.tools.TestTools.strToUri
 import dbis.piglet.plan.rewriting.Rewriter
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
+import dbis.piglet.tools.TopoSort
+import dbis.piglet.codegen.CodeGenerator
 
 //@RunWith(classOf[JUnitRunner])
 class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
@@ -497,14 +499,6 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     JoinEmitter.joinKeyVars.clear() // make sure we start generated names with a
 
     val s = """triples = RDFLOAD('$rdffile');
-              |<%
-              |def changeToDouble(str: String) : Double = {
-              |var s = str.replace("\"","")
-              |var v = s.toDouble
-              |return v
-              |}
-              |%>
-              |
               |proc1 = FILTER triples by predicate == "<http://knoesis.wright.edu/ssw/ont/sensor-observation.owl#procedure>";
               |typ1 = FILTER triples by predicate == "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>" AND object == "<http://knoesis.wright.edu/ssw/ont/weather.owl#RainfallObservation>";
               |
@@ -528,33 +522,28 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
               |
               |dump out4;""".stripMargin
     
-    
-//    val ops = parseScript(
-//      """triples = RDFLOAD('$rdffile');
-//        |proc1 = FILTER triples by predicate == "<http://knoesis.wright.edu/ssw/ont/sensor-observation.owl#procedure>";
-//        |floatValue2 = FILTER triples by predicate == "<http://knoesis.wright.edu/ssw/ont/sensor-observation.owl#floatValue>";
-//        |out1= FOREACH proc1 GENERATE subject, object as result;
-//        |out2 = FOREACH floatValue2 GENERATE subject, object as uom ;
-//        |j = join out1 by result, out2 by subject;
-//        |""".stripMargin)
-
-    
     val ops = parseScript(s)
     
-    val newPlan = Rewriter.insertTimings(new DataflowPlan(ops))
-        
+    val newPlan = Rewriter.insertTimings(Rewriter.rewritePlan(new DataflowPlan(ops)))
+    
     val joinOp = newPlan.findOperatorForAlias("out300").get.inputs.head.producer
+    val schema1 = newPlan.findOperatorForAlias("out1").get.inputs.head.producer.schema.get
+    val schema2 = newPlan.findOperatorForAlias("out2").get.inputs.head.producer.schema.get
     
-    joinOp.printOperator(0)
-    println(joinOp)
+    // make sure that the schema is correct
+    joinOp.inputs.map(_.producer.schema.get) should contain only (schema1, schema2)
     
+    // check if code is generated - especially for that operator that used to cause trouble
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, joinOp))
-    println(generatedCode)
+
+    // check if we can generate code for _all_ operators
+    TopoSort.sort(newPlan).foreach(codeGenerator.emitNode(ctx, _))
     
-    println(s"inputSchema: ${joinOp.inputSchema}")
-    println(s"schema: ${joinOp.schema}")
-    println(s"schemaString: ${joinOp.schemaToString}")
     
+    val gen = new CodeGenerator(codeGenerator)
+    
+    val code = gen.generate("testscript", newPlan, Some(new java.net.URI("http://localhost:9000/")))
+    println(code)
   }
   
   it should "contain code for multiple joins" in {

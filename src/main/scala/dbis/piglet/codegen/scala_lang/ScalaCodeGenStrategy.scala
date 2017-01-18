@@ -35,7 +35,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
   val target = CodeGenTarget.Unknown
 
 //  val pkg = "dbis.piglet.op"
-//  def emitters[O <: PigOperator]: Map[String, CodeEmitter[PigOperator]] = Map[String, CodeEmitter[PigOperator]](
+//  val emitters = Map[String, CodeEmitter[PigOperator]](
 //    s"$pkg.Load" -> new LoadEmitter,
 //    s"$pkg.Filter" -> new FilterEmitter,
 //    s"$pkg.Limit" -> new LimitEmitter,
@@ -66,7 +66,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
 
   def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
     val em = op match {
-      case _: Load => new LoadEmitter
+      case _: Load => LoadEmitter.instance
       case _: Filter => new FilterEmitter
       case _: Limit => new LimitEmitter
       case _: Foreach => new ForeachEmitter
