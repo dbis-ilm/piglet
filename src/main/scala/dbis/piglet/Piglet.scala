@@ -109,10 +109,10 @@ object Piglet extends PigletLogging {
     if(c.profiling.isDefined) {
       val reachable = FileTools.checkHttpServer(c.profiling.get)
 
-      if(! reachable) {
-        logger.error(s"Statistics management server is not reachable at ${c.profiling.get}. Aborting")
-        return
-      }
+//      if(! reachable) {
+//        logger.error(s"Statistics management server is not reachable at ${c.profiling.get}. Aborting")
+//        return
+//      }
     }
 
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
