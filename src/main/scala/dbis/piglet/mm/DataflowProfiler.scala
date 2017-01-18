@@ -92,7 +92,7 @@ class DataflowProfiler(private val url: Option[URI]) extends PigletLogging {
 
       logger.debug( s"""checking storage service for runtime information for operator "${op.lineageSignature}" """)
       // check for the current operator, if we have some runtime/stage information 
-      val avg: Option[(Long, Long)] = getExectimes(op.lineageSignature) 
+      val avg: Option[(Long, Long)] = None //getExectimes(op.lineageSignature) 
 
       // if we have information, create a (potential) materialization point
       if (avg.isDefined) {
