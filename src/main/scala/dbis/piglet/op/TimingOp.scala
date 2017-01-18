@@ -14,11 +14,11 @@ case class TimingOp (
   }
   
   override def equals(other: Any) = other match {
-    case o: TimingOp => operatorId == o.operatorId  
+    case o: TimingOp => (operatorId == o.operatorId && outPipeName == o.outPipeName)  
     case _ => false
   }
   
-  override def hashCode() = operatorId.hashCode()
+  override def hashCode() = (operatorId+outPipeName).hashCode()
   
   
   override def toString() = s"TIMING { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")}, schema = $schema }"

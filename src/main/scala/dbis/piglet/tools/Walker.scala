@@ -164,9 +164,6 @@ object TopoSort extends PigletLogging {
       
       if(!l.contains(n))
     	  l.append(n)
-    	else {
-    	  logger.warn(s"$n was already added to result list before!")
-    	}
     	  
       for(consumer <- n.outputs.flatMap(_.consumer)) {
         
@@ -175,6 +172,13 @@ object TopoSort extends PigletLogging {
           s.enqueue(consumer)
       }
      
+    }
+
+    if(l.size != plan.operators.size) {
+      println(s"l: ${l.size}  vs ops ${plan.operators.size}")
+      val diff = plan.operators.diff(l)
+      diff.foreach(println)
+    	throw new IllegalStateException("we lost some operators")
     }
     
     l
