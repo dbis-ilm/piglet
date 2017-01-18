@@ -31,3 +31,7 @@ class StreamOpEmitter extends CodeEmitter[StreamOp] {
         "params" -> ScalaEmitter.emitParamList(CodeGenContext(ctx, Map("schema" -> op.schema)), op.params)))
   }
 }
+
+object StreamOpEmitter {
+	lazy val instance = new StreamOpEmitter
+}

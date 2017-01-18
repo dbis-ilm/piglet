@@ -13,30 +13,25 @@ import dbis.piglet.plan.DataflowPlan
 
 class FlinkStreamingCodeGenStrategy extends FlinkCodeGenStrategy {
   override val target = CodeGenTarget.FlinkStreaming
-  //  override val emitters = super.emitters + (
-  //    s"$pkg.Load" -> new FlinkStreamingLoadEmitter,
-  //    s"$pkg.Dump" -> new FlinkStreamingDumpEmitter,
-  //    s"$pkg.Store" -> new FlinkStreamingStoreEmitter
-  //  )
 
   override def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
 
     val emitter = op match {
-      case _: Load => new StreamLoadEmitter
-      case _: Store => new StreamStoreEmitter
-      case _: SocketRead => new SocketReadEmitter
-      case _: SocketWrite => new SocketWriteEmitter
-      case _: Filter => new StreamFilterEmitter
-      case _: Foreach => new StreamForeachEmitter
-      case _: Grouping => new StreamGroupingEmitter
-      case _: OrderBy => new StreamOrderByEmitter
-      case _: Accumulate => new StreamAccumulateEmitter
-      case _: Join => new StreamJoinEmitter
-      case _: Cross => new StreamCrossEmitter
-      case _: Window => new StreamWindowEmitter
-      case _: WindowApply => new StreamWindowApplyEmitter
-      case _: Distinct => new StreamDistinctEmitter
-      case _: Sample => new StreamSampleEmitter
+      case _: Load => StreamLoadEmitter.instance
+      case _: Store => StreamStoreEmitter.instance
+      case _: SocketRead => SocketReadEmitter.instance
+      case _: SocketWrite => SocketWriteEmitter.instance
+      case _: Filter => StreamFilterEmitter.instance
+      case _: Foreach => StreamForeachEmitter.instance
+      case _: Grouping => StreamGroupingEmitter.instance
+      case _: OrderBy => StreamOrderByEmitter.instance
+      case _: Accumulate => StreamAccumulateEmitter.instance
+      case _: Join => StreamJoinEmitter.instance
+      case _: Cross => StreamCrossEmitter.instance
+      case _: Window => StreamWindowEmitter.instance
+      case _: WindowApply => StreamWindowApplyEmitter.instance
+      case _: Distinct => StreamDistinctEmitter.instance
+      case _: Sample => StreamSampleEmitter.instance
       case _ => super.emitterForNode(op)
     }
 

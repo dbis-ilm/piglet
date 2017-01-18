@@ -26,3 +26,7 @@ class StoreEmitter extends CodeEmitter[Store] {
   }
 
 }
+
+object StoreEmitter {
+	lazy val instance = new StoreEmitter
+}

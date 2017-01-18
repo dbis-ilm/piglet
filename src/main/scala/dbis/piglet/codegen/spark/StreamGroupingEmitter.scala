@@ -25,3 +25,7 @@ class StreamGroupingEmitter extends GroupingEmitter {
                                     |    val <out> = <in>.transform(rdd => rdd.coalesce(1).glom.map(t => <class>("all", t)))
                                     |<endif>""".stripMargin
 }
+
+object StreamGroupingEmitter {
+	lazy val instance = new StreamGroupingEmitter
+}

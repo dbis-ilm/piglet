@@ -64,3 +64,7 @@ class JoinEmitter extends dbis.piglet.codegen.scala_lang.JoinEmitter {
         "fields" -> fieldList.mkString(", ")))
   }
 }
+
+object JoinEmitter {
+	lazy val instance = new JoinEmitter
+}

@@ -8,3 +8,7 @@ import dbis.piglet.codegen.scala_lang.LoadEmitter
 class StreamLoadEmitter extends LoadEmitter {
   override def template: String = """    val <out> = <func>[<class>]().loadStream(ssc, "<file>", <extractor><if (params)>, <params><endif>)""".stripMargin
 }
+
+object StreamLoadEmitter {
+	lazy val instance = new StreamLoadEmitter
+}

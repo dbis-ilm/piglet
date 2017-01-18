@@ -28,3 +28,7 @@ class LoadEmitter extends CodeEmitter[Load] {
   }
 
 }
+
+object LoadEmitter {
+  lazy val instance = new LoadEmitter
+}

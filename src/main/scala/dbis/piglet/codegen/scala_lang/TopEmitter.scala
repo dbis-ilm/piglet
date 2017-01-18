@@ -129,3 +129,7 @@ class TopEmitter extends CodeEmitter[Top] {
   }
 
 }
+
+object TopEmitter {
+	lazy val instance = new TopEmitter
+}

@@ -128,3 +128,7 @@ class StreamAccumulateEmitter extends dbis.piglet.codegen.scala_lang.AccumulateE
     render(params.toMap)
   }
 }
+
+object StreamAccumulateEmitter {
+	lazy val instance = new StreamAccumulateEmitter
+}

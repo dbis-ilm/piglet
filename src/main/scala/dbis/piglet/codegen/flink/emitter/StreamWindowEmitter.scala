@@ -65,3 +65,7 @@ class StreamWindowEmitter extends CodeEmitter[Window] {
     }
   }
 }
+
+object StreamWindowEmitter {
+	lazy val instance = new StreamWindowEmitter
+}

@@ -29,3 +29,7 @@ class StreamFilterEmitter extends CodeEmitter[Filter] {
       "pred" -> ScalaEmitter.emitPredicate(CodeGenContext(ctx, Map[String, Any]("schema" -> op.schema)), op.pred)))
   }
 }
+
+object StreamFilterEmitter {
+	lazy val instance = new StreamFilterEmitter
+}

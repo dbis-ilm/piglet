@@ -31,3 +31,7 @@ class SpatialFilterEmitter extends CodeEmitter[SpatialFilter] {
         ))
   
 }
+
+object SpatialFilterEmitter {
+	lazy val instance = new SpatialFilterEmitter
+}

@@ -9,3 +9,7 @@ import dbis.piglet.codegen.scala_lang.StoreEmitter
 class StreamStoreEmitter extends StoreEmitter {
   override def template: String = """    <func>[<class>]().writeStream("<file>", <in><if (params)>, <params><endif>)""".stripMargin
 }
+
+object StreamStoreEmitter {
+	lazy val instance = new StreamStoreEmitter
+}

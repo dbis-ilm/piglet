@@ -14,3 +14,7 @@ class DistinctEmitter extends CodeEmitter[Distinct] {
         render(Map("out" -> op.outPipeName, "in" -> op.inPipeName))
 
 }
+
+object DistinctEmitter {
+  lazy val instance = new DistinctEmitter
+}

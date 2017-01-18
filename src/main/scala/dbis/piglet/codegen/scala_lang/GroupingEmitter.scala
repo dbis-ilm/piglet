@@ -44,3 +44,8 @@ class GroupingEmitter extends CodeEmitter[Grouping] {
   }
 
 }
+
+
+object GroupingEmitter {
+  lazy val instance = new GroupingEmitter
+}

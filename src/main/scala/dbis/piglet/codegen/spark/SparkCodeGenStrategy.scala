@@ -39,10 +39,10 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
   
   override def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
     val emitter = op match {
-      case _: SpatialFilter => new SpatialFilterEmitter
-      case _: SpatialJoin => new SpatialJoinEmitter
-      case _: IndexOp => new SpatialIndexEmitter
-      case _: Partition => new PartitionerEmitter
+      case _: SpatialFilter => SpatialFilterEmitter.instance
+      case _: SpatialJoin => SpatialJoinEmitter.instance
+      case _: IndexOp => SpatialIndexEmitter.instance
+      case _: Partition => PartitionerEmitter.instance
       case _ => super.emitterForNode(op)      
     }
   

@@ -91,3 +91,7 @@ class StreamWindowApplyEmitter extends CodeEmitter[WindowApply] {
           """.stripMargin
   }
 }
+
+object StreamWindowApplyEmitter {
+	lazy val instance = new StreamWindowApplyEmitter
+}

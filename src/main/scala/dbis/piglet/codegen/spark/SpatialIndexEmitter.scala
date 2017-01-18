@@ -20,3 +20,7 @@ class SpatialIndexEmitter extends CodeEmitter[IndexOp] {
                   else s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputSchema)), op.field)})"} 
     ) )
 }
+
+object SpatialIndexEmitter {
+	lazy val instance = new SpatialIndexEmitter
+}

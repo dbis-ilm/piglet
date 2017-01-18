@@ -50,3 +50,7 @@ class StreamGroupingEmitter extends GroupingEmitter {
 
   }
 }
+
+object StreamGroupingEmitter {
+	lazy val instance = new StreamGroupingEmitter
+}

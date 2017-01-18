@@ -113,4 +113,6 @@ class JoinEmitter extends CodeEmitter[Join] {
 
 object JoinEmitter {
   val joinKeyVars = Set[String]()
+  
+  lazy val instance = new JoinEmitter
 }

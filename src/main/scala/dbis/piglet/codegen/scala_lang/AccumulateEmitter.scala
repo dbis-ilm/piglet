@@ -136,3 +136,7 @@ class AccumulateEmitter extends CodeEmitter[Accumulate] {
     res
   }
 }
+
+object AccumulateEmitter {
+  lazy val instance = new AccumulateEmitter
+}

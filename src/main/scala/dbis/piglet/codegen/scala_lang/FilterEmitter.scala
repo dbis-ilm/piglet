@@ -14,3 +14,7 @@ class FilterEmitter extends CodeEmitter[Filter] {
           "in" -> op.inPipeName,
           "pred" -> ScalaEmitter.emitPredicate(CodeGenContext(ctx, Map[String,Any]("schema" -> op.schema)), op.pred)))
 }
+
+object FilterEmitter {
+  lazy val instance = new FilterEmitter
+}

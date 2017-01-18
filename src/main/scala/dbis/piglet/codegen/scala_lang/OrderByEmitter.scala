@@ -93,3 +93,10 @@ class OrderByEmitter extends CodeEmitter[OrderBy] {
   }
 
 }
+
+/**
+ * @author hg
+ */
+object OrderByEmitter {
+  lazy val instance = new OrderByEmitter
+}

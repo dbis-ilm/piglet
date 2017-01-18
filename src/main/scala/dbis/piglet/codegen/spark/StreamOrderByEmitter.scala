@@ -21,3 +21,7 @@ import dbis.piglet.codegen.scala_lang.OrderByEmitter
 class StreamOrderByEmitter extends OrderByEmitter {
   override def template: String = """    val <out> = <in>.transform(rdd => rdd.repartition(1).sortBy(t => <key>, <asc>))""".stripMargin
 }
+
+object StreamOrderByEmitter {
+	lazy val instance = new StreamOrderByEmitter
+}

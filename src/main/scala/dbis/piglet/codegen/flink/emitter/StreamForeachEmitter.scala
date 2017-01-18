@@ -144,3 +144,7 @@ class StreamForeachEmitter extends ForeachEmitter {
     return false
   }
 }
+
+object StreamForeachEmitter {
+	lazy val instance = new StreamForeachEmitter
+}

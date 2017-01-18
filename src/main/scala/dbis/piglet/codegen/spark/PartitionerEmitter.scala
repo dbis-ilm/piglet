@@ -29,3 +29,7 @@ class PartitionerEmitter extends CodeEmitter[Partition]  {
     
   }
 }
+
+object PartitionerEmitter {
+	lazy val instance = new PartitionerEmitter
+}

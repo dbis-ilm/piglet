@@ -18,3 +18,7 @@ class TimingEmitter extends CodeEmitter[TimingOp] {
       "in" -> op.inPipeName,
       "lineage" -> op.operatorId))
 }
+
+object TimingEmitter {
+	lazy val instance = new TimingEmitter
+}

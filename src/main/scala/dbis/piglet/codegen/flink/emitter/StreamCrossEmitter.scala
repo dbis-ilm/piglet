@@ -38,3 +38,7 @@ class StreamCrossEmitter extends CrossEmitter {
     render(params)
   }
 }
+
+object StreamCrossEmitter {
+	lazy val instance = new StreamCrossEmitter
+}

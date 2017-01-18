@@ -5,3 +5,7 @@ class StreamOpEmitter extends dbis.piglet.codegen.scala_lang.StreamOpEmitter {
                                     |    val <out> = <op>(env, <in>_helper<params>).map(t => <class>(<out_fields>))""".stripMargin
 
 }
+
+object StreamOpEmitter {
+	lazy val instance = new StreamOpEmitter
+}

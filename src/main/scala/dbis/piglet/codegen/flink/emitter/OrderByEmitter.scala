@@ -18,3 +18,7 @@ class OrderByEmitter extends dbis.piglet.codegen.scala_lang.OrderByEmitter {
     render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "key" -> key, "asc" -> orders))
   }
 }
+
+object OrderByEmitter {
+	lazy val instance = new OrderByEmitter
+}

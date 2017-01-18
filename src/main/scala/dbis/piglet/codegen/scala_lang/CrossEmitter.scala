@@ -65,3 +65,7 @@ class CrossEmitter extends CodeEmitter[Cross] {
   }
 
 }
+
+object CrossEmitter {
+  lazy val instance = new CrossEmitter
+}

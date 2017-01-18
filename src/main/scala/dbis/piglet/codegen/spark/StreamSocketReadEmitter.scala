@@ -48,3 +48,7 @@ class StreamSocketReadEmitter extends CodeEmitter[SocketRead] {
         render(paramMap)
   }
 }
+
+object StreamSocketReadEmitter {
+	lazy val instance = new StreamSocketReadEmitter
+}

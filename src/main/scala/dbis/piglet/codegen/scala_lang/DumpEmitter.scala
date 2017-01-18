@@ -13,3 +13,7 @@ class DumpEmitter extends CodeEmitter[Dump] {
   override def code(ctx: CodeGenContext, op: Dump): String = render(Map("in" -> op.inPipeName))
 
 }
+
+object DumpEmitter {
+  lazy val instance = new DumpEmitter 
+}

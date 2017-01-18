@@ -15,3 +15,8 @@ class SampleEmitter extends CodeEmitter[Sample] {
           "expr" -> ScalaEmitter.emitExpr(ctx, op.expr)))
 
 }
+
+
+object SampleEmitter {
+	lazy val instance = new SampleEmitter
+}

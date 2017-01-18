@@ -30,3 +30,7 @@ class SocketReadEmitter extends CodeEmitter[SocketRead] {
     render(paramMap)
   }
 }
+
+object SocketReadEmitter {
+	lazy val instance = new SocketReadEmitter
+}

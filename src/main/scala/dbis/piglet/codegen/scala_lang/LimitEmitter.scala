@@ -14,3 +14,7 @@ class LimitEmitter extends CodeEmitter[Limit] {
         render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "num" -> op.num))
 
 }
+
+object LimitEmitter {
+  lazy val instance = new LimitEmitter
+}

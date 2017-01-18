@@ -12,3 +12,7 @@ class StreamDistinctEmitter extends dbis.piglet.codegen.scala_lang.DistinctEmitt
     CodeEmitter.render(templateHelper, Map())
   }
 }
+
+object StreamDistinctEmitter {
+	lazy val instance = new StreamDistinctEmitter
+}

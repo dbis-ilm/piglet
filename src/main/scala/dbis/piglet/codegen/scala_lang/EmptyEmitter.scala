@@ -11,3 +11,7 @@ class EmptyEmitter extends CodeEmitter[Empty] {
 
   override def code(ctx: CodeGenContext, node: Empty): String = template
 }
+
+object EmptyEmitter {
+  lazy val instance = new EmptyEmitter
+}

@@ -18,23 +18,23 @@ import dbis.piglet.expr.Ref
 class FlinkCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.FlinkStreaming
   //  override val emitters = super.emitters + (
-  //    s"$pkg.Load" -> new FlinkLoadEmitter,
-  //    s"$pkg.Dump" -> new FlinkDumpEmitter,
-  //    s"$pkg.Store" -> new FlinkStoreEmitter
+  //    s"$pkg.Load" -> FlinkLoadEmitter.instance,
+  //    s"$pkg.Dump" -> FlinkDumpEmitter.instance,
+  //    s"$pkg.Store" -> FlinkStoreEmitter.instance
   //  )
 
   override def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
 
     val emitter = op match {
-      case _: Load => new LoadEmitter
-      case _: Dump => new DumpEmitter
-      case _: Store => new StoreEmitter
-      case _: Grouping => new GroupingEmitter
-      case _: OrderBy => new OrderByEmitter
-      case _: Join => new JoinEmitter
-      case _: Limit => new LimitEmitter
-      case _: StreamOp => new StreamOpEmitter
-      case _: Accumulate => new AccumulateEmitter
+      case _: Load => LoadEmitter.instance
+      case _: Dump => DumpEmitter.instance
+      case _: Store => StoreEmitter.instance
+      case _: Grouping => GroupingEmitter.instance
+      case _: OrderBy => OrderByEmitter.instance
+      case _: Join => JoinEmitter.instance
+      case _: Limit => LimitEmitter.instance
+      case _: StreamOp => StreamOpEmitter.instance
+      case _: Accumulate => AccumulateEmitter.instance
       case _ => super.emitterForNode(op)
     }
 

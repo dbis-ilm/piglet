@@ -169,3 +169,7 @@ class ForeachEmitter extends CodeEmitter[Foreach] {
   }
 
 }
+
+object ForeachEmitter {
+  lazy val instance = new ForeachEmitter
+}

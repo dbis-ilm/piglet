@@ -50,3 +50,7 @@ class AccumulateEmitter extends dbis.piglet.codegen.scala_lang.AccumulateEmitter
         "init_aggr_expr" -> initAggrFun, "more_aggr_expr" -> moreAggrFuns))
   }
 }
+
+object AccumulateEmitter {
+	lazy val instance = new AccumulateEmitter
+}

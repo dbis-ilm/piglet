@@ -50,14 +50,14 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
   override def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
     
     val emitter = op match {
-      case _: Load => new StreamLoadEmitter
-      case _: Dump => new StreamDumpEmitter
-      case _: Store => new StreamStoreEmitter
-      case _: Grouping => new StreamGroupingEmitter
-      case _: OrderBy => new StreamOrderByEmitter
-      case _: Distinct => new StreamDistinctEmitter
-      case _: Window => new StreamWindowEmitter
-      case _: SocketRead => new StreamSocketReadEmitter
+      case _: Load => StreamLoadEmitter.instance
+      case _: Dump => StreamDumpEmitter.instance
+      case _: Store => StreamStoreEmitter.instance
+      case _: Grouping => StreamGroupingEmitter.instance
+      case _: OrderBy => StreamOrderByEmitter.instance
+      case _: Distinct => StreamDistinctEmitter.instance
+      case _: Window => StreamWindowEmitter.instance
+      case _: SocketRead => StreamSocketReadEmitter.instance
       case _ => super.emitterForNode(op)
     }
     

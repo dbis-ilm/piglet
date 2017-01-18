@@ -56,3 +56,7 @@ class StreamJoinEmitter extends JoinEmitter {
         "fields" -> extractor._2))
   }
 }
+
+object StreamJoinEmitter {
+	lazy val instance = new StreamJoinEmitter
+}

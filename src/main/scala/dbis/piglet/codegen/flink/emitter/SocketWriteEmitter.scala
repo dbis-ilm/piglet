@@ -27,3 +27,7 @@ class SocketWriteEmitter extends CodeEmitter[SocketWrite] {
     render(paramMap)
   }
 }
+
+object SocketWriteEmitter {
+	lazy val instance = new SocketWriteEmitter
+}

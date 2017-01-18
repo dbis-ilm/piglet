@@ -69,3 +69,7 @@ class StreamOrderByEmitter extends OrderByEmitter {
       s"(${orderSpec.map(r => ScalaEmitter.emitRef(ctx, r.field)).mkString(",")})"
   }
 }
+
+object StreamOrderByEmitter {
+	lazy val instance = new StreamOrderByEmitter
+}

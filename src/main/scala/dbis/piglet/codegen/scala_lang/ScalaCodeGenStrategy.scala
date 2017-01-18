@@ -66,24 +66,24 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
 
   def emitterForNode[O <: PigOperator](op: O): CodeEmitter[O] = {
     val em = op match {
-      case _: Load => new LoadEmitter
-      case _: Filter => new FilterEmitter
-      case _: Limit => new LimitEmitter
-      case _: Foreach => new ForeachEmitter
-      case _: Distinct => new DistinctEmitter
-      case _: Sample => new SampleEmitter
-      case _: Union => new UnionEmitter
-      case _: Grouping => new GroupingEmitter
-      case _: OrderBy => new OrderByEmitter
-      case _: Top => new TopEmitter
-      case _: Accumulate => new AccumulateEmitter
-      case _: Join => new JoinEmitter
-      case _: Cross => new CrossEmitter
-      case _: Dump => new DumpEmitter
-      case _: Empty => new EmptyEmitter
-      case _: Store => new StoreEmitter
-      case _: StreamOp => new StreamOpEmitter
-      case _: TimingOp => new TimingEmitter
+      case _: Load => LoadEmitter.instance
+      case _: Filter => FilterEmitter.instance
+      case _: Limit => LimitEmitter.instance
+      case _: Foreach => ForeachEmitter.instance
+      case _: Distinct => DistinctEmitter.instance
+      case _: Sample => SampleEmitter.instance
+      case _: Union => UnionEmitter.instance
+      case _: Grouping => GroupingEmitter.instance
+      case _: OrderBy => OrderByEmitter.instance
+      case _: Top => TopEmitter.instance
+      case _: Accumulate => AccumulateEmitter.instance
+      case _: Join => JoinEmitter.instance
+      case _: Cross => CrossEmitter.instance
+      case _: Dump => DumpEmitter.instance
+      case _: Empty => EmptyEmitter.instance
+      case _: Store => StoreEmitter.instance
+      case _: StreamOp => StreamOpEmitter.instance
+      case _: TimingOp => TimingEmitter.instance
       case _ => throw new IllegalArgumentException(s"no emitter for $op")      
     }
   

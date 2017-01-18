@@ -12,3 +12,7 @@ class HdfsCmdEmitter extends CodeEmitter[HdfsCmd] {
 
   override def code(ctx: CodeGenContext, op: HdfsCmd): String = render(Map("cmd" -> op.cmd, "params" -> s"List(${op.paramString})"))
 }
+
+object HdfsCmdEmitter {
+  lazy val instance = new HdfsCmdEmitter
+}

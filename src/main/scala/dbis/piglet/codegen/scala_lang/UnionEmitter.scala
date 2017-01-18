@@ -15,3 +15,7 @@ class UnionEmitter extends CodeEmitter[Union] {
           "others" -> op.inPipeNames.tail))
 
 }
+
+object UnionEmitter {
+	lazy val instance = new UnionEmitter
+}

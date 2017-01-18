@@ -50,3 +50,7 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
     render(params)
   }
 }
+
+object SpatialJoinEmitter {
+	lazy val instance = new SpatialJoinEmitter
+}

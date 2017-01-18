@@ -21,3 +21,7 @@ import dbis.piglet.codegen.scala_lang.DistinctEmitter
 class StreamDistinctEmitter extends DistinctEmitter {
   override def template: String = """    val <out> = <in>.transform(rdd => rdd.distinct)""".stripMargin
 }
+
+object StreamDistinctEmitter {
+	lazy val instance = new StreamDistinctEmitter
+}
