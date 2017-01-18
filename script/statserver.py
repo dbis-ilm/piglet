@@ -90,8 +90,8 @@ def addTiming():
     'time': request.json['time']
   }
 
-  print(timingData)
-  return str("ok")
+  res = saveExectimeToDB(timingData)
+  return str(res)
 
 
 #########################################

@@ -18,7 +18,7 @@ import java.nio.file.attribute.FileAttribute
  */
 object Conf extends PigletLogging {
 
-  val EXECTIMES_FRAGMENT = "exectimes"
+  val EXECTIMES_FRAGMENT = "times"
   val MATERIALIZATION_FRAGMENT = "materializations"
 
 
