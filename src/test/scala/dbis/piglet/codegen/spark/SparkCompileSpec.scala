@@ -62,7 +62,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val generatedCode = cleanString(codeGenerator.emitImport(ctx)
       + codeGenerator.emitHeader1(ctx, "test")
-      + codeGenerator.emitHeader2(ctx, "test",Some(new URI("http://localhost:5555/exectimes")))
+      + codeGenerator.emitHeader2(ctx, "test",Some(new URI("http://localhost:5555/times")))
       + codeGenerator.emitFooter(ctx, new DataflowPlan(List.empty[PigOperator])))
 
     val expectedCode = cleanString("""
@@ -79,9 +79,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |    val sc = new SparkContext(conf)
         |    def main(args: Array[String]) {
         |
-        |      //val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
+        |      //val perfMon = new PerfMonitor("test_App","http://localhost:5555/times")
         |      //sc.addSparkListener(perfMon)
-        |      val url = "http://localhost:5555/exectimes"
+        |      val url = "http://localhost:5555/times"
         |      sc.stop()
         |
         |    }
@@ -95,7 +95,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val generatedCode = cleanString(codeGenerator.emitImport(ctx, Seq("import breeze.linalg._"))
       + codeGenerator.emitHeader1(ctx, "test")
-      + codeGenerator.emitHeader2(ctx, "test", Some(new URI("http://localhost:5555/exectimes")))
+      + codeGenerator.emitHeader2(ctx, "test", Some(new URI("http://localhost:5555/times")))
       + codeGenerator.emitFooter(ctx, new DataflowPlan(List.empty[PigOperator])))
     val expectedCode = cleanString("""
                                      |import org.apache.spark.SparkContext
@@ -112,9 +112,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |    val sc = new SparkContext(conf)
                                      |    def main(args: Array[String]) {
                                      |
-                                     |      //val perfMon = new PerfMonitor("test_App","http://localhost:5555/exectimes")
+                                     |      //val perfMon = new PerfMonitor("test_App","http://localhost:5555/times")
                                      |      //sc.addSparkListener(perfMon)
-                                     |      val url = "http://localhost:5555/exectimes"
+                                     |      val url = "http://localhost:5555/times"
                                      |      sc.stop()
                                      |
                                      |    }
@@ -543,7 +543,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val gen = new CodeGenerator(codeGenerator)
     
     val code = gen.generate("testscript", newPlan, Some(new java.net.URI("http://localhost:9000/")))
-    println(code)
+//    println(code)
   }
   
   it should "contain code for multiple joins" in {

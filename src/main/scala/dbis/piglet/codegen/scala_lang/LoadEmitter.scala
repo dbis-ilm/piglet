@@ -29,16 +29,5 @@ class LoadEmitter extends CodeEmitter[Load] {
 }
 
 object LoadEmitter {
-  
-  private var _instance: Option[LoadEmitter] = None
-  
-  def instance = _instance match {
-    case None => _instance = Some(new LoadEmitter); _instance.get
-    case _ => _instance.get
-  }
-  
-}
-
-object LoadEmitter {
   lazy val instance = new LoadEmitter
 }
