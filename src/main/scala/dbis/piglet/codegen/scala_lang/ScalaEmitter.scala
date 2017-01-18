@@ -57,27 +57,29 @@ object ScalaEmitter {
     */
   def emitRef(ctx: CodeGenContext, ref: Ref): String = ref match {
 
-    case nf @ NamedField(f, _) => if (ctx.asBoolean("namedRef")) {
-      // check if f exists in the schema
-      ctx.schema match {
-        case Some(s) => {
-          val p = s.indexOfField(nf)
-          if (p != -1)
-            s"${ctx.asString("tuplePrefix")}._$p"
-          else
-            f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
+    case nf @ NamedField(f, _) => 
+      if (ctx.asBoolean("namedRef")) {
+        // check if f exists in the schema
+        ctx.schema match {
+          case Some(s) => {
+            val p = s.indexOfField(nf)
+            if (p != -1)
+              s"${ctx.asString("tuplePrefix")}._$p"
+            else
+              f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
+          }
+          case None =>
+            // if we don't have a schema this is not allowed
+            throw new CodeGenException(s"invalid field name $f (named ref not found)")
         }
-        case None =>
-          // if we don't have a schema this is not allowed
-          throw new CodeGenException(s"invalid field name $f")
       }
-    }
-    else {
-      val pos = ctx.schema.get.indexOfField(nf)
-      if (pos == -1)
-        throw new CodeGenException(s"invalid field name $nf")
-      s"${ctx.asString("tuplePrefix")}._$pos" // s"$tuplePrefix.$f"
-    }
+      else {
+        val pos = ctx.schema.get.indexOfField(nf)
+        if (pos == -1) {
+          throw new CodeGenException(s"invalid field name $nf (field position not found)")
+        }
+        s"${ctx.asString("tuplePrefix")}._$pos" // s"$tuplePrefix.$f"
+      }
     case PositionalField(pos) => ctx.schema match {
       case Some(s) => s"${ctx.asString("tuplePrefix")}._$pos"
       case None =>

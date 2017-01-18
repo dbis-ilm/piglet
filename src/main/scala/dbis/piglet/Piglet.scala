@@ -100,7 +100,7 @@ object Piglet extends PigletLogging {
      */
 
     if(c.params.nonEmpty)
-    	logger.info(s"provided parameters: ${c.params.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
+    	logger.debug(s"provided parameters: ${c.params.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
 
 
     /* if profiling is enabled, check the HTTP server
@@ -161,7 +161,7 @@ object Piglet extends PigletLogging {
       // don't print full stack trace to error
       case e: Exception =>
         logger.error(s"An error occured: ${e.getMessage}")
-        logger.debug(e.getMessage, e)
+        logger.debug("Stackstrace: ", e)
     }
   }
 
@@ -229,7 +229,11 @@ object Piglet extends PigletLogging {
     logger.debug("start processing created dataflow plans")
 
     for ((plan, path) <- schedule) timing("execute plan") {
-
+      
+      logger.info(s"processing plan for $path")
+      //TODO:this is ugly in this place here... maybe we should create a "clear-wrapper"
+      dbis.piglet.codegen.scala_lang.JoinEmitter.joinKeyVars.clear()
+      
       // 3. now, we should apply optimizations
       var newPlan = plan
 
@@ -250,7 +254,7 @@ object Piglet extends PigletLogging {
       
       // after rewriting the plan, add the timing operations
       if(c.profiling.isDefined) {
-        newPlan = insertTimings(newPlan, c.profiling.get)
+        newPlan = insertTimings(newPlan)
       }
       
       
@@ -266,15 +270,23 @@ object Piglet extends PigletLogging {
       }
 
       try {
+    	  newPlan.checkConsistency
+      } catch {
+        case e: InvalidPlanException => {
+      	  logger.error(s"inconsistent plan in ${e.getMessage}")
+      	  return
+        }
+      }
+      try {
         // if this does _not_ throw an exception, the schema is ok
-        // TODO: we should do this AFTER rewriting!
         newPlan.checkSchemaConformance
       } catch {
         case e: SchemaException => {
-          logger.error(s"schema conformance error in ${e.getMessage} for plan")
+          logger.error(s"schema conformance error in ${e.getMessage}")
           return
         }
       }
+      
 
       val scriptName = path.getFileName.toString().replace(".pig", "")
       logger.debug(s"using script name: $scriptName")

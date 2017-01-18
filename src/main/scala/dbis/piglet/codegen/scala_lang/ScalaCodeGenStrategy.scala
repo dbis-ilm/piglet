@@ -104,8 +104,6 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
     
     val emitter = emitterForNode(node)
     
-    logger.debug(s"using ${emitter.getClass.getName} for op $className")
-    
     var code = emitter.beforeCode(ctx, node)
     if (code.length > 0) code += "\n"
 

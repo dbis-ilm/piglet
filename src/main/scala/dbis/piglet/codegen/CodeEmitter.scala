@@ -6,7 +6,14 @@ import org.stringtemplate.v4.misc.ErrorBuffer
 
 import dbis.piglet.op.PigOperator
 
-case class CodeGenException(msg: String) extends Exception(msg)
+case class CodeGenException(msg: String, cause: Throwable) extends Exception(msg, cause) {
+  def this(msg: String) = this(msg, null)
+}
+
+object CodeGenException {
+  def apply(msg: String) = new CodeGenException(msg)
+}
+
 
 abstract class CodeEmitter[O <: PigOperator] {
   def template: String

@@ -27,6 +27,10 @@ import dbis.setm.SETM.timing
 import scala.collection.mutable.ListBuffer
 import java.net.URI
 import dbis.piglet.codegen.scala_lang.LoadEmitter
+import dbis.piglet.tools.BreadthFirstTopDownWalker
+import dbis.piglet.tools.DepthFirstTopDownWalker
+import dbis.piglet.tools.TopoSort
+import dbis.piglet.op.TimingOp
 
 
 /**
@@ -163,28 +167,36 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
       
     // generate helper classes (if needed, e.g. for custom key classes)
     for (n <- plan.operators) {
-      
-      val genCode = codeGen.emitHelperClass(ctx, n)
-      code = code + genCode  + (if(genCode.nonEmpty) "\n" else "")
+      try {
+        val genCode = codeGen.emitHelperClass(ctx, n)
+        code = code + genCode  + (if(genCode.nonEmpty) "\n" else "")
+      } catch {
+        case e: CodeGenException => throw new CodeGenException(s"error producing helper class for $n", e) 
+      }
     }
-
+    
     if (!forREPL)
       // generate the object definition representing the script
       code = code + codeGen.emitHeader2(ctx, scriptName, profiling)
 
-    for (n <- plan.operators) {
-      val generatedCode = codeGen.emitNode(CodeGenContext(ctx, Map("schema" -> n.schema, "tuplePrefix" -> "t")), n)
-
-      if(profiling.isDefined) {
-        /* count the generated lines
-         * this is needed for the PerfMonitor to identify stages by line number
-         * 
-         * +1 is for the additional line that is inserted for the register code
-         */
-        val lines = scala.io.Source.fromBytes((code + generatedCode).getBytes).getLines().size + 1
-        ctx.set("lines", lines)
+    val sortedOps = TopoSort.sort(plan)
+      
+    sortedOps.foreach { op =>
+//    for(op <- plan.operators) {
+      
+      try {
+        
+        val generatedCode = codeGen.emitNode(
+            CodeGenContext(ctx, Map("schema" -> op.schema, "tuplePrefix" -> "t")),
+            op)
+  
+        code =  code + generatedCode + "\n"
+        
+      } catch {
+      case e: CodeGenException => 
+        op.printOperator(2)
+        throw new CodeGenException(s"error producing code for $op", e)
       }
-      code =  code + generatedCode + "\n"
     }
 
     // generate the cleanup code

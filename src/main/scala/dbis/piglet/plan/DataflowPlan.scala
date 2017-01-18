@@ -24,6 +24,8 @@ import dbis.piglet.schema.{Types, PigType, Schema, SchemaException}
 import dbis.piglet.udf.{UDFTable, UDF}
 import scala.collection.mutable.{ListBuffer, Map}
 import dbis.piglet.tools.logging.PigletLogging
+import dbis.piglet.tools.BreadthFirstTopDownWalker
+import dbis.piglet.tools.TopoSort
 
 
 
@@ -419,7 +421,10 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    *
    * @param tab the number of whitespaces for indention
    */
-  def printPlan(tab: Int = 0): Unit = operators.foreach(_.printOperator(tab))
+  def printPlan(tab: Int = 0): Unit = {
+//    operators.foreach(_.printOperator(tab))
+    TopoSort.sort(this).foreach(_.printOperator(tab))
+  }
 
    /**
    * Swaps two successive operators in the dataflow plan. Both operators are unary operators and have to be already

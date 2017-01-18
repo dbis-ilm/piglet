@@ -266,11 +266,13 @@ case class Foreach(
         false // TODO: what happens if GENERATE contains flatten?
     }
   }
+  
+  override def toString() = s"""FOREACH { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }
+                                |  inSchema = $inputSchema
+                                |  outSchema = $schema)""".stripMargin
 
   override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"FOREACH { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
+    println(indent(tab) + this.toString())
     generator match {
       case GeneratorList(exprs) => println(indent(tab + 2) + "exprs = " + exprs.mkString(","))
       case GeneratorPlan(_) => subPlan.get.printPlan(tab + 5)

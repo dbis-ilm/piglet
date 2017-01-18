@@ -176,11 +176,11 @@ object PigletCompiler extends PigletLogging {
         return None
 
       // build a jar file
-      logger.info(s"creating job's jar file ... ")
+      logger.debug(s"creating job's jar file ... ")
     
       val jarFile = outputDir.resolve(s"$scriptName.jar")
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
-        logger.info(s"created job's jar file at $jarFile")
+        logger.debug(s"created job's jar file at $jarFile")
 
         if(!c.keepFiles) {
           // remove directory $outputDirectory
