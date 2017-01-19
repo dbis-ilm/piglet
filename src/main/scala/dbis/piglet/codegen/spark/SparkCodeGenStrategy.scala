@@ -78,8 +78,6 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
   override def emitHeader1(ctx: CodeGenContext, scriptName: String): String =
     CodeEmitter.render(
       """object <name> {
-        |val conf = new SparkConf().setAppName("<name>_App")
-        |val sc = new SparkContext(conf)
         |""".stripMargin, Map("name" -> scriptName))
 
 
@@ -100,6 +98,8 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
 
 
     CodeEmitter.render("""  def main(args: Array[String]) {
+                         |val conf = new SparkConf().setAppName("<name>_App")
+                         |val sc = new SparkContext(conf)
                          |
                          |<if (profiling)>
                          |    //val perfMon = new PerfMonitor("<name>_App","<profiling>")
