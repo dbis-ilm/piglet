@@ -51,6 +51,7 @@ import dbis.piglet.tools.CliParams
 
 import dbis.setm.SETM
 import dbis.setm.SETM.timing
+import java.util.Formatter.DateTime
 
 
 object Piglet extends PigletLogging {
@@ -132,7 +133,7 @@ object Piglet extends PigletLogging {
     * Start compiling the Pig script into a the desired program
     */
   def run(c: CliParams): Unit = {
-
+    var success = true
     try {
 
       // initialize backend
@@ -162,6 +163,22 @@ object Piglet extends PigletLogging {
       case e: Exception =>
         logger.error(s"An error occured: ${e.getMessage}")
         logger.debug("Stackstrace: ", e)
+        success = false
+    } finally {
+      if(c.notifyURL.isDefined) {
+        
+        val stringURI = c.notifyURL.get.toString()
+          .replace("[success]", if(success) "Success" else "Failed")
+          .replace("[name]", c.inputFiles.map(_.getFileName.toString()).mkString(","))
+          .replace("[time]", java.time.LocalDateTime.now().toString())
+
+        logger.debug(s"notification url: $stringURI")  
+          
+        val result = scalaj.http.Http(stringURI).asString
+        logger.debug(s"notification HTTP service responeded with: ${result.body}")
+      } else {
+        logger.debug("finished.")
+      }
     }
   }
 
