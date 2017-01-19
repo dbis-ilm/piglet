@@ -13,7 +13,7 @@ import org.apache.pig.PigRunner
  */
 class PigRun extends PigletBackend with BackendConf {
 
-  override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]) = ???
+  override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String], profiling: Boolean) = ???
   
   override def executeRaw(program: Path, master: String, backendArgs: Map[String,String]) {
     

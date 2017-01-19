@@ -11,6 +11,7 @@
 from flask import Flask, request, jsonify, make_response
 from tinydb import TinyDB, where, Query
 import argparse
+import threading
 
 
 # a new Flask app for REST service
@@ -20,7 +21,7 @@ app = Flask(__name__)
 # http://stackoverflow.com/questions/14888799/disable-console-messages-in-flask-server
 import logging
 log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+log.setLevel(logging.DEBUG)
 
 @app.errorhandler(404)
 def not_found(error):
@@ -33,6 +34,14 @@ db = None
 #@app.errorhandler(404)
 #def notFound(error):
 #	return make_response(jsonify({'error': 'Not Found'}),404)
+
+class SaveThread(threading.Thread):
+    def __init__(self, json):
+        super(SaveThread, self).__init__()
+        self.json = json
+
+    def run(self):
+        saveExectimeToDB(self.json)
 
 #########################################
 # Execution statistics for stages
@@ -86,11 +95,16 @@ def addTiming():
 
   timingData = {
     'lineage': request.json['lineage'],
-    'partitionId': request.json['id'],
+    'partitionId': request.json['partitionId'],
     'time': request.json['time']
   }
 
-  res = saveExectimeToDB(timingData)
+  # thread = SaveThread(timingData)
+  # thread.start()
+  res = "ok"
+
+  # print(timingData)
+  # res = saveExectimeToDB(timingData)
   return str(res)
 
 
@@ -138,10 +152,6 @@ def getMaterialization(lineage):
 @app.route('/',methods=['GET'])
 def index():
 	return "Hallo Welt"
-
-
-
-
 
 if __name__ == '__main__':
 

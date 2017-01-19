@@ -36,7 +36,7 @@ import dbis.piglet.tools.logging.PigletLogging
 
 class FlinkRun extends PigletBackend with PigletLogging {
 
-  override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]){
+  override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String], profiling: Boolean){
     // CliFrontend  needs FLINK_CONF_DIR to be set 
     val args = backendArgs.map {case (k, v) => (Array(k) ++ Array(v))}.flatten
     if (master.startsWith("local") && !master.startsWith("localhost")){  

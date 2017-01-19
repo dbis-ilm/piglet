@@ -10,8 +10,7 @@ import dbis.piglet.schema.Schema
   */
 class LoadEmitter extends CodeEmitter[Load] {
   override def template: String =
-    """    val <out> =
-      |      <func>[<class>]().load(sc, "<file>", <extractor><if (params)>, <params><endif>)""".stripMargin
+    """    val <out> = <func>[<class>]().load(sc, "<file>", <extractor><if (params)>, <params><endif>)""".stripMargin
 
   override def code(ctx: CodeGenContext, op: Load): String = {
     var paramMap = ScalaEmitter.emitExtractorFunc(op, op.loaderFunc)

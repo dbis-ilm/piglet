@@ -32,7 +32,7 @@ trait PigletBackend {
    * @param jarFile The path to the jar file representing the job
    * @param backendArgs Argument list passed to the job executor
    */
-  def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String]): Unit
+  def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String], profiling: Boolean): Unit
 
   /**
    * Execute the raw Pig script. Use this function if your engine does not rely on

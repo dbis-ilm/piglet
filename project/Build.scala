@@ -140,8 +140,8 @@ object Dependencies {
   val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
   val log4j = "log4j" % "log4j" % "1.2.17"
 
-  val scalajhttp = "org.scalaj" % "scalaj-http_2.11" % "2.3.0"
-  val json4s = "org.json4s" % "json4s-native_2.11" % "3.4.0"
+  val scalajhttp = "org.scalaj" %% "scalaj-http" % "2.3.0"
+  val json4s = "org.json4s" %% "json4s-native" % "3.4.0"
 
   // Projects
   val rootDeps = Seq(

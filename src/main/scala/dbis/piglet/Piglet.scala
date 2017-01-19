@@ -303,7 +303,7 @@ object Piglet extends PigletLogging {
             logger.info( s"""starting job at "$jarFile" using backend "${c.backend}" """)
 
             timing("job execution") {
-              runner.execute(c.master, scriptName, jarFile, c.backendArgs)
+              runner.execute(c.master, scriptName, jarFile, c.backendArgs, c.profiling.isDefined)
             }
           } else
             logger.info("successfully compiled program - exiting.")

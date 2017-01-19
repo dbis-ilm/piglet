@@ -374,7 +374,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       PigletCompiler.compilePlan(plan, scriptName, c) match {
         case Some(jarFile) =>
           val runner = BackendManager.backend.runnerClass
-          runner.execute(c.master, scriptName, jarFile, c.backendArgs)
+          runner.execute(c.master, scriptName, jarFile, c.backendArgs, c.profiling.isDefined)
           FileTools.recursiveDelete(scriptName)
 
         case None => Console.err.println("failed to build jar file for job")
