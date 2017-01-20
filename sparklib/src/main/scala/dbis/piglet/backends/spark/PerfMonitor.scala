@@ -14,9 +14,11 @@ import ExecutionContext.Implicits.global
 object PerfMonitor {
   
   def notify(url: String, lineage: String, partitionId: Long, time: Long) = /*Future*/ {
-    val jsonString = s"""{"partitionId":"$partitionId","time":"${time}","lineage":"$lineage"}""" 
-    val result = scalaj.http.Http(url).postData(jsonString).header("Content-Type", "application/json").header("Charset","UTF-8").asString
-    println(result)
+    //val jsonString = s"""{"partitionId":"$partitionId","time":"${time}","lineage":"$lineage"}""" 
+    //val result = scalaj.http.Http(url).postData(jsonString).header("Content-Type", "application/json").header("Charset","UTF-8").asString
+    //println(result)
+    val dataString = s"${lineage};${partitionId};${time}"
+    scalaj.http.Http(url).method("HEAD").param("data", dataString).asString
   }
   
   
