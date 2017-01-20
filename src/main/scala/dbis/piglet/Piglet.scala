@@ -273,6 +273,10 @@ object Piglet extends PigletLogging {
       if(c.profiling.isDefined) {
         newPlan = insertTimings(newPlan)
       }
+
+      if(c.muteConsumer) {
+        newPlan = mute(newPlan)
+      }
       
       
       // find materialization points
@@ -282,7 +286,7 @@ object Piglet extends PigletLogging {
 
       if (c.showPlan) {
         println("final plan = {")
-        newPlan.printPlan()
+        newPlan.printPlan(2)
         println("}")
       }
 

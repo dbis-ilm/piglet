@@ -275,8 +275,6 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   lazy val accumulateKeyword = "accumulate".ignoreCase
   lazy val timestampKeyword = "timestamp".ignoreCase
 
-
-
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
       | falseKeyword ^^ { _ => false }
@@ -418,10 +416,12 @@ class PigParser extends JavaTokenParsers with PigletLogging {
       new RDFLoad(Pipe(b), uri, grouped)
   }
 
+  lazy val nullKeyword = "devnull".ignoreCase
+  
   /*
    * DUMP <A>
    */
-  def dumpStmt: Parser[PigOperator] = dumpKeyword ~ bag ^^ { case _ ~ b => new Dump(Pipe(b)) }
+  def dumpStmt: Parser[PigOperator] = dumpKeyword ~ bag ~ (nullKeyword?) ^^ { case _ ~ b ~ nuller => new Dump(Pipe(b), nuller.isDefined) }
 
   /*
    * DISPLAY <A>

@@ -103,6 +103,7 @@ object Rewriter extends PigletLogging
                 with EmbedSupport
                 with MaterializationSupport
                 with ProfilingSupport
+                with MutingSupport
                 with Fixers
                 with FastStrategyAdder
                 with RewriterDSL {

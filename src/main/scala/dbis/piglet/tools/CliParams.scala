@@ -53,11 +53,13 @@ case class CliParams(
   paramFile: Option[Path] = None,
   interactive: Boolean = false,
   quiet: Boolean = false,
-  notifyURL: Option[URI] = None
+  notifyURL: Option[URI] = None,
+  muteConsumer: Boolean = false
 ) {
   
   require(!showPlan || (showPlan && !quiet), "show-plan and quiet cannot be active at the same time" )
   require(!showStats || (showStats && !quiet), "show-stats and quiet cannot be active at the same time" )
+  require(!muteConsumer || (muteConsumer && !interactive), "dev-null cannot be used in interactive mode")
 }
 
 object CliParams {
@@ -103,6 +105,7 @@ object CliParams {
     opt[Unit]('u', "update-config") optional() action { (_, c) => c.copy(updateConfig = true) } text (s"update config file in program home (see config file)")
     opt[Unit]('q',"quiet") optional() action { (_,c) => c.copy(quiet = true) } text ("Don't print header output (does not affect logging and error output)")
     opt[URI]('n',"notify") optional() action { (x,c) => c.copy(notifyURL = Some(x)) } text ("URL to call upon exit (in case of error and success). Available placeholders are [time] (time when program finished) , [name] (script name) and [success] (indicator of success or exception)")
+    opt[Unit]("mute-consumer") optional() action { (_,c) => c.copy(muteConsumer = true)} text ("Make DUMP or STORE operators consume but NOT write any output")
     help("help") text ("prints this usage text")
     version("version") text ("prints this version info")
     arg[File]("<file>...") unbounded() optional() action { (x, c) => c.copy(inputFiles = c.inputFiles :+ x.toPath()) } text ("Pig script files to execute")

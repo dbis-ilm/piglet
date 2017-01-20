@@ -21,7 +21,7 @@ package dbis.piglet.op
  *
  * @param in the input pipe
  */
-case class Dump(private val in: Pipe) extends PigOperator(List(), List(in)) {
+case class Dump(private val in: Pipe, var mute: Boolean = false) extends PigOperator(List(), List(in)) {
 
   /**
    * Returns the lineage string describing the sub-plan producing the input for this operator.
@@ -33,7 +33,7 @@ case class Dump(private val in: Pipe) extends PigOperator(List(), List(in)) {
   }
 
   override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"DUMP { in = ${inPipeName} }")
+    println(indent(tab) + s"DUMP { in = ${inPipeName} ${if(mute)", mute" else ""}}")
   }
 
 }
