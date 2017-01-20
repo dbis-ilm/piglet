@@ -34,27 +34,6 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
   // initialize target and emitters
   val target = CodeGenTarget.Unknown
 
-//  val pkg = "dbis.piglet.op"
-//  def emitters[O <: PigOperator]: Map[String, CodeEmitter[PigOperator]] = Map[String, CodeEmitter[PigOperator]](
-//    s"$pkg.Load" -> new LoadEmitter,
-//    s"$pkg.Filter" -> new FilterEmitter,
-//    s"$pkg.Limit" -> new LimitEmitter,
-//    s"$pkg.Foreach" -> new ForeachEmitter,
-//    s"$pkg.Distinct" -> new DistinctEmitter,
-//    s"$pkg.Sample" -> new SampleEmitter,
-//    s"$pkg.Union" -> new UnionEmitter,
-//    s"$pkg.Grouping" -> new GroupingEmitter,
-//    s"$pkg.OrderBy" -> new OrderByEmitter,
-//    s"$pkg.Top" -> new TopEmitter,
-//    s"$pkg.Accumulate" -> new AccumulateEmitter,
-//    s"$pkg.Join" -> new JoinEmitter,
-//    s"$pkg.Cross" -> new CrossEmitter,
-//    s"$pkg.Dump" -> new DumpEmitter,
-//    s"$pkg.Empty" -> new EmptyEmitter,
-//    s"$pkg.Store" -> new StoreEmitter
-//  )
-  
-
   override def collectAdditionalImports(plan: DataflowPlan) = {
     val additionalImports = ListBuffer.empty[String]
     if (plan.checkExpressions(Expr.containsMatrixType)) {

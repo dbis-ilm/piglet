@@ -102,8 +102,6 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
                          |val sc = new SparkContext(conf)
                          |
                          |<if (profiling)>
-                         |    //val perfMon = new PerfMonitor("<name>_App","<profiling>")
-                         |    //sc.addSparkListener(perfMon)
                          |    val url = "<profiling>"
                          |<endif>
                          |""".stripMargin, map)
