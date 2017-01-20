@@ -88,6 +88,12 @@ def getExectime(lineage):
 	res = findExectimeInDB(lineage)
 	return jsonify({'exectimes':res})
 
+@app.route('/times', methods=['GET'])
+def addTiming2():
+    datastring = request.args.get("data")
+    print(datastring)
+    return "ok"
+
 @app.route('/times', methods=['POST'])
 def addTiming():
   if not request.json:
