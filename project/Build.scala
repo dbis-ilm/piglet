@@ -142,6 +142,7 @@ object Dependencies {
 
   val scalajhttp = "org.scalaj" %% "scalaj-http" % "2.3.0"
   val json4s = "org.json4s" %% "json4s-native" % "3.4.0"
+  val akkahttp = "com.typesafe.akka" %% "akka-http" % "10.0.1"
 
   // Projects
   val rootDeps = Seq(
@@ -163,6 +164,7 @@ object Dependencies {
     jdbc,
     breeze,
     scalajhttp,
-    json4s
+    json4s,
+    akkahttp
   )
 }

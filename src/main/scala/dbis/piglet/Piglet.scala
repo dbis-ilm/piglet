@@ -52,6 +52,7 @@ import dbis.piglet.tools.CliParams
 import dbis.setm.SETM
 import dbis.setm.SETM.timing
 import java.util.Formatter.DateTime
+import dbis.piglet.mm.StatServer
 
 
 object Piglet extends PigletLogging {
@@ -108,17 +109,23 @@ object Piglet extends PigletLogging {
      * If it's unavailable print an error and stop
      */
     if(c.profiling.isDefined) {
-      val reachable = FileTools.checkHttpServer(c.profiling.get)
-
-      if(! reachable) {
-        logger.error(s"Statistics management server is not reachable at ${c.profiling.get}. Aborting")
-        return
-      }
+//      val reachable = FileTools.checkHttpServer(c.profiling.get)
+//
+//      if(! reachable) {
+//        logger.error(s"Statistics management server is not reachable at ${c.profiling.get}. Aborting")
+//        return
+//      }
+      
+      StatServer.start(8000)
     }
 
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     run(c)  // this little call starts the whole processing!
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    
+    
+    if(c.profiling.isDefined)
+      StatServer.stop()
     
     // at the end, show the statistics
     if(c.showStats) {
