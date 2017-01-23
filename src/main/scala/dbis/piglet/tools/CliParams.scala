@@ -45,7 +45,8 @@ case class CliParams(
   updateConfig: Boolean = false,
   showPlan: Boolean = false,
   backendArgs: Map[String, String] = Map.empty,
-  profiling: Option[URI] = None,
+  profiling: Option[Path] = None,
+  profilingPort: Int = 8000,
   logLevel: LogLevel = LogLevel.WARN,
   sequential: Boolean = false,
   keepFiles: Boolean = false,
@@ -99,7 +100,8 @@ object CliParams {
     opt[Unit]('k',"keep") optional() action { (x,c) => c.copy(keepFiles = true) } text ("keep generated files")
     opt[String]('g', "log-level") optional() action { (x, c) => c.copy(logLevel = LogLevel.withName(x.toUpperCase())) } text ("Set the log level: DEBUG, INFO, WARN, ERROR")
     opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text (s"show the execution plan")
-    opt[URI]("profiling") optional() action { (x, c) => c.copy(profiling = Some(x)) } text ("Switch on profiling and write to DB. Provide the connection string as schema://host:port/dbname?user=username&pw=password")
+    opt[File]("profiling") optional() action { (x, c) => c.copy(profiling = Some(x.toPath())) } text ("Activate profiling and use given file as storage")
+//    opt[Int]("profiling-url") optional() action { (x,c) => c.copy(profilingPort = x) } text ("Port to run profiling server on")
     opt[Unit]("show-stats") optional() action { (_,c) => c.copy(showStats = true) } text ("print detailed timing stats at the end")
     opt[Unit]("sequential") optional() action{ (_,c) => c.copy(sequential = true) } text ("sequential execution (do not merge plans)")
     opt[Unit]('u', "update-config") optional() action { (_, c) => c.copy(updateConfig = true) } text (s"update config file in program home (see config file)")

@@ -12,6 +12,7 @@ import scala.collection.JavaConverters._
 
 import dbis.piglet.tools.logging.PigletLogging
 import java.nio.file.attribute.FileAttribute
+import java.net.URL
 
 /**
  * This is the global configuration object that contains all user-defined values
@@ -100,6 +101,9 @@ object Conf extends PigletLogging {
   def commonJar = Paths.get(appconf.getString("common.jar"))
   
   def spatialJar = Paths.get(appconf.getString("features.spatial.jar"))
+  
+  def statServerPort = appconf.getInt("statserver.port")
+  def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url")).toURL()) else None
   
 //  def langfeatureImports(feature: String) = appconf.getStringList(s"langfeature.$feature.imports").asScala
 //  def langfeatureAdditionalJars(feature: String) = appconf.getStringList(s"langfeature.$feature.jars")

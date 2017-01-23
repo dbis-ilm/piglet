@@ -46,6 +46,7 @@ import scopt.OptionParser
 import java.net.URI
 import dbis.piglet.op.cmd.HdfsCmd
 import dbis.piglet.tools.CliParams
+import dbis.piglet.mm.DataflowProfiler
 
 sealed trait JLineEvent
 
@@ -250,11 +251,11 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return
     */
-  def handlePrettyPrint(buf: ListBuffer[PigOperator], profiling: Option[URI]): Boolean = {
+  def handlePrettyPrint(buf: ListBuffer[PigOperator], profiling: Boolean): Boolean = {
     var plan = new DataflowPlan(buf.toList)
 
-    if(profiling.isDefined) {
-  	  val mm = new MaterializationManager(Conf.materializationBaseDir, profiling.get)
+    if(profiling) {
+  	  val mm = new MaterializationManager(Conf.materializationBaseDir)
 			plan = processMaterializations(plan, mm)
     }
 
@@ -271,11 +272,11 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return false
     */
-  def handleDescribe(s: String, buf: ListBuffer[PigOperator], profiling: Option[URI]): Boolean = {
+  def handleDescribe(s: String, buf: ListBuffer[PigOperator], profiling: Boolean): Boolean = {
     var plan = new DataflowPlan(buf.toList)
 
-    if(profiling.isDefined) {
-      val mm = new MaterializationManager(Conf.materializationBaseDir, profiling.get)
+    if(profiling) {
+      val mm = new MaterializationManager(Conf.materializationBaseDir)
       plan = processMaterializations(plan, mm)
     }
 
@@ -349,7 +350,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       logger.debug("plan created.")
 
       if(c.profiling.isDefined) {
-        val mm = new MaterializationManager(Conf.materializationBaseDir, c.profiling.get)
+        val mm = new MaterializationManager(Conf.materializationBaseDir)
         plan = processMaterializations(plan, mm)
       }
 
@@ -370,8 +371,11 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
    //      val jobJar = Paths.get(s"$backendPath/${Conf.backendJar(backend).toString}")
 
       nextScriptName()
+
       
-      PigletCompiler.compilePlan(plan, scriptName, c) match {
+      val profiler = if(c.profiling.isDefined) Some(DataflowProfiler.instance) else None
+      
+      PigletCompiler.compilePlan(plan, scriptName, c, profiler) match {
         case Some(jarFile) =>
           val runner = BackendManager.backend.runnerClass
           runner.execute(c.master, scriptName, jarFile, c.backendArgs, c.profiling.isDefined)
@@ -449,23 +453,23 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
 
 
-    if(c.profiling.isDefined) {
-      val reachable = FileTools.checkHttpServer(c.profiling.get)
-
-      if(! reachable) {
-        logger.error(s"Statistics management server is not reachable at ${c.profiling.get}. Aborting")
-        return
-      }
-    }
+//    if(c.profiling.isDefined) {
+//      val reachable = FileTools.checkHttpServer(c.profiling.get)
+//
+//      if(! reachable) {
+//        logger.error(s"Statistics management server is not reachable at ${c.profiling.get}. Aborting")
+//        return
+//      }
+//    }
 
 
     console {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
       case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
-      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf, c.profiling)
+      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf, c.profiling.isDefined)
       case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => handleRewrite(buf)
-      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf, c.profiling)
+      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf, c.profiling.isDefined)
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
         s.toLowerCase.startsWith(s"display ") ||
         s.toLowerCase.startsWith(s"store ") ||

@@ -116,7 +116,7 @@ object Piglet extends PigletLogging {
 //        return
 //      }
       
-      StatServer.start(8000)
+      StatServer.start(Conf.statServerPort)
     }
 
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -242,7 +242,8 @@ object Piglet extends PigletLogging {
 
    // val templateFile = BackendManager.backend.templateFile
 
-		val profiler = c.profiling.map { u => new DataflowProfiler(Some(u)) }
+		val profiler = if(c.profiling.isDefined) Some(DataflowProfiler.instance) else None 
+		  
 
 
 		// begin global analysis phase
@@ -263,7 +264,7 @@ object Piglet extends PigletLogging {
 
       // process explicit MATERIALIZE operators
       if (c.profiling.isDefined) {
-        val mm = new MaterializationManager(Conf.materializationBaseDir, c.profiling.get)
+        val mm = new MaterializationManager(Conf.materializationBaseDir)
         newPlan = processMaterializations(newPlan, mm)
       }
 
@@ -320,7 +321,7 @@ object Piglet extends PigletLogging {
       logger.debug(s"using script name: $scriptName")
 
 
-      PigletCompiler.compilePlan(newPlan, scriptName, c) match {
+      PigletCompiler.compilePlan(newPlan, scriptName, c, profiler) match {
         // the file was created --> execute it
         case Some(jarFile) =>
           if (!c.compileOnly) {

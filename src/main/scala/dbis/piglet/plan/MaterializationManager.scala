@@ -16,10 +16,10 @@ import dbis.piglet.tools.Conf
 /**
  * Manage where materialized intermediate results are stored
  */
-class MaterializationManager(private val matBaseDir: URI, private val url: URI) extends PigletLogging {
+class MaterializationManager(private val matBaseDir: URI) extends PigletLogging {
   
   logger.debug(s"base: $matBaseDir")
-  logger.debug(s"using materialization storage service at $url")
+//  logger.debug(s"using materialization storage service at $url")
 
   require(matBaseDir != null, "Base directory for materialization must not be null")
   
@@ -31,34 +31,36 @@ class MaterializationManager(private val matBaseDir: URI, private val url: URI) 
    */
   def getDataFor(hash: String): Option[String] = {
     
-    val result = scalaj.http.Http(url.resolve(s"${Conf.MATERIALIZATION_FRAGMENT}/${hash}").toString()).asString
+//    val result = scalaj.http.Http(url.resolve(s"${Conf.MATERIALIZATION_FRAGMENT}/${hash}").toString()).asString
+//    
+//    logger.debug(s"data for $hash: ${result}")
+//    
+//    if(result.isError) {
+//      logger.warn(s"Could not retreive materialization info. ${result.statusLine}")
+//      return None
+//    }
+//    
+//    if(result.body.isEmpty())
+//      return None
+//    else {
+//      import org.json4s._
+//      import org.json4s.native.JsonMethods._
+//      
+//      val json = parse(result.body)
+//      
+//      val JString(lineage) = (json \ "lineage")
+//      
+//      if(lineage != hash) {
+//        logger.error(s"Server sent wrong data. Requested Materialization info for $hash but got data for $lineage !")
+//        return None
+//      }
+//      
+//      val JString(path) = (json \ "path")
+//      
+//      return Some(path)
+//    }
     
-    logger.debug(s"data for $hash: ${result}")
-    
-    if(result.isError) {
-      logger.warn(s"Could not retreive materialization info. ${result.statusLine}")
-      return None
-    }
-    
-    if(result.body.isEmpty())
-      return None
-    else {
-      import org.json4s._
-      import org.json4s.native.JsonMethods._
-      
-      val json = parse(result.body)
-      
-      val JString(lineage) = (json \ "lineage")
-      
-      if(lineage != hash) {
-        logger.error(s"Server sent wrong data. Requested Materialization info for $hash but got data for $lineage !")
-        return None
-      }
-      
-      val JString(path) = (json \ "path")
-      
-      return Some(path)
-    }
+    ???
     
   }
     
@@ -88,13 +90,15 @@ class MaterializationManager(private val matBaseDir: URI, private val url: URI) 
    */
   private def saveMapping(hash: String, matFile: URI) = { 
     
-    val json = s"""{"lineage":"${hash}","path":"${matFile.toString()}"}"""
+//    val json = s"""{"lineage":"${hash}","path":"${matFile.toString()}"}"""
+//    
+//    val result = scalaj.http.Http(url.resolve(Conf.MATERIALIZATION_FRAGMENT).toString()).postData(json)
+//        .header("Content-Type", "application/json")
+//        .header("Charset", "UTF-8").asString
+//
+//    logger.debug(s"successfully sent data materialize data for $hash: ${result.body}")
     
-    val result = scalaj.http.Http(url.resolve(Conf.MATERIALIZATION_FRAGMENT).toString()).postData(json)
-        .header("Content-Type", "application/json")
-        .header("Charset", "UTF-8").asString
-
-    logger.debug(s"successfully sent data materialize data for $hash: ${result.body}")    
+    ???
         
   }
     

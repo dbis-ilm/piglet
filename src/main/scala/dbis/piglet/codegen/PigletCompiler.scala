@@ -28,6 +28,7 @@ import java.net.URI
 
 import dbis.piglet.tools.CliParams
 import dbis.piglet.expr.Expr
+import dbis.piglet.mm.DataflowProfiler
 
 
 object PigletCompiler extends PigletLogging {
@@ -108,7 +109,7 @@ object PigletCompiler extends PigletLogging {
    * @param scriptName The name of the script (used as program and file name)
    * @param c Paramters
    */
-  def compilePlan(plan: DataflowPlan, scriptName: String, c: CliParams): Option[Path] = timing("compile plan") {
+  def compilePlan(plan: DataflowPlan, scriptName: String, c: CliParams, profiler: Option[DataflowProfiler]): Option[Path] = timing("compile plan") {
 
     // compile it into Scala code for Spark
     val generatorClass = Conf.backendGenerator(c.backend)
@@ -124,7 +125,7 @@ object PigletCompiler extends PigletLogging {
     logger.debug(s"successfully created code generator class $codeGenerator")
 
     // generate the Scala code
-    val code = codeGenerator.generate(scriptName, plan, c.profiling)
+    val code = codeGenerator.generate(scriptName, plan, profiler.map(_.url))
 
     logger.debug("successfully generated program source code")
 

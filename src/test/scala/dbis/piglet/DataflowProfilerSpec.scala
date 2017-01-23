@@ -8,7 +8,7 @@ import org.scalatest.{FlatSpec, Matchers}
  */
 class DataflowProfilerSpec extends FlatSpec with Matchers {
   "The DataflowProfiler" should "accept several materialization points and adjust their benefits" in {
-    val cacheMgr = new DataflowProfiler()
+    val cacheMgr = new DataflowProfiler(java.net.URI.create("http://localhost:8000/"))
     cacheMgr.addMaterializationPoint(MaterializationPoint("m1", None, 10, 100, 100))
     cacheMgr.addMaterializationPoint(MaterializationPoint("m2", Some("m1"), 20, 80, 50))
     cacheMgr.addMaterializationPoint(MaterializationPoint("m3", Some("m2"), 40, 60, 40))

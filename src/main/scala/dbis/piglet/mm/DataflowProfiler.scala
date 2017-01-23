@@ -22,10 +22,10 @@ import dbis.setm.SETM.timing
 /**
  * Created by kai on 24.08.15.
  */
-class DataflowProfiler(private val url: Option[URI]) extends PigletLogging {
+class DataflowProfiler(val url: URI) extends PigletLogging {
   
   
-  def this() = this(None)
+//  def this() = this(None)
   
   private val cache = MutableMap.empty[String, MaterializationPoint]
 
@@ -53,11 +53,11 @@ class DataflowProfiler(private val url: Option[URI]) extends PigletLogging {
   
   
   def getExectimes(lineage: String): Option[(Long, Long)] = {
-    if(url.isEmpty) {
-      logger.warn("cannot retreive execution statistics: No URL to storage service set")
-      return None
-    }
-    val u = url.get.resolve(s"/${Conf.EXECTIMES_FRAGMENT}/$lineage")
+//    if(url.isEmpty) {
+//      logger.warn("cannot retreive execution statistics: No URL to storage service set")
+//      return None
+//    }
+    val u = url.resolve(s"/${Conf.EXECTIMES_FRAGMENT}/$lineage")
     val result = scalaj.http.Http(u.toString()).asString
       
     if(result.isError) {
@@ -173,6 +173,20 @@ class DataflowProfiler(private val url: Option[URI]) extends PigletLogging {
     
     
     logger.warn("updating opcount not implemented yet.")
+  }
+}
+
+object DataflowProfiler {
+  
+  def instance = {
+    val url = if(Conf.statServerURL.isDefined) {
+      Conf.statServerURL.get.toURI()
+    } else {
+      val addr = java.net.InetAddress.getLocalHost.getHostAddress
+      java.net.URI.create(s"http://${addr}:${Conf.statServerPort}/")
+    }
+    
+    new DataflowProfiler(url)
   }
   
 }
