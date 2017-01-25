@@ -1,11 +1,13 @@
 package dbis.piglet.mm
 
-import scala.collection.mutable.{Map => MutableMap}
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{Map => MutableMap,ListBuffer}
+import scala.collection.JavaConverters._
 import scala.io.Source
 
 import java.net.URI
 import java.nio.file.Path
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 
 import org.json4s._
 import org.json4s.native.JsonMethods._
@@ -22,17 +24,16 @@ import dbis.setm.SETM.timing
 /**
  * Created by kai on 24.08.15.
  */
-class DataflowProfiler(val url: URI) extends PigletLogging {
+object DataflowProfiler extends PigletLogging {
   
-  
-//  def this() = this(None)
+  logger.debug(s"using profiling ")
   
   private val cache = MutableMap.empty[String, MaterializationPoint]
 
   implicit lazy val formats = org.json4s.DefaultFormats
   
   
-  logger.info(s"Using storage service at $url for execution times")
+//  logger.info(s"Using storage service at $url for execution times")
   
   def getMaterializationPoint(hash: String): Option[MaterializationPoint] = cache.get(hash)
 
@@ -57,28 +58,29 @@ class DataflowProfiler(val url: URI) extends PigletLogging {
 //      logger.warn("cannot retreive execution statistics: No URL to storage service set")
 //      return None
 //    }
-    val u = url.resolve(s"/${Conf.EXECTIMES_FRAGMENT}/$lineage")
-    val result = scalaj.http.Http(u.toString()).asString
-      
-    if(result.isError) {
-//      logger.warn(s"Could not retreive exectimes for $lineage: ${result.statusLine}")
-      return None
-    }
-    
-    
-    val json = parse(result.body)
-    
-    
-    if((json \ "exectimes").children.size <= 0)
-      return None
-    
-    val progDurations = (json \ "exectimes" \ "progduration").extract[Seq[Long]]
-    val avgProgDuration = progDurations.sum / progDurations.size 
-    
-    val stageDurations = (json \ "exectimes" \ "stageduration").extract[Seq[Long]]
-    val avgStageDuration = stageDurations.sum / stageDurations.size
-    
-    return Some(avgProgDuration, avgStageDuration)
+//    val u = url.resolve(s"/${Conf.EXECTIMES_FRAGMENT}/$lineage")
+//    val result = scalaj.http.Http(u.toString()).asString
+//      
+//    if(result.isError) {
+////      logger.warn(s"Could not retreive exectimes for $lineage: ${result.statusLine}")
+//      return None
+//    }
+//    
+//    
+//    val json = parse(result.body)
+//    
+//    
+//    if((json \ "exectimes").children.size <= 0)
+//      return None
+//    
+//    val progDurations = (json \ "exectimes" \ "progduration").extract[Seq[Long]]
+//    val avgProgDuration = progDurations.sum / progDurations.size 
+//    
+//    val stageDurations = (json \ "exectimes" \ "stageduration").extract[Seq[Long]]
+//    val avgStageDuration = stageDurations.sum / stageDurations.size
+//    
+//    return Some(avgProgDuration, avgStageDuration)
+    None
   }
 
   /**
@@ -134,59 +136,54 @@ class DataflowProfiler(val url: URI) extends PigletLogging {
    * 
    * @param schedule The schedule, all current plans, to count operators in
    */
-  def createOpCounter(schedule: Seq[(DataflowPlan, Path)]) = timing("analyze plans") {
+  def createOpCounter(schedule: Seq[(DataflowPlan, Path)], file: Path) = timing("analyze plans") {
 
     logger.debug("start creating lineage counter map")
 
+    val delim = ";"
+    
+    val map = MutableMap.empty[String, Int].withDefaultValue(0)
+    
+    if(Files.exists(file)) {
+      Source.fromFile(file.toFile()).getLines().foreach{line =>
+        val arr = line.split(delim)
+        val key = arr(0)
+        val value = arr(1).toInt
+        
+        map += (key -> value)
+      }
+    }
+    
     // the walker to traverse a plan
     val walker = new BreadthFirstTopDownWalker
 
-    // the map to store count values
-    val lineageMap = MutableMap.empty[String, Int]
-
+    
     // the visitor to add/update the operator count in the map 
     def visitor(op: PigOperator): Unit = {
       val lineage = op.lineageSignature
 
-      val value = lineageMap.getOrElse(lineage, 0)
-      lineageMap.update(lineage, value + 1) // increment counter 
+      op.outputs.flatMap(_.consumer).foreach{c => 
+        val key = s"${lineage}-${c.lineageSignature}"
+        
+        map(key) += 1
+      }
     }
 
     // traverse all plans and visit each operator within a plan
     schedule.foreach { plan => walker.walk(plan._1)(visitor) }
 
-    // prepare map content to be stored into database (using batch insert)
-    val entrySet = lineageMap.map { case (k, v) => Seq('id -> k, 'cnt -> v) }.toSeq
     
-    // TODO send opcount statistics to server
-//    DB localTx { implicit session =>
-//      /* this insert statement requires Postgres 9.5 (or higher):
-//       * we try to insert the id and count value, if there is a conflict on the ID (lineage) column,
-//       * it means that there already exists a value for this lineage, in this case we update the
-//       * existing value by adding the current value
-//       */
-//      sql"insert into opcount(id,cnt) values({id},{cnt}) on conflict (id) do update set cnt = opcount.cnt+{cnt};"
-//        .batchByName(entrySet: _*)
-//        .apply()
-//    }
-    
-    
-    
-    logger.warn("updating opcount not implemented yet.")
+    // after we counted the edges for all plans, write the data back to file
+    Files.write(file, map.toIterable.map{ case (key,value) => s"${key}${delim}${value}"}.asJava, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
   }
-}
-
-object DataflowProfiler {
   
-  def instance = {
-    val url = if(Conf.statServerURL.isDefined) {
+  
+  lazy val url = if(Conf.statServerURL.isDefined) {
       Conf.statServerURL.get.toURI()
     } else {
       val addr = java.net.InetAddress.getLocalHost.getHostAddress
-      java.net.URI.create(s"http://${addr}:${Conf.statServerPort}/")
+      logger.debug(s"identified local address as $addr")
+      val u = java.net.URI.create(s"http://${addr}:${Conf.statServerPort}/")
+      u
     }
-    
-    new DataflowProfiler(url)
-  }
-  
 }

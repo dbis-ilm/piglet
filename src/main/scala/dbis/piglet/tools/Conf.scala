@@ -105,6 +105,9 @@ object Conf extends PigletLogging {
   def statServerPort = appconf.getInt("statserver.port")
   def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url")).toURL()) else None
   
+  def opCountFile = "opcount"
+  def execTimesFile = "exectimes"
+  
 //  def langfeatureImports(feature: String) = appconf.getStringList(s"langfeature.$feature.imports").asScala
 //  def langfeatureAdditionalJars(feature: String) = appconf.getStringList(s"langfeature.$feature.jars")
 

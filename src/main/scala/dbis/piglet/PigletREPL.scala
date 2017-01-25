@@ -373,9 +373,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       nextScriptName()
 
       
-      val profiler = if(c.profiling.isDefined) Some(DataflowProfiler.instance) else None
-      
-      PigletCompiler.compilePlan(plan, scriptName, c, profiler) match {
+      PigletCompiler.compilePlan(plan, scriptName, c) match {
         case Some(jarFile) =>
           val runner = BackendManager.backend.runnerClass
           runner.execute(c.master, scriptName, jarFile, c.backendArgs, c.profiling.isDefined)

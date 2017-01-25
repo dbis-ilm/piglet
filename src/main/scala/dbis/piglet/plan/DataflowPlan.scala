@@ -423,7 +423,10 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    */
   def printPlan(tab: Int = 0): Unit = {
 //    operators.foreach(_.printOperator(tab))
-    TopoSort.sort(this).foreach(_.printOperator(tab))
+    TopoSort.sort(this).foreach{op =>
+      op.printOperator(tab)
+      println(s"${op.indent(2)}${op.lineageSignature}")
+    }
   }
 
    /**

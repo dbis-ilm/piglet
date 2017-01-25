@@ -11,6 +11,18 @@ import akka.actor.Props
 
 import dbis.piglet.tools.logging.PigletLogging
 import scala.concurrent.Future
+import java.nio.file.Path
+import akka.stream.scaladsl.FileIO
+import java.nio.file.StandardOpenOption
+import java.nio.channels.AsynchronousFileChannel
+import scalax.io.nio.ByteBuffer
+import java.nio.ByteBuffer
+import scala.collection.mutable.ListBuffer
+import java.io.PrintWriter
+import java.io.BufferedWriter
+import java.io.FileWriter
+import java.io.BufferedOutputStream
+import java.nio.file.Files
 
 object StatServer extends PigletLogging {
   
@@ -21,11 +33,15 @@ object StatServer extends PigletLogging {
 
 	private var bindingFuture: Future[Http.ServerBinding] = null
 	
+	var file: Option[Path] = None
 	
-	def start(port: Int) {
+
+	def start(port: Int, file: Path) {
     
-		val writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
-		
+	  StatServer.file = Some(file)
+
+	  val writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
+	  
     val route =
       path("times") {
         get {
@@ -38,22 +54,35 @@ object StatServer extends PigletLogging {
 
     bindingFuture = Http().bindAndHandle(route, "0.0.0.0", port)
 
-    logger.info(s"Stats server online at port")
+    logger.info(s"Stats server online at $port")
   }
    
   def stop(): Unit = {
+
+    StatsWriterActor.writer.flush()
+    StatsWriterActor.writer.close()
+    
     bindingFuture
       .flatMap(_.unbind()) // trigger unbinding from the port
       .onComplete(_ => system.terminate()) // and shutdown when done
-
-    system.terminate()  
   }
+}
+
+object StatsWriterActor {
+//  val writer = new PrintWriter(new BufferedWriter(new FileWriter(
+//      StatServer.file.get.toFile(), // the file to write to 
+//      true)))                       // true for APPEND mode
+  
+  val writer = new PrintWriter(Files.newBufferedWriter(StatServer.file.get, StandardOpenOption.APPEND, StandardOpenOption.CREATE))
 }
 
 class StatsWriterActor extends Actor  {
   
   def receive = {
-    case msg: String => 
-      Console.err.println(msg)
+    case msg: String =>
+      StatsWriterActor.writer.println(msg)
+//      StatsWriterActor.writer.flush()
+      
   }
 }
+

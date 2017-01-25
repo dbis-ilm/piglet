@@ -115,8 +115,8 @@ object Piglet extends PigletLogging {
 //        logger.error(s"Statistics management server is not reachable at ${c.profiling.get}. Aborting")
 //        return
 //      }
-      
-      StatServer.start(Conf.statServerPort)
+      val file = c.profiling.get.resolve(Conf.execTimesFile)
+      StatServer.start(Conf.statServerPort, file)
     }
 
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -240,16 +240,14 @@ object Piglet extends PigletLogging {
       schedule = ListBuffer((mergedPlan, Paths.get(s"merged_${System.currentTimeMillis()}.pig")))
     }
 
-   // val templateFile = BackendManager.backend.templateFile
-
-		val profiler = if(c.profiling.isDefined) Some(DataflowProfiler.instance) else None 
-		  
-
 
 		// begin global analysis phase
 
 		// count occurrences of each operator in schedule
-    profiler.foreach { p => p.createOpCounter(schedule) }
+    if(c.profiling.isDefined) {
+      val file = c.profiling.get.resolve(Conf.opCountFile)
+      DataflowProfiler.createOpCounter(schedule, file)
+    }
 
     logger.debug("start processing created dataflow plans")
 
@@ -288,7 +286,9 @@ object Piglet extends PigletLogging {
       
       
       // find materialization points
-      profiler.foreach { p => p.addMaterializationPoints(newPlan) }
+//      profiler.foreach { p => p.addMaterializationPoints(newPlan) }
+      if(c.profiling.isDefined)
+        DataflowProfiler.addMaterializationPoints(newPlan)
 
       logger.debug("finished optimizations")
 
@@ -321,7 +321,7 @@ object Piglet extends PigletLogging {
       logger.debug(s"using script name: $scriptName")
 
 
-      PigletCompiler.compilePlan(newPlan, scriptName, c, profiler) match {
+      PigletCompiler.compilePlan(newPlan, scriptName, c) match {
         // the file was created --> execute it
         case Some(jarFile) =>
           if (!c.compileOnly) {
