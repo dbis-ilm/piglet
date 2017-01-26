@@ -67,5 +67,10 @@ case class Filter(
     println(indent(tab + 2) + "outSchema = " + schema)
     println(indent(tab + 2) + "expr = " + pred)
   }
+  
+  override def toString() = s"""|FILTER { out = $outPipeName , in = $inPipeName }
+                                |  schema = $inputSchema
+                                |  expr = $pred
+                                """.stripMargin
 
 }
