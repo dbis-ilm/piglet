@@ -179,7 +179,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
       // generate the object definition representing the script
       code = code + codeGen.emitHeader2(ctx, scriptName, profiling)
 
-    val sortedOps = TopoSort.sort(plan)
+    val sortedOps = TopoSort(plan)
       
     sortedOps.foreach { op =>
 //    for(op <- plan.operators) {

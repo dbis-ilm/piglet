@@ -9,8 +9,8 @@ import java.nio.file.Path
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
-import org.json4s._
-import org.json4s.native.JsonMethods._
+//import org.json4s._
+//import org.json4s.native.JsonMethods._
 
 import dbis.piglet.op.PigOperator
 import dbis.piglet.plan.DataflowPlan
@@ -30,7 +30,7 @@ object DataflowProfiler extends PigletLogging {
   
   private val cache = MutableMap.empty[String, MaterializationPoint]
 
-  implicit lazy val formats = org.json4s.DefaultFormats
+//  implicit lazy val formats = org.json4s.DefaultFormats
   
   
 //  logger.info(s"Using storage service at $url for execution times")
@@ -89,8 +89,7 @@ object DataflowProfiler extends PigletLogging {
    */
   def addMaterializationPoints(plan: DataflowPlan) = timing("identify mat points") {
     
-    val walker = new DepthFirstTopDownWalker 
-    walker.walk(plan) { op =>
+    DepthFirstTopDownWalker.walk(plan) { op =>
 
       logger.debug( s"""checking storage service for runtime information for operator "${op.lineageSignature}" """)
       // check for the current operator, if we have some runtime/stage information 
@@ -154,10 +153,6 @@ object DataflowProfiler extends PigletLogging {
       }
     }
     
-    // the walker to traverse a plan
-    val walker = new BreadthFirstTopDownWalker
-
-    
     // the visitor to add/update the operator count in the map 
     def visitor(op: PigOperator): Unit = {
       val lineage = op.lineageSignature
@@ -170,11 +165,13 @@ object DataflowProfiler extends PigletLogging {
     }
 
     // traverse all plans and visit each operator within a plan
-    schedule.foreach { plan => walker.walk(plan._1)(visitor) }
+    schedule.foreach { plan => BreadthFirstTopDownWalker.walk(plan._1)(visitor) }
 
     
     // after we counted the edges for all plans, write the data back to file
-    Files.write(file, map.toIterable.map{ case (key,value) => s"${key}${delim}${value}"}.asJava, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+    Files.write(file, 
+        map.toIterable.map{ case (key,value) => s"${key}${delim}${value}"}.asJava, 
+        StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
   }
   
   

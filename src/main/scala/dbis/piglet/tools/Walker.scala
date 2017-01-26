@@ -35,7 +35,7 @@ trait Walker[T] {
  * This class provides the possibility to traverse a dataflow plan
  * in breadth first manner by starting at the sink nodes (botton-up)
  */
-class BreadthFirstBottomUpWalker extends Walker[PigOperator] {
+object BreadthFirstBottomUpWalker extends Walker[PigOperator] {
   
 	@Override
 	def walk(plan: DataflowPlan)(visit: (PigOperator => Unit)) = {
@@ -101,7 +101,7 @@ class BreadthFirstBottomUpWalker extends Walker[PigOperator] {
  * This class provides the possibility to traverse a dataflow plan
  * in breadth first manner by starting at the source nodes (top-down)
  */
-class BreadthFirstTopDownWalker extends Walker[PigOperator] {
+object BreadthFirstTopDownWalker extends Walker[PigOperator] {
   
 	override def walk(plan: DataflowPlan)(visit: (PigOperator => Unit)) = {
 //	  new BreadthFirstTopDownIterator(plan).foreach(visit)
@@ -126,7 +126,7 @@ class BreadthFirstTopDownWalker extends Walker[PigOperator] {
   } 
 }
 
-class DepthFirstTopDownWalker extends Walker[PigOperator] {
+object DepthFirstTopDownWalker extends Walker[PigOperator] {
   
   @Override
   override def walk(plan: DataflowPlan)(visit: (PigOperator => Unit)) = {
@@ -152,7 +152,7 @@ class DepthFirstTopDownWalker extends Walker[PigOperator] {
 
 object TopoSort extends PigletLogging {
 	
-  def sort(plan: DataflowPlan) = {
+  def apply(plan: DataflowPlan) = {
     
     val l = ListBuffer.empty[PigOperator]
     val s = Queue(plan.sourceNodes.toSeq: _*)

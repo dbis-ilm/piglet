@@ -40,15 +40,12 @@ trait WindowSupport extends PigletLogging {
 
     var newPlan = plan
 
-    val walker1 = new BreadthFirstTopDownWalker
-    val walker2 = new BreadthFirstBottomUpWalker
-
     // All Window Ops: Group,Filter,Distinct,Limit,OrderBy,Foreach
     // Two modes: Group,Filter,Limit,Foreach
     // Terminator: Foreach, Join
 
     logger.debug(s"Searching for Window Operators")
-    walker1.walk(newPlan){ op =>
+    BreadthFirstTopDownWalker.walk(newPlan){ op =>
       op match {
         case o: Window => {
           logger.debug(s"Found Window Operator")
@@ -60,7 +57,7 @@ trait WindowSupport extends PigletLogging {
 
     // Find and process Window Joins and Cross'
     val joins = ListBuffer.empty[PigOperator]
-    walker2.walk(newPlan){ op =>
+    BreadthFirstBottomUpWalker.walk(newPlan){ op =>
       op match {
         case o: Join => joins += o
         case o: Cross => joins += o

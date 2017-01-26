@@ -23,7 +23,6 @@ object PlanMerger extends PigletLogging {
 	  // start with the first plan as basis
 		var mergedPlan = schedule.head
 
-		val walker = new BreadthFirstTopDownWalker
 		
 		// just to avoid magic "numbers" in later code
 		val deferrPlanConstruction = true
@@ -99,7 +98,7 @@ object PlanMerger extends PigletLogging {
 		  .foreach {  case (plan,idx) => 
 		    // for all remaining: visit each op and add to merged plan 
 		    logger.debug(s"processing plan no. #$idx")
-		    walker.walk(plan)(visitor) 
+		    BreadthFirstTopDownWalker.walk(plan)(visitor) 
 	    }      
 
 		

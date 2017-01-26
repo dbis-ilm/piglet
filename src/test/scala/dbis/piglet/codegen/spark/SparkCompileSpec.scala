@@ -533,7 +533,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, joinOp))
 
     // check if we can generate code for _all_ operators
-    TopoSort.sort(newPlan).foreach(codeGenerator.emitNode(ctx, _))
+    TopoSort(newPlan).foreach(codeGenerator.emitNode(ctx, _))
     
     
     val gen = new CodeGenerator(codeGenerator)

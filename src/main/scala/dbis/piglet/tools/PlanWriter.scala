@@ -17,9 +17,9 @@ object PlanWriter extends PigletLogging {
     val dot = s"""digraph {
     |  node [shape=box]
     |  ${ plan.operators.map{ op => s"op${op.lineageSignature} [label=${quote(op.toString())}]" }.mkString("\n") }
-    |  ${ val walker = new BreadthFirstTopDownWalker
+    |  ${  
       val edges = ListBuffer.empty[String]
-      walker.walk(plan) { op =>
+      BreadthFirstTopDownWalker.walk(plan) { op =>
         op.outputs.flatMap(_.consumer).foreach { c =>
           edges += s"  op${op.lineageSignature} -> op${c.lineageSignature}"
         }

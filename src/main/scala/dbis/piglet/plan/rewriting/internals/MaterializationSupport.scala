@@ -35,11 +35,9 @@ trait MaterializationSupport extends PigletLogging {
     require(plan != null, "Plan must not be null")
     require(mm != null, "Materialization Manager must not be null")
 
-    val walker = new BreadthFirstBottomUpWalker
-
     val materializes = ListBuffer.empty[Materialize]
 
-    walker.walk(plan) { op =>
+    BreadthFirstBottomUpWalker.walk(plan) { op =>
       op match {
         case o: Materialize => materializes += o
         case _ =>

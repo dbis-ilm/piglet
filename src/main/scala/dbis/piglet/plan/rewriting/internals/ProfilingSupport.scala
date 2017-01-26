@@ -14,7 +14,7 @@ trait ProfilingSupport extends PigletLogging {
   def insertTimings(plan: DataflowPlan): DataflowPlan = {
 
     
-    for(op <- TopoSort.sort(plan) if op.outputs.nonEmpty) {
+    for(op <- TopoSort(plan) if op.outputs.nonEmpty) {
       
       val outArr = new Array[Pipe](op.outputs.size)
       op.outputs.copyToArray(outArr)

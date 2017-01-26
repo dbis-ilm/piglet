@@ -69,9 +69,9 @@ public class PigletInterpreter extends Interpreter {
         }
         
         // TODO: add language feature COMPLETE here
-        List<String> features = new LinkedList<String>();
-        features.add("CompletePiglet");
-        String sparkCode = PigletInterpreterAPI.createCodeFromInput(line, "spark", features);
+//        List<String> features = new LinkedList<String>();
+//        features.add("CompletePiglet");
+        String sparkCode = PigletInterpreterAPI.createCodeFromInput(line, "spark");
         sparkCode += "\nsc.stop()";
         // sparkCode = "println(\"%table x\ty\\n1\t2\\n3\t4\\n\\n\")";
         logger.info("PigletInterpreter.interpret = " + sparkCode);
