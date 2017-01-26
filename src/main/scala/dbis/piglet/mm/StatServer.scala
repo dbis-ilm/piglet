@@ -9,20 +9,14 @@ import akka.stream.ActorMaterializer
 import akka.actor.Actor
 import akka.actor.Props
 
-import dbis.piglet.tools.logging.PigletLogging
 import scala.concurrent.Future
-import java.nio.file.Path
-import akka.stream.scaladsl.FileIO
-import java.nio.file.StandardOpenOption
-import java.nio.channels.AsynchronousFileChannel
-import scalax.io.nio.ByteBuffer
-import java.nio.ByteBuffer
-import scala.collection.mutable.ListBuffer
+
 import java.io.PrintWriter
-import java.io.BufferedWriter
-import java.io.FileWriter
-import java.io.BufferedOutputStream
 import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+
+import dbis.piglet.tools.logging.PigletLogging
 
 object StatServer extends PigletLogging {
   
@@ -33,8 +27,7 @@ object StatServer extends PigletLogging {
 
 	private var bindingFuture: Future[Http.ServerBinding] = null
 	
-	var file: Option[Path] = None
-	
+	private[mm] var file: Option[Path] = None
 
 	def start(port: Int, file: Path) {
     
@@ -69,11 +62,8 @@ object StatServer extends PigletLogging {
 }
 
 object StatsWriterActor {
-//  val writer = new PrintWriter(new BufferedWriter(new FileWriter(
-//      StatServer.file.get.toFile(), // the file to write to 
-//      true)))                       // true for APPEND mode
   
-  val writer = new PrintWriter(Files.newBufferedWriter(StatServer.file.get, StandardOpenOption.APPEND, StandardOpenOption.CREATE))
+  lazy val writer = new PrintWriter(Files.newBufferedWriter(StatServer.file.get, StandardOpenOption.APPEND, StandardOpenOption.CREATE))
 }
 
 class StatsWriterActor extends Actor  {
