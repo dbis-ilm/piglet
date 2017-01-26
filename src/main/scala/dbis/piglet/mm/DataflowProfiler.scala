@@ -29,11 +29,9 @@ object DataflowProfiler extends PigletLogging {
   logger.debug(s"using profiling ")
   
   private val cache = MutableMap.empty[String, MaterializationPoint]
+  private[mm] val exectimes = ListBuffer.empty[(String,Int,Long)]
 
-//  implicit lazy val formats = org.json4s.DefaultFormats
   
-  
-//  logger.info(s"Using storage service at $url for execution times")
   
   def getMaterializationPoint(hash: String): Option[MaterializationPoint] = cache.get(hash)
 

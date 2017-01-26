@@ -294,6 +294,7 @@ object Piglet extends PigletLogging {
       logger.debug("finished optimizations")
 
       if (c.showPlan) {
+        PlanWriter.init(newPlan)
         println("final plan = {")
         newPlan.printPlan(2)
         println("}")
@@ -338,7 +339,9 @@ object Piglet extends PigletLogging {
           } else
             logger.info("successfully compiled program - exiting.")
             
-          PlanWriter.writeDotFile(newPlan, c.outDir.resolve(path.getFileName.toString()+".dot"))
+          if(c.showPlan) {  
+            PlanWriter.writeDotFile(jarFile.getParent.resolve(s"${scriptName}.dot"))
+          }
 
         case None => logger.error(s"creating jar file failed for ${path}")
       }

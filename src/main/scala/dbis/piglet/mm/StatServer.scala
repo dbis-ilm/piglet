@@ -28,7 +28,7 @@ object StatServer extends PigletLogging {
 	private var bindingFuture: Future[Http.ServerBinding] = null
 	
 	private[mm] var file: Option[Path] = None
-
+	
 	def start(port: Int, file: Path) {
     
 	  StatServer.file = Some(file)
@@ -52,8 +52,8 @@ object StatServer extends PigletLogging {
    
   def stop(): Unit = {
 
-    StatsWriterActor.writer.flush()
-    StatsWriterActor.writer.close()
+//    StatsWriterActor.writer.flush()
+//    StatsWriterActor.writer.close()
     
     bindingFuture
       .flatMap(_.unbind()) // trigger unbinding from the port
@@ -61,18 +61,14 @@ object StatServer extends PigletLogging {
   }
 }
 
-object StatsWriterActor {
-  
-  lazy val writer = new PrintWriter(Files.newBufferedWriter(StatServer.file.get, StandardOpenOption.APPEND, StandardOpenOption.CREATE))
-}
+//  lazy val writer = new PrintWriter(Files.newBufferedWriter(StatServer.file.get, StandardOpenOption.APPEND, StandardOpenOption.CREATE))
 
 class StatsWriterActor extends Actor  {
   
   def receive = {
     case msg: String =>
-      StatsWriterActor.writer.println(msg)
-//      StatsWriterActor.writer.flush()
-      
+      val arr = msg.split(";")
+      DataflowProfiler.exectimes += ((arr(0), arr(1).toInt, arr(2).toLong))      
   }
 }
 
