@@ -22,25 +22,26 @@ import org.scalatest.FlatSpec
 
 class SparksCompileIt extends FlatSpec with CompileIt {
   val scripts = Table(
-   ("script", "result", "truth", "inOrder", "language", "backend"), // only the header of the table
-    ("stream_load.pig",  "result1.out",   "truth/result1.data",   false, "streaming", "sparks"),
-    ("stream_load2.pig", "result2.out",   "truth/result2.data",   false, "streaming", "sparks"),
-    ("stream_foreach1.pig", "distances.out", "truth/distances.data", false, "streaming", "sparks"),
-    ("stream_filter.pig", "filtered.out",  "truth/filtered.data",  false, "streaming", "sparks"),
+   ("script", "result", "truth", "inOrder", "backend"), // only the header of the table
+    ("stream_load.pig",  "result1.out",   "truth/result1.data",   false, "sparks"),
+    ("stream_load2.pig", "result2.out",   "truth/result2.data",   false, "sparks"),
+    ("stream_foreach1.pig", "distances.out", "truth/distances.data", false, "sparks"),
+    ("stream_filter.pig", "filtered.out",  "truth/filtered.data",  false,  "sparks"),
 /*    ("construct.pig",     "result3.out", "truth/construct.data",   false, "streaming", "sparks"),
     ("union.pig",         "united.out",    "truth/united.data",    false, "streaming", "sparks"),
     ("aggregate.pig",     "aggregate.out", "truth/aggregate2.data",false, "streaming", "sparks"),*/
-    ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false, "streaming", "sparks"),
-    ("windowJoin.pig",    "joinedW.out",   "truth/joined.data",    false, "streaming", "sparks"),
+    ("splitInto.pig",     "splitX.out",    "truth/splitX.data",    false, "sparks"),
+    ("windowJoin.pig",    "joinedW.out",   "truth/joined.data",    false, "sparks"),
 //    ("windowCross.pig",   "crossedW.out",  "truth/crossed.data",   false, "streaming", "sparks"),
-    ("windowGrouping.pig","grouping.out",  "truth/grouping.data",  false, "streaming", "sparks"),
-    ("windowNforeach.pig","nested.out",    "truth/nested.data",    false, "streaming", "sparks"),
-    ("windowFilter.pig",  "filtered.out",  "truth/filtered.data",  false, "streaming", "sparks"),
-    ("windowCount.pig",   "marycounts.out","truth/marycount.data", false, "streaming", "sparks"),
-    ("windowDistinct.pig","unique.out",    "truth/unique.data",    false, "streaming", "sparks"),
-    ("windowSort.pig",    "sorted.out",    "truth/sorted.data",    true,  "streaming", "sparks")
+    ("windowGrouping.pig","grouping.out",  "truth/grouping.data",  false, "sparks"),
+    ("windowNforeach.pig","nested.out",    "truth/nested.data",    false, "sparks"),
+    ("windowFilter.pig",  "filtered.out",  "truth/filtered.data",  false, "sparks"),
+    ("windowCount.pig",   "marycounts.out","truth/marycount.data", false, "sparks"),
+    ("windowDistinct.pig","unique.out",    "truth/unique.data",    false, "sparks"),
+    ("windowSort.pig",    "sorted.out",    "truth/sorted.data",    true, "sparks")
     //TODO: Sample, Split, Stream-Through, Hybrid-Operators
  )
-  
- it should behave like checkMatch(scripts)
+ 
+ scripts.zipWithIndex foreach { case ((script, result, truth, inOrder, backend), i) =>
+  checkMatch(script, result, truth, inOrder, backend, i, scripts.size) }
 }

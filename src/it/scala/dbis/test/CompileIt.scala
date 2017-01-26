@@ -22,7 +22,7 @@ import dbis.piglet.Piglet
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.BuildInfo
 import org.scalatest.prop.TableDrivenPropertyChecks._
-import org.scalatest.prop.TableFor6
+import org.scalatest.prop.TableFor5
 import scala.io.Source
 import scalax.file.Path
 import org.apache.commons.exec._
@@ -32,14 +32,9 @@ import java.nio.charset.MalformedInputException
 trait CompileIt extends Matchers {
   this: FlatSpec =>
 
-    
-  def checkMatch(scripts: TableFor6[String, String, String, Boolean, String, String]) {
-    "The Pig compiler" should "compile and execute the script" in {
-      
-      var i = 1
-      
-      forEvery(scripts) { (script: String, resultDir: String, truthFile: String, inOrder: Boolean, lang: String, backend: String) =>
-        // 1. make sure the output directory is empty
+  def checkMatch (script: String, resultDir: String, truthFile: String, inOrder: Boolean, backend: String, i: Int, nTests: Int) {
+      "The Pig compiler" should s"compile and execute the script $script" in {
+       // 1. make sure the output directory is empty
         cleanupResult(resultDir)
         cleanupResult(script.replace(".pig", ""))
 
@@ -47,10 +42,9 @@ trait CompileIt extends Matchers {
         val resourcePath = getClass.getResource("").getPath + "../../../"
         // 2. compile and execute Pig script
         
-        print(s"Testing: [${"#"*i}${" "*(scripts.size - i)}] ${i}/${scripts.size} : $script                                        \r")
-        i += 1
-        
-        runCompiler(script, resourcePath, resultPath, lang, backend) should be(true)
+       print(s"Testing: [${"#"*(i+1)}${" "*(nTests - i)}] ${i+1}/${nTests} : $script                                        \r")
+
+        runCompiler(script, resourcePath, resultPath, backend) should be(true)
 
         val result = getResult(resultPath)
 
@@ -70,7 +64,8 @@ trait CompileIt extends Matchers {
       
       println
     }
-  }
+  // }
+
   private def cleanupResult(dir: String): Unit = {
     import scalax.file.Path
     val path: Path = Path.fromString(dir)
@@ -80,8 +75,8 @@ trait CompileIt extends Matchers {
       case e: java.io.IOException => println("WARNING: " + e.getMessage)// some file could not be deleted
 
     }
-
   }
+
   private def getResult(resultPath: Path): Seq[String] = {
 
     // 3. load the output file(s) and the truth file
@@ -106,15 +101,9 @@ trait CompileIt extends Matchers {
     result.toSeq
   }
 
-  private def runCompiler(script: String, resourceName: String, resultPath: Path, lang: String, backend: String): Boolean = {
-//    val executeLine = "| execute: " + script + " |"
-//    var frame = ""
-//    for (c <- 1 to executeLine.length()) frame += "-"
-//    print("\n" + frame + "\n" + executeLine + "\n" + frame)
-
+  private def runCompiler(script: String, resourceName: String, resultPath: Path, backend: String): Boolean = {
     val params = new java.util.HashMap[String, Object]()
     params.put("backend", backend)
-    params.put("languages", lang)
     params.put("master", BuildInfo.master)
     params.put("outdir", ".")
     params.put("log-level", "ERROR")
@@ -128,8 +117,6 @@ trait CompileIt extends Matchers {
     cmdLine.addArgument("${master}")
     cmdLine.addArgument("--log-level")
     cmdLine.addArgument("${log-level}")
-//    cmdLine.addArgument("--languages")
-//    cmdLine.addArgument("${languages}")
     cmdLine.addArgument("--outdir")
     cmdLine.addArgument("${outdir}")
     cmdLine.addArgument("--params")

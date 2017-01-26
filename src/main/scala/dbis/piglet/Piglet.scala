@@ -53,6 +53,7 @@ import dbis.setm.SETM
 import dbis.setm.SETM.timing
 import java.util.Formatter.DateTime
 import dbis.piglet.mm.StatServer
+import dbis.piglet.tools.PlanWriter
 
 
 object Piglet extends PigletLogging {
@@ -336,6 +337,8 @@ object Piglet extends PigletLogging {
             }
           } else
             logger.info("successfully compiled program - exiting.")
+            
+          PlanWriter.writeDotFile(newPlan, c.outDir.resolve(path.getFileName.toString()+".dot"))
 
         case None => logger.error(s"creating jar file failed for ${path}")
       }
