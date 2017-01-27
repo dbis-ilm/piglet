@@ -41,7 +41,7 @@ class SparksCompileIt extends FlatSpec with CompileIt {
     ("windowSort.pig",    "sorted.out",    "truth/sorted.data",    true, "sparks")
     //TODO: Sample, Split, Stream-Through, Hybrid-Operators
  )
- 
+
  scripts.zipWithIndex foreach { case ((script, result, truth, inOrder, backend), i) =>
   checkMatch(script, result, truth, inOrder, backend, i, scripts.size) }
 }
