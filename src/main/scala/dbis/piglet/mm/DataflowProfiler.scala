@@ -9,9 +9,6 @@ import java.nio.file.Path
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
-//import org.json4s._
-//import org.json4s.native.JsonMethods._
-
 import dbis.piglet.op.PigOperator
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.plan.MaterializationManager
@@ -20,6 +17,7 @@ import dbis.piglet.tools.BreadthFirstTopDownWalker
 import dbis.piglet.tools.DepthFirstTopDownWalker
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.setm.SETM.timing
+import dbis.piglet.tools.CliParams
 
 /**
  * Created by kai on 24.08.15.
@@ -28,10 +26,48 @@ object DataflowProfiler extends PigletLogging {
   
   logger.debug(s"using profiling ")
   
+  val delim = ";"
+  
   private val cache = MutableMap.empty[String, MaterializationPoint]
   private[mm] val exectimes = ListBuffer.empty[(String,Int,Long)]
+  private[mm] val opcounts  = MutableMap.empty[String, Int].withDefaultValue(0)
 
+  def init(base: Path) = {
+    val opCountFile = base.resolve(Conf.opCountFile)
+    if(Files.exists(opCountFile)) {
+      Source.fromFile(opCountFile.toFile()).getLines().foreach{line =>
+        val arr = line.split(delim)
+        val key = arr(0)
+        val value = arr(1).toInt
+        
+        opcounts += (key -> value)
+      }
+    }  
+    
+    val execTimesFile = base.resolve(Conf.execTimesFile)
+    if(Files.exists(execTimesFile)) {
+      Source.fromFile(execTimesFile.toFile()).getLines().foreach{line =>
+        val arr = line.split(delim)
+        val entry = (arr(0),arr(1).toInt, arr(2).toLong)
+        
+        exectimes += entry
+      }
+    } 
+    
+  }
   
+  def writeStatistics(c: CliParams) = {
+    
+    val execTimesFile = c.profiling.get.resolve(Conf.execTimesFile)
+    Files.write(execTimesFile, 
+        exectimes.map(t => s"${t._1}${delim}${t._2}${delim}${t._3}").toIterable.asJava, 
+        StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)
+    
+    val opCountFile = c.profiling.get.resolve(Conf.opCountFile)
+    Files.write(opCountFile, 
+        opcounts.toIterable.map{ case (key,value) => s"${key}${delim}${value}"}.asJava, 
+        StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+  }
   
   def getMaterializationPoint(hash: String): Option[MaterializationPoint] = cache.get(hash)
 
@@ -48,8 +84,6 @@ object DataflowProfiler extends PigletLogging {
   }
 
   override def toString = cache.mkString(",")
-  
-  
   
   def getExectimes(lineage: String): Option[(Long, Long)] = {
 //    if(url.isEmpty) {
@@ -133,23 +167,9 @@ object DataflowProfiler extends PigletLogging {
    * 
    * @param schedule The schedule, all current plans, to count operators in
    */
-  def createOpCounter(schedule: Seq[(DataflowPlan, Path)], file: Path) = timing("analyze plans") {
+  def createOpCounter(schedule: Seq[(DataflowPlan, Path)], c: CliParams) = timing("analyze plans") {
 
     logger.debug("start creating lineage counter map")
-
-    val delim = ";"
-    
-    val map = MutableMap.empty[String, Int].withDefaultValue(0)
-    
-    if(Files.exists(file)) {
-      Source.fromFile(file.toFile()).getLines().foreach{line =>
-        val arr = line.split(delim)
-        val key = arr(0)
-        val value = arr(1).toInt
-        
-        map += (key -> value)
-      }
-    }
     
     // the visitor to add/update the operator count in the map 
     def visitor(op: PigOperator): Unit = {
@@ -158,18 +178,12 @@ object DataflowProfiler extends PigletLogging {
       op.outputs.flatMap(_.consumer).foreach{c => 
         val key = s"${lineage}-${c.lineageSignature}"
         
-        map(key) += 1
+        opcounts(key) += 1
       }
     }
 
     // traverse all plans and visit each operator within a plan
     schedule.foreach { plan => BreadthFirstTopDownWalker.walk(plan._1)(visitor) }
-
-    
-    // after we counted the edges for all plans, write the data back to file
-    Files.write(file, 
-        map.toIterable.map{ case (key,value) => s"${key}${delim}${value}"}.asJava, 
-        StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
   }
   
   

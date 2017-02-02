@@ -27,11 +27,8 @@ object StatServer extends PigletLogging {
 
 	private var bindingFuture: Future[Http.ServerBinding] = null
 	
-	private[mm] var file: Option[Path] = None
-	
-	def start(port: Int, file: Path) {
+	def start(port: Int) {
     
-	  StatServer.file = Some(file)
 
 	  val writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
 	  
@@ -52,16 +49,11 @@ object StatServer extends PigletLogging {
    
   def stop(): Unit = {
 
-//    StatsWriterActor.writer.flush()
-//    StatsWriterActor.writer.close()
-    
     bindingFuture
       .flatMap(_.unbind()) // trigger unbinding from the port
       .onComplete(_ => system.terminate()) // and shutdown when done
   }
 }
-
-//  lazy val writer = new PrintWriter(Files.newBufferedWriter(StatServer.file.get, StandardOpenOption.APPEND, StandardOpenOption.CREATE))
 
 class StatsWriterActor extends Actor  {
   

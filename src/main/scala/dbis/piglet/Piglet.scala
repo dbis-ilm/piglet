@@ -110,14 +110,8 @@ object Piglet extends PigletLogging {
      * If it's unavailable print an error and stop
      */
     if(c.profiling.isDefined) {
-//      val reachable = FileTools.checkHttpServer(c.profiling.get)
-//
-//      if(! reachable) {
-//        logger.error(s"Statistics management server is not reachable at ${c.profiling.get}. Aborting")
-//        return
-//      }
-      val file = c.profiling.get.resolve(Conf.execTimesFile)
-      StatServer.start(Conf.statServerPort, file)
+      DataflowProfiler.init(c.profiling.get)
+      StatServer.start(Conf.statServerPort)
     }
 
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -125,8 +119,11 @@ object Piglet extends PigletLogging {
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     
-    if(c.profiling.isDefined)
-      StatServer.stop()
+    if(c.profiling.isDefined) {
+    	StatServer.stop()
+
+    	DataflowProfiler.writeStatistics(c)
+    }
     
     // at the end, show the statistics
     if(c.showStats) {
@@ -247,7 +244,7 @@ object Piglet extends PigletLogging {
 		// count occurrences of each operator in schedule
     if(c.profiling.isDefined) {
       val file = c.profiling.get.resolve(Conf.opCountFile)
-      DataflowProfiler.createOpCounter(schedule, file)
+      DataflowProfiler.createOpCounter(schedule, c)
     }
 
     logger.debug("start processing created dataflow plans")
@@ -339,6 +336,8 @@ object Piglet extends PigletLogging {
           } else
             logger.info("successfully compiled program - exiting.")
             
+            
+          // after execution we want to write the dot file  
           if(c.showPlan) {  
             PlanWriter.writeDotFile(jarFile.getParent.resolve(s"${scriptName}.dot"))
           }
