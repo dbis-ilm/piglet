@@ -48,5 +48,9 @@ case class Store(
       println(indent(tab + 2) + "func = " + func.get)
     }
   }
+  
+  override def toString() = s"""STORE { in = $inPipeName }
+                                |  file = ${file.toString()}
+                                |  ${func.getOrElse("")}""".stripMargin
 
 }

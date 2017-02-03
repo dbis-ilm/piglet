@@ -54,6 +54,7 @@ import dbis.setm.SETM.timing
 import java.util.Formatter.DateTime
 import dbis.piglet.mm.StatServer
 import dbis.piglet.tools.PlanWriter
+import dbis.piglet.tools.TopoSort
 
 
 object Piglet extends PigletLogging {
@@ -338,7 +339,20 @@ object Piglet extends PigletLogging {
             
             
           // after execution we want to write the dot file  
-          if(c.showPlan) {  
+          if(c.showPlan) {
+            
+            if(c.profiling.isDefined) {
+              
+              logger.info(s"profiler has info for ${DataflowProfiler.exectimes.size} lineages")
+              
+              newPlan.operators.filter(o => o.inputs.nonEmpty && o.outputs.nonEmpty).foreach{ node => 
+                val time = DataflowProfiler.getExectime(node.lineageSignature, node.inputs.map(_.producer).map(_.lineageSignature):_*)
+                
+                PlanWriter.nodes(node.lineageSignature).time = time
+              }
+              
+            }
+            
             PlanWriter.writeDotFile(jarFile.getParent.resolve(s"${scriptName}.dot"))
           }
 

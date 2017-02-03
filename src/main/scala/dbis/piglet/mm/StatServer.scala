@@ -28,8 +28,6 @@ object StatServer extends PigletLogging {
 	private var bindingFuture: Future[Http.ServerBinding] = null
 	
 	def start(port: Int) {
-    
-
 	  val writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
 	  
     val route =
@@ -55,12 +53,12 @@ object StatServer extends PigletLogging {
   }
 }
 
-class StatsWriterActor extends Actor  {
+class StatsWriterActor extends Actor with PigletLogging  {
   
   def receive = {
     case msg: String =>
       val arr = msg.split(";")
-      DataflowProfiler.exectimes += ((arr(0), arr(1).toInt, arr(2).toLong))      
+      DataflowProfiler.addExecTime(arr(0), arr(1).toInt, arr(2).toLong)
   }
 }
 

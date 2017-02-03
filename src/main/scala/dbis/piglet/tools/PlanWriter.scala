@@ -8,10 +8,15 @@ import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import dbis.piglet.tools.logging.PigletLogging
 import scala.collection.mutable.Map
+import dbis.piglet.op.TimingOp
+import dbis.piglet.op.PigOperator
 
 
-case class Node(id: String, var time: Option[Long] = None, var label: String = "") {
-  override def toString() = s"op${id} ${if(label.trim().nonEmpty) s"[label=$label]" else ""}"
+case class Node(id: String, var time: Option[Double] = None, var label: String = "") {
+  override def toString() = s"op${id} ${if(label.trim().nonEmpty) s"[label=${
+    val t = if(time.isDefined) "\n"+time.get else ""
+    PlanWriter.quote(label+t)
+    }]" else ""}"
 }
 case class Edge(from: String, to: String, var label: String = "") {
   override def toString() = s"op$from -> op$to ${if(label.trim().nonEmpty) s"[label=$label]" else "" }"
@@ -22,17 +27,24 @@ object PlanWriter extends PigletLogging {
   
   def quote(s: String) = s""""${s.replace('\"', '\'')}""""
   
-  private val nodes = Map.empty[String, Node]
-  private val edges = ListBuffer.empty[Edge]
+  val nodes = Map.empty[String, Node]
+  val edges = ListBuffer.empty[Edge]
   
-  def init(plan: DataflowPlan) = {
+  private def signature(op: PigOperator) = op match { 
+        case _:TimingOp => s"timing_${op.lineageSignature}"
+        case _ => op.lineageSignature
+      }
+  
+  def init(plan: DataflowPlan, includeTimingOp: Boolean = true) = {
     
-    plan.operators.foreach{ op =>
-      val sig = op.lineageSignature
+    val ops = if(includeTimingOp) plan.operators else plan.operators.filterNot(_.isInstanceOf[TimingOp])
+    
+    ops.foreach{ op =>
+      val sig = signature(op)
       nodes += (sig -> Node(sig, label = quote(op.toString())))
       
       op.outputs.flatMap(_.consumer).foreach { c =>
-        edges += Edge(sig, c.lineageSignature)
+        edges += Edge(sig, signature(c))
       }
     }
   }
