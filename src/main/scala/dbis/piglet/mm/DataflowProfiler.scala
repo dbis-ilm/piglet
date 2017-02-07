@@ -108,6 +108,11 @@ object DataflowProfiler extends PigletLogging {
         
       } else { // parent/parents has different number of partitions than current op
         
+                
+        val ratio = parentTimes.size.asInstanceOf[Double] / times.size 
+        println(s"op: $lineage  parents: ${parentTimes.size}  op = ${times.size} ratio = $ratio")
+        
+        
     	  val opFinish = times.last._2
         
     	  val parentFinishFirst = if(parentTimes.nonEmpty) parentTimes.map(_._2).min else currentTimes("start").head._2

@@ -10,9 +10,10 @@ import dbis.piglet.tools.logging.PigletLogging
 import scala.collection.mutable.Map
 import dbis.piglet.op.TimingOp
 import dbis.piglet.op.PigOperator
+import scala.concurrent.duration.Duration
 
 
-case class Node(id: String, var time: Option[Double] = None, var label: String = "") {
+case class Node(id: String, var time: Option[Duration] = None, var label: String = "") {
   
   private def mkLabel = {
     val t = if(time.isDefined) "\n"+time.get else ""

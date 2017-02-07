@@ -19,6 +19,7 @@ package dbis.piglet
 
 import scala.io.Source
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration._
 
 import scopt.OptionParser
 
@@ -344,7 +345,9 @@ object Piglet extends PigletLogging {
               
               logger.info(s"profiler has info for ${exectimesCnt} lineages")
               newPlan.operators.foreach{ node => 
-                val time = DataflowProfiler.getExectime(node.lineageSignature)
+                val time = DataflowProfiler.getExectime(node.lineageSignature).map(_.milliseconds)
+                
+                
                 
                 PlanWriter.nodes(node.lineageSignature).time = time
               }
