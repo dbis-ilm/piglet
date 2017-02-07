@@ -70,7 +70,6 @@ case class Filter(
   
   override def toString() = s"""|FILTER { out = $outPipeName , in = $inPipeName }
                                 |  schema = $inputSchema
-                                |  expr = $pred
-                                """.stripMargin
+                                |  expr = $pred""".stripMargin
 
 }

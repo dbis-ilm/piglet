@@ -13,10 +13,14 @@ import dbis.piglet.op.PigOperator
 
 
 case class Node(id: String, var time: Option[Double] = None, var label: String = "") {
-  override def toString() = s"op${id} ${if(label.trim().nonEmpty) s"[label=${
+  
+  private def mkLabel = {
     val t = if(time.isDefined) "\n"+time.get else ""
-    PlanWriter.quote(label+t)
-    }]" else ""}"
+    val l = s"$label\n$id\n$t" 
+    PlanWriter.quote(l)
+  }
+  
+  override def toString() = s"op${id} ${if(label.trim().nonEmpty) s"[label=${mkLabel}]" else ""}"
 }
 case class Edge(from: String, to: String, var label: String = "") {
   override def toString() = s"op$from -> op$to ${if(label.trim().nonEmpty) s"[label=$label]" else "" }"
@@ -31,9 +35,9 @@ object PlanWriter extends PigletLogging {
   val edges = ListBuffer.empty[Edge]
   
   private def signature(op: PigOperator) = op match { 
-        case _:TimingOp => s"timing_${op.lineageSignature}"
-        case _ => op.lineageSignature
-      }
+      case _:TimingOp => s"timing_${op.lineageSignature}"
+      case _ => op.lineageSignature
+    }
   
   def init(plan: DataflowPlan, includeTimingOp: Boolean = true) = {
     

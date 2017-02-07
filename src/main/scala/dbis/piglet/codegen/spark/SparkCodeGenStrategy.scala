@@ -103,6 +103,8 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
                          |
                          |<if (profiling)>
                          |    val url = "<profiling>"
+                         |    sc.addSparkListener(new PerfMonitor(url))
+                         |    PerfMonitor.notify(url,"start",-1,System.currentTimeMillis)
                          |<endif>
                          |""".stripMargin, map)
   }

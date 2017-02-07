@@ -3,6 +3,7 @@ package dbis.piglet.backends.spark
 import java.net.URI
 import scala.concurrent._
 import ExecutionContext.Implicits.global
+import org.apache.spark.scheduler.{SparkListener,SparkListenerApplicationStart,SparkListenerApplicationEnd}
 
 /**
  * A performance monitor to collect Spark job statistics. It extends {{SparkListener}}
@@ -21,5 +22,13 @@ object PerfMonitor {
     scalaj.http.Http(url).method("HEAD").param("data", dataString).asString
   }
   
+  
+}
+
+class PerfMonitor(url: String) extends SparkListener {
+  
+  override def onApplicationStart(e: SparkListenerApplicationStart) = PerfMonitor.notify(url, "start", -1, e.time)
+  
+  override def onApplicationEnd(e: SparkListenerApplicationEnd) = PerfMonitor.notify(url, "end", -1, e.time)
   
 }

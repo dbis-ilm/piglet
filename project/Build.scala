@@ -141,7 +141,7 @@ object Dependencies {
   val log4j = "log4j" % "log4j" % "1.2.17"
 
   val scalajhttp = "org.scalaj" %% "scalaj-http" % "2.3.0"
-  val json4s = "org.json4s" %% "json4s-native" % "3.4.0"
+  val json4s = "org.json4s" %% "json4s-native" % "3.5.0"
   val akkahttp = "com.typesafe.akka" %% "akka-http" % "10.0.1"
 
   // Projects

@@ -9,6 +9,8 @@ import java.nio.file.Path
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
+import org.json4s.native.Serialization.{read, write => swrite}
+
 import dbis.piglet.op.PigOperator
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.plan.MaterializationManager
@@ -18,24 +20,45 @@ import dbis.piglet.tools.DepthFirstTopDownWalker
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.setm.SETM.timing
 import dbis.piglet.tools.CliParams
+import dbis.piglet.op.TimingOp
+
+case class T(cnt: Int, sum: Long)
 
 /**
  * Created by kai on 24.08.15.
  */
 object DataflowProfiler extends PigletLogging {
 
-  logger.debug(s"using profiling ")
-  
   val delim = ";"
   
   private val cache = MutableMap.empty[String, MaterializationPoint]
   
-  /*private[mm]*/ val exectimes = MutableMap.empty[String, MutableMap[Int, ListBuffer[Long]]] //.withDefault(_ => MutableMap.empty[Int, ListBuffer[Long]].withDefault(_ => ListBuffer.empty[Long])) 
+  private val exectimes = MutableMap.empty[String, T]
+  val currentTimes = MutableMap.empty[String, ListBuffer[(Int, Long)]]
+  
   private[mm] val opcounts  = MutableMap.empty[String, Int].withDefaultValue(0)
-
+  
+  val parents = MutableMap.empty[String, List[String]].withDefault(_ => List.empty)
+  
+  
+  // for json (de-)serialization
+  implicit val formats = org.json4s.native.Serialization.formats(org.json4s.NoTypeHints)
+  
   override def toString = cache.mkString(",")
 
-  def init(base: Path) = {
+  def init(base: Path, plan: DataflowPlan) = {
+    logger.debug("init Dataflow profiler")
+    
+    exectimes.clear()
+    opcounts.clear()
+    parents.clear()
+    currentTimes.clear()
+    
+    plan.operators.filterNot(_.isInstanceOf[TimingOp]).foreach{op =>
+      parents += (op.lineageSignature -> op.inputs.map(_.producer.lineageSignature))
+      println(s"$op --> ${parents(op.lineageSignature)}")
+    }
+    
     val opCountFile = base.resolve(Conf.opCountFile)
     if(Files.exists(opCountFile)) {
       Source.fromFile(opCountFile.toFile()).getLines().foreach{line =>
@@ -49,32 +72,68 @@ object DataflowProfiler extends PigletLogging {
     
     val execTimesFile = base.resolve(Conf.execTimesFile)
     if(Files.exists(execTimesFile)) {
-      Source.fromFile(execTimesFile.toFile()).getLines().foreach{line =>
-        val arr = line.split(delim)
-        val lineage = arr(0)
-        val partitionIdTimes = arr(1).split(":")
-        val partitionId = partitionIdTimes(0).toInt
-        
-        val times = partitionIdTimes(1).split(",").map(_.toLong)
-        
-        exectimes(lineage)(partitionId) = times.to
-      }
+      val json = Source.fromFile(execTimesFile.toFile()).getLines().mkString("\n")
+      val exectimes1 = read[Map[String,T]](json)
+      exectimes1.foreach( mapping => exectimes += mapping)
+      logger.debug(s"loaded ${exectimes.size} execution time statistics")
     } 
-    
   }
+  
+  def collect = {
+    currentTimes.foreach{ case (lineage, times) =>
+      currentTimes.update(lineage, times.sortBy(_._2)) // sort by time
+    }
+    
+    currentTimes.filterNot{ case (id, _) => id == "start" || id == "end" }.foreach{ case (lineage, times) =>
+      
+      val parentsOps = parents(lineage) 
+        
+      val parentTimes = if(parentsOps.size == 1) {
+        currentTimes(parentsOps.head)
+      } else {
+        parentsOps.flatMap(currentTimes(_))
+      }
+        
+      val duration = if(parentTimes.size == times.size) {
+        val sum = parentTimes.map(_._2) // times of parent operator
+                             .zip(times.map(_._2)) // zip with times of current op
+                             .map{ case (p,c) => // calculate time difference between parent and self 
+//                                 if(c < p)
+//                                   throw new IllegalStateException(s"child partition could not be started before parent partition: child: $c  parent: $p")
+                               math.abs(c - p) 
+                             } 
+                             .sum // sum differences
+        
+        sum
+        
+      } else { // parent/parents has different number of partitions than current op
+        
+    	  val opFinish = times.last._2
+        
+    	  val parentFinishFirst = if(parentTimes.nonEmpty) parentTimes.map(_._2).min else currentTimes("start").head._2
+  
+        val opDuration = opFinish - parentFinishFirst
+        opDuration        
+      }
+      
+      val oldT = exectimes.getOrElse(lineage, T(0,0L))
+      val a = T(oldT.cnt + 1, oldT.sum + duration)
+
+      exectimes.update(lineage, a)
+    }
+    
+    exectimes.size
+  }
+      
   
   def writeStatistics(c: CliParams) = {
     
     val execTimesFile = c.profiling.get.resolve(Conf.execTimesFile)
-    
-    val a = exectimes.map{ case (lineage, idTimes) => 
-      val b = idTimes.map{ case (partitionId, times) => s"${partitionId}:${times.mkString(",")}"} 
-      s"$lineage$delim$b"
-    }
+
+    val json = swrite(exectimes)
     
     Files.write(execTimesFile, 
-//        exectimes.map(t => s"${t._1}${delim}${t._2}${delim}${t._3}").toIterable.asJava,
-        a.toIterable.asJava,
+        List(json).toIterable.asJava,
         StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
     
     val opCountFile = c.profiling.get.resolve(Conf.opCountFile)
@@ -84,81 +143,24 @@ object DataflowProfiler extends PigletLogging {
   }
   
   def addExecTime(lineage: String, partitionId: Int, time: Long) = {
-//    exectimes(lineage)(partitionId) += time
-    
-    if(exectimes.contains(lineage)) {
-      val partitionTimes = exectimes(lineage)
-      if(partitionTimes.contains(partitionId))
-        partitionTimes(partitionId) += time
-      else
-        partitionTimes += (partitionId -> ListBuffer(time))
+    if(currentTimes.contains(lineage)) {
+      currentTimes(lineage) += ((partitionId, time))
     } else {
-      val m = MutableMap( (partitionId -> ListBuffer(time)) )
-      exectimes += (lineage -> m)
+      currentTimes += (lineage -> ListBuffer((partitionId, time)))
     }
   }
   
-  def getExectime(op: String, parents: String*): Option[Double] = {
-    
-    if(parents.size == 1) {
-      
-      val parent = parents.head
-      val parentTimes = exectimes(parent)
-      if(parentTimes.isEmpty) {
-        logger.warn(s"no exectimes entry for parent lineage $parent")
-//        throw new IllegalArgumentException(s"no exectimes entry for parent lineage $parent")
-        None
-      }
-        
-      val opTimes = exectimes(op)
-      if(opTimes.isEmpty) {
-        logger.warn(s"no exectimes entry for op lineage $op")
-//        throw new IllegalArgumentException(s"no exectimes entry for op lineage $op")
-        None
-      }
-      
-      
-      
-      val avgTime = if(parentTimes.size == opTimes.size) {
-      	val t = opTimes.map{ case (partitionId, oTimes) =>
-      	  val pTimes = parentTimes(partitionId)
-      	  
-      	  val diffs = oTimes.zip(pTimes).map{case (c,p) => c - p}
-      	  diffs.sum / diffs.size.asInstanceOf[Double] // average of all runs for same partition
-      	}.toList
-      	
-      	t.sum / t.size.asInstanceOf[Double] // average of all partitions 
-      	
-      } else { // different number of in- and output partitions
-
-        /* if there are different number of partitions for in- and output
-         * we are very pessimistic and take the earliest start
-         * time of the parent and the latest finish time of the op
-         */
-        val parentMins = parentTimes.values.transpose.map(_.min)
-        val opMaxs = opTimes.values.transpose.map(_.max).toList
-        
-        val diffs = opMaxs.zip(parentMins).map{case (o,p) => o - p}
-        diffs.sum / diffs.size.asInstanceOf[Double]
-        
-      }
-      
-      Some(avgTime)
-    } else { // we have more than one parent
-      
-      /* if there is more than parent operator, we are also pessimistic
-       *  
-       */
-      
-//      val a = parents.map(exectimes(_).values.transpose.map(_.min)).min
-      
+  def getExectime(op: String): Option[Double] = {
+    val s = if(exectimes.contains(op)) {
+      val T(cnt,sum) = exectimes(op)
+      Some(sum / cnt.asInstanceOf[Double])
+    } else
       None
-    }
-     
+      
+//    println(s"returning $s")  
+    s 
   } 
   
-  def getExectimes(lineage: String): Map[Int, List[Long]] = exectimes(lineage).toMap.map{ case (k,v) => (k,v.toList)}
-
   def getMaterializationPoint(hash: String): Option[MaterializationPoint] = cache.get(hash)
 
   def addMaterializationPoint(matPoint: MaterializationPoint): Unit = {

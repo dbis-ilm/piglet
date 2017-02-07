@@ -107,14 +107,6 @@ object Piglet extends PigletLogging {
     	logger.debug(s"provided parameters: ${c.params.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
 
 
-    /* if profiling is enabled, check the HTTP server
-     * If it's unavailable print an error and stop
-     */
-    if(c.profiling.isDefined) {
-      DataflowProfiler.init(c.profiling.get)
-      StatServer.start(Conf.statServerPort)
-    }
-
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     run(c)  // this little call starts the whole processing!
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -246,6 +238,8 @@ object Piglet extends PigletLogging {
     if(c.profiling.isDefined) {
       val file = c.profiling.get.resolve(Conf.opCountFile)
       DataflowProfiler.createOpCounter(schedule, c)
+
+      StatServer.start(Conf.statServerPort)
     }
 
     logger.debug("start processing created dataflow plans")
@@ -255,6 +249,7 @@ object Piglet extends PigletLogging {
       logger.info(s"processing plan for $path")
       //TODO:this is ugly in this place here... maybe we should create a "clear-wrapper"
       dbis.piglet.codegen.scala_lang.JoinEmitter.joinKeyVars.clear()
+
       
       // 3. now, we should apply optimizations
       var newPlan = plan
@@ -286,8 +281,10 @@ object Piglet extends PigletLogging {
       
       // find materialization points
 //      profiler.foreach { p => p.addMaterializationPoints(newPlan) }
-      if(c.profiling.isDefined)
+      if(c.profiling.isDefined) {
+    	  DataflowProfiler.init(c.profiling.get, newPlan)
         DataflowProfiler.addMaterializationPoints(newPlan)
+      }
 
       logger.debug("finished optimizations")
 
@@ -343,10 +340,11 @@ object Piglet extends PigletLogging {
             
             if(c.profiling.isDefined) {
               
-              logger.info(s"profiler has info for ${DataflowProfiler.exectimes.size} lineages")
+              val exectimesCnt = DataflowProfiler.collect
               
-              newPlan.operators.filter(o => o.inputs.nonEmpty && o.outputs.nonEmpty).foreach{ node => 
-                val time = DataflowProfiler.getExectime(node.lineageSignature, node.inputs.map(_.producer).map(_.lineageSignature):_*)
+              logger.info(s"profiler has info for ${exectimesCnt} lineages")
+              newPlan.operators.foreach{ node => 
+                val time = DataflowProfiler.getExectime(node.lineageSignature)
                 
                 PlanWriter.nodes(node.lineageSignature).time = time
               }
