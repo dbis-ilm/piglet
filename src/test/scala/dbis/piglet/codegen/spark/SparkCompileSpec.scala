@@ -1227,25 +1227,25 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
 
   }
-/*
+
   it should "contain code for match_event with a pattern SEQ (A, B)" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     Schema.init()
     val ops = parseScript("""
-                            |b =  match_event b pattern SEQ (A, B) with (A: t1 == 1, B: t2 == 2);
+                            |c = match_event b pattern SEQ (A, B) with (A: t1 == 1, B: t2 == 2);
                             |""".stripMargin)
     val schema = Schema(Array(Field("t1", Types.IntType),
       Field("t2", Types.IntType),
       Field("t3", Types.IntType)))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val op = plan.findOperatorForAlias("b").get
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val op = plan.findOperatorForAlias("c").get
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """
-        |val b = b.matchNFA(bNFA.createNFA, NextMatches)
+        |val c = b.matchNFA(bNFA.createNFA, NextMatches)
         |""".stripMargin)
-    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
+    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(ctx, op))
     val expectedHelperClass = cleanString(
       """object bNFA {
         |  def filterA (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._0 == 1
@@ -1268,23 +1268,23 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   }
 
   it should "contain code for match_event with a pattern SEQ (A, B) where B refers to A" in {
+    val ctx = CodeGenContext(CodeGenTarget.Spark)
     Schema.init()
     val ops = parseScript("""
-                            |b =  match_event b pattern SEQ (A, B) with (A: t1 == 1, B: t2 == 2 AND t3 == A.t3);
+                            |c = match_event b pattern SEQ (A, B) with (A: t1 == 1, B: t2 == 2 AND t3 == A.t3);
                             |""".stripMargin)
     val schema = Schema(Array(Field("t1", Types.IntType),
       Field("t2", Types.IntType),
       Field("t3", Types.IntType)))
     ops.head.schema = Some(schema)
     val plan = new DataflowPlan(ops)
-    val op = plan.findOperatorForAlias("b").get
-    val codeGenerator = new BatchCodeGen(templateFile)
-    val generatedCode = cleanString(codeGenerator.emitNode(op))
+    val op = plan.findOperatorForAlias("c").get
+    val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """
-        |val b = b.matchNFA(bNFA.createNFA, NextMatches)
+        |val c = b.matchNFA(bNFA.createNFA, NextMatches)
         |""".stripMargin)
-    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(op))
+    val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(ctx, op))
     val expectedHelperClass = cleanString(
       """object bNFA {
         |  def filterA (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._0 == 1
@@ -1305,5 +1305,4 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
     generatedHelperClass should matchSnippet(expectedHelperClass)
   }
-*/
 }

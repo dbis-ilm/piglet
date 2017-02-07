@@ -2,7 +2,7 @@ package dbis.piglet.codegen.scala_lang
 
 import dbis.piglet.codegen._
 import dbis.piglet.expr._
-import dbis.piglet.op.{GroupingExpression, PigOperator}
+import dbis.piglet.op.{CompEvent, GroupingExpression, PigOperator, SimplePattern}
 import dbis.piglet.schema._
 import dbis.piglet.udf.UDFTable
 import org.clapper.scalasti.ST
@@ -57,7 +57,7 @@ object ScalaEmitter {
     */
   def emitRef(ctx: CodeGenContext, ref: Ref): String = ref match {
 
-    case nf @ NamedField(f, _) => 
+    case nf@NamedField(f, _) =>
       if (ctx.asBoolean("namedRef")) {
         // check if f exists in the schema
         ctx.schema match {
@@ -91,31 +91,30 @@ object ScalaEmitter {
     case DerefTuple(r1, r2) =>
       if (ctx.asBoolean("aggregate"))
         s"${emitRef(CodeGenContext(ctx, Map("tuplePrefix" -> "t")), r1)}.map(e => e${emitRef(CodeGenContext(ctx, Map("schema" -> tupleSchema(ctx.schema, r1), "tuplePrefix" -> "")), r2)})"
-      else {/*
-        ctx.events match {
-          case Some(evs) => {
-            // we try to find r1 in the specification of the events and retrieve the position (or -1 if not found)
-            val res = evs.complex.zipWithIndex.filter{ case (e, pos)  => e.simplePattern.asInstanceOf[SimplePattern].name == r1.toString  }
-            if (res.length != 1)
-              s"${emitRef(CodeGenContext(schema = ctx.schema, tuplePrefix = "t", events = ctx.events), r1)}${emitRef(CodeGenContext(schema = tupleSchema(ctx.schema, r1), tuplePrefix = "", aggregate = ctx.aggregate, namedRef = ctx.namedRef, events = ctx.events), r2)}"
-            else {
-              val p = r2 match {
-                case nf @ NamedField(f, _) => ctx.schema.get.indexOfField(nf)
-                case PositionalField (pos) => pos
-                case _ => 0
-              }
-              if (p == -1)
-                throw new CodeGenException(s"invalid field name $r2 in event ${r1.toString}")
-
-              s"rvalues.events(${res(0)._2})._$p)"  //TODO: work more on other related values
+      else if (ctx.contains("events")) {
+          val evs = ctx.params("events").asInstanceOf[Some[CompEvent]].get
+          // we try to find r1 in the specification of the events and retrieve the position (or -1 if not found)
+          val res = evs.complex.zipWithIndex.filter { case (e, pos) => e.simplePattern.asInstanceOf[SimplePattern].name == r1.toString }
+          if (res.length != 1)
+            s"${emitRef(CodeGenContext(ctx, Map("tuplePrefix" -> "t")), r1)}${emitRef(CodeGenContext(ctx, Map("schema" -> tupleSchema(ctx.schema, r1))), r2)}"
+          else {
+            val p = r2 match {
+              case nf@NamedField(f, _) => ctx.schema.get.indexOfField(nf)
+              case PositionalField(pos) => pos
+              case _ => 0
             }
+            if (p == -1)
+              throw new CodeGenException(s"invalid field name $r2 in event ${r1.toString}")
+
+            s"rvalues.events(${res(0)._2})._$p)" //TODO: work more on other related values
           }
-          case None =>
-          */
-          s"${emitRef(CodeGenContext(ctx, Map("tuplePrefix" -> "t")), r1)}${emitRef(CodeGenContext(ctx, Map("schema" -> tupleSchema(ctx.schema, r1), "tuplePrefix" -> "")), r2)}"
+
 
         }
+      else
+       s"${emitRef(CodeGenContext(ctx, Map("tuplePrefix" -> "t")), r1)}${emitRef(CodeGenContext(ctx, Map("schema" -> tupleSchema(ctx.schema, r1), "tuplePrefix" -> "")), r2)}"
 
+    // }
     case _ => { "" }
   }
 

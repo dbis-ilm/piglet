@@ -63,6 +63,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
       case _: Store => StoreEmitter.instance
       case _: StreamOp => StreamOpEmitter.instance
       case _: TimingOp => TimingEmitter.instance
+      case _: Matcher => MatcherEmitter.instance
       case _ => throw new IllegalArgumentException(s"no emitter for $op")      
     }
   
