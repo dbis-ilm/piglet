@@ -40,12 +40,10 @@ import dbis.piglet.schema._
 import dbis.piglet.tools.CodeMatchers
 import dbis.piglet.tools.TestTools.strToUri
 import dbis.piglet.plan.rewriting.Rewriter
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+//import org.scalatest.junit.JUnitRunner
 import dbis.piglet.tools.TopoSort
 import dbis.piglet.codegen.CodeGenerator
 
-//@RunWith(classOf[JUnitRunner])
 class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
 
   override def beforeAll()  {
