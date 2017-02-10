@@ -98,19 +98,20 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
 
 
     CodeEmitter.render("""  def main(args: Array[String]) {
-                         |val conf = new SparkConf().setAppName("<name>_App")
-                         |val sc = new SparkContext(conf)
                          |
+                         |val conf = new SparkConf().setAppName("<name>_App")
+                    		 |val sc = new SparkContext(conf)
                          |<if (profiling)>
                          |    val url = "<profiling>"
-                         |    sc.addSparkListener(new PerfMonitor(url))
                          |    PerfMonitor.notify(url,"start",-1,System.currentTimeMillis)
                          |<endif>
+                      	 
                          |""".stripMargin, map)
   }
 
   override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan): String = {
-      CodeEmitter.render("""    sc.stop()
+      CodeEmitter.render("""  sc.stop()  
+                         |    PerfMonitor.notify(url,"end",-1,System.currentTimeMillis)
                          |  }
                          |}""".stripMargin, Map("name" -> "Starting Query"))
 

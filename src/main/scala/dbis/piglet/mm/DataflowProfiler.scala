@@ -21,14 +21,40 @@ import dbis.piglet.tools.logging.PigletLogging
 import dbis.setm.SETM.timing
 import dbis.piglet.tools.CliParams
 import dbis.piglet.op.TimingOp
+import scala.math.Numeric
 
 case class T(cnt: Int, sum: Long)
+
+
+case class MedianList[T](list: Seq[T]) {
+  def median: T = if(list.isEmpty) {
+    throw new UnsupportedOperationException("median of empty list")
+  } else if(list.size == 1)
+    list.head
+  else
+    list(list.size / 2)
+}
+
+case class AvgList(list: Seq[Long]) {
+  
+  def avg: Double = if(list.isEmpty) 
+    throw new UnsupportedOperationException("avg of empty list")
+  else if(list.size == 1)
+    list.head.toDouble
+  else {
+    list.sum / list.size.asInstanceOf[Double]
+  }
+    
+}
 
 /**
  * Created by kai on 24.08.15.
  */
 object DataflowProfiler extends PigletLogging {
 
+  implicit def toMedianList[T](l: Seq[T]) = MedianList(l)
+  implicit def toAvgList[T <: Long](l: Seq[T]) = AvgList(l)
+  
   val delim = ";"
   
   private val cache = MutableMap.empty[String, MaterializationPoint]
@@ -55,8 +81,11 @@ object DataflowProfiler extends PigletLogging {
     currentTimes.clear()
     
     plan.operators.filterNot(_.isInstanceOf[TimingOp]).foreach{op =>
-      parents += (op.lineageSignature -> op.inputs.map(_.producer.lineageSignature))
-      println(s"$op --> ${parents(op.lineageSignature)}")
+      val inputs = op.inputs.map(_.producer.lineageSignature)
+      
+      val p = if(inputs.nonEmpty) (op.lineageSignature -> inputs) else (op.lineageSignature -> List("start")) 
+          
+      parents += p
     }
     
     val opCountFile = base.resolve(Conf.opCountFile)
@@ -86,12 +115,12 @@ object DataflowProfiler extends PigletLogging {
     
     currentTimes.filterNot{ case (id, _) => id == "start" || id == "end" }.foreach{ case (lineage, times) =>
       
-      val parentsOps = parents(lineage) 
+      val parentOps = parents(lineage) 
         
-      val parentTimes = if(parentsOps.size == 1) {
-        currentTimes(parentsOps.head)
+      val parentTimes = if(parentOps.size == 1) {
+        currentTimes(parentOps.head)
       } else {
-        parentsOps.flatMap(currentTimes(_))
+        parentOps.flatMap(currentTimes(_))
       }
         
       val duration = if(parentTimes.size == times.size) {
@@ -107,18 +136,56 @@ object DataflowProfiler extends PigletLogging {
         sum
         
       } else { // parent/parents has different number of partitions than current op
-        
                 
-        val ratio = parentTimes.size.asInstanceOf[Double] / times.size 
-        println(s"op: $lineage  parents: ${parentTimes.size}  op = ${times.size} ratio = $ratio")
-        
-        
-    	  val opFinish = times.last._2
-        
-    	  val parentFinishFirst = if(parentTimes.nonEmpty) parentTimes.map(_._2).min else currentTimes("start").head._2
-  
-        val opDuration = opFinish - parentFinishFirst
-        opDuration        
+        val ratio = parentTimes.size.asInstanceOf[Double] % times.size 
+        println(s"op: $lineage  parents: ${parentTimes.size} (${parents(lineage).size})  op = ${times.size} ratio = $ratio")
+
+        if(ratio == 0 && parentOps.size > 1) {
+          
+          /* we implement three different approaches to calculate the elapsed time of an operator.
+           * 
+           * 1.: median: determine the median time of all parent partitions - and also of the Op's partitions
+           * 2.: avg: average time of parent partitions - and Op's partitions
+           * 3.: earliest time for each partition (by Id)
+           */
+          
+          // median
+          val medianParent = parentTimes.map(_._2).sortBy(identity).median
+          val medianOp = times.map(_._2).sortBy(identity).median
+          medianOp - medianParent
+          
+//          // min avg of parents
+//          val avgParent = parentOps.map(currentTimes(_).map(_._2)).map(_.avg).min
+//          val avgOp = times.map(_._2).avg
+//          (avgOp - avgParent).toLong
+          
+          // this takes the earliest time of each partition - very pessimistic and not accurate
+//          parentOps.map(currentTimes(_)/*.sortBy(_._1)*/.map(_._2)) // get times for parent
+//                   .transpose // we had a list of times per parent, now we have a list of lists where the inner lists contain the time for the respective partition 
+//                   .map(_.min) // we are pessimistic at take the earliest starting time
+//                   .zip(times.map(_._2)) // zip with the finish times of the operator
+//                   .map{ case (p,c) => math.abs(c - p) } // calculate the differences
+//                   .sum // sum the differences
+                   
+        } else if(ratio == 0 && parentOps == 1) {
+          // compute how many of the parent's partition will result in one of Ops partition
+          val c = math.max(parentTimes.size / times.size,1)
+          parentTimes.map(_._2)// get only times of parent
+            .grouped(c) //create partitions of size c 
+            .map(_.min) // for every list, we only take the earliest time (pessimistic)
+            .zip(times.map(_._2).toIterator) // combine with op's times
+            .map{ case (p,c) => math.abs(c - p) } // calculate the differences
+            .sum // sum the differences
+
+        } else {
+          logger.warn(s"using very pessimistic calculation for $lineage")
+      	  val opFinish = times.last._2
+          
+      	  val parentFinishFirst = if(parentTimes.nonEmpty) parentTimes.map(_._2).min else currentTimes("start").head._2
+    
+          val opDuration = opFinish - parentFinishFirst
+          opDuration
+        }        
       }
       
       val oldT = exectimes.getOrElse(lineage, T(0,0L))
@@ -126,6 +193,8 @@ object DataflowProfiler extends PigletLogging {
 
       exectimes.update(lineage, a)
     }
+    
+    logger.debug(s"total: ${currentTimes("end").head._2 - currentTimes("start").head._2}")
     
     exectimes.size
   }
@@ -135,8 +204,10 @@ object DataflowProfiler extends PigletLogging {
     
     val execTimesFile = c.profiling.get.resolve(Conf.execTimesFile)
 
+    // create json from collected times
     val json = swrite(exectimes)
     
+    // overwrite old file
     Files.write(execTimesFile, 
         List(json).toIterable.asJava,
         StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)

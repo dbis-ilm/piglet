@@ -6,12 +6,10 @@ import dbis.piglet.codegen.CodeEmitter
 import dbis.piglet.codegen.CodeGenContext
 
 class TimingEmitter extends CodeEmitter[TimingOp] {
-  override def template = """val <out> = <in>.mapPartitionsWithIndex{ case (idx,iter) => 
-    |  //val jsonString = s"{'partitionId':'$idx','time':'${System.currentTimeMillis}','lineage':'<lineage>'}" 
-    |  //val result = scalaj.http.Http(url).postData(jsonString).header("Content-Type", "application/json").header("Charset","UTF-8").asString
+  override def template = """val <out> = <in>.mapPartitionsWithIndex({case (idx,iter) => 
     |  PerfMonitor.notify(url, "<lineage>", idx, System.currentTimeMillis)
     |  iter
-    \}""".stripMargin
+    \},true)""".stripMargin
   
   override def code(ctx: CodeGenContext, op: TimingOp): String = render(Map(
       "out"-> op.outPipeName, 

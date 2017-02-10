@@ -11,18 +11,20 @@ import scala.collection.mutable.Map
 import dbis.piglet.op.TimingOp
 import dbis.piglet.op.PigOperator
 import scala.concurrent.duration.Duration
+import java.math.RoundingMode
 
 
 case class Node(id: String, var time: Option[Duration] = None, var label: String = "") {
   
   private def mkLabel = {
-    val t = if(time.isDefined) "\n"+time.get else ""
+    val t = if(time.isDefined) s"\n${time.get.toMillis}ms (${BigDecimal(time.get.toMillis / 1000.0).setScale(2,BigDecimal.RoundingMode.HALF_UP).toDouble}s)" else ""
     val l = s"$label\n$id\n$t" 
     PlanWriter.quote(l)
   }
   
   override def toString() = s"op${id} ${if(label.trim().nonEmpty) s"[label=${mkLabel}]" else ""}"
 }
+
 case class Edge(from: String, to: String, var label: String = "") {
   override def toString() = s"op$from -> op$to ${if(label.trim().nonEmpty) s"[label=$label]" else "" }"
 }
