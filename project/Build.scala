@@ -106,7 +106,7 @@ object PigBuild extends Build {
  */
 object Dependencies {
   
-  val sparkVersion = "2.0.2"
+  val sparkVersion = "2.1.0"
   val flinkVersion = "1.1.3"
   
   // Libraries
@@ -137,7 +137,7 @@ object Dependencies {
   val twitterUtil = "com.twitter" %% "util-eval" % "6.29.0"
   val jdbc = "com.h2database" % "h2" % "1.4.190"
 
-  val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
+  //val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
   val log4j = "log4j" % "log4j" % "1.2.17"
 
   val scalajhttp = "org.scalaj" %% "scalaj-http" % "2.3.0"
@@ -161,7 +161,7 @@ object Dependencies {
     hadoop % "provided",
     twitterUtil,
     jdbc,
-    breeze,
+    //breeze,
     scalajhttp,
     json4s
   )
