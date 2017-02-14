@@ -128,7 +128,7 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
                          |""".stripMargin, map)
   }
 
-  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan): String = {
+  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
     /*
      * We want to force the termination with the help of a timeout,
      * if all source nodes are Load operators as text files are not continuous.

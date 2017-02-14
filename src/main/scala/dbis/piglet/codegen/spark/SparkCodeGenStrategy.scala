@@ -105,15 +105,22 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
                          |    val url = "<profiling>"
                          |    PerfMonitor.notify(url,"start",-1,System.currentTimeMillis)
                          |<endif>
-                      	 
                          |""".stripMargin, map)
   }
 
-  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan): String = {
-      CodeEmitter.render("""  sc.stop()  
+  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
+
+    val map = profiling.map { u => 
+      val url = u.resolve(Conf.EXECTIMES_FRAGMENT).toString()
+      Map("profiling" -> url)
+    }.getOrElse(Map.empty[String,String])
+      
+      CodeEmitter.render("""  sc.stop() 
+                         |<if (profiling)> 
                          |    PerfMonitor.notify(url,"end",-1,System.currentTimeMillis)
+                         |<endif>
                          |  }
-                         |}""".stripMargin, Map("name" -> "Starting Query"))
+                         |}""".stripMargin, map)
 
   }
 }

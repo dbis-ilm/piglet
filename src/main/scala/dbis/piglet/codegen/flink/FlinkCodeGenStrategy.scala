@@ -87,7 +87,7 @@ class FlinkCodeGenStrategy extends ScalaCodeGenStrategy {
     CodeEmitter.render("""  def main(args: Array[String]) {<\n>""", Map.empty)
   }
 
-  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan): String = {
+  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
     var params = Map("name" -> "Starting Query")
     CodeEmitter.render("""<if (hook)>
 	                       |    shutdownHook()

@@ -59,11 +59,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   "The compiler output" should "contain the Spark header & footer" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-
+    val profiling = Some(new URI("http://localhost:5555/times"))
     val generatedCode = cleanString(codeGenerator.emitImport(ctx)
       + codeGenerator.emitHeader1(ctx, "test")
-      + codeGenerator.emitHeader2(ctx, "test",Some(new URI("http://localhost:5555/times")))
-      + codeGenerator.emitFooter(ctx, new DataflowPlan(List.empty[PigOperator])))
+      + codeGenerator.emitHeader2(ctx, "test", profiling)
+      + codeGenerator.emitFooter(ctx, new DataflowPlan(List.empty[PigOperator]), profiling))
 
     val expectedCode = cleanString("""
         |import org.apache.spark.SparkContext
@@ -81,9 +81,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |      val sc = new SparkContext(conf)
         |      val url = "http://localhost:5555/times"
         |      PerfMonitor.notify(url,"start",-1,System.currentTimeMillis)
-        |      PerfMonitor.notify(url,"end",-1,System.currentTimeMillis)
         |      sc.stop()
-        |
+        |      PerfMonitor.notify(url,"end",-1,System.currentTimeMillis)
         |    }
         |}
       """.stripMargin)
@@ -93,10 +92,12 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
   it should "contain the Spark header with additional imports" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
 
+    val profiling = Some(new URI("http://localhost:5555/times"))
+    
     val generatedCode = cleanString(codeGenerator.emitImport(ctx, Seq("import breeze.linalg._"))
       + codeGenerator.emitHeader1(ctx, "test")
-      + codeGenerator.emitHeader2(ctx, "test", Some(new URI("http://localhost:5555/times")))
-      + codeGenerator.emitFooter(ctx, new DataflowPlan(List.empty[PigOperator])))
+      + codeGenerator.emitHeader2(ctx, "test", profiling)
+      + codeGenerator.emitFooter(ctx, new DataflowPlan(List.empty[PigOperator]), profiling))
     val expectedCode = cleanString("""
                                      |import org.apache.spark.SparkContext
                                      |import org.apache.spark.SparkContext._
@@ -114,8 +115,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |      val sc = new SparkContext(conf)
                                      |      val url = "http://localhost:5555/times"
                                      |      PerfMonitor.notify(url,"start",-1,System.currentTimeMillis)
-                                     |      PerfMonitor.notify(url,"end",-1,System.currentTimeMillis)
                                      |      sc.stop()
+                                     |      PerfMonitor.notify(url,"end",-1,System.currentTimeMillis)
                                      |
                                      |    }
                                      |}

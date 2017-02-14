@@ -114,7 +114,7 @@ trait CodeGenStrategy {
    * @param plan the dataflow plan for which we generate the code
    * @return a string representing the end of the code.
    */
-  def emitFooter(ctx: CodeGenContext, plan: DataflowPlan): String
+  def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI]): String
 
   /**
    * Generate code for any helper class/function if needed by the given operator.
@@ -200,7 +200,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
     }
 
     // generate the cleanup code
-    if (forREPL) code else code + codeGen.emitFooter(ctx, plan)
+    if (forREPL) code else code + codeGen.emitFooter(ctx, plan, profiling)
   }
 }
 
