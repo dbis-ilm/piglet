@@ -1,27 +1,17 @@
 package dbis.piglet.mm
 
-import scala.collection.mutable.{Map => MutableMap,ListBuffer}
-import scala.collection.JavaConverters._
-import scala.io.Source
+import java.nio.file.{Files, Path, StandardOpenOption}
 
-import java.net.URI
-import java.nio.file.Path
-import java.nio.file.Files
-import java.nio.file.StandardOpenOption
-
+import dbis.piglet.op.{PigOperator, TimingOp}
+import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.tools.logging.PigletLogging
+import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf, DepthFirstTopDownWalker}
+import dbis.setm.SETM.timing
 import org.json4s.native.Serialization.{read, write => swrite}
 
-import dbis.piglet.op.PigOperator
-import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.plan.MaterializationManager
-import dbis.piglet.tools.Conf
-import dbis.piglet.tools.BreadthFirstTopDownWalker
-import dbis.piglet.tools.DepthFirstTopDownWalker
-import dbis.piglet.tools.logging.PigletLogging
-import dbis.setm.SETM.timing
-import dbis.piglet.tools.CliParams
-import dbis.piglet.op.TimingOp
-import scala.math.Numeric
+import scala.collection.JavaConverters._
+import scala.collection.mutable.{ListBuffer, Map => MutableMap}
+import scala.io.Source
 
 case class T(cnt: Int, sum: Long)
 
@@ -47,147 +37,156 @@ case class AvgList(list: Seq[Long]) {
     
 }
 
-/**
- * Created by kai on 24.08.15.
- */
 object DataflowProfiler extends PigletLogging {
 
-  implicit def toMedianList[T](l: Seq[T]) = MedianList(l)
-  implicit def toAvgList[T <: Long](l: Seq[T]) = AvgList(l)
+  implicit def toMedianList[T](l: Seq[T]): MedianList[T] = MedianList(l)
+  implicit def toAvgList[T <: Long](l: Seq[T]): AvgList = AvgList(l)
   
   val delim = ";"
   
   private val cache = MutableMap.empty[String, MaterializationPoint]
   
   private val exectimes = MutableMap.empty[String, T]
-  val currentTimes = MutableMap.empty[String, ListBuffer[(Int, Long)]]
+  val currentTimes = MutableMap.empty[String, ListBuffer[(Int, Long, Seq[Seq[Int]])]]
   
   private[mm] val opcounts  = MutableMap.empty[String, Int].withDefaultValue(0)
   
-  val parents = MutableMap.empty[String, List[String]].withDefault(_ => List.empty)
-  
-  
+  val parentsOf = MutableMap.empty[String, List[String]].withDefault(_ => List.empty)
+
+
   // for json (de-)serialization
   implicit val formats = org.json4s.native.Serialization.formats(org.json4s.NoTypeHints)
-  
+
   override def toString = cache.mkString(",")
 
   def init(base: Path, plan: DataflowPlan) = {
     logger.debug("init Dataflow profiler")
-    
+
     exectimes.clear()
     opcounts.clear()
-    parents.clear()
+    parentsOf.clear()
     currentTimes.clear()
-    
+
     plan.operators.filterNot(_.isInstanceOf[TimingOp]).foreach{op =>
       val inputs = op.inputs.map(_.producer.lineageSignature)
-      
-      val p = if(inputs.nonEmpty) (op.lineageSignature -> inputs) else (op.lineageSignature -> List("start")) 
-          
-      parents += p
+
+      val p = if(inputs.nonEmpty) op.lineageSignature -> inputs else op.lineageSignature -> List("start")
+
+      parentsOf += p
     }
-    
+
     val opCountFile = base.resolve(Conf.opCountFile)
     if(Files.exists(opCountFile)) {
-      Source.fromFile(opCountFile.toFile()).getLines().foreach{line =>
+      Source.fromFile(opCountFile.toFile).getLines().foreach{ line =>
         val arr = line.split(delim)
         val key = arr(0)
         val value = arr(1).toInt
-        
+
         opcounts += (key -> value)
       }
-    }  
-    
+    }
+
     val execTimesFile = base.resolve(Conf.execTimesFile)
     if(Files.exists(execTimesFile)) {
-      val json = Source.fromFile(execTimesFile.toFile()).getLines().mkString("\n")
+      val json = Source.fromFile(execTimesFile.toFile).getLines().mkString("\n")
       val exectimes1 = read[Map[String,T]](json)
       exectimes1.foreach( mapping => exectimes += mapping)
       logger.debug(s"loaded ${exectimes.size} execution time statistics")
-    } 
-  }
-  
-  def collect = {
-    currentTimes.foreach{ case (lineage, times) =>
-      currentTimes.update(lineage, times.sortBy(_._2)) // sort by time
     }
-    
-    currentTimes.filterNot{ case (id, _) => id == "start" || id == "end" }.foreach{ case (lineage, times) =>
-      
-      val parentOps = parents(lineage) 
-        
-      val parentTimes = if(parentOps.size == 1) {
-        currentTimes(parentOps.head)
-      } else {
-        parentOps.flatMap(currentTimes(_))
-      }
-        
-      val duration = if(parentTimes.size == times.size) {
-        val sum = parentTimes.map(_._2) // times of parent operator
-                             .zip(times.map(_._2)) // zip with times of current op
-                             .map{ case (p,c) => // calculate time difference between parent and self 
-//                                 if(c < p)
-//                                   throw new IllegalStateException(s"child partition could not be started before parent partition: child: $c  parent: $p")
-                               math.abs(c - p) 
-                             } 
-                             .sum // sum differences
-        
-        sum
-        
-      } else { // parent/parents has different number of partitions than current op
-                
-        val ratio = parentTimes.size.asInstanceOf[Double] % times.size 
-        println(s"op: $lineage  parents: ${parentTimes.size} (${parents(lineage).size})  op = ${times.size} ratio = $ratio")
+  }
 
-        if(ratio == 0 && parentOps.size > 1) {
-          
-          /* we implement three different approaches to calculate the elapsed time of an operator.
-           * 
-           * 1.: median: determine the median time of all parent partitions - and also of the Op's partitions
-           * 2.: avg: average time of parent partitions - and Op's partitions
-           * 3.: earliest time for each partition (by Id)
-           */
-          
-          // median
-          val medianParent = parentTimes.map(_._2).sortBy(identity).median
-          val medianOp = times.map(_._2).sortBy(identity).median
-          medianOp - medianParent
-          
-//          // min avg of parents
-//          val avgParent = parentOps.map(currentTimes(_).map(_._2)).map(_.avg).min
-//          val avgOp = times.map(_._2).avg
-//          (avgOp - avgParent).toLong
-          
-          // this takes the earliest time of each partition - very pessimistic and not accurate
-//          parentOps.map(currentTimes(_)/*.sortBy(_._1)*/.map(_._2)) // get times for parent
-//                   .transpose // we had a list of times per parent, now we have a list of lists where the inner lists contain the time for the respective partition 
-//                   .map(_.min) // we are pessimistic at take the earliest starting time
-//                   .zip(times.map(_._2)) // zip with the finish times of the operator
-//                   .map{ case (p,c) => math.abs(c - p) } // calculate the differences
-//                   .sum // sum the differences
-                   
-        } else if(ratio == 0 && parentOps == 1) {
-          // compute how many of the parent's partition will result in one of Ops partition
-          val c = math.max(parentTimes.size / times.size,1)
-          parentTimes.map(_._2)// get only times of parent
-            .grouped(c) //create partitions of size c 
-            .map(_.min) // for every list, we only take the earliest time (pessimistic)
-            .zip(times.map(_._2).toIterator) // combine with op's times
-            .map{ case (p,c) => math.abs(c - p) } // calculate the differences
-            .sum // sum the differences
+  def collect = {
+//    currentTimes.foreach{ case (lineage, times) =>
+//      currentTimes.update(lineage, times.sortBy(_._2)) // sort by time
+//    }
 
-        } else {
-          logger.warn(s"using very pessimistic calculation for $lineage")
-      	  val opFinish = times.last._2
-          
-      	  val parentFinishFirst = if(parentTimes.nonEmpty) parentTimes.map(_._2).min else currentTimes("start").head._2
-    
-          val opDuration = opFinish - parentFinishFirst
-          opDuration
-        }        
+    currentTimes.filterNot{ case (lineage, _) => lineage == "start" || lineage == "end" }
+                .foreach{ case (lineage, times) =>
+
+
+      val parents = parentsOf(lineage)
+        
+      val parentTimes: Seq[ListBuffer[(Int, Long, Seq[Seq[Int]])]] =
+        parents.map(currentTimes(_))
+
+
+      times.zipWithIndex.foreach { case ((_, time, parentPartitions),parentIdx) =>
+
+          val t = parentTimes(parentIdx)
+          val parentPartitionTimes = parentPartitions(parentIdx)
+
+
+
       }
-      
+
+      val duration: Long = 0
+
+//      val duration = if(parentTimes.size == times.size) {
+//        val sum = parentTimes.map(_._2) // times of parent operator
+//                             .zip(times.map(_._2)) // zip with times of current op
+//                             .map{ case (p,c) => // calculate time difference between parent and self
+////                                 if(c < p)
+////                                   throw new IllegalStateException(s"child partition could not be started before parent partition: child: $c  parent: $p")
+//                               math.abs(c - p)
+//                             }
+//                             .sum // sum differences
+//
+//        sum
+//
+//      } else { // parent/parents has different number of partitions than current op
+//
+//        val ratio = parentTimes.size.asInstanceOf[Double] % times.size
+//        println(s"op: $lineage  parents: ${parentTimes.size} (${parents(lineage).size})  op = ${times.size} ratio = $ratio")
+//
+//        if(ratio == 0 && parents.size > 1) {
+//
+//          /* we implement three different approaches to calculate the elapsed time of an operator.
+//           *
+//           * 1.: median: determine the median time of all parent partitions - and also of the Op's partitions
+//           * 2.: avg: average time of parent partitions - and Op's partitions
+//           * 3.: earliest time for each partition (by Id)
+//           */
+//
+//          // median
+//          val medianParent = parentTimes.map(_._2).sortBy(identity).median
+//          val medianOp = times.map(_._2).sortBy(identity).median
+//          medianOp - medianParent
+//
+////          // min avg of parents
+////          val avgParent = parents.map(currentTimes(_).map(_._2)).map(_.avg).min
+////          val avgOp = times.map(_._2).avg
+////          (avgOp - avgParent).toLong
+//
+//          // this takes the earliest time of each partition - very pessimistic and not accurate
+////          parents.map(currentTimes(_)/*.sortBy(_._1)*/.map(_._2)) // get times for parent
+////                   .transpose // we had a list of times per parent, now we have a list of lists where the inner lists contain the time for the respective partition
+////                   .map(_.min) // we are pessimistic at take the earliest starting time
+////                   .zip(times.map(_._2)) // zip with the finish times of the operator
+////                   .map{ case (p,c) => math.abs(c - p) } // calculate the differences
+////                   .sum // sum the differences
+//
+//        } else if(ratio == 0 && parents.size == 1) {
+//          // compute how many of the parent's partition will result in one of Ops partition
+//          val c = math.max(parentTimes.size / times.size,1)
+//          parentTimes.map(_._2)// get only times of parent
+//            .grouped(c) //create partitions of size c
+//            .map(_.min) // for every list, we only take the earliest time (pessimistic)
+//            .zip(times.map(_._2).toIterator) // combine with op's times
+//            .map{ case (p,c1) => math.abs(c1 - p) } // calculate the differences
+//            .sum // sum the differences
+//
+//        } else {
+//          logger.warn(s"using very pessimistic calculation for $lineage")
+//      	  val opFinish = times.last._2
+//
+//      	  val parentFinishFirst = if(parentTimes.nonEmpty) parentTimes.map(_._2).min else currentTimes("start").head._2
+//
+//          val opDuration = opFinish - parentFinishFirst
+//          opDuration
+//        }
+//      }
+
+
       val oldT = exectimes.getOrElse(lineage, T(0,0L))
       val a = T(oldT.cnt + 1, oldT.sum + duration)
 
@@ -209,20 +208,20 @@ object DataflowProfiler extends PigletLogging {
     
     // overwrite old file
     Files.write(execTimesFile, 
-        List(json).toIterable.asJava,
+        List(json).asJava,
         StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
     
     val opCountFile = c.profiling.get.resolve(Conf.opCountFile)
     Files.write(opCountFile, 
-        opcounts.toIterable.map{ case (key,value) => s"${key}${delim}${value}"}.asJava, 
+        opcounts.map{ case (key,value) => s"$key$delim$value"}.asJava,
         StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
   }
   
-  def addExecTime(lineage: String, partitionId: Int, time: Long) = {
+  def addExecTime(lineage: String, partitionId: Int, parentPartitions: Seq[Seq[Int]], time: Long) = {
     if(currentTimes.contains(lineage)) {
-      currentTimes(lineage) += ((partitionId, time))
+      currentTimes(lineage) += ((partitionId, time, parentPartitions))
     } else {
-      currentTimes += (lineage -> ListBuffer((partitionId, time)))
+      currentTimes += (lineage -> ListBuffer((partitionId, time, parentPartitions)))
     }
   }
   
@@ -243,7 +242,7 @@ object DataflowProfiler extends PigletLogging {
     val entry = cache.getOrElse(matPoint.hash, matPoint)
     if (entry.parentHash.nonEmpty && cache.contains(entry.parentHash.get)) {
       // TODO: calculate _cumulative_ benefit
-      val parent = cache.get(entry.parentHash.get).get
+      val parent = cache(entry.parentHash.get)
       val benefit = parent.loadTime + entry.procTime - entry.loadTime
       entry.benefit = parent.benefit + benefit
     }
@@ -312,7 +311,7 @@ object DataflowProfiler extends PigletLogging {
       val lineage = op.lineageSignature
 
       op.outputs.flatMap(_.consumer).foreach{c => 
-        val key = s"${lineage}-${c.lineageSignature}"
+        val key = s"$lineage-${c.lineageSignature}"
         
         opcounts(key) += 1
       }
@@ -324,11 +323,11 @@ object DataflowProfiler extends PigletLogging {
   
   
   lazy val url = if(Conf.statServerURL.isDefined) {
-      Conf.statServerURL.get.toURI()
+      Conf.statServerURL.get.toURI
     } else {
       val addr = java.net.InetAddress.getLocalHost.getHostAddress
       logger.debug(s"identified local address as $addr")
-      val u = java.net.URI.create(s"http://${addr}:${Conf.statServerPort}/")
+      val u = java.net.URI.create(s"http://$addr:${Conf.statServerPort}/")
       u
     }
 }

@@ -1,13 +1,11 @@
 package dbis.piglet.codegen.scala_lang
 
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
 import dbis.piglet.op.TimingOp
-import dbis.piglet.op.PigOperator
-import dbis.piglet.codegen.CodeEmitter
-import dbis.piglet.codegen.CodeGenContext
 
 class TimingEmitter extends CodeEmitter[TimingOp] {
   override def template = """val <out> = <in>.mapPartitionsWithIndex({case (idx,iter) => 
-    |  PerfMonitor.notify(url, "<lineage>", idx, System.currentTimeMillis)
+    |  PerfMonitor.notify(url, "<lineage>", <in>,idx, System.currentTimeMillis)
     |  iter
     \},true)""".stripMargin
   

@@ -185,7 +185,6 @@ object Piglet extends PigletLogging {
     *
     * @param file
     * @param master
-    * @param backendConf
     * @param backendArgs
     */
   def runRaw(file: Path, master: String, backendArgs: Map[String, String]) = timing("execute raw") {

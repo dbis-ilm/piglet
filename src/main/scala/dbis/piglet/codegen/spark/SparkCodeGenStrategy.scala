@@ -2,22 +2,12 @@ package dbis.piglet.codegen.spark
 
 import java.net.URI
 
-import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
 import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
-import dbis.piglet.op.Load
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenTarget}
+import dbis.piglet.expr.Expr
+import dbis.piglet.op._
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.Conf
-import dbis.piglet.codegen.CodeGenTarget
-import dbis.piglet.codegen.scala_lang.LoadEmitter
-import dbis.piglet.codegen.scala_lang.StoreEmitter
-import dbis.piglet.codegen.scala_lang.DumpEmitter
-import dbis.piglet.op.PigOperator
-import dbis.piglet.op.SpatialFilter
-import dbis.piglet.op.SpatialJoin
-import scala.collection.mutable.ListBuffer
-import dbis.piglet.expr.Expr
-import dbis.piglet.op.IndexOp
-import dbis.piglet.op.Partition
 
 class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.Spark
@@ -93,7 +83,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
   override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None): String = {
     var map = Map("name" -> scriptName)
 
-    profiling.map { u => u.resolve(Conf.EXECTIMES_FRAGMENT).toString() }
+    profiling.map { u => u.resolve(Conf.EXECTIMES_FRAGMENT).toString }
       .foreach { s => map += ("profiling" -> s) }
 
 
@@ -103,7 +93,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
                     		 |val sc = new SparkContext(conf)
                          |<if (profiling)>
                          |    val url = "<profiling>"
-                         |    PerfMonitor.notify(url,"start",-1,System.currentTimeMillis)
+                         |    PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
                          |<endif>
                          |""".stripMargin, map)
   }
@@ -111,13 +101,13 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
   override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
 
     val map = profiling.map { u => 
-      val url = u.resolve(Conf.EXECTIMES_FRAGMENT).toString()
+      val url = u.resolve(Conf.EXECTIMES_FRAGMENT).toString
       Map("profiling" -> url)
     }.getOrElse(Map.empty[String,String])
       
       CodeEmitter.render("""  sc.stop() 
                          |<if (profiling)> 
-                         |    PerfMonitor.notify(url,"end",-1,System.currentTimeMillis)
+                         |    PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
                          |<endif>
                          |  }
                          |}""".stripMargin, map)
