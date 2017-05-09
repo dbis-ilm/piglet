@@ -114,7 +114,7 @@ object CliParams {
   }
   
   def parse(args: Array[String]): CliParams = optparser.parse(args, CliParams()).getOrElse{
-    throw new IllegalStateException("Error parsing config file")
+    throw new IllegalStateException("Error parsing parameter options")
   }
   
 }

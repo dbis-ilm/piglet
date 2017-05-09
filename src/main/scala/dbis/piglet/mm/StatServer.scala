@@ -70,7 +70,7 @@ class StatsWriterActor extends Actor with PigletLogging  {
       val parents = arr(2)
       val currTime = arr(3).toLong
 
-      logger.debug(s"$lineage -> $partitionId : $parents")
+//      logger.debug(s"$lineage -> $partitionId : $parents")
 
       val parentsList = parents.split(StatsWriterActor.DEP_DELIM)
                           .filter(_.nonEmpty)

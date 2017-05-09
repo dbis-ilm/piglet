@@ -17,45 +17,22 @@
 
 package dbis.piglet
 
-import scala.io.Source
-import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration._
-
-import scopt.OptionParser
-
-import java.io.File
-import java.nio.file.Path
-import java.nio.file.Paths
-import java.nio.file.Files
-import java.net.URI
+import java.nio.file.{Path, Paths}
 
 import dbis.piglet.backends.BackendManager
-import dbis.piglet.backends.BackendConf
 import dbis.piglet.codegen.PigletCompiler
-import dbis.piglet.mm.{DataflowProfiler, MaterializationPoint}
-import dbis.piglet.op.PigOperator
-import dbis.piglet.parser.PigParser
-import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.plan.InvalidPlanException
-import dbis.piglet.plan.MaterializationManager
-import dbis.piglet.plan.PlanMerger
+import dbis.piglet.mm.{DataflowProfiler, StatServer}
+import dbis.piglet.plan.{DataflowPlan, InvalidPlanException, MaterializationManager, PlanMerger}
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.rewriting.Rules
 import dbis.piglet.schema.SchemaException
-import dbis.piglet.tools.FileTools
-import dbis.piglet.tools.Conf
-import dbis.piglet.tools.{DepthFirstTopDownWalker, BreadthFirstTopDownWalker}
+import dbis.piglet.tools.{CliParams, Conf, PlanWriter}
 import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.tools.logging.LogLevel
-import dbis.piglet.tools.logging.LogLevel._
-import dbis.piglet.tools.CliParams
-
 import dbis.setm.SETM
 import dbis.setm.SETM.timing
-import java.util.Formatter.DateTime
-import dbis.piglet.mm.StatServer
-import dbis.piglet.tools.PlanWriter
-import dbis.piglet.tools.TopoSort
+
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration._
 
 
 object Piglet extends PigletLogging {
@@ -122,7 +99,7 @@ object Piglet extends PigletLogging {
     // at the end, show the statistics
     if(c.showStats) {
       // collect and print runtime stats
-      collectStats
+      collectStats()
     }
 
   } // main
@@ -166,10 +143,10 @@ object Piglet extends PigletLogging {
     } finally {
       if(c.notifyURL.isDefined) {
         
-        val stringURI = c.notifyURL.get.toString()
+        val stringURI = c.notifyURL.get.toString
           .replace("[success]", if(success) "Success" else "Failed")
           .replace("[name]", c.inputFiles.map(_.getFileName.toString()).mkString(","))
-          .replace("[time]", java.time.LocalDateTime.now().toString())
+          .replace("[time]", java.time.LocalDateTime.now().toString)
 
         logger.debug(s"notification url: $stringURI")  
           
@@ -183,9 +160,9 @@ object Piglet extends PigletLogging {
 
   /**
     *
-    * @param file
-    * @param master
-    * @param backendArgs
+    * @param file The pig script file to execute
+    * @param master The master info
+    * @param backendArgs Additional arguments to the target runtime
     */
   def runRaw(file: Path, master: String, backendArgs: Map[String, String]) = timing("execute raw") {
     logger.debug(s"executing in raw mode: $file with master $master for backend ${BackendManager.backend.name} with arguments ${backendArgs.mkString(" ")}")
@@ -288,8 +265,9 @@ object Piglet extends PigletLogging {
 
       logger.debug("finished optimizations")
 
+      PlanWriter.init(newPlan)
+
       if (c.showPlan) {
-        PlanWriter.init(newPlan)
         println("final plan = {")
         newPlan.printPlan(2)
         println("}")
@@ -298,23 +276,21 @@ object Piglet extends PigletLogging {
       try {
     	  newPlan.checkConsistency
       } catch {
-        case e: InvalidPlanException => {
-      	  logger.error(s"inconsistent plan in ${e.getMessage}")
-      	  return
-        }
+        case e: InvalidPlanException =>
+          logger.error(s"inconsistent plan in ${e.getMessage}")
+          return
       }
       try {
         // if this does _not_ throw an exception, the schema is ok
         newPlan.checkSchemaConformance
       } catch {
-        case e: SchemaException => {
+        case e: SchemaException =>
           logger.error(s"schema conformance error in ${e.getMessage}")
           return
-        }
       }
       
 
-      val scriptName = path.getFileName.toString().replace(".pig", "")
+      val scriptName = path.getFileName.toString.replace(".pig", "")
       logger.debug(s"using script name: $scriptName")
 
 
@@ -324,7 +300,7 @@ object Piglet extends PigletLogging {
           if (!c.compileOnly) {
             // 4. and finally deploy/submit
             val runner = BackendManager.backend.runnerClass
-            logger.debug(s"using runner class ${runner.getClass.toString()}")
+            logger.debug(s"using runner class ${runner.getClass.toString}")
 
             logger.info( s"""starting job at "$jarFile" using backend "${c.backend}" """)
 
@@ -336,27 +312,22 @@ object Piglet extends PigletLogging {
             
             
           // after execution we want to write the dot file  
-          if(c.showPlan) {
-            
-            if(c.profiling.isDefined) {
-              
-              val exectimesCnt = DataflowProfiler.collect
-              
-              logger.info(s"profiler has info for ${exectimesCnt} lineages")
-              newPlan.operators.foreach{ node => 
-                val time = DataflowProfiler.getExectime(node.lineageSignature).map(_.milliseconds)
-                
-                
-                
-                PlanWriter.nodes(node.lineageSignature).time = time
-              }
-              
+          if(c.profiling.isDefined) {
+
+            val exectimesCnt = DataflowProfiler.collect
+
+            logger.info(s"profiler has info for $exectimesCnt lineages")
+            newPlan.operators.foreach{ node =>
+              val time = DataflowProfiler.getExectime(node.lineageSignature).map(_.milliseconds)
+
+              PlanWriter.nodes(node.lineageSignature).time = time
             }
-            
-            PlanWriter.writeDotFile(jarFile.getParent.resolve(s"${scriptName}.dot"))
+
           }
 
-        case None => logger.error(s"creating jar file failed for ${path}")
+          PlanWriter.writeDotFile(jarFile.getParent.resolve(s"$scriptName.dot"))
+
+        case None => logger.error(s"creating jar file failed for $path")
       }
     }
   }
@@ -370,6 +341,6 @@ object Piglet extends PigletLogging {
     SETM.quiet = quiet
   }
   
-  def collectStats = SETM.collect()
+  def collectStats() = SETM.collect()
 
 }

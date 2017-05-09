@@ -10,7 +10,7 @@ import dbis.setm.SETM.timing
 import org.json4s.native.Serialization.{read, write => swrite}
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.{ListBuffer, Map => MutableMap}
+import scala.collection.mutable.{Map => MutableMap}
 import scala.io.Source
 
 case class T(cnt: Int, sum: Long) {
@@ -57,7 +57,7 @@ object DataflowProfiler extends PigletLogging {
   // map lineage ->
 //  val currentTimes = MutableMap.empty[String, ListBuffer[(Int, Long, Seq[Seq[Int]])]]
 
-  val parentPartitionInfo = MutableMap.empty[String, MutableMap[Int, ListBuffer[ListBuffer[Int]]]]
+  val parentPartitionInfo = MutableMap.empty[String, MutableMap[Int, Seq[Seq[Int]]]]
   val currentTimes = MutableMap.empty[Partition, Long]
 
   // list of parent operators for each operator
@@ -115,13 +115,32 @@ object DataflowProfiler extends PigletLogging {
       val lineage = partition.lineage
       val partitionId = partition.partitionId
 
+      // parent operators
       val parentLineages = parentsOf(lineage)
+      // list of parent partitions per parent
       val parentPartitionIds = parentPartitionInfo(lineage)
 
-
+      /* for each parent operator, get the times for the respective parent partitions.
+       * and at the end take the min (first processed parent partition) or max (last processed parent partition) value
+       */
       val earliestParentTime = parentPartitionIds(partitionId).zipWithIndex.flatMap{ case (list, idx) =>
-          list.map{ pId => currentTimes(Partition(parentLineages(idx),pId)) }
-        }.min
+          val parentLineage = parentLineages(idx)
+
+          list.map{ pId =>
+            val p = if(parentLineage == "start")
+                Partition(parentLineage, -1) // for "start" we only have one value with partition id -1
+              else
+                Partition(parentLineage,pId)
+
+            if(currentTimes.contains(p))
+              currentTimes(p)
+            else {
+              logger.error(currentTimes.mkString("\n"))
+//              sys.error(s"cannot find $p in current times")
+              0
+            }
+          }
+        }.max
 
       val duration = time - earliestParentTime
 
@@ -144,7 +163,26 @@ object DataflowProfiler extends PigletLogging {
 //      currentTimes += (lineage -> ListBuffer((partitionId, time, parentPartitions)))
 //    }
 
+    val p = Partition(lineage, partitionId)
+    if(currentTimes.contains(p)) {
+      logger.warn(s"we already have a time for $p : oldTime: ${currentTimes(p)}  newTime: $time  (diff: ${currentTimes(p) - time}ms")
+    }
+    currentTimes +=  p -> time
 
+    if(parentPartitionInfo.contains(lineage)) {
+
+      val m = parentPartitionInfo(lineage)
+
+      if(m.contains(partitionId)) {
+        // warning?
+//        logger.warn(s"WARNING: we already have that partition: $lineage  $partitionId . ")
+      } else {
+        m += partitionId -> parentPartitions
+      }
+
+    } else {
+      parentPartitionInfo += lineage -> MutableMap(partitionId -> parentPartitions)
+    }
 
   }
   
