@@ -16,16 +16,15 @@
  */
 package dbis.piglet.plan
 
+import dbis.piglet.expr._
 import dbis.piglet.op._
 import dbis.piglet.op.cmd._
-import dbis.piglet.expr._
 import dbis.piglet.plan.rewriting.Rewriter
-import dbis.piglet.schema.{Types, PigType, Schema, SchemaException}
-import dbis.piglet.udf.{UDFTable, UDF}
-import scala.collection.mutable.{ListBuffer, Map}
-import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.tools.BreadthFirstTopDownWalker
+import dbis.piglet.schema.{Schema, SchemaException}
 import dbis.piglet.tools.TopoSort
+
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 
 
@@ -61,7 +60,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
   /**
    * A map for UDF aliases + constructor arguments.
    */
-  val udfAliases = Map[String,(String, List[Any])]()
+  val udfAliases = mutable.Map[String,(String, List[Any])]()
 
   // start with empty code
   var code: String = ""
@@ -99,10 +98,10 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
 
     // This maps a String (the relation name, a string) to the pipe that writes it and the list of
     // operators that read it.
-    var pipes = Map[String, Pipe]()
+    var pipes = mutable.Map[String, Pipe]()
 
     // This maps macro names to their definitions
-    val macros = Map[String, DefineMacroCmd]()
+    val macros = mutable.Map[String, DefineMacroCmd]()
 
     /*
      * 1. We remove all REGISTER, DEFINE, SET, and embedded code operators: they are just pseudo-operators.
@@ -117,7 +116,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
     ops.filter(_.isInstanceOf[EmbedCmd]).foreach(op => {
       val castedOp = op.asInstanceOf[EmbedCmd]
       code += castedOp.code
-      castedOp.extractUDFs
+      castedOp.extractUDFs()
       castedOp.ruleCode.foreach { c: String => extraRuleCode = extraRuleCode :+ c}
     })
 
@@ -159,7 +158,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
       op.outputs.foreach { p: Pipe =>
         if (p.name != "") {
           if (pipes.contains(p.name)) {
-            throw new InvalidPlanException("duplicate pipe: " + p.name)
+            throw InvalidPlanException("duplicate pipe: " + p.name)
           }
           // we initialize the producer of the pipe
           p.producer = op
@@ -183,19 +182,18 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
              */
             val outerPipe = resolvePipeFromContext(p.name)
             outerPipe match {
-              case Some(oPipe) => {
+              case Some(oPipe) =>
                 if (oPipe.name != p.name) {
                   /*
                    * The outer pipe name is different from the input pipe. Thus, we have to insert
                    * a ConstructBag operator before the current operator. For this purpose, we collect
                    * pairs of (ConstructBag, operator) which we later insert.
                    */
-                  val cbOp = ConstructBag(Pipe(s"${p.name}_${varCnt}"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
+                  val cbOp = ConstructBag(Pipe(s"${p.name}_$varCnt"), DerefTuple(NamedField(oPipe.name), NamedField(p.name)))
                   newOps += ((cbOp, op))
                   varCnt += 1
                 }
-              }
-              case None => throw new InvalidPlanException("invalid pipe: " + p.name + " for " + op)
+              case None => throw InvalidPlanException("invalid pipe: " + p.name + " for " + op)
             }
           }
           else {
@@ -222,7 +220,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
     try {
       newOpList.foreach(op => {
         // we ignore $name here because this appears only inside a macro
-        if (op.inputs.filter(p => p.name.startsWith("$")).isEmpty) {
+        if (!op.inputs.exists(p => p.name.startsWith("$"))) {
           val newPipes = op.inputs.map(p => pipes(p.name))
           op.inputs = newPipes
         }
@@ -231,9 +229,10 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
       })
     }
     catch {
-      case e: java.util.NoSuchElementException => throw new InvalidPlanException("invalid pipe: " + e.getMessage)
+      case e: java.util.NoSuchElementException => throw InvalidPlanException("invalid pipe: " + e.getMessage)
     }
-    operators = newOpList.toList
+
+    operators = newOpList
   }
 
   /**
@@ -248,7 +247,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    * @return the updated operator list + the updated pipe map
    */
   def insertOperators(opList: List[PigOperator], newOps: List[(PigOperator, PigOperator)],
-                      pipes: Map[String, Pipe]): (List[PigOperator], Map[String, Pipe]) = {
+                      pipes: mutable.Map[String, Pipe]): (List[PigOperator], mutable.Map[String, Pipe]) = {
 
     /*
      * Replace the name of the pipe with the oName by the name of the pipe.
@@ -314,12 +313,11 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    * each subsequent operator in the list.
    */
   def processSetCmds(opList: List[PigOperator]): List[PigOperator] = {
-    val currentParams: Map[String, Any] = Map()
-    opList.foreach(op => op match {
+    val currentParams: mutable.Map[String, Any] = mutable.Map()
+    opList.foreach {
       case SetCmd(key, value) => currentParams += (key -> value)
-      case _ => op.configParams = op.configParams ++ currentParams
-      }
-    )
+      case op => op.configParams = op.configParams ++ currentParams
+    }
     opList
   }
 
@@ -380,11 +378,11 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    * Checks whether all operators and their expressions conform to the schema
    * of their input bags. If not, a SchemaException is raised.
    */
-  def checkSchemaConformance: Unit = {
+  def checkSchemaConformance(): Unit = {
     val errors = operators.view.map{ op => (op, op.checkSchemaConformance) }
-                    .filter{ t => t._2 == false }
+                    .filter{ t => !t._2 }
 
-    if(!errors.isEmpty) {
+    if(errors.nonEmpty) {
       val str = errors.map(_._1).mkString(" and ")
       throw SchemaException(str)
     }
@@ -503,13 +501,13 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
     require(operators.contains(op1), s"operator is not member of the plan: $op1")
     require(operators.contains(op2), s"operator is not member of the plan: $op2")
     
-    op2.inputs = op2.inputs.filter { op => op.producer != op1 }
-    op1.outputs = op1.outputs.filter { op => op != op2 }
+    op2.inputs = op2.inputs.filterNot { _.producer != op1 }
+    op1.outputs = op1.outputs.filterNot { _.consumer == op2 }
 
     this
   }
 
-  def resolveParameters(mapping: Map[String, Ref]): Unit = operators.foreach(p => p.resolveParameters(mapping))
+  def resolveParameters(mapping: mutable.Map[String, Ref]): Unit = operators.foreach(p => p.resolveParameters(mapping))
 
   /**
     * Check all statements using the given expression traverser if any of the expressions
@@ -519,14 +517,14 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
     * @return true if any expression was found satisfying the predicate of the traverser
     */
   def checkExpressions(f: (Schema, Expr) => Boolean): Boolean = {
-    val res = operators.map(_ match {
+    val res = operators.map {
       case op@Foreach(_, _, gen, _) => gen match {
         case GeneratorList(exprs) => exprs.exists(g => f(op.schema.orNull, g.expr))
         case GeneratorPlan(p) => false
       }
       case op@Filter(_, _, pred, _) => pred.traverseOr(op.schema.orNull, f)
       case _ => false
-    })
+    }
     res.contains(true)
   }
 }

@@ -1,9 +1,8 @@
 package dbis.piglet.codegen.scala_lang
 
 import dbis.piglet.backends.BackendManager
-import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenException}
-import dbis.piglet.op.{Load, PigOperator}
-import dbis.piglet.schema.Schema
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
+import dbis.piglet.op.Load
 
 /**
   * Created by kai on 03.12.16.

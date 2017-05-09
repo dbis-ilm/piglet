@@ -20,7 +20,7 @@ object StatServer extends PigletLogging {
 	// needed for the future flatMap/onComplete in the end
 	implicit private val executionContext = system.dispatcher
 
-	private var bindingFuture: Future[Http.ServerBinding] = null
+	private var bindingFuture: Future[Http.ServerBinding] = _
 	
 	def start(port: Int) {
 

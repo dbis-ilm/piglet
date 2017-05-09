@@ -16,21 +16,21 @@
  */
 package dbis.piglet.op
 
-import dbis.piglet.backends.BackendManager
-import dbis.piglet.expr.{Value, Ref}
-import dbis.piglet.schema.Schema
 import java.net.URI
 
-import scala.collection.mutable.Map
+import dbis.piglet.expr.{Ref, Value}
+import dbis.piglet.schema.Schema
+
+import scala.collection.mutable
 
 /**
  * Load represents the LOAD operator of Pig.
  *
  * @param out the output pipe (relation).
  * @param file the name of the file to be loaded
- * @param loadSchema
- * @param loaderFunc
- * @param loaderParams
+ * @param loadSchema The schema of the underlying file content
+ * @param loaderFunc The name of the loader function to use (PigStorage, ...)
+ * @param loaderParams Parameters (delimiter, ...)
  */
 case class Load(
     private val out: Pipe, 
@@ -47,11 +47,11 @@ case class Load(
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""LOAD%${file}%""" + super.lineageString
+    s"""LOAD%$file%""" + super.lineageString
   }
 
   override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"LOAD { out = ${outPipeName} }")
+    println(indent(tab) + s"LOAD { out = $outPipeName }")
     println(indent(tab + 2) + "file = " + file.toString)
     if (loaderFunc.isDefined) {
       println(indent(tab + 2) + "func = " + loaderFunc.get)
@@ -59,16 +59,15 @@ case class Load(
     println(indent(tab + 2) + "outSchema = " + schema)
   }
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = {
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = {
     // we replace only the filename
     if (file.toString.startsWith("$") && mapping.contains(file.toString)) {
       mapping(file.toString) match {
-        case Value(v) => {
+        case Value(v) =>
           val s = v.toString
           if (s(0) == '"')
             file = new URI(s.substring(1, s.length-1))
-        }
-        case _ => {}
+        case _ =>
       }
     }
   }
