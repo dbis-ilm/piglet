@@ -2,6 +2,7 @@ package dbis.piglet.mm
 
 import java.nio.file.{Files, Path, StandardOpenOption}
 
+import dbis.piglet.Piglet.Lineage
 import dbis.piglet.op.{PigOperator, TimingOp}
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.logging.PigletLogging
@@ -13,49 +14,29 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.{Map => MutableMap}
 import scala.io.Source
 
-case class T(cnt: Int, sum: Long) {
-  def value(): Long = sum / cnt
+case class T private(sum: Long, cnt: Int, min: Long = Long.MaxValue, max: Long = Long.MinValue) {
+  def avg(): Long = sum / cnt
 }
 
+object T {
 
-case class MedianList[T](list: Seq[T]) {
-  def median: T = if(list.isEmpty) {
-    throw new UnsupportedOperationException("median of empty list")
-  } else if(list.size == 1)
-    list.head
-  else
-    list(list.size / 2)
-}
+  def apply(value: Long): T = T(value,1,value,value)
 
-case class AvgList(list: Seq[Long]) {
-  
-  def avg: Double = if(list.isEmpty) 
-    throw new UnsupportedOperationException("avg of empty list")
-  else if(list.size == 1)
-    list.head.toDouble
-  else {
-    list.sum / list.size.asInstanceOf[Double]
-  }
-    
+  def merge(t: T, value: Long): T = T(cnt = t.cnt +1,
+                                      sum = t.sum + value,
+                                      min = if(value < t.min) value else t.min,
+                                      max = if(value > t.max) value else t.max)
 }
 
 case class Partition(lineage: String, partitionId: Int)
 
 object DataflowProfiler extends PigletLogging {
 
-  implicit def toMedianList[T](l: Seq[T]): MedianList[T] = MedianList(l)
-  implicit def toAvgList[T <: Long](l: Seq[T]): AvgList = AvgList(l)
-  
-  val delim = ";"
-
-  private[mm] val opcounts  = MutableMap.empty[String, Int].withDefaultValue(0)
+  private[mm] var opCount: OpCount = _
 
   private val cache = MutableMap.empty[String, MaterializationPoint]
 
   private val exectimes = MutableMap.empty[String, T]
-
-  // map lineage ->
-//  val currentTimes = MutableMap.empty[String, ListBuffer[(Int, Long, Seq[Seq[Int]])]]
 
   val parentPartitionInfo = MutableMap.empty[String, MutableMap[Int, Seq[Seq[Int]]]]
   val currentTimes = MutableMap.empty[Partition, Long]
@@ -69,32 +50,35 @@ object DataflowProfiler extends PigletLogging {
 
   override def toString = cache.mkString(",")
 
-  def init(base: Path, plan: DataflowPlan) = {
+  def load(base: Path) = {
     logger.debug("init Dataflow profiler")
 
     exectimes.clear()
-    opcounts.clear()
-    parentsOf.clear()
-    currentTimes.clear()
-
-    plan.operators.filterNot(_.isInstanceOf[TimingOp]).foreach{op =>
-      val inputs = op.inputs.map(_.producer.lineageSignature)
-
-      val p = if(inputs.nonEmpty) op.lineageSignature -> inputs else op.lineageSignature -> List("start")
-
-      parentsOf += p
-    }
 
     val opCountFile = base.resolve(Conf.opCountFile)
     if(Files.exists(opCountFile)) {
-      Source.fromFile(opCountFile.toFile).getLines().foreach{ line =>
-        val arr = line.split(delim)
-        val key = arr(0)
-        val value = arr(1).toInt
 
-        opcounts += (key -> value)
-      }
-    }
+      val json = Source.fromFile(opCountFile.toFile).getLines().mkString("\n")
+      val opcounts = read[Map[Lineage, Map[Lineage, Int]]](json)
+
+      if(opcounts.nonEmpty) {
+
+        // copy content that was read from JSON to a _mutable_ map!
+        val mm = MutableMap.empty[Lineage, MutableMap[Lineage, Int]]
+        opcounts.filterKeys(_ != "meta").foreach{ case (parent,children) =>
+
+          val mm2 = MutableMap.empty[Lineage, Int]
+          children.foreach{ case (l,c) => mm2.put(l,c)}
+
+          mm.put(parent, mm2)
+        }
+        // create opcount instance
+        opCount = OpCount(opcounts("meta")("runs"), mm)
+      } else
+        opCount = OpCount.empty
+
+    } else
+      opCount = OpCount.empty
 
     val execTimesFile = base.resolve(Conf.execTimesFile)
     if(Files.exists(execTimesFile)) {
@@ -105,11 +89,40 @@ object DataflowProfiler extends PigletLogging {
     }
   }
 
+  def reset() = {
+    parentsOf.clear()
+    currentTimes.clear()
+  }
+
+  def analyze(plan: DataflowPlan): Unit = timing("analyze plan") {
+
+    // reset old values for parents and execution time
+    reset()
+
+    opCount.incrRuns()
+
+    /* walk over the plan and
+     *   - count operator occurrences
+     *   - save the parent information
+     */
+    BreadthFirstTopDownWalker.walk(plan){ op =>
+        val lineage = op.lineageSignature
+        op.outputs.flatMap(_.consumer).foreach{ c =>
+            opCount.add(lineage, c.lineageSignature)
+        }
+
+        val inputs = op.inputs.map(_.producer.lineageSignature)
+        val p = if(inputs.nonEmpty) lineage -> inputs else lineage -> List("start")
+        parentsOf += p
+    }
+  }
+
+
   def collect = {
 
     currentTimes//.keySet
                 //.map(_.lineage)
-                .filterNot{ case (Partition(lineage,_),_) => lineage == "start" || lineage == "end" }
+                .filterNot{ case (Partition(lineage,_),_) => lineage == "start" || lineage == "end" || lineage == "progstart" }
                 .foreach{ case (partition,time) =>
 
       val lineage = partition.lineage
@@ -123,45 +136,56 @@ object DataflowProfiler extends PigletLogging {
       /* for each parent operator, get the times for the respective parent partitions.
        * and at the end take the min (first processed parent partition) or max (last processed parent partition) value
        */
-      val earliestParentTime = parentPartitionIds(partitionId).zipWithIndex.flatMap{ case (list, idx) =>
+      val parentTimes = parentPartitionIds(partitionId).zipWithIndex.flatMap{ case (list, idx) =>
           val parentLineage = parentLineages(idx)
 
           list.map{ pId =>
             val p = if(parentLineage == "start")
                 Partition(parentLineage, -1) // for "start" we only have one value with partition id -1
+//            else if(parentLineage == "progstart")
+//              Partition(parentLineage, -1)
               else
                 Partition(parentLineage,pId)
 
             if(currentTimes.contains(p))
               currentTimes(p)
             else {
+              logger.error("currentTimes: ")
               logger.error(currentTimes.mkString("\n"))
-//              sys.error(s"cannot find $p in current times")
-              0
+              throw ProfilingException(s"no $p in list of current execution times")
             }
           }
-        }.max
+        }
+
+
+
+      val earliestParentTime = if(parentTimes.nonEmpty) {
+        parentTimes.max
+      } else {
+        throw ProfilingException(s"no parent time for $lineage on partition $partitionId")
+      }
 
       val duration = time - earliestParentTime
 
-      val oldT = exectimes.getOrElse(lineage, T(0,0L))
-      val a = T(oldT.cnt + 1, oldT.sum + duration)
+      val oldT = exectimes.getOrElse(lineage, T(0L, cnt = 0))
+      val a = T.merge(oldT, duration) //T(oldT.cnt + 1, oldT.sum + duration)
 
       exectimes.update(lineage, a)
     }
+
+    // manually add execution time for creating spark context
+    val progStart = currentTimes(Partition("progstart", -1))
+    val start = currentTimes(Partition("start", -1))
+    exectimes += "sparkcontext" -> T(start - progStart)
     
 //    logger.debug(s"total: ${currentTimes("end").head._2 - currentTimes("start").head._2}")
     
     exectimes.size
   }
       
-  
+
+
   def addExecTime(lineage: String, partitionId: Int, parentPartitions: Seq[Seq[Int]], time: Long) = {
-//    if(currentTimes.contains(lineage)) {
-//      currentTimes(lineage) += ((partitionId, time, parentPartitions))
-//    } else {
-//      currentTimes += (lineage -> ListBuffer((partitionId, time, parentPartitions)))
-//    }
 
     val p = Partition(lineage, partitionId)
     if(currentTimes.contains(p)) {
@@ -174,8 +198,7 @@ object DataflowProfiler extends PigletLogging {
       val m = parentPartitionInfo(lineage)
 
       if(m.contains(partitionId)) {
-        // warning?
-//        logger.warn(s"WARNING: we already have that partition: $lineage  $partitionId . ")
+        logger.warn(s"we already have that partition: $lineage  $partitionId . ")
       } else {
         m += partitionId -> parentPartitions
       }
@@ -186,18 +209,9 @@ object DataflowProfiler extends PigletLogging {
 
   }
   
-  def getExectime(op: String): Option[Double] = {
-    val s = if(exectimes.contains(op)) {
-      val T(cnt,sum) = exectimes(op)
-      Some(sum / cnt.asInstanceOf[Double])
-    } else
-      None
-      
-//    println(s"returning $s")  
-    s 
-  }
+  def getExectime(op: String): Option[T] = exectimes.get(op)
 
-  def writeStatistics(c: CliParams) = {
+  def writeStatistics(c: CliParams): Unit = {
 
     val execTimesFile = c.profiling.get.resolve(Conf.execTimesFile)
 
@@ -210,8 +224,12 @@ object DataflowProfiler extends PigletLogging {
       StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
 
     val opCountFile = c.profiling.get.resolve(Conf.opCountFile)
+    logger.debug(s"writing opcounts to $opCountFile with ${opCount.size} entries")
+
+    val o = Map(("meta",Map(("runs",opCount.totalRuns))))
+    val opJson = swrite(opCount.adj ++ o)
     Files.write(opCountFile,
-      opcounts.map{ case (key,value) => s"$key$delim$value"}.asJava,
+      List(opJson).asJava,
       StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
   }
 
@@ -234,8 +252,10 @@ object DataflowProfiler extends PigletLogging {
    * If something exists, create a materialization point that can be used later. 
    */
   def addMaterializationPoints(plan: DataflowPlan) = timing("identify mat points") {
-    
-    DepthFirstTopDownWalker.walk(plan) { op =>
+
+    DepthFirstTopDownWalker.walk(plan) {
+      case _ : TimingOp => // we want to ignore Timing operators
+      case op: PigOperator =>
 
       logger.debug( s"""checking storage service for runtime information for operator "${op.lineageSignature}" """)
       // check for the current operator, if we have some runtime/stage information 
@@ -257,8 +277,7 @@ object DataflowProfiler extends PigletLogging {
           None, // currently, we do not consider the parent
           progduration, // set the processing time
           0L, // TODO: calculate loading time at this point
-          0L, // TODO: calculate saving time at this point
-          0 // no count/size information so far
+          0L // TODO: calculate saving time at this point
         )
 
         this.addMaterializationPoint(mp)
@@ -267,40 +286,9 @@ object DataflowProfiler extends PigletLogging {
         logger.debug(s" found no runtime information")
       }
     }
-    
   }
   
-  /**
-   * For profiling the jobs that are run with Piglet, we count how often an
-   * operator lineage is used within a script. This counter value is added
-   * and stored in our database. 
-   * <br><br>
-   * We traverse the plan and for operator we find, we store its count value
-   * in a map. Afterwards, this map's content is stored in our database
-   * where the values are added to already existing ones.
-   * 
-   * @param schedule The schedule, all current plans, to count operators in
-   */
-  def createOpCounter(schedule: Seq[(DataflowPlan, Path)], c: CliParams) = timing("analyze plans") {
 
-    logger.debug("start creating lineage counter map")
-    
-    // the visitor to add/update the operator count in the map 
-    def visitor(op: PigOperator): Unit = {
-      val lineage = op.lineageSignature
-
-      op.outputs.flatMap(_.consumer).foreach{c => 
-        val key = s"$lineage-${c.lineageSignature}"
-        
-        opcounts(key) += 1
-      }
-    }
-
-    // traverse all plans and visit each operator within a plan
-    schedule.foreach { plan => BreadthFirstTopDownWalker.walk(plan._1)(visitor) }
-  }
-  
-  
   lazy val url = if(Conf.statServerURL.isDefined) {
       Conf.statServerURL.get.toURI
     } else {
@@ -310,3 +298,5 @@ object DataflowProfiler extends PigletLogging {
       u
     }
 }
+
+case class ProfilingException(msg: String) extends Exception

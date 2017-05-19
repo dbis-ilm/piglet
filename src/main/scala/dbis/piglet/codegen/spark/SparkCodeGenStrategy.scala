@@ -87,12 +87,14 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
       .foreach { s => map += ("profiling" -> s) }
 
 
-    CodeEmitter.render("""  def main(args: Array[String]) {
-                         |
+    CodeEmitter.render(s"""  def main(args: Array[String]) {
+                         |<if (profiling)>
+                         |  val url = "<profiling>"
+                         |  PerfMonitor.notify(url,"progstart",null,-1,System.currentTimeMillis)
+                         |<endif>
                          |val conf = new SparkConf().setAppName("<name>_App")
                     		 |val sc = new SparkContext(conf)
                          |<if (profiling)>
-                         |    val url = "<profiling>"
                          |    PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
                          |<endif>
                          |""".stripMargin, map)

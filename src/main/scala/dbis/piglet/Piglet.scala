@@ -21,12 +21,12 @@ import java.nio.file.{Path, Paths}
 
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.PigletCompiler
-import dbis.piglet.mm.{DataflowProfiler, StatServer}
+import dbis.piglet.mm.{DataflowProfiler, ProfilingException, StatServer}
 import dbis.piglet.plan.{DataflowPlan, InvalidPlanException, MaterializationManager, PlanMerger}
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.rewriting.Rules
 import dbis.piglet.schema.SchemaException
-import dbis.piglet.tools.{CliParams, Conf, PlanWriter}
+import dbis.piglet.tools._
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.setm.SETM
 import dbis.setm.SETM.timing
@@ -37,6 +37,7 @@ import scala.concurrent.duration._
 
 object Piglet extends PigletLogging {
 
+  type Lineage = String
 
   def main(args: Array[String]): Unit = {
 
@@ -89,12 +90,6 @@ object Piglet extends PigletLogging {
     run(c)  // this little call starts the whole processing!
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
-    
-    if(c.profiling.isDefined) {
-    	StatServer.stop()
-
-    	DataflowProfiler.writeStatistics(c)
-    }
     
     // at the end, show the statistics
     if(c.showStats) {
@@ -213,9 +208,7 @@ object Piglet extends PigletLogging {
 
 		// count occurrences of each operator in schedule
     if(c.profiling.isDefined) {
-      val file = c.profiling.get.resolve(Conf.opCountFile)
-      DataflowProfiler.createOpCounter(schedule, c)
-
+      DataflowProfiler.load(c.profiling.get)
       StatServer.start(Conf.statServerPort)
     }
 
@@ -245,22 +238,19 @@ object Piglet extends PigletLogging {
       Rules.registerBackendRules(c.backend)
       newPlan = rewritePlan(newPlan)
 
-      
-      // after rewriting the plan, add the timing operations
+
+      // find materialization points
+      //      profiler.foreach { p => p.addMaterializationPoints(newPlan) }
       if(c.profiling.isDefined) {
+        DataflowProfiler.analyze(newPlan)
+        DataflowProfiler.addMaterializationPoints(newPlan)
+
+        // after rewriting the plan, add the timing operations
         newPlan = insertTimings(newPlan)
       }
 
       if(c.muteConsumer) {
         newPlan = mute(newPlan)
-      }
-      
-      
-      // find materialization points
-//      profiler.foreach { p => p.addMaterializationPoints(newPlan) }
-      if(c.profiling.isDefined) {
-    	  DataflowProfiler.init(c.profiling.get, newPlan)
-        DataflowProfiler.addMaterializationPoints(newPlan)
       }
 
       logger.debug("finished optimizations")
@@ -274,21 +264,20 @@ object Piglet extends PigletLogging {
       }
 
       try {
-    	  newPlan.checkConsistency
-      } catch {
-        case e: InvalidPlanException =>
-          logger.error(s"inconsistent plan in ${e.getMessage}")
-          return
-      }
-      try {
+
+        newPlan.checkConsistency
         // if this does _not_ throw an exception, the schema is ok
-        newPlan.checkSchemaConformance
+        newPlan.checkSchemaConformance()
+
       } catch {
-        case e: SchemaException =>
-          logger.error(s"schema conformance error in ${e.getMessage}")
+        case InvalidPlanException(msg) =>
+          logger.error(s"inconsistent plan in $msg")
+          return
+        case SchemaException(msg) =>
+          logger.error(s"schema conformance error in $msg")
           return
       }
-      
+
 
       val scriptName = path.getFileName.toString.replace(".pig", "")
       logger.debug(s"using script name: $scriptName")
@@ -314,22 +303,49 @@ object Piglet extends PigletLogging {
           // after execution we want to write the dot file  
           if(c.profiling.isDefined) {
 
-            val exectimesCnt = DataflowProfiler.collect
+            try {
+              val exectimesCnt = DataflowProfiler.collect
 
-            logger.info(s"profiler has info for $exectimesCnt lineages")
+              logger.info(s"profiler has info for $exectimesCnt lineages")
+
+              /* if we really have a batch of scripts, then writing the statistics after
+               * each plan is a performance issue. However, doing it at this place allows
+               * us to easily react on errors: We don't want to write the statistics if
+               * there was an error...
+               */
+              DataflowProfiler.writeStatistics(c)
+
+            } catch {
+              case ProfilingException(msg) =>
+                logger.error(s"error in profiler: $msg")
+            }
+
             newPlan.operators.foreach{ node =>
-              val time = DataflowProfiler.getExectime(node.lineageSignature).map(_.milliseconds)
+              val time = DataflowProfiler.getExectime(node.lineageSignature).map(t => t.avg().milliseconds)
 
               PlanWriter.nodes(node.lineageSignature).time = time
             }
 
+            val scLineage = "sparkcontext"
+            PlanWriter.nodes += scLineage -> Node(scLineage, DataflowProfiler.getExectime(scLineage).map(_.max.milliseconds), PlanWriter.quote("Spark Context"))
+            newPlan.sourceNodes.map(PlanWriter.signature).foreach { load => PlanWriter.edges += Edge(scLineage, load)}
+
           }
 
-          PlanWriter.writeDotFile(jarFile.getParent.resolve(s"$scriptName.dot"))
+//          PlanWriter.writeDotFile(jarFile.getParent.resolve(s"$scriptName.dot"))
+          PlanWriter.createImage(jarFile.getParent, scriptName)
 
         case None => logger.error(s"creating jar file failed for $path")
       }
     }
+
+
+    if(c.profiling.isDefined) {
+      StatServer.stop()
+
+
+    }
+
   }
 
   def startCollectStats(enable: Boolean, quiet: Boolean) = {

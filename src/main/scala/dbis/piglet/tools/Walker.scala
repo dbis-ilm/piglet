@@ -1,21 +1,11 @@
 package dbis.piglet.tools
 
 import dbis.piglet.op.PigOperator
-import dbis.piglet.op.PigOperator
-import dbis.piglet.op.PigOperator
-import dbis.piglet.op.PigOperator
-import scala.collection.mutable.Stack
 import dbis.piglet.plan.DataflowPlan
-import scala.collection.mutable.Queue
-import scala.collection.mutable.Set
-import dbis.piglet.op.PigOperator
-import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.op.PigOperator
-import dbis.piglet.op.PigOperator
-import dbis.piglet.op.PigOperator
-import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.Map
 import dbis.piglet.tools.logging.PigletLogging
+
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 /**
  * A general trait to be implemented by all walkers
@@ -41,12 +31,12 @@ object BreadthFirstBottomUpWalker extends Walker[PigOperator] {
 	def walk(plan: DataflowPlan)(visit: (PigOperator => Unit)) = {
     
     // the list of unprocessed nodes
-    val todo = Queue(plan.sinkNodes.toSeq: _*)
+    val todo = mutable.Queue(plan.sinkNodes.toSeq: _*)
     
     // the list of already processed nodes
-    val seen = Set.empty[String]
+    val seen = mutable.Set.empty[String]
     
-    while(!todo.isEmpty) {
+    while(todo.nonEmpty) {
       val op = todo.dequeue()
       
       val sig = op.lineageSignature 
@@ -105,11 +95,11 @@ object BreadthFirstTopDownWalker extends Walker[PigOperator] {
   
 	override def walk(plan: DataflowPlan)(visit: (PigOperator => Unit)) = {
 //	  new BreadthFirstTopDownIterator(plan).foreach(visit)
-	  val todo = Queue(plan.sourceNodes.toSeq: _*)
+	  val todo = mutable.Queue(plan.sourceNodes.toSeq: _*)
 //    val seen = Set.empty[String]
-	  val seen = Set.empty[PigOperator]
+	  val seen = mutable.Set.empty[PigOperator]
    
-    while(!todo.isEmpty) {
+    while(todo.nonEmpty) {
       val op = todo.dequeue()      
 //      val sig = op.lineageSignature 
   
@@ -119,7 +109,7 @@ object BreadthFirstTopDownWalker extends Walker[PigOperator] {
     	  visit(op)    // apply the visitor to the current op
       }
       
-      // add all consumers of the current op to our todo list
+      // add all consumers of the current op to our to-do-list
       // execpt the ones that we have already seen
       todo ++= op.outputs.flatMap(_.consumer).filter { op => !seen.contains(op) }
     }
@@ -131,10 +121,10 @@ object DepthFirstTopDownWalker extends Walker[PigOperator] {
   @Override
   override def walk(plan: DataflowPlan)(visit: (PigOperator => Unit)) = {
     
-    val todo = Stack(plan.sourceNodes.toSeq: _*)
-    val seen = Set.empty[PigOperator]
+    val todo = mutable.Stack(plan.sourceNodes.toSeq: _*)
+    val seen = mutable.Set.empty[PigOperator]
    
-    while(!todo.isEmpty) {
+    while(todo.nonEmpty) {
       val op = todo.pop()
       
   
@@ -144,7 +134,7 @@ object DepthFirstTopDownWalker extends Walker[PigOperator] {
         visit(op)    // apply the visitor to the current op
       }
       
-      val children = op.outputs.flatMap(_.consumer).filter { o => !seen.contains(o) } 
+      val children = op.outputs.flatMap(_.consumer).filterNot { o => seen.contains(o) }
       todo.pushAll(children)
     }
   }
@@ -155,9 +145,9 @@ object TopoSort extends PigletLogging {
   def apply(plan: DataflowPlan) = {
     
     val l = ListBuffer.empty[PigOperator]
-    val s = Queue(plan.sourceNodes.toSeq: _*)
+    val s = mutable.Queue(plan.sourceNodes.toSeq: _*)
     
-    val m = Map.empty[PigOperator, Int].withDefaultValue(0)
+    val m = mutable.Map.empty[PigOperator, Int].withDefaultValue(0)
     
     while(s.nonEmpty) {
       val n = s.dequeue()

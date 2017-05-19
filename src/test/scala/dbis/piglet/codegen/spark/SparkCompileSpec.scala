@@ -74,10 +74,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |
         |object test {
         |    def main(args: Array[String]) {
-        |
+        |      val url = "http://localhost:5555/times"
+        |      PerfMonitor.notify(url,"progstart",null,-1,System.currentTimeMillis)
         |      val conf = new SparkConf().setAppName("test_App")
         |      val sc = new SparkContext(conf)
-        |      val url = "http://localhost:5555/times"
         |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
         |      sc.stop()
         |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
@@ -108,10 +108,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |
                                      |object test {
                                      |    def main(args: Array[String]) {
-                                     |
+                                     |      val url = "http://localhost:5555/times"
+                                     |      PerfMonitor.notify(url,"progstart",null,-1,System.currentTimeMillis)
                                      |      val conf = new SparkConf().setAppName("test_App")
                                      |      val sc = new SparkContext(conf)
-                                     |      val url = "http://localhost:5555/times"
                                      |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
                                      |      sc.stop()
                                      |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
