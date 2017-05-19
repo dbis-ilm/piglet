@@ -411,7 +411,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val op = Limit(Pipe("aa"), Pipe("bb"), 10)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
-    val expectedCode = cleanString("val aa = sc.parallelize(bb.take(10))")
+//    sc.parallelize(bb.take(10))
+    val expectedCode = cleanString("val aa = bb.zipWithIndex.filter{case (_,idx) => idx < 10}.map(_._1)")
     assert(generatedCode == expectedCode)
   }
 
