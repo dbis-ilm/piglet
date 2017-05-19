@@ -40,12 +40,10 @@ import dbis.piglet.schema._
 import dbis.piglet.tools.CodeMatchers
 import dbis.piglet.tools.TestTools.strToUri
 import dbis.piglet.plan.rewriting.Rewriter
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+//import org.scalatest.junit.JUnitRunner
 import dbis.piglet.tools.TopoSort
 import dbis.piglet.codegen.CodeGenerator
 
-//@RunWith(classOf[JUnitRunner])
 class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
 
   override def beforeAll()  {
@@ -418,7 +416,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val op = Limit(Pipe("aa"), Pipe("bb"), 10)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
-    val expectedCode = cleanString("val aa = sc.parallelize(bb.take(10))")
+//    sc.parallelize(bb.take(10))
+    val expectedCode = cleanString("val aa = bb.zipWithIndex.filter{case (_,idx) => idx < 10}.map(_._1)")
     assert(generatedCode == expectedCode)
   }
 

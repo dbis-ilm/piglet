@@ -1,13 +1,14 @@
 package dbis.piglet.codegen.scala_lang
 
-import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenException}
-import dbis.piglet.op.{Limit, PigOperator}
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
+import dbis.piglet.op.Limit
 
 /**
   * Created by kai on 03.12.16.
   */
 class LimitEmitter extends CodeEmitter[Limit] {
-  override def template: String = """val <out> = sc.parallelize(<in>.take(<num>))""".stripMargin
+  // val <out> = sc.parallelize(<in>.take(<num>))
+  override def template: String = """val <out> = <in>.zipWithIndex.filter{case (_,idx) => idx \< <num>}.map(_._1)""".stripMargin
 
 
   override def code(ctx: CodeGenContext, op: Limit): String = 
