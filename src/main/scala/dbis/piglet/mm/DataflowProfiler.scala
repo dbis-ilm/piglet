@@ -14,6 +14,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.{Map => MutableMap}
 import scala.io.Source
 
+
 case class T private(sum: Long, cnt: Int, min: Long = Long.MaxValue, max: Long = Long.MinValue) {
   def avg(): Long = sum / cnt
 }
@@ -32,18 +33,14 @@ case class Partition(lineage: String, partitionId: Int)
 
 object DataflowProfiler extends PigletLogging {
 
-  private[mm] var opCount: OpCount = _
+  private[mm] var opCount: Markov = _
 
   private val cache = MutableMap.empty[String, MaterializationPoint]
 
-  private val exectimes = MutableMap.empty[String, T]
+  private val exectimes = MutableMap.empty[Lineage, T]
 
-  val parentPartitionInfo = MutableMap.empty[String, MutableMap[Int, Seq[Seq[Int]]]]
+  val parentPartitionInfo = MutableMap.empty[Lineage, MutableMap[Int, Seq[Seq[Int]]]]
   val currentTimes = MutableMap.empty[Partition, Long]
-
-  // list of parent operators for each operator
-  val parentsOf = MutableMap.empty[String, List[String]].withDefault(_ => List.empty)
-
 
   // for json (de-)serialization
   implicit val formats = org.json4s.native.Serialization.formats(org.json4s.NoTypeHints)
@@ -57,28 +54,13 @@ object DataflowProfiler extends PigletLogging {
 
     val opCountFile = base.resolve(Conf.opCountFile)
     if(Files.exists(opCountFile)) {
-
       val json = Source.fromFile(opCountFile.toFile).getLines().mkString("\n")
-      val opcounts = read[Map[Lineage, Map[Lineage, Int]]](json)
-
-      if(opcounts.nonEmpty) {
-
-        // copy content that was read from JSON to a _mutable_ map!
-        val mm = MutableMap.empty[Lineage, MutableMap[Lineage, Int]]
-        opcounts.filterKeys(_ != "meta").foreach{ case (parent,children) =>
-
-          val mm2 = MutableMap.empty[Lineage, Int]
-          children.foreach{ case (l,c) => mm2.put(l,c)}
-
-          mm.put(parent, mm2)
-        }
-        // create opcount instance
-        opCount = OpCount(opcounts("meta")("runs"), mm)
-      } else
-        opCount = OpCount.empty
-
+      opCount = Markov.fromJson(json)
     } else
-      opCount = OpCount.empty
+      opCount = Markov.empty
+
+    logger.debug(s"loaded markov model with size: ${opCount.size}")
+    logger.debug(s"total runs in markov is: ${opCount.totalRuns}")
 
     val execTimesFile = base.resolve(Conf.execTimesFile)
     if(Files.exists(execTimesFile)) {
@@ -90,7 +72,6 @@ object DataflowProfiler extends PigletLogging {
   }
 
   def reset() = {
-    parentsOf.clear()
     currentTimes.clear()
   }
 
@@ -105,15 +86,12 @@ object DataflowProfiler extends PigletLogging {
      *   - count operator occurrences
      *   - save the parent information
      */
+
     BreadthFirstTopDownWalker.walk(plan){ op =>
         val lineage = op.lineageSignature
         op.outputs.flatMap(_.consumer).foreach{ c =>
-            opCount.add(lineage, c.lineageSignature)
+          opCount.add(lineage, c.lineageSignature)
         }
-
-        val inputs = op.inputs.map(_.producer.lineageSignature)
-        val p = if(inputs.nonEmpty) lineage -> inputs else lineage -> List("start")
-        parentsOf += p
     }
   }
 
@@ -129,7 +107,7 @@ object DataflowProfiler extends PigletLogging {
       val partitionId = partition.partitionId
 
       // parent operators
-      val parentLineages = parentsOf(lineage)
+      val parentLineages = opCount.parents(lineage).getOrElse(List("start")) //parentsOf(lineage)
       // list of parent partitions per parent
       val parentPartitionIds = parentPartitionInfo(lineage)
 
@@ -226,8 +204,9 @@ object DataflowProfiler extends PigletLogging {
     val opCountFile = c.profiling.get.resolve(Conf.opCountFile)
     logger.debug(s"writing opcounts to $opCountFile with ${opCount.size} entries")
 
-    val o = Map(("meta",Map(("runs",opCount.totalRuns))))
-    val opJson = swrite(opCount.adj ++ o)
+//    val o = Map(("meta",Map(("runs",opCount.totalRuns))))
+//    val opJson = swrite(opCount.adj ++ o)
+    val opJson = opCount.toString()
     Files.write(opCountFile,
       List(opJson).asJava,
       StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)

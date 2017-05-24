@@ -144,6 +144,9 @@ object Dependencies {
   val json4s = "org.json4s" %% "json4s-native" % "3.5.0"
   val akkahttp = "com.typesafe.akka" %% "akka-http" % "10.0.1"
 
+  val graphcore = "org.scala-graph" %% "graph-core" % "1.11.5"
+  val graphjson = "org.scala-graph" % "graph-json_2.11" % "1.11.0"
+
   // Projects
   val rootDeps = Seq(
     scalaLib,
@@ -165,6 +168,8 @@ object Dependencies {
     //breeze,
     scalajhttp,
     json4s,
-    akkahttp
+    akkahttp,
+    graphcore,
+    graphjson
   )
 }
