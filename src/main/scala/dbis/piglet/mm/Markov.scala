@@ -9,14 +9,28 @@ import scalax.collection.edge.WDiEdge
 import scalax.collection.io.json._
 import scalax.collection.io.json.descriptor.predefined.WDi
 
+
+case class Op(lineage: Lineage, var cost: Option[T] = None) {
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case Op(l,_) => l equals lineage
+    case _ => false
+  }
+
+  override def hashCode(): Int = lineage.hashCode
+}
+
+object Op {
+  implicit def lineageToOp(lineage: Lineage): Op = Op(lineage)
+}
+
 /**
   * A data structure to maintain profiling information on operator occurrences
   * @param adj The adjacency matrix
   */
-case class Markov(protected[mm] var adj: Graph[Lineage, WDiEdge]) extends PigletLogging {
+case class Markov(protected[mm] var adj: Graph[Op, WDiEdge]) extends PigletLogging {
 
 
-  private val startNode: Lineage = "start"
+  import Markov._
 
   /* Increase the total amount of runs
    */
@@ -33,7 +47,7 @@ case class Markov(protected[mm] var adj: Graph[Lineage, WDiEdge]) extends Piglet
     * @param parent The "source" operator / producer
     * @param child  The "target" operator / consumer
     */
-  def add(parent: Lineage, child: Lineage): Unit = {
+  def add(parent: Op, child: Op): Unit = {
 
     require(parent != child || (parent == startNode && child == startNode), "an operator cannot be child of itself (parent must be != child): $parent")
     val newWeight = weight(parent, child) + 1
@@ -47,7 +61,7 @@ case class Markov(protected[mm] var adj: Graph[Lineage, WDiEdge]) extends Piglet
     */
   def parents(op: Lineage): Option[List[Lineage]] = {
 
-    val a = adj.get(op).inNeighbors.map(_.value).toList
+    val a = adj.get(Op(op)).inNeighbors.map(_.value.lineage).toList
     if(a.isEmpty)
       None
     else
@@ -62,10 +76,21 @@ case class Markov(protected[mm] var adj: Graph[Lineage, WDiEdge]) extends Piglet
     * @param child The child operator
     * @return Returns the weight of this edge or 0 if there is none
     */
-  def weight(parent: Lineage, child: Lineage): Long =
+  def weight(parent: Op, child: Op): Long =
     adj.find( (parent ~%> child)(0) ) // the weight is not regarded for search
         .map(_.weight)
         .getOrElse(0L)
+
+  def cost(op: Op): Option[T] = adj.get(op).value.cost
+
+  def updateCost(lineage: Lineage, cost: Long) = {
+
+    val a = adj.get( Op(lineage)).value
+    if(a.cost.isDefined) {
+      a.cost = Some(T.merge(a.cost.get, cost))
+    } else
+      a.cost = Some(T(cost))
+  }
 
   /**
     * String representation of this model as JSON
@@ -77,17 +102,19 @@ case class Markov(protected[mm] var adj: Graph[Lineage, WDiEdge]) extends Piglet
 
 object Markov {
 
+  val startNode: Op = Op("start")
+
   // used to serialize the nodes to JSON
-  private val nodeDescriptor = new NodeDescriptor[Lineage](typeId = "operators"){
+  private val nodeDescriptor = new NodeDescriptor[Op](typeId = "operators"){
     def id(node: Any) = node match {
-      case l: Lineage => l
+      case Op(l,_) => l
     }
   }
 
   // graph descriptor
-  val descriptor = new Descriptor[Lineage](
+  val descriptor = new Descriptor[Op](
     defaultNodeDescriptor = nodeDescriptor,
-    defaultEdgeDescriptor = WDi.descriptor[Lineage]()
+    defaultEdgeDescriptor = WDi.descriptor[Op]()
   )
 
   /**
@@ -96,7 +123,7 @@ object Markov {
     * @return Returns the Markov model parsed from JSON
     */
   def fromJson(json: String): Markov = {
-    val g = Graph.fromJson[Lineage, WDiEdge](json, descriptor)
+    val g = Graph.fromJson[Op, WDiEdge](json, descriptor)
     Markov(g)
   }
 
@@ -104,6 +131,6 @@ object Markov {
     * Create an empty model
     * @return An empty Markov model
     */
-  def empty = new Markov(Graph[Lineage, WDiEdge]())
+  def empty = new Markov(Graph[Op, WDiEdge]())
 }
 

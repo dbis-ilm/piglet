@@ -8,7 +8,6 @@ import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf, DepthFirstTopDownWalker}
 import dbis.setm.SETM.timing
-import org.json4s.native.Serialization.{read, write => swrite}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{Map => MutableMap}
@@ -37,7 +36,6 @@ object DataflowProfiler extends PigletLogging {
 
   private val cache = MutableMap.empty[String, MaterializationPoint]
 
-  private val exectimes = MutableMap.empty[Lineage, T]
 
   val parentPartitionInfo = MutableMap.empty[Lineage, MutableMap[Int, Seq[Seq[Int]]]]
   val currentTimes = MutableMap.empty[Partition, Long]
@@ -50,8 +48,6 @@ object DataflowProfiler extends PigletLogging {
   def load(base: Path) = {
     logger.debug("init Dataflow profiler")
 
-    exectimes.clear()
-
     val opCountFile = base.resolve(Conf.opCountFile)
     if(Files.exists(opCountFile)) {
       val json = Source.fromFile(opCountFile.toFile).getLines().mkString("\n")
@@ -61,14 +57,6 @@ object DataflowProfiler extends PigletLogging {
 
     logger.debug(s"loaded markov model with size: ${opCount.size}")
     logger.debug(s"total runs in markov is: ${opCount.totalRuns}")
-
-    val execTimesFile = base.resolve(Conf.execTimesFile)
-    if(Files.exists(execTimesFile)) {
-      val json = Source.fromFile(execTimesFile.toFile).getLines().mkString("\n")
-      val exectimes1 = read[Map[String,T]](json)
-      exectimes1.foreach( mapping => exectimes += mapping)
-      logger.debug(s"loaded ${exectimes.size} execution time statistics")
-    }
   }
 
   def reset() = {
@@ -96,7 +84,7 @@ object DataflowProfiler extends PigletLogging {
   }
 
 
-  def collect = {
+  def collect() = {
 
     currentTimes//.keySet
                 //.map(_.lineage)
@@ -107,7 +95,7 @@ object DataflowProfiler extends PigletLogging {
       val partitionId = partition.partitionId
 
       // parent operators
-      val parentLineages = opCount.parents(lineage).getOrElse(List("start")) //parentsOf(lineage)
+      val parentLineages = opCount.parents(lineage).getOrElse(List(Markov.startNode.lineage)) //parentsOf(lineage)
       // list of parent partitions per parent
       val parentPartitionIds = parentPartitionInfo(lineage)
 
@@ -118,7 +106,7 @@ object DataflowProfiler extends PigletLogging {
           val parentLineage = parentLineages(idx)
 
           list.map{ pId =>
-            val p = if(parentLineage == "start")
+            val p = if(parentLineage == Markov.startNode.lineage)
                 Partition(parentLineage, -1) // for "start" we only have one value with partition id -1
 //            else if(parentLineage == "progstart")
 //              Partition(parentLineage, -1)
@@ -135,8 +123,6 @@ object DataflowProfiler extends PigletLogging {
           }
         }
 
-
-
       val earliestParentTime = if(parentTimes.nonEmpty) {
         parentTimes.max
       } else {
@@ -145,20 +131,17 @@ object DataflowProfiler extends PigletLogging {
 
       val duration = time - earliestParentTime
 
-      val oldT = exectimes.getOrElse(lineage, T(0L, cnt = 0))
-      val a = T.merge(oldT, duration) //T(oldT.cnt + 1, oldT.sum + duration)
+      opCount.updateCost(lineage, duration)
 
-      exectimes.update(lineage, a)
     }
 
     // manually add execution time for creating spark context
     val progStart = currentTimes(Partition("progstart", -1))
     val start = currentTimes(Partition("start", -1))
-    exectimes += "sparkcontext" -> T(start - progStart)
+
+    opCount.add("sparkcontext","start")
+    opCount.updateCost("sparkcontext", start - progStart)
     
-//    logger.debug(s"total: ${currentTimes("end").head._2 - currentTimes("start").head._2}")
-    
-    exectimes.size
   }
       
 
@@ -187,25 +170,13 @@ object DataflowProfiler extends PigletLogging {
 
   }
   
-  def getExectime(op: String): Option[T] = exectimes.get(op)
+  def getExectime(op: String): Option[T] = opCount.cost(op)
 
   def writeStatistics(c: CliParams): Unit = {
-
-    val execTimesFile = c.profiling.get.resolve(Conf.execTimesFile)
-
-    // create json from collected times
-    val json = swrite(exectimes)
-
-    // overwrite old file
-    Files.write(execTimesFile,
-      List(json).asJava,
-      StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
 
     val opCountFile = c.profiling.get.resolve(Conf.opCountFile)
     logger.debug(s"writing opcounts to $opCountFile with ${opCount.size} entries")
 
-//    val o = Map(("meta",Map(("runs",opCount.totalRuns))))
-//    val opJson = swrite(opCount.adj ++ o)
     val opJson = opCount.toString()
     Files.write(opCountFile,
       List(opJson).asJava,
