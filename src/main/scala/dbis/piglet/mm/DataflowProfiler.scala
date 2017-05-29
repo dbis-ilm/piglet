@@ -10,6 +10,7 @@ import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf, DepthFirst
 import dbis.setm.SETM.timing
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.collection.mutable.{Map => MutableMap}
 import scala.io.Source
 
@@ -32,7 +33,7 @@ case class Partition(lineage: String, partitionId: Int)
 
 object DataflowProfiler extends PigletLogging {
 
-  private[mm] var opCount: Markov = _
+  private[mm] var executionGraph: Markov = _
 
   private val cache = MutableMap.empty[String, MaterializationPoint]
 
@@ -51,12 +52,12 @@ object DataflowProfiler extends PigletLogging {
     val opCountFile = base.resolve(Conf.opCountFile)
     if(Files.exists(opCountFile)) {
       val json = Source.fromFile(opCountFile.toFile).getLines().mkString("\n")
-      opCount = Markov.fromJson(json)
+      executionGraph = Markov.fromJson(json)
     } else
-      opCount = Markov.empty
+      executionGraph = Markov.empty
 
-    logger.debug(s"loaded markov model with size: ${opCount.size}")
-    logger.debug(s"total runs in markov is: ${opCount.totalRuns}")
+    logger.debug(s"loaded markov model with size: ${executionGraph.size}")
+    logger.debug(s"total runs in markov is: ${executionGraph.totalRuns}")
   }
 
   def reset() = {
@@ -68,7 +69,7 @@ object DataflowProfiler extends PigletLogging {
     // reset old values for parents and execution time
     reset()
 
-    opCount.incrRuns()
+    executionGraph.incrRuns()
 
     /* walk over the plan and
      *   - count operator occurrences
@@ -78,7 +79,7 @@ object DataflowProfiler extends PigletLogging {
     BreadthFirstTopDownWalker.walk(plan){ op =>
         val lineage = op.lineageSignature
         op.outputs.flatMap(_.consumer).foreach{ c =>
-          opCount.add(lineage, c.lineageSignature)
+          executionGraph.add(lineage, c.lineageSignature)
         }
     }
   }
@@ -95,7 +96,7 @@ object DataflowProfiler extends PigletLogging {
       val partitionId = partition.partitionId
 
       // parent operators
-      val parentLineages = opCount.parents(lineage).getOrElse(List(Markov.startNode.lineage)) //parentsOf(lineage)
+      val parentLineages = executionGraph.parents(lineage).getOrElse(List(Markov.startNode.lineage)) //parentsOf(lineage)
       // list of parent partitions per parent
       val parentPartitionIds = parentPartitionInfo(lineage)
 
@@ -131,7 +132,7 @@ object DataflowProfiler extends PigletLogging {
 
       val duration = time - earliestParentTime
 
-      opCount.updateCost(lineage, duration)
+      executionGraph.updateCost(lineage, duration)
 
     }
 
@@ -139,11 +140,11 @@ object DataflowProfiler extends PigletLogging {
     val progStart = currentTimes(Partition("progstart", -1))
     val start = currentTimes(Partition("start", -1))
 
-    opCount.add("sparkcontext","start")
-    opCount.updateCost("sparkcontext", start - progStart)
-    
+    executionGraph.add("sparkcontext","start")
+    executionGraph.updateCost("sparkcontext", start - progStart)
+
   }
-      
+
 
 
   def addExecTime(lineage: String, partitionId: Int, parentPartitions: Seq[Seq[Int]], time: Long) = {
@@ -169,15 +170,15 @@ object DataflowProfiler extends PigletLogging {
     }
 
   }
-  
-  def getExectime(op: String): Option[T] = opCount.cost(op)
+
+  def getExectime(op: String): Option[T] = executionGraph.cost(op)
 
   def writeStatistics(c: CliParams): Unit = {
 
     val opCountFile = c.profiling.get.resolve(Conf.opCountFile)
-    logger.debug(s"writing opcounts to $opCountFile with ${opCount.size} entries")
+    logger.debug(s"writing opcounts to $opCountFile with ${executionGraph.size} entries")
 
-    val opJson = opCount.toString()
+    val opJson = executionGraph.toString()
     Files.write(opCountFile,
       List(opJson).asJava,
       StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
@@ -196,10 +197,10 @@ object DataflowProfiler extends PigletLogging {
     entry.count += 1
     cache += (matPoint.hash -> entry)
   }
-  
+
   /**
    * Go over the plan and and check for existing runtime information for each op (lineage).
-   * If something exists, create a materialization point that can be used later. 
+   * If something exists, create a materialization point that can be used later.
    */
   def addMaterializationPoints(plan: DataflowPlan) = timing("identify mat points") {
 
@@ -208,12 +209,13 @@ object DataflowProfiler extends PigletLogging {
       case op: PigOperator =>
 
       logger.debug( s"""checking storage service for runtime information for operator "${op.lineageSignature}" """)
-      // check for the current operator, if we have some runtime/stage information 
-      val avg: Option[(Long, Long)] = None// getExectimes(op.lineageSignature) 
+      // check for the current operator, if we have some runtime/stage information
+      val execInfo: Option[(Long, Double)] = executionGraph.totalCost(op.lineageSignature)(Markov.CostMax)
+
 
       // if we have information, create a (potential) materialization point
-      if (avg.isDefined) {
-        val (progduration, stageduration) = avg.get
+      if (execInfo.isDefined) {
+        val (progduration, stageduration) = execInfo.get
 
         logger.debug( s"""found runtime information: program: $progduration  stage: $stageduration""")
 

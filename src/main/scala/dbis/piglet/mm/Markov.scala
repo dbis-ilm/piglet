@@ -3,6 +3,7 @@ package dbis.piglet.mm
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.tools.logging.PigletLogging
 
+
 import scalax.collection.mutable.Graph
 import scalax.collection.edge.Implicits._
 import scalax.collection.edge.WDiEdge
@@ -83,6 +84,39 @@ case class Markov(protected[mm] var adj: Graph[Op, WDiEdge]) extends PigletLoggi
 
   def cost(op: Op): Option[T] = adj.get(op).value.cost
 
+  def totalCost(lineage: Lineage,
+                probStrategy: Traversable[Long] => Double = Markov.ProbMin)(
+                costStrategy: Traversable[(Long, Double)] => (Long, Double)): Option[(Long, Double)] = {
+
+    val g = adj
+    val sources = (g get startNode).outNeighbors
+    val theOp: g.NodeT = g get lineage
+
+    val paths = sources.map(_.pathTo(theOp))
+
+
+    val runtimes = paths.map{ opath =>
+
+      opath.map { p =>
+        val costSum = p.nodes.map(_.cost) // for each node on the path from start to the target, get the cost
+          .filter(_.isDefined) // only those costs that are defined
+          .map(_.get.avg()) // get average cost per operator (could use min/max as well)
+          .sum // sum up costs of operators
+
+
+        val probs = p.edges.map(_.weight)
+        val prob = probStrategy(probs)
+
+        (costSum, prob)
+      }
+    }.filter(_.isDefined).map(_.get)
+
+    val res = if(runtimes.isEmpty) None else Some(costStrategy(runtimes))
+
+    res
+
+  }
+
   def updateCost(lineage: Lineage, cost: Long) = {
 
     val a = adj.get( Op(lineage)).value
@@ -132,5 +166,13 @@ object Markov {
     * @return An empty Markov model
     */
   def empty = new Markov(Graph[Op, WDiEdge]())
+
+
+  def ProbMin(l: Traversable[(Long)]): Double = l.min
+  def ProbMax(l: Traversable[(Long)]): Double = l.max
+  def ProbProduct(l: Traversable[(Long)]): Double = l.product
+
+  def CostMin(l: Traversable[(Long, Double)]): (Long, Double) = l.minBy(_._1)
+  def CostMax(l: Traversable[(Long, Double)]): (Long, Double) = l.maxBy(_._1)
 }
 
