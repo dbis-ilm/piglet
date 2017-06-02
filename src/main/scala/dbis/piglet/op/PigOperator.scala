@@ -312,4 +312,10 @@ abstract class PigOperator(
   def printOperator(tab: Int): Unit = {
     println(indent(tab) + this.toString + s" { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
   }
+
+  def name = toString.split(PigOperator.p).head
+}
+
+object PigOperator {
+  val p = "\\P{Alpha}"
 }

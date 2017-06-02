@@ -10,7 +10,11 @@ import scalax.collection.edge.WDiEdge
 import scalax.collection.io.json._
 import scalax.collection.io.json.descriptor.predefined.WDi
 
-
+/**
+  * Represents a node in the markov graph
+  * @param lineage The lineage for the operator
+  * @param cost The operator cost (execution time)
+  */
 case class Op(lineage: Lineage, var cost: Option[T] = None) {
   override def equals(obj: scala.Any): Boolean = obj match {
     case Op(l,_) => l equals lineage
@@ -21,14 +25,16 @@ case class Op(lineage: Lineage, var cost: Option[T] = None) {
 }
 
 object Op {
+  def apply(lineage: Lineage, cost: T): Op = Op(lineage, Some(cost))
+
   implicit def lineageToOp(lineage: Lineage): Op = Op(lineage)
 }
 
 /**
   * A data structure to maintain profiling information on operator occurrences
-  * @param adj The adjacency matrix
+  * @param model The graph representing operators with their costs and the number of transitions on the edges
   */
-case class Markov(protected[mm] var adj: Graph[Op, WDiEdge]) extends PigletLogging {
+case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLogging {
 
 
   import Markov._
@@ -37,11 +43,12 @@ case class Markov(protected[mm] var adj: Graph[Op, WDiEdge]) extends PigletLoggi
    */
   def incrRuns() = add(startNode, startNode)
 
+
   /**
     * The total number of runs
     * @return Returns the number of runs
     */
-  def totalRuns = weight(startNode, startNode)
+  def totalRuns = rawWeight(startNode, startNode)
 
   /**
     * Add the information that there is an edge ([[dbis.piglet.op.Pipe]]) between parent and child
@@ -51,8 +58,11 @@ case class Markov(protected[mm] var adj: Graph[Op, WDiEdge]) extends PigletLoggi
   def add(parent: Op, child: Op): Unit = {
 
     require(parent != child || (parent == startNode && child == startNode), "an operator cannot be child of itself (parent must be != child): $parent")
-    val newWeight = weight(parent, child) + 1
-    adj upsert (parent ~%> child) (newWeight) // update with new weight / count
+    val newWeight = rawWeight(parent, child) + 1
+
+    logger debug s"upserting edge $parent -> $child with new weight $newWeight"
+
+    model upsert (parent ~%> child) (newWeight) // update with new weight / count
   }
 
   /**
@@ -62,14 +72,14 @@ case class Markov(protected[mm] var adj: Graph[Op, WDiEdge]) extends PigletLoggi
     */
   def parents(op: Lineage): Option[List[Lineage]] = {
 
-    val a = adj.get(Op(op)).inNeighbors.map(_.value.lineage).toList
+    val a = model.get(Op(op)).inNeighbors.map(_.value.lineage).toList
     if(a.isEmpty)
       None
     else
       Some(a)
   }
 
-  def size = adj.size
+  def size = model.size
 
   /**
     * The weight of an edge representing the number of occurrences of this edge
@@ -77,39 +87,73 @@ case class Markov(protected[mm] var adj: Graph[Op, WDiEdge]) extends PigletLoggi
     * @param child The child operator
     * @return Returns the weight of this edge or 0 if there is none
     */
-  def weight(parent: Op, child: Op): Long =
-    adj.find( (parent ~%> child)(0) ) // the weight is not regarded for search
+  def rawWeight(parent: Op, child: Op): Long =
+    model.find( (parent ~%> child)(0) ) // the weight is not regarded for search
         .map(_.weight)
         .getOrElse(0L)
 
-  def cost(op: Op): Option[T] = adj.get(op).value.cost
+  def cost(op: Op): Option[T] = model.get(op).value.cost
 
+  /**
+    * Get the cost (execution time and probability) from start to the specified node.
+    *
+    * The cost is determined by aggregating the cost from all operators on the path from the source to the specified
+    * node (lineage). If the specified op (lineage) is the (indirect) result of a Join or Cross operation, we will
+    * find multiple paths, i.e., one path for each source node.
+    *
+    * The strategy parameters allow to define the way how to aggregate the costs and probabilities on the found paths.
+    * While the probStrategy is used only to aggregate the probabilities on a path, the costStrategy is used also to
+    * decide which path defines that actual cost of the plan until the specified parameter-
+    * @param lineage The operator
+    * @param probStrategy The aggregation strategy for the probabilities
+    * @param costStrategy The aggregation strategy for the costs of operators
+    * @return Returns the total cost until the specified operator along with its probability,
+    *         or None, if there is no such op
+    */
   def totalCost(lineage: Lineage,
-                probStrategy: Traversable[Long] => Double = Markov.ProbMin)(
+                probStrategy: Traversable[Double] => Double = Markov.ProbMin)(
                 costStrategy: Traversable[(Long, Double)] => (Long, Double)): Option[(Long, Double)] = {
 
-    val g = adj
+    // this assignment is needed by the type checker/compiler to bring the graph in scope
+    val g = model
+
+//    logger.debug(g.toString())
+
+    // get all actual source (LOAD) nodes
+
     val sources = (g get startNode).outNeighbors
+
+//    logger.debug(s"found sources (${sources.size}): ${sources.mkString(",")}")
+
+    // the node in the graph for the specified lineage
     val theOp: g.NodeT = g get lineage
 
-    val paths = sources.map(_.pathTo(theOp))
+//    logger.debug(s"graph node for $lineage : $theOp ")
 
+    /* The paths from all known source nodes to the op
+     * An entry of None means that there is no path from that source to the op
+     */
+    val paths = sources.map(_.pathTo(theOp)).filter(_.isDefined).map(_.get).toList
 
-    val runtimes = paths.map{ opath =>
+//    logger.debug(s"paths from sources (${paths.size}): \n${paths.mkString("\n")}")
 
-      opath.map { p =>
-        val costSum = p.nodes.map(_.cost) // for each node on the path from start to the target, get the cost
+    val runtimes = paths.map{ path =>
+
+        val costSum = path.nodes.map(_.cost) // for each node on the path from start to the target, get the cost
           .filter(_.isDefined) // only those costs that are defined
           .map(_.get.avg()) // get average cost per operator (could use min/max as well)
           .sum // sum up costs of operators
 
-
-        val probs = p.edges.map(_.weight)
-        val prob = probStrategy(probs)
+        // probabilities are stored as weights on the edges
+        val probs = path.edges.map{e =>
+          e.weight / e.head.outDegree.toDouble
+        }
+        // aggregate probabilities
+        val prob = if(probs.isEmpty) Double.NaN else probStrategy(probs)
 
         (costSum, prob)
       }
-    }.filter(_.isDefined).map(_.get)
+
 
     val res = if(runtimes.isEmpty) None else Some(costStrategy(runtimes))
 
@@ -117,9 +161,15 @@ case class Markov(protected[mm] var adj: Graph[Op, WDiEdge]) extends PigletLoggi
 
   }
 
+  /**
+    * Update the cost of an operator, e.g., after an additional execution.
+    * The given cost value will be "merged" with the previous values
+    * @param lineage The lineage of that operator
+    * @param cost The newly measured cost
+    */
   def updateCost(lineage: Lineage, cost: Long) = {
 
-    val a = adj.get( Op(lineage)).value
+    val a = model.get( Op(lineage)).value
     if(a.cost.isDefined) {
       a.cost = Some(T.merge(a.cost.get, cost))
     } else
@@ -130,13 +180,17 @@ case class Markov(protected[mm] var adj: Graph[Op, WDiEdge]) extends PigletLoggi
     * String representation of this model as JSON
     * @return JSON representation of this model
     */
-  override def toString: String = adj.toJson(Markov.descriptor)
+  def toJson: String = model.toJson(Markov.descriptor)
+
+  override def toString: Lineage = model.toString()
 
 }
 
 object Markov {
 
-  val startNode: Op = Op("start")
+  val startLineage: Lineage = "start"
+  val startNode: Op = Op(startLineage)
+
 
   // used to serialize the nodes to JSON
   private val nodeDescriptor = new NodeDescriptor[Op](typeId = "operators"){
@@ -168,9 +222,9 @@ object Markov {
   def empty = new Markov(Graph[Op, WDiEdge]())
 
 
-  def ProbMin(l: Traversable[(Long)]): Double = l.min
-  def ProbMax(l: Traversable[(Long)]): Double = l.max
-  def ProbProduct(l: Traversable[(Long)]): Double = l.product
+  def ProbMin(l: Traversable[(Double)]): Double = l.min
+  def ProbMax(l: Traversable[(Double)]): Double = l.max
+  def ProbProduct(l: Traversable[(Double)]): Double = l.product
 
   def CostMin(l: Traversable[(Long, Double)]): (Long, Double) = l.minBy(_._1)
   def CostMax(l: Traversable[(Long, Double)]): (Long, Double) = l.maxBy(_._1)

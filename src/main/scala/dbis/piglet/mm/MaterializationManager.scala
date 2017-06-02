@@ -1,29 +1,46 @@
-package dbis.piglet.plan
-
-import java.io.File
-import dbis.piglet.mm.MaterializationPoint
-
-import scala.io.Source
-import java.io.PrintWriter
-import java.io.FileWriter
-//import dbis.piglet.tools.Conf
-import java.nio.file.Path
+package dbis.piglet.mm
 import java.net.URI
-import java.nio.file.Files
+
+import dbis.piglet.op.TimingOp
+import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.tools.DepthFirstTopDownWalker
 import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.tools.Conf
+
+
+
 
 /**
  * Manage where materialized intermediate results are stored
  */
 class MaterializationManager(private val matBaseDir: URI) extends PigletLogging {
   
-  logger.debug(s"base: $matBaseDir")
+  logger.debug(s"materialization base directory: $matBaseDir")
 //  logger.debug(s"using materialization storage service at $url")
 
   require(matBaseDir != null, "Base directory for materialization must not be null")
-  
-    /**
+
+
+  def insertMaterializationPoints(plan: DataflowPlan, model: Markov): Unit = {
+
+    DepthFirstTopDownWalker.walk(plan) {
+      case _: TimingOp =>
+      case op =>
+        model.totalCost(op.lineageSignature, Markov.ProbMin)(Markov.CostMax) match {
+          case Some((cost,prob)) =>
+            val relProb = prob / model.totalRuns
+            logger.debug(s"${op.name} (${op.lineageSignature})  : $cost ($relProb)")
+          case None =>
+        }
+
+
+    }
+
+  }
+
+
+
+
+  /**
    * Checks if we have materialized results for the given hash value
    * 
    * @param hash The hash value to get data for

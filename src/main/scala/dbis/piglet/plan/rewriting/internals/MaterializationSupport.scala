@@ -18,11 +18,11 @@ package dbis.piglet.plan.rewriting.internals
 
 import java.net.URI
 
+import dbis.piglet.mm.MaterializationManager
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.op.{Load, Materialize, Store}
-import dbis.piglet.plan.{DataflowPlan, MaterializationManager}
+import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.BreadthFirstBottomUpWalker
-
 import dbis.setm.SETM.timing
 
 import scala.collection.mutable.ListBuffer

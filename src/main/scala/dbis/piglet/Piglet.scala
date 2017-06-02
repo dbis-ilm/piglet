@@ -21,8 +21,8 @@ import java.nio.file.{Path, Paths}
 
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.PigletCompiler
-import dbis.piglet.mm.{DataflowProfiler, ProfilingException, StatServer}
-import dbis.piglet.plan.{DataflowPlan, InvalidPlanException, MaterializationManager, PlanMerger}
+import dbis.piglet.mm.{DataflowProfiler, MaterializationManager, ProfilingException, StatServer}
+import dbis.piglet.plan.{DataflowPlan, InvalidPlanException, PlanMerger}
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.rewriting.Rules
 import dbis.piglet.schema.SchemaException
@@ -224,9 +224,9 @@ object Piglet extends PigletLogging {
       // 3. now, we should apply optimizations
       var newPlan = plan
 
+      val mm = new MaterializationManager(Conf.materializationBaseDir)
       // process explicit MATERIALIZE operators
       if (c.profiling.isDefined) {
-        val mm = new MaterializationManager(Conf.materializationBaseDir)
         newPlan = processMaterializations(newPlan, mm)
       }
 
@@ -242,8 +242,9 @@ object Piglet extends PigletLogging {
       // find materialization points
       //      profiler.foreach { p => p.addMaterializationPoints(newPlan) }
       if(c.profiling.isDefined) {
-        DataflowProfiler.analyze(newPlan)
-        DataflowProfiler.addMaterializationPoints(newPlan)
+
+        val model = DataflowProfiler.analyze(newPlan)
+        mm.insertMaterializationPoints(newPlan, model)
 
         // after rewriting the plan, add the timing operations
         newPlan = insertTimings(newPlan)
@@ -301,12 +302,10 @@ object Piglet extends PigletLogging {
             
             
           // after execution we want to write the dot file  
-          if(c.profiling.isDefined) {
+          if(c.profiling.isDefined && !c.compileOnly) {
 
             try {
-              val exectimesCnt = DataflowProfiler.collect
-
-              logger.info(s"profiler has info for $exectimesCnt lineages")
+              DataflowProfiler.collect()
 
               /* if we really have a batch of scripts, then writing the statistics after
                * each plan is a performance issue. However, doing it at this place allows

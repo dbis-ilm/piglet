@@ -3,14 +3,13 @@ package dbis.piglet.mm
 import java.nio.file.{Files, Path, StandardOpenOption}
 
 import dbis.piglet.Piglet.Lineage
-import dbis.piglet.op.{PigOperator, TimingOp}
+import dbis.piglet.op.{Load, TimingOp}
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf, DepthFirstTopDownWalker}
+import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf}
 import dbis.setm.SETM.timing
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.collection.mutable.{Map => MutableMap}
 import scala.io.Source
 
@@ -33,9 +32,9 @@ case class Partition(lineage: String, partitionId: Int)
 
 object DataflowProfiler extends PigletLogging {
 
-  private[mm] var executionGraph: Markov = _
+  protected[mm] var executionGraph: Markov = _
 
-  private val cache = MutableMap.empty[String, MaterializationPoint]
+//  private val cache = MutableMap.empty[String, MaterializationPoint]
 
 
   val parentPartitionInfo = MutableMap.empty[Lineage, MutableMap[Int, Seq[Seq[Int]]]]
@@ -44,7 +43,7 @@ object DataflowProfiler extends PigletLogging {
   // for json (de-)serialization
   implicit val formats = org.json4s.native.Serialization.formats(org.json4s.NoTypeHints)
 
-  override def toString = cache.mkString(",")
+//  override def toString = cache.mkString(",")
 
   def load(base: Path) = {
     logger.debug("init Dataflow profiler")
@@ -64,7 +63,7 @@ object DataflowProfiler extends PigletLogging {
     currentTimes.clear()
   }
 
-  def analyze(plan: DataflowPlan): Unit = timing("analyze plan") {
+  def analyze(plan: DataflowPlan): Markov = timing("analyze plan") {
 
     // reset old values for parents and execution time
     reset()
@@ -76,16 +75,25 @@ object DataflowProfiler extends PigletLogging {
      *   - save the parent information
      */
 
-    BreadthFirstTopDownWalker.walk(plan){ op =>
+    BreadthFirstTopDownWalker.walk(plan){
+      case _: TimingOp =>
+      case op =>
         val lineage = op.lineageSignature
+
+        if(op.isInstanceOf[Load])
+          executionGraph.add("start",lineage)
+
         op.outputs.flatMap(_.consumer).foreach{ c =>
+          logger.debug(s"add to model ${op.name} -> ${c.name}")
           executionGraph.add(lineage, c.lineageSignature)
         }
     }
+
+    executionGraph
   }
 
 
-  def collect() = {
+  def collect() = timing("process runtime stats") {
 
     currentTimes//.keySet
                 //.map(_.lineage)
@@ -178,67 +186,70 @@ object DataflowProfiler extends PigletLogging {
     val opCountFile = c.profiling.get.resolve(Conf.opCountFile)
     logger.debug(s"writing opcounts to $opCountFile with ${executionGraph.size} entries")
 
-    val opJson = executionGraph.toString()
+    val opJson = executionGraph.toJson
     Files.write(opCountFile,
       List(opJson).asJava,
       StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
   }
 
-  def getMaterializationPoint(hash: String): Option[MaterializationPoint] = cache.get(hash)
-
-  def addMaterializationPoint(matPoint: MaterializationPoint): Unit = {
-    val entry = cache.getOrElse(matPoint.hash, matPoint)
-    if (entry.parentHash.nonEmpty && cache.contains(entry.parentHash.get)) {
-      // TODO: calculate _cumulative_ benefit
-      val parent = cache(entry.parentHash.get)
-      val benefit = parent.loadTime + entry.procTime - entry.loadTime
-      entry.benefit = parent.benefit + benefit
-    }
-    entry.count += 1
-    cache += (matPoint.hash -> entry)
-  }
-
-  /**
-   * Go over the plan and and check for existing runtime information for each op (lineage).
-   * If something exists, create a materialization point that can be used later.
-   */
-  def addMaterializationPoints(plan: DataflowPlan) = timing("identify mat points") {
-
-    DepthFirstTopDownWalker.walk(plan) {
-      case _ : TimingOp => // we want to ignore Timing operators
-      case op: PigOperator =>
-
-      logger.debug( s"""checking storage service for runtime information for operator "${op.lineageSignature}" """)
-      // check for the current operator, if we have some runtime/stage information
-      val execInfo: Option[(Long, Double)] = executionGraph.totalCost(op.lineageSignature)(Markov.CostMax)
 
 
-      // if we have information, create a (potential) materialization point
-      if (execInfo.isDefined) {
-        val (progduration, stageduration) = execInfo.get
 
-        logger.debug( s"""found runtime information: program: $progduration  stage: $stageduration""")
-
-        /* XXX: calculate benefit
-         * Here, we do not have the parent hash information.
-         * But is it still needed? Since we have the program runtime duration 
-         * from beginning until the end the stage, we don't need to calculate
-         * the cumulative benefit?
-         */
-        val mp = MaterializationPoint(op.lineageSignature,
-          None, // currently, we do not consider the parent
-          progduration, // set the processing time
-          0L, // TODO: calculate loading time at this point
-          0L // TODO: calculate saving time at this point
-        )
-
-        this.addMaterializationPoint(mp)
-
-      } else {
-        logger.debug(s" found no runtime information")
-      }
-    }
-  }
+//  def getMaterializationPoint(hash: String): Option[MaterializationPoint] = cache.get(hash)
+//
+//  def addMaterializationPoint(matPoint: MaterializationPoint): Unit = {
+//    val entry = cache.getOrElse(matPoint.hash, matPoint)
+//    if (entry.parentHash.nonEmpty && cache.contains(entry.parentHash.get)) {
+//      // TODO: calculate _cumulative_ benefit
+//      val parent = cache(entry.parentHash.get)
+//      val benefit = parent.loadTime + entry.procTime - entry.loadTime
+//      entry.benefit = parent.benefit + benefit
+//    }
+//    entry.count += 1
+//    cache += (matPoint.hash -> entry)
+//  }
+//
+//  /**
+//   * Go over the plan and and check for existing runtime information for each op (lineage).
+//   * If something exists, create a materialization point that can be used later.
+//   */
+//  def addMaterializationPoints(plan: DataflowPlan) = timing("identify mat points") {
+//
+//    DepthFirstTopDownWalker.walk(plan) {
+//      case _ : TimingOp => // we want to ignore Timing operators
+//      case op: PigOperator =>
+//
+//      logger.debug( s"""checking storage service for runtime information for operator "${op.lineageSignature}" """)
+//      // check for the current operator, if we have some runtime/stage information
+//      val execInfo: Option[(Long, Double)] = executionGraph.totalCost(op.lineageSignature)(Markov.CostMax)
+//
+//
+//      // if we have information, create a (potential) materialization point
+//      if (execInfo.isDefined) {
+//        val (cost, probability) = execInfo.get
+//
+//        logger.debug( s"""found runtime information: cost: $cost  prob: $probability""")
+//
+//        /* XXX: calculate benefit
+//         * Here, we do not have the parent hash information.
+//         * But is it still needed? Since we have the program runtime duration
+//         * from beginning until the end the stage, we don't need to calculate
+//         * the cumulative benefit?
+//         */
+//        val mp = MaterializationPoint(op.lineageSignature,
+//          None, // currently, we do not consider the parent
+//          cost, // set the processing time
+//          0L, // TODO: calculate loading time at this point
+//          0L // TODO: calculate saving time at this point
+//        )
+//
+//        this.addMaterializationPoint(mp)
+//
+//      } else {
+//        logger.debug(s" found no runtime information")
+//      }
+//    }
+//  }
   
 
   lazy val url = if(Conf.statServerURL.isDefined) {

@@ -17,36 +17,21 @@
 
 package dbis.piglet
 
-import java.io.{PrintStream, File}
-import dbis.piglet.Piglet._
-import dbis.piglet.op.{Display, PigOperator, Dump}
+import dbis.piglet.backends.BackendManager
+import dbis.piglet.codegen.PigletCompiler
+import dbis.piglet.mm.MaterializationManager
+import dbis.piglet.op.cmd.HdfsCmd
+import dbis.piglet.op.{Display, Dump, PigOperator}
 import dbis.piglet.parser.PigParser
 import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.PrettyPrinter._
+import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.schema.SchemaException
-import dbis.piglet.tools.logging.LogLevel
-import dbis.piglet.tools.{HDFSService, FileTools, Conf}
-import dbis.piglet.backends.{BackendConf, BackendManager}
-import dbis.piglet.plan.MaterializationManager
-import dbis.piglet.plan.rewriting.Rewriter
-import dbis.piglet.codegen.PigletCompiler
-
+import dbis.piglet.tools.{CliParams, Conf, FileTools, HDFSService}
 import jline.console.ConsoleReader
+import jline.console.history.FileHistory
 
 import scala.collection.mutable.ListBuffer
-import java.nio.file.{Path, Paths}
-import jline.console.history.FileHistory
-import dbis.piglet.tools.Conf
-
-import dbis.piglet.plan.MaterializationManager
-import dbis.piglet.plan.rewriting.Rewriter
-
-import scopt.OptionParser
-import java.net.URI
-import dbis.piglet.op.cmd.HdfsCmd
-import dbis.piglet.tools.CliParams
-import dbis.piglet.mm.DataflowProfiler
 
 sealed trait JLineEvent
 
@@ -148,7 +133,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     var prompt = "pigsh> "
     var insideEmbeddedCode = false
 
-    val history = new FileHistory(Conf.replHistoryFile.toFile().getAbsoluteFile)
+    val history = new FileHistory(Conf.replHistoryFile.toFile.getAbsoluteFile)
     logger.debug(s"will use ${history.getFile} as history file")
     consoleReader.setHistory(history)
 
@@ -159,14 +144,14 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       while (!finished) {
         val line = consoleReader.readLine(prompt)
         if (line == null) {
-          consoleReader.getTerminal().restore()
-          consoleReader.shutdown
+          consoleReader.getTerminal.restore()
+          consoleReader.shutdown()
           finished = handler(EOF)
         }
-        else if (line.size == 0) {
+        else if (line.isEmpty) {
           finished = handler(EmptyLine)
         }
-        else if (line.size > 0) {
+        else if (line.nonEmpty) {
           lineBuffer += line
           if (line.startsWith("<%") || line.startsWith("<!")) {
             insideEmbeddedCode = true
@@ -202,7 +187,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
   /**
     * Prints the usage string.
     */
-  def usage: Unit = {
+  def usage(): Unit = {
     println(
       """Commands:
         |<pig latin statement>; - See the PigLatin manual for details: http://hadoop.apache.org/pig
@@ -261,7 +246,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
 
     plan = rewritePlan(plan)
 
-    plan.printPlan(0)
+    plan.printPlan()
     false
   }
 
@@ -281,7 +266,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     }
 
     try {
-      plan.checkSchemaConformance
+      plan.checkSchemaConformance()
 
       val pat = "[Dd][Ee][Ss][Cc][Rr][Ii][Bb][Ee]\\s[A-Za-z]\\w*".r
       pat.findFirstIn(s) match {
@@ -360,12 +345,11 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
 
       try {
         // if this does _not_ throw an exception, the schema is ok
-        plan.checkSchemaConformance
+        plan.checkSchemaConformance()
       } catch {
-        case e: SchemaException => {
+        case e: SchemaException =>
           logger.error(s"schema conformance error in ${e.getMessage} for plan")
           return false
-        }
       }
 
    //      val jobJar = Paths.get(s"$backendPath/${Conf.backendJar(backend).toString}")
@@ -373,11 +357,11 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       nextScriptName()
 
       
-      PigletCompiler.compilePlan(plan, scriptName, c) match {
+      PigletCompiler.compilePlan(plan, scriptName(), c) match {
         case Some(jarFile) =>
           val runner = BackendManager.backend.runnerClass
-          runner.execute(c.master, scriptName, jarFile, c.backendArgs, c.profiling.isDefined)
-          FileTools.recursiveDelete(scriptName)
+          runner.execute(c.master, scriptName(), jarFile, c.backendArgs, c.profiling.isDefined)
+          FileTools.recursiveDelete(scriptName())
 
         case None => Console.err.println("failed to build jar file for job")
       }
@@ -386,7 +370,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       case e: Throwable =>
         Console.err.println(s"error while executing: ${e.getMessage}")
         e.printStackTrace(Console.err)
-        FileTools.recursiveDelete(scriptName)
+        FileTools.recursiveDelete(scriptName())
     }
 
     // buf.clear()
