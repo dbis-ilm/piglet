@@ -32,11 +32,19 @@ object StatServer extends PigletLogging {
       path("times") {
         get {
           parameters('data.as[String]) { data => // parse HTTP parameter "data"
-            writer ! data // send the String to the processing aktor
+            writer ! TimeMsg(data) // send the String to the processing aktor
             complete(HttpEntity(ContentTypes.`text/plain(UTF-8)`, "ok")) // respond with OK
           }
         }
+      } ~
+    path("sizes") {
+      get {
+        parameters('data.as[String]) { data =>
+          writer ! SizeMsg(data)
+          complete(HttpEntity(ContentTypes.`text/plain(UTF-8)`, "ok"))
+        }
       }
+    }
 
     // start the server, listen on all addresses
     bindingFuture = Http().bindAndHandle(route, "0.0.0.0", port)
@@ -62,7 +70,8 @@ class StatsWriterActor extends Actor with PigletLogging  {
    */
 
   def receive = {
-    case msg: String =>
+    case TimeMsg(msg) =>
+//      logger.debug(s"received time msg: $msg")
       val arr = msg.split(StatsWriterActor.FIELD_DELIM)
 
       val lineage = arr(0)
@@ -83,7 +92,18 @@ class StatsWriterActor extends Actor with PigletLogging  {
 
       // store info in profiler
       DataflowProfiler.addExecTime(lineage, partitionId, parentsList, currTime)
+    case msg: SizeMsg =>
+//      logger.debug(s"received size msg: ${msg.values}")
+      DataflowProfiler.addSizes(msg.values)
   }
+}
+
+case class TimeMsg(time: String)
+case class SizeMsg(private val sizes: String) {
+  lazy val values = sizes.split(StatsWriterActor.FIELD_DELIM).map{s =>
+    val a = s.split("=")
+    a(0) -> Some(a(1).toLong)
+  }.toMap
 }
 
 object StatsWriterActor {

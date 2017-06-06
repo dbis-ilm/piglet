@@ -18,6 +18,7 @@ package dbis.piglet.codegen.spark
 
 import java.net.URI
 
+import dbis.piglet.Piglet.Lineage
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
 import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
 import dbis.piglet.op.Load
@@ -112,10 +113,10 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
     * @param profiling add profiling code to the generated code
     * @return a string representing the header code
     */
-  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None): String = {
+  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None, operators: Seq[Lineage] = Seq.empty): String = {
     var map = Map("name" -> scriptName)
 
-    profiling.map { u => u.resolve(Conf.EXECTIMES_FRAGMENT).toString() }
+    profiling.map { u => u.resolve(Conf.EXECTIMES_FRAGMENT).toString }
       .foreach { s => map += ("profiling" -> s) }
 
 
@@ -128,7 +129,7 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
                          |""".stripMargin, map)
   }
 
-  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
+  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None, operators:Seq[Lineage]=Seq.empty): String = {
     /*
      * We want to force the termination with the help of a timeout,
      * if all source nodes are Load operators as text files are not continuous.
@@ -136,7 +137,7 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
     var forceTermin = if(plan.operators.isEmpty) false else true
     plan.sourceNodes.foreach(op => forceTermin &= op.isInstanceOf[Load])
     var params = Map("name" -> "Starting Query")
-    if (forceTermin) params += ("forceTermin" -> forceTermin.toString())
+    if (forceTermin) params += ("forceTermin" -> forceTermin.toString)
     CodeEmitter.render("""    ssc.start()
                          |	  ssc.awaitTermination<if (forceTermin)>OrTimeout(10000)<else>()<endif>
                          |  }

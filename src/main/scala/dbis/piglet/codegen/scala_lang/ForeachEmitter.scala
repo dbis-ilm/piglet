@@ -10,9 +10,26 @@ import dbis.piglet.schema.Schema
   * Created by kai on 06.12.16.
   */
 class ForeachEmitter extends CodeEmitter[Foreach] {
-  override def template: String = """val <out> = <in>.map(t => <class>(<expr>))""".stripMargin
-  def templateNested: String = """val <out> = <in>.map(t => <expr>)""".stripMargin
-  def templateFlatMap: String = """val <out> = <in>.flatMap(t => <expr>)""".stripMargin
+
+  override def template: String =
+    """val <out> = <in>.map{t =>
+      |<if (profiling)>
+      |accum_<lineage>.add(1)
+      |<endif>
+      |<class>(<expr>)}""".stripMargin
+  def templateNested: String =
+    """val <out> = <in>.map{t =>
+      |<if (profiling)>
+      |accum_<lineage>.add(1)
+      |<endif>
+      |<expr>}""".stripMargin
+
+  def templateFlatMap: String =
+    """val <out> = <in>.flatMap{t =>
+      |<if (profiling)>
+      |accum_<lineage>.add(1)
+      |<endif>
+      |<expr>}""".stripMargin
 
   override def code(ctx: CodeGenContext, op: Foreach): String = {
     if (!op.schema.isDefined)
@@ -23,15 +40,15 @@ class ForeachEmitter extends CodeEmitter[Foreach] {
     // in case of a nested FOREACH the tuples are creates as part of the GENERATE clause
     // -> no need to give the schema class
     if (op.generator.isInstanceOf[GeneratorPlan]) {
-      CodeEmitter.render(templateNested, Map("out" -> op.outPipeName, "in" -> op.inPipeName, "expr" -> expr))
+      CodeEmitter.render(templateNested, Map("out" -> op.outPipeName, "in" -> op.inPipeName, "expr" -> expr, "lineage"->op.lineageSignature))
     }
     else {
       // we need to know if the generator contains flatten on tuples or on bags (which require flatMap)
       val requiresFlatMap = op.containsFlatten(onBag = true)
       if (requiresFlatMap)
-        CodeEmitter.render(templateFlatMap, Map("out" -> op.outPipeName, "in" -> op.inPipeName, "expr" -> expr))
+        CodeEmitter.render(templateFlatMap, Map("out" -> op.outPipeName, "in" -> op.inPipeName, "expr" -> expr, "lineage"->op.lineageSignature))
       else
-        render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "class" -> className, "expr" -> expr))
+        render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "class" -> className, "expr" -> expr, "lineage"->op.lineageSignature))
     }
   }
 

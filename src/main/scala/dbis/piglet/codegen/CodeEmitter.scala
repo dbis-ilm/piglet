@@ -1,9 +1,10 @@
 package dbis.piglet.codegen
 
+import java.net.URI
+
 import org.clapper.scalasti.ST
 import org.stringtemplate.v4.AutoIndentWriter
 import org.stringtemplate.v4.misc.ErrorBuffer
-
 import dbis.piglet.op.PigOperator
 
 case class CodeGenException(msg: String, cause: Throwable) extends Exception(msg, cause) {
@@ -40,6 +41,9 @@ abstract class CodeEmitter[O <: PigOperator] {
 }
 
 object CodeEmitter {
+
+  protected[codegen] var profiling: Option[URI] = None
+
   val sw = new java.io.StringWriter
 
   /**
@@ -51,9 +55,11 @@ object CodeEmitter {
    */
   def render(template: String, params: Map[String, Any]): String = {
 
+    val theParams = if(profiling.isDefined) params + ("profiling" -> profiling.get.toString) else params
+
     val st = ST(template)
-    if (params.nonEmpty) {
-      params.foreach {
+    if (theParams.nonEmpty) {
+      theParams.foreach {
         attr => st.add(attr._1, attr._2)
       }
     }

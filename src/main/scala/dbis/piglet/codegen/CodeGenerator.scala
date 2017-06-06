@@ -16,21 +16,19 @@
  */
 package dbis.piglet.codegen
 
-import dbis.piglet.op.PigOperator
+import dbis.piglet.Piglet.Lineage
+import dbis.piglet.op.{PigOperator, TimingOp}
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema.Schema
+
 import scala.collection.immutable.Map
 //import scala.collection.mutable.Set
-import org.clapper.scalasti.STGroupFile
-import dbis.piglet.expr.{Expr, Value}
-import dbis.setm.SETM.timing
-import scala.collection.mutable.ListBuffer
 import java.net.URI
-import dbis.piglet.codegen.scala_lang.LoadEmitter
-import dbis.piglet.tools.BreadthFirstTopDownWalker
-import dbis.piglet.tools.DepthFirstTopDownWalker
+
 import dbis.piglet.tools.TopoSort
-import dbis.piglet.op.TimingOp
+import dbis.setm.SETM.timing
+
+import scala.collection.mutable.ListBuffer
 
 
 /**
@@ -106,7 +104,7 @@ trait CodeGenStrategy {
    * @param profiling add profiling code to the generated code
    * @return a string representing the header code
    */
-  def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI]): String
+  def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI], operators:Seq[Lineage]=Seq.empty): String
 
   /**
    * Generate code needed for finishing the script.
@@ -114,7 +112,7 @@ trait CodeGenStrategy {
    * @param plan the dataflow plan for which we generate the code
    * @return a string representing the end of the code.
    */
-  def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI]): String
+  def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI], operators: Seq[Lineage] = Seq.empty): String
 
   /**
    * Generate code for any helper class/function if needed by the given operator.
@@ -148,6 +146,9 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
   def generate(scriptName: String, plan: DataflowPlan, profiling: Option[URI], forREPL: Boolean = false): String = timing("generate code") {
     require(codeGen != null, "code generator undefined")
 
+
+    CodeEmitter.profiling = profiling
+
     val aliases = if (plan.udfAliases != null) { Some(plan.udfAliases.toMap) } else None
 
     val ctx = CodeGenContext(codeGen.target, aliases)
@@ -163,21 +164,29 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
     if(plan.code.nonEmpty)
       code = code + codeGen.emitEmbeddedCode(ctx, plan.code)
 
-    code += codeGen.emitSchemaHelpers(ctx, Schema.schemaList)
-      
+    code += codeGen.emitSchemaHelpers(ctx, Schema.schemaList())
+
+    val lineages = ListBuffer.empty[Lineage]
+
     // generate helper classes (if needed, e.g. for custom key classes)
-    for (n <- plan.operators) {
+    for (op <- plan.operators) {
+
+      op match {
+        case _: TimingOp =>
+        case _ => lineages += op.lineageSignature
+      }
+
       try {
-        val genCode = codeGen.emitHelperClass(ctx, n)
+        val genCode = codeGen.emitHelperClass(ctx, op)
         code = code + genCode  + (if(genCode.nonEmpty) "\n" else "")
       } catch {
-        case e: CodeGenException => throw new CodeGenException(s"error producing helper class for $n", e) 
+        case e: CodeGenException => throw new CodeGenException(s"error producing helper class for $op", e)
       }
     }
     
     if (!forREPL)
       // generate the object definition representing the script
-      code = code + codeGen.emitHeader2(ctx, scriptName, profiling)
+      code = code + codeGen.emitHeader2(ctx, scriptName, profiling, lineages)
 
     val sortedOps = TopoSort(plan)
       
@@ -200,7 +209,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
     }
 
     // generate the cleanup code
-    if (forREPL) code else code + codeGen.emitFooter(ctx, plan, profiling)
+    if (forREPL) code else code + codeGen.emitFooter(ctx, plan, profiling,lineages)
   }
 }
 

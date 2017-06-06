@@ -28,7 +28,7 @@ object T {
                                       max = if(value > t.max) value else t.max)
 }
 
-case class Partition(lineage: String, partitionId: Int)
+case class Partition(lineage: Lineage, partitionId: Int)
 
 object DataflowProfiler extends PigletLogging {
 
@@ -155,7 +155,7 @@ object DataflowProfiler extends PigletLogging {
 
 
 
-  def addExecTime(lineage: String, partitionId: Int, parentPartitions: Seq[Seq[Int]], time: Long) = {
+  def addExecTime(lineage: Lineage, partitionId: Int, parentPartitions: Seq[Seq[Int]], time: Long) = {
 
     val p = Partition(lineage, partitionId)
     if(currentTimes.contains(p)) {
@@ -179,7 +179,11 @@ object DataflowProfiler extends PigletLogging {
 
   }
 
-  def getExectime(op: String): Option[T] = executionGraph.cost(op)
+  def addSizes(m: Map[Lineage, Option[Long]]) = m.foreach{ case(lineage, size) =>
+      executionGraph.updateSize(lineage, size)
+  }
+
+  def getExectime(op: Lineage): Option[T] = executionGraph.cost(op)
 
   def writeStatistics(c: CliParams): Unit = {
 

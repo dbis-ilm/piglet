@@ -19,7 +19,9 @@ import java.net.URL
  */
 object Conf extends PigletLogging {
 
+
   val EXECTIMES_FRAGMENT = "times"
+  val SIZES_FRAGMENT = "sizes"
   val MATERIALIZATION_FRAGMENT = "materializations"
 
 

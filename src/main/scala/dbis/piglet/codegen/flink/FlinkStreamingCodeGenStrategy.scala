@@ -2,12 +2,10 @@ package dbis.piglet.codegen.flink
 
 import java.net.URI
 
-import dbis.piglet.op._
-import dbis.piglet.codegen.CodeEmitter
-import dbis.piglet.codegen.CodeGenContext
-import dbis.piglet.codegen.CodeGenTarget
+import dbis.piglet.Piglet.Lineage
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenTarget}
 import dbis.piglet.codegen.flink.emitter._
-import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
+import dbis.piglet.op._
 import dbis.piglet.plan.DataflowPlan
 
 
@@ -86,11 +84,11 @@ class FlinkStreamingCodeGenStrategy extends FlinkCodeGenStrategy {
    * @param profiling add profiling code to the generated code
    * @return a string representing the header code
    */
-  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None): String = {
+  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None, operators: Seq[Lineage] = Seq.empty): String = {
     CodeEmitter.render("""  def main(args: Array[String]) {<\n>""", Map.empty)
   }
 
-  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
+  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None, operators:Seq[Lineage]=Seq.empty): String = {
     var params = Map("name" -> "Starting Query")
     CodeEmitter.render("""    env.execute("<name>")
                          |<if (hook)>

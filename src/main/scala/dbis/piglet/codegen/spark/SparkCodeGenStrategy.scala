@@ -2,6 +2,7 @@ package dbis.piglet.codegen.spark
 
 import java.net.URI
 
+import dbis.piglet.Piglet.Lineage
 import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenTarget}
 import dbis.piglet.expr.Expr
@@ -80,39 +81,62 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
     * @param profiling add profiling code to the generated code
     * @return a string representing the header code
     */
-  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None): String = {
-    var map = Map("name" -> scriptName)
+  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None, operators: Seq[Lineage] = Seq.empty): String = {
+    var map = Map[String,Any]("name" -> scriptName)
 
-    profiling.map { u => u.resolve(Conf.EXECTIMES_FRAGMENT).toString }
-      .foreach { s => map += ("profiling" -> s) }
+    logger.debug(operators.mkString("\n"))
+
+    profiling.foreach { p =>
+      val t = p.resolve(Conf.EXECTIMES_FRAGMENT).toString
+      val s = p.resolve(Conf.SIZES_FRAGMENT).toString
+
+//      map += ("profiling" -> t)
+      map += ("profilingTimes" -> t)
+      map += ("profilingSizes" -> s)
+      map += ("lineages" -> operators)
+    }
 
 
     CodeEmitter.render(s"""  def main(args: Array[String]) {
                          |<if (profiling)>
-                         |  val url = "<profiling>"
+                         |  val url = "<profilingTimes>"
+                         |  val sizesUrl = "<profilingSizes>"
                          |  PerfMonitor.notify(url,"progstart",null,-1,System.currentTimeMillis)
                          |<endif>
                          |val conf = new SparkConf().setAppName("<name>_App")
                     		 |val sc = new SparkContext(conf)
                          |<if (profiling)>
+                         |    <lineages:{ l | val accum_<l> = new dbis.piglet.backends.spark.SizeAccumulator()
+                         |    sc.register(accum_<l>,"accum_<l>")
+                         |     }>
+                         |
                          |    PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
                          |<endif>
                          |""".stripMargin, map)
   }
 
-  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
+  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None, operators: Seq[Lineage] = Seq.empty): String = {
 
     val map = profiling.map { u => 
       val url = u.resolve(Conf.EXECTIMES_FRAGMENT).toString
-      Map("profiling" -> url)
+      Map("profiling" -> url,"lineages"->operators)
     }.getOrElse(Map.empty[String,String])
       
-      CodeEmitter.render("""  sc.stop() 
-                         |<if (profiling)> 
-                         |    PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
-                         |<endif>
-                         |  }
-                         |}""".stripMargin, map)
+      CodeEmitter.render(
+
+        s"""
+         |<if (profiling)>
+         |  val m = scala.collection.mutable.Map.empty[String,Option[Long]]
+         |  <lineages:{ l | m("<l>") = accum_<l>.value
+         |  }>
+         |  PerfMonitor.sizes(sizesUrl,m)
+         |<endif>
+         |  sc.stop()
+         |<if (profiling)>
+         |    PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
+         |<endif>
+         |  }
+         |}""".stripMargin, map)
 
   }
 }

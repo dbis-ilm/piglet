@@ -26,12 +26,15 @@ import org.apache.spark.streaming.dstream.DStream
 import java.io.ObjectOutputStream
 import java.io.ObjectInputStream
 import java.io.FileOutputStream
+
 import scala.tools.nsc.io._
 import scala.reflect.ClassTag
 import scala.collection.mutable.Queue
 import FileStreamReader.customFileStreamReader
 import org.apache.spark.streaming.scheduler.StreamingListener
 import org.apache.spark.streaming.scheduler.StreamingListenerReceiverStopped
+
+import scala.collection.mutable
 
 //-----------------------------------------------------------------------------------------------------
 
@@ -65,10 +68,13 @@ object PigStorage extends java.io.Serializable {
 //-----------------------------------------------------------------------------------------------------
 
 class TextLoader[T <: SchemaClass :ClassTag] extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[T] =
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[T] = {
     sc.textFile(path).map(line => extract(Array(line)))  //.map(line => Record(Array(line)))
+  }
+
+
   def loadStream(ssc: StreamingContext, path: String, extract: (Array[String]) => T): DStream[T] =
-    ssc.queueStream(Queue(ssc.sparkContext.textFile(path)),true, null).map(line => extract(Array(line)))
+    ssc.queueStream(mutable.Queue(ssc.sparkContext.textFile(path)),oneAtATime = true, null).map(line => extract(Array(line)))
     //ssc.readFile(path).map(line => extract(Array(line)))
 }
 
@@ -85,7 +91,7 @@ class PigStream[T <: SchemaClass: ClassTag] extends java.io.Serializable {
     ssc.socketTextStream(hostname, port).map(line => extract(line.split(delim, -1)))
 
   def loadStream(ssc: StreamingContext, path: String, extract: (Array[String]) => T, delim: String = "\t"): DStream[T] ={
-     ssc.queueStream(Queue(ssc.sparkContext.textFile(path)),true, null).map(line => extract(line.split(delim, -1)))
+     ssc.queueStream(mutable.Queue(ssc.sparkContext.textFile(path)),oneAtATime = true, null).map(line => extract(line.split(delim, -1)))
   }
     //ssc.readFile(path).map(line => extract(Array(line)))
 

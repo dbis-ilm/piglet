@@ -341,8 +341,6 @@ object Piglet extends PigletLogging {
 
     if(c.profiling.isDefined) {
       StatServer.stop()
-
-
     }
 
   }

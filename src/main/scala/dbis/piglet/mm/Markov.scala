@@ -15,9 +15,9 @@ import scalax.collection.io.json.descriptor.predefined.WDi
   * @param lineage The lineage for the operator
   * @param cost The operator cost (execution time)
   */
-case class Op(lineage: Lineage, var cost: Option[T] = None) {
+case class Op(lineage: Lineage, var cost: Option[T] = None, var inputSize: Option[Long] = None) {
   override def equals(obj: scala.Any): Boolean = obj match {
-    case Op(l,_) => l equals lineage
+    case Op(l,_,_) => l equals lineage
     case _ => false
   }
 
@@ -35,20 +35,19 @@ object Op {
   * @param model The graph representing operators with their costs and the number of transitions on the edges
   */
 case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLogging {
-
-
   import Markov._
+
 
   /* Increase the total amount of runs
    */
   def incrRuns() = add(startNode, startNode)
-
 
   /**
     * The total number of runs
     * @return Returns the number of runs
     */
   def totalRuns = rawWeight(startNode, startNode)
+
 
   /**
     * Add the information that there is an edge ([[dbis.piglet.op.Pipe]]) between parent and child
@@ -176,6 +175,11 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
       a.cost = Some(T(cost))
   }
 
+  def updateSize(lineage: Lineage, size: Option[Long]) = {
+    val a = model.get(Op(lineage)).value
+    a.inputSize = size
+  }
+
   /**
     * String representation of this model as JSON
     * @return JSON representation of this model
@@ -195,7 +199,7 @@ object Markov {
   // used to serialize the nodes to JSON
   private val nodeDescriptor = new NodeDescriptor[Op](typeId = "operators"){
     def id(node: Any) = node match {
-      case Op(l,_) => l
+      case Op(l,_,_) => l
     }
   }
 
