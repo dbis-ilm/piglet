@@ -5,12 +5,14 @@ import sbtbuildinfo.BuildInfoKeys._
 
 object PigBuild extends Build {
 
+  val scala = "2.11.8"
+
   /*
    * Common Settings **********************************************************
    */
   lazy val commonSettings = Seq(
     version := "0.3",
-    scalaVersion := "2.11.8",
+    scalaVersion := scala,
     organization := "dbis"
   )
 
@@ -106,16 +108,17 @@ object PigBuild extends Build {
  */
 object Dependencies {
   
-  val sparkVersion = "2.1.0"
+  val sparkVersion = "2.1.1"
   val flinkVersion = "1.1.3"
-  
+
   // Libraries
-  val scalaLib = "org.scala-lang" % "scala-library" %  "2.11.8"
-  val scalaCompiler = "org.scala-lang" % "scala-compiler" %  "2.11.8"
-  val scalaTest = "org.scalatest" %% "scalatest" % "3.0.0"
-  val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.3"
+  val scalaLib = "org.scala-lang" % "scala-library" % PigBuild.scala
+  val scalaCompiler = "org.scala-lang" % "scala-compiler" %  PigBuild.scala
+
+  val scalaTest = "org.scalatest" %% "scalatest" % "3.0.3"
+  val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
-  val jline = "jline" % "jline" % "2.13"
+  val jline = "jline" % "jline" % "2.14.3"
   
   val sparkCore = "org.apache.spark" %% "spark-core" % sparkVersion
   val sparkSql = "org.apache.spark" %% "spark-sql" % sparkVersion
@@ -125,12 +128,12 @@ object Dependencies {
   val flinkScala = "org.apache.flink" %% "flink-scala" % flinkVersion
   val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % flinkVersion
   
-  val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.1"
+  val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.3"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
 
-  val scopt = "com.github.scopt" %% "scopt" % "3.3.0"
-  val scalasti = "org.clapper" %% "scalasti" % "2.0.0"
-  val jeromq = "org.zeromq" % "jeromq" % "0.3.4"
+  val scopt = "com.github.scopt" %% "scopt" % "3.6.0"
+  val scalasti = "org.clapper" %% "scalasti" % "3.0.1"
+  val jeromq = "org.zeromq" % "jeromq" % "0.4.0"
   val kiama = "com.googlecode.kiama" %% "kiama" % "1.8.0"
   val typesafe = "com.typesafe" % "config" % "1.3.0"
   val commons = "org.apache.commons" % "commons-exec" % "1.3"
@@ -140,9 +143,14 @@ object Dependencies {
   //val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
   val log4j = "log4j" % "log4j" % "1.2.17"
 
+
   val scalajhttp = "org.scalaj" %% "scalaj-http" % "2.3.0"
-  val json4s = "org.json4s" %% "json4s-native" % "3.5.0"
-  val akkahttp = "com.typesafe.akka" %% "akka-http" % "10.0.1"
+  val json4s = "org.json4s" %% "json4s-native" % "3.5.2"
+//  val akkahttp = "com.typesafe.akka" %% "akka-http" % "10.0.7"
+//  val akkaslf = "com.typesafe.akka" % "akka-slf4j_2.11" % "2.4.17"
+
+  val akka = "com.typesafe.akka" % "akka-actor_2.11" % "2.5.2"
+  val akkaLogging = "com.typesafe.akka" % "akka-slf4j_2.11" % "2.5.2"
 
   val graphcore = "org.scala-graph" %% "graph-core" % "1.11.5"
   val graphjson = "org.scala-graph" % "graph-json_2.11" % "1.11.0"
@@ -168,7 +176,9 @@ object Dependencies {
     //breeze,
     scalajhttp,
     json4s,
-    akkahttp,
+//    akkahttp,
+    akka,
+//    akkaLogging,
     graphcore,
     graphjson
   )

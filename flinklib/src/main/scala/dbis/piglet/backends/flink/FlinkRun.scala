@@ -17,35 +17,26 @@
 
 package dbis.piglet.backends.flink
 
-import scala.sys.process._
-import java.security._
-import org.apache.flink.client.CliFrontend
-import dbis.piglet.backends.PigletBackend
-import com.typesafe.config.ConfigFactory
-import dbis.piglet.backends.BackendConf
 import java.nio.file.Path
-import java.io.File
-import org.apache.flink.configuration.ConfigConstants
-import org.apache.flink.configuration.Configuration
-import org.apache.flink.configuration.GlobalConfiguration
-import java.net.URI
-import java.net.URISyntaxException
-import java.net.InetSocketAddress
 
+import dbis.piglet.backends.PigletBackend
 import dbis.piglet.tools.logging.PigletLogging
+import org.apache.flink.client.CliFrontend
 
 class FlinkRun extends PigletBackend with PigletLogging {
 
   override def execute(master: String, className: String, jarFile: Path, backendArgs: Map[String,String], profiling: Boolean){
     // CliFrontend  needs FLINK_CONF_DIR to be set 
-    val args = backendArgs.map {case (k, v) => (Array(k) ++ Array(v))}.flatten
+    val args = backendArgs.flatMap { case (k, v) => Array(k) ++ Array(v) }
     if (master.startsWith("local") && !master.startsWith("localhost")){  
       val cli = new CliFrontend
-      val ret = cli.parseParameters(Array("run", "-q") ++ args ++ Array("--class", className, jarFile.toString()) ++ args)
+      val ret = cli.parseParameters(Array("run", "-q") ++ args ++ Array("--class", className, jarFile.toString) ++ args)
+      logger.info(s"completed with status code $ret")
     }
     else {
       val cli = new CliFrontend
-      val ret = cli.parseParameters(Array("run", "-q", "--jobmanager", master) ++ args ++ Array("--class", className, jarFile.toString()))
+      val ret = cli.parseParameters(Array("run", "-q", "--jobmanager", master) ++ args ++ Array("--class", className, jarFile.toString))
+      logger.info(s"completed with status code $ret")
     }
   }
 

@@ -209,7 +209,8 @@ object Piglet extends PigletLogging {
 		// count occurrences of each operator in schedule
     if(c.profiling.isDefined) {
       DataflowProfiler.load(c.profiling.get)
-      StatServer.start(Conf.statServerPort)
+      logger.debug("starting stat server")
+      StatServer.start()
     }
 
     logger.debug("start processing created dataflow plans")
@@ -295,8 +296,15 @@ object Piglet extends PigletLogging {
             logger.info( s"""starting job at "$jarFile" using backend "${c.backend}" """)
 
             timing("job execution") {
+              val start = System.currentTimeMillis()
               runner.execute(c.master, scriptName, jarFile, c.backendArgs, c.profiling.isDefined)
+
+              logger.info(s"program execution finished in ${System.currentTimeMillis() - start} ms")
+
             }
+
+
+
           } else
             logger.info("successfully compiled program - exiting.")
             
@@ -339,9 +347,9 @@ object Piglet extends PigletLogging {
     }
 
 
-    if(c.profiling.isDefined) {
+    // if the StatServer was created, stop it now
+    if(c.profiling.isDefined)
       StatServer.stop()
-    }
 
   }
 

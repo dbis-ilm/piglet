@@ -17,13 +17,14 @@
 package dbis.piglet.op
 
 import java.security.MessageDigest
+
+import dbis.piglet.expr.{NamedField, Ref}
 import dbis.piglet.plan.InvalidPlanException
 import dbis.piglet.schema._
 import org.kiama.rewriting.Rewritable
+
 import scala.collection.immutable.Seq
-import scala.collection.mutable.Map
-import dbis.piglet.expr.NamedField
-import dbis.piglet.expr.Ref
+import scala.collection.mutable
 
 /**
  * PigOperator is the base trait for all Pig operators. An operator contains
@@ -45,7 +46,7 @@ abstract class PigOperator(
   /**
    * A map of key-value pairs representing operator-specific parameters.
    */
-  var configParams: Map[String, Any] = Map()
+  var configParams: mutable.Map[String, Any] = mutable.Map()
 
   /**
    * Getter method for the output pipes.
@@ -116,7 +117,7 @@ abstract class PigOperator(
   /**
    * Checks whether the pipe names are valid identifiers. If not an exception is raised.
    */
-  def checkPipeNames: Unit = {
+  def checkPipeNames(): Unit = {
     def validPipeName(s: String) = if (!s.matches("""[a-zA-Z_]\w*""")) throw InvalidPipeNameException(s)
 
     outputs.foreach(p => validPipeName(p.name))
@@ -125,14 +126,14 @@ abstract class PigOperator(
 
   def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
 
-  def preparePlan: Unit = {}
+  def preparePlan(): Unit = {}
 
   /**
    * Try to replace all pipes/references with a leading $ via the mapping table.
    *
    * @param mapping a map from identifiers to values
    */
-  def resolveParameters(mapping: Map[String, Ref]): Unit = {
+  def resolveParameters(mapping: mutable.Map[String, Ref]): Unit = {
     def rename(p: Pipe): Unit = {
       if (p.name.startsWith("$") && mapping.contains(p.name)) {
         val s2 = mapping(p.name) match {
@@ -160,7 +161,7 @@ abstract class PigOperator(
    *
    * @param mapping a map from identifiers to values
    */
-  def resolveReferences(mapping: Map[String, Ref]): Unit = {}
+  def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = {}
 
   def checkConnectivity: Boolean = true
 
@@ -173,7 +174,7 @@ abstract class PigOperator(
   def addConsumer(name: String, op: PigOperator): Unit = {
     _outputs.find(_.name == name) match {
       case Some(p) => if (!p.consumer.contains(op)) p.consumer = p.consumer :+ op
-      case None => {}
+      case None =>
     }
   }
 
@@ -232,7 +233,8 @@ abstract class PigOperator(
    * @return a string representation of the sub-plan.
    */
   def lineageString: String = {
-    inputs.map(p => p.producer.lineageString).mkString("%")
+    inputs.filter(p => p != null && p.producer != null).map{p =>
+      p.producer.lineageString}.mkString("%")
   }
 
   /**

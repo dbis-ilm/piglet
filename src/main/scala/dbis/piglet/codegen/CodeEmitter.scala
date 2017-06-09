@@ -2,10 +2,11 @@ package dbis.piglet.codegen
 
 import java.net.URI
 
+import dbis.piglet.op.PigOperator
+import dbis.piglet.tools.logging.PigletLogging
 import org.clapper.scalasti.ST
 import org.stringtemplate.v4.AutoIndentWriter
 import org.stringtemplate.v4.misc.ErrorBuffer
-import dbis.piglet.op.PigOperator
 
 case class CodeGenException(msg: String, cause: Throwable) extends Exception(msg, cause) {
   def this(msg: String) = this(msg, null)
@@ -16,7 +17,7 @@ object CodeGenException {
 }
 
 
-abstract class CodeEmitter[O <: PigOperator] {
+abstract class CodeEmitter[O <: PigOperator] extends PigletLogging {
   def template: String
 
   def render: String = CodeEmitter.render(template, Map[String, Any]())
@@ -55,20 +56,21 @@ object CodeEmitter {
    */
   def render(template: String, params: Map[String, Any]): String = {
 
-    val theParams = if(profiling.isDefined) params + ("profiling" -> profiling.get.toString) else params
+    var st = ST(template)
+    params.foreach { case (name, value) => st = st.add(name, value) }
 
-    val st = ST(template)
-    if (theParams.nonEmpty) {
-      theParams.foreach {
-        attr => st.add(attr._1, attr._2)
-      }
-    }
-    //st.render()
+    st = st.add("profiling", profiling.isDefined)
+
+//    st.render() match {
+//      case Success(code) => code
+//      case Failure(e) => println(e.getMessage); ""//throw e//CodeGenException(s"Could not render template $template with params ${theParams.mkString("\n")}", e)
+//    }
+
     // Ugly version to suppress warnings such as "attribute isn't defined":
     sw.getBuffer.setLength(0)
     st.nativeTemplate.write(new AutoIndentWriter(sw), new ErrorBuffer())
     sw.flush()
-    sw.toString()
+    sw.toString
   }
 
 }

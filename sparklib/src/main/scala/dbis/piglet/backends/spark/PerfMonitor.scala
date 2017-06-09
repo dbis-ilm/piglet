@@ -1,5 +1,7 @@
 package dbis.piglet.backends.spark
 
+import java.net.{HttpURLConnection, URL, URLEncoder}
+
 import dbis.piglet.backends.spark.PerfMonitor.FIELD_DELIM
 import org.apache.spark.rdd.RDD
 import org.apache.spark.scheduler.{SparkListener, SparkListenerStageCompleted, SparkListenerTaskEnd}
@@ -20,63 +22,16 @@ class UpdateMap[K,V](m: MutableMap[K,V]) {
   }
 }
 
-/**
- * A performance monitor to collect Spark job statistics. It extends {{SparkListener}}
- * which allows to register it at the SparkContext and get notified, when a Task or Stage
- * is submitted or finished.
- *les
- * We use the provided information to collect statistics about runtimes and result sizes of a stage
- */
-class PerfMonitor(url: String) extends SparkListener {
-
-  private val lineLineageMapping = MutableMap.empty[Int, String]
-  private val stageSizeMapping = MutableMap.empty[Int, MutableMap[Long, (Long,Long,Long,Long)]].withDefault(MutableMap.empty)
-
-
-  implicit def createUpdateMap[K,V](m: MutableMap[K,V]): UpdateMap[K,V] = new UpdateMap[K,V](m)
-
-  override def onTaskEnd(taskEnd: SparkListenerTaskEnd): Unit = {
-
-    if(!taskEnd.taskInfo.successful)
-      return
-
-    val inputBytes = taskEnd.taskMetrics.inputMetrics.bytesRead
-    val inputRecords = taskEnd.taskMetrics.inputMetrics.recordsRead
-
-    val outputBytes = taskEnd.taskMetrics.outputMetrics.bytesWritten
-    val outputRecords = taskEnd.taskMetrics.outputMetrics.recordsWritten
-
-    val stageId = taskEnd.stageId
-    val taskId = taskEnd.taskInfo.taskId
-
-    stageSizeMapping(stageId).insertOrUpdate(taskId){
-      case Some((ib,ir,ob,or)) => (ib + inputBytes, ir + inputRecords, ob + outputBytes, or + outputRecords)
-      case None => (inputBytes, inputRecords, outputBytes, outputRecords)
-    }
-  }
-
-  override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
-
-    if(stageCompleted.stageInfo.failureReason.isDefined)
-      return
-
-    val stageId = stageCompleted.stageInfo.stageId
-
-    val (inputBytes, inputRecords, outputBytes, outputRecords) = stageSizeMapping(stageId).values.reduceLeft{ (l,r) =>
-      (l._1 + r._1, l._2 + r._2, l._3 + r._3, l._4 + r._4)
-    }
-
-    val dataString = s"${}${}$inputBytes$FIELD_DELIM$inputRecords$FIELD_DELIM$outputBytes$FIELD_DELIM$outputRecords"
-    scalaj.http.Http(url).method("HEAD").param("metrics", dataString).asString
-  }
-
-  def register(line: Int, lineage: String) {
-    lineLineageMapping += (line -> lineage)
-  }
-}
-
-
 object PerfMonitor {
+
+  def request(url: String, data: String): Boolean = {
+    val theUrl = new URL(s"$url?data=${URLEncoder.encode(data, "UTF-8")}")
+    val c = theUrl.openConnection().asInstanceOf[HttpURLConnection]
+    c.setRequestMethod("HEAD")
+    c.setUseCaches(false)
+
+    c.getResponseCode == HttpURLConnection.HTTP_OK
+  }
 
   // keep in sync with [[dbis.piglet.mm.StatsWriterActor]]
   final val FIELD_DELIM = ";"
@@ -84,8 +39,9 @@ object PerfMonitor {
   final val DEP_DELIM = "#"
 
   def sizes(url: String, m: scala.collection.Map[String, Option[Long]]) = {
-    val dataSring = m.filter(_._2.isDefined).map{case(k,v) => s"$k=${v.get}"}.mkString(FIELD_DELIM)
-    scalaj.http.Http(url).method("HEAD").param("data",dataSring).asString
+    val dataString = m.filter(_._2.isDefined).map{case(k,v) => s"$k:${v.get}"}.mkString(FIELD_DELIM)
+//    scalaj.http.Http(url).method("HEAD").param("data",dataSring).asString
+    request(url, dataString)
   }
 
   def notify(url: String, lineage: String, rdd: RDD[_], partitionId: Int, time: Long) = {
@@ -123,7 +79,8 @@ object PerfMonitor {
       ""
 
     val dataString = s"$lineage$FIELD_DELIM$partitionId$FIELD_DELIM$parents$FIELD_DELIM$time"
-    scalaj.http.Http(url).method("HEAD").param("data", dataString).asString
+//    scalaj.http.Http(url).method("HEAD").param("data", dataString).asString
+    request(url, dataString)
   }
 }
 

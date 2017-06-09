@@ -14,6 +14,13 @@ mainClass in (Compile, run) := Some("dbis.piglet.PigletREPL")
 assemblyJarName in assembly := "piglet.jar"
 
 mainClass in assembly := Some("dbis.piglet.Piglet")
+assemblyMergeStrategy in assembly := {
+	case PathList(ps@_*) if ps.last == "libjansi.so" || ps.last == "libjansi.jnilib" || ps.last == "jansi.dll" => MergeStrategy.first // linux
+  case x =>
+    val oldStrategy = (assemblyMergeStrategy in assembly).value
+    oldStrategy(x)
+}
+
 
 test in assembly := {}
 

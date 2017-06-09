@@ -29,9 +29,8 @@ import dbis.piglet.schema._
 import dbis.piglet.udf.UDFTable
 import dbis.piglet.tools.CodeMatchers
 import dbis.piglet.tools.TestTools.strToUri
-import org.scalatest.{ Matchers, BeforeAndAfterAll, FlatSpec }
-import dbis.piglet.codegen.CodeGenContext
-import dbis.piglet.codegen.CodeGenTarget
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenTarget}
 import dbis.piglet.codegen.scala_lang.JoinEmitter
 
 class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
@@ -314,9 +313,11 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   /*******************/
   it should "contain code for FILTER" in {
     val ctx = CodeGenContext(CodeGenTarget.SparkStreaming)
+    CodeEmitter.profiling = None
+
     val op = Filter(Pipe("a"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
-    val expectedCode = cleanString("val a = b.filter(t => {t.get(1) < 42})")
+    val expectedCode = cleanString("val a = b.filter{t => t.get(1) < 42}")
     assert(generatedCode == expectedCode)
   }
 

@@ -39,9 +39,9 @@ class SparkRun extends PigletBackend with BackendConf {
 
     val ba = backendArgs.flatMap{case (k,v) => Seq(k,v)}.toArray
     
-    val profilingDep = if(profiling) Seq("--packages", "org.scalaj:scalaj-http_2.11:2.3.0") else Seq()
+//    val profilingDep = if(profiling) Seq("--packages", "org.scalaj:scalaj-http_2.11:2.3.0") else Seq()
     
-    var args = List("--master", master, "--class", className) ++ profilingDep ++ ba ++ Seq(jarFile.toAbsolutePath().toString())
+    var args = List("--master", master, "--class", className) ++  ba ++ Seq(jarFile.toAbsolutePath().toString())
     
     SparkSubmit.main(args.toArray)
   }
