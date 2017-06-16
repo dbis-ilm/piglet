@@ -122,7 +122,7 @@ object PigletCompiler extends PigletLogging {
     val codeGenStrategy = Class.forName(generatorClass).getConstructors()(0).newInstance().asInstanceOf[CodeGenStrategy]
     val codeGenerator = CodeGenerator(codeGenStrategy)
 
-    logger.debug(s"successfully created code generator class $codeGenerator")
+    logger.debug(s"successfully created code generator class ${codeGenerator.getClass.getName}")
 
     // generate the Scala code
     val code = codeGenerator.generate(scriptName, plan, if(c.profiling.isDefined) Some(DataflowProfiler.url) else None)

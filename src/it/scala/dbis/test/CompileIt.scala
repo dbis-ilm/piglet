@@ -17,17 +17,12 @@
 
 package dbis.test
 
-import org.scalatest.{ Matchers, FlatSpec }
-import dbis.piglet.Piglet
-import dbis.piglet.backends.BackendManager
 import dbis.piglet.BuildInfo
-import org.scalatest.prop.TableDrivenPropertyChecks._
-import org.scalatest.prop.TableFor5
+import org.apache.commons.exec._
+import org.scalatest.{FlatSpec, Matchers}
+
 import scala.io.Source
 import scalax.file.Path
-import org.apache.commons.exec._
-import org.apache.commons.exec.environment.EnvironmentUtils
-import java.nio.charset.MalformedInputException
 
 trait CompileIt extends Matchers {
   this: FlatSpec =>
@@ -42,21 +37,21 @@ trait CompileIt extends Matchers {
         val resourcePath = getClass.getResource("").getPath + "../../../"
         // 2. compile and execute Pig script
         
-       print(s"Testing: [${"#"*(i+1)}${" "*(nTests - i)}] ${i+1}/${nTests} : $script                                        \r")
+       print(s"Testing: [${"#"*(i+1)}${" "*(nTests - i)}] ${i+1}/$nTests : $script                                        \r")
 
         runCompiler(script, resourcePath, resultPath, backend) should be(true)
 
         val result = getResult(resultPath)
 
-        result should not be (null)
+        result should not be null
 
         val truth = Source.fromFile(resourcePath + truthFile).getLines()
 
         // 4. compare both files
         if (inOrder)
-          result should contain theSameElementsInOrderAs (truth.toTraversable)
+          result should contain theSameElementsInOrderAs truth.toTraversable
         else
-          result should contain theSameElementsAs (truth.toTraversable)
+          result should contain theSameElementsAs truth.toTraversable
         // 5. delete the output directory*/
         cleanupResult(resultDir)
         cleanupResult(script.replace(".pig", ""))

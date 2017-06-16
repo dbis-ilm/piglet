@@ -45,7 +45,7 @@ case class CliParams(
   updateConfig: Boolean = false,
   showPlan: Boolean = false,
   backendArgs: Map[String, String] = Map.empty,
-  profiling: Option[Path] = None,
+  profiling: Option[Map[String,String]] = None,
 //  profilingPort: Int = 8000,
   logLevel: LogLevel = LogLevel.WARN,
   sequential: Boolean = false,
@@ -100,7 +100,9 @@ object CliParams {
     opt[Unit]('k',"keep") optional() action { (x,c) => c.copy(keepFiles = true) } text "keep generated files"
     opt[String]('g', "log-level") optional() action { (x, c) => c.copy(logLevel = LogLevel.withName(x.toUpperCase())) } text "Set the log level: DEBUG, INFO, WARN, ERROR"
     opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text s"show the execution plan"
-    opt[File]("profiling") optional() action { (x, c) => c.copy(profiling = Some(x.toPath)) } text "Activate profiling and use given file as storage"
+    opt[Map[String,String]]("profiling") optional() valueName "prob=prob_thresh,cost=cost_thresh,cost_strategy=strategy,prob_strategy=strategy" action {
+      (x, c) => c.copy(profiling = Some(x))
+    } text "Activate profiling, where prob_thresh and cost_thresh are the respective threshold values and the strategy is one of (min|max|avg|product)"
 //    opt[Int]("profiling-url") optional() action { (x,c) => c.copy(profilingPort = x) } text ("Port to run profiling server on")
     opt[Unit]("show-stats") optional() action { (_,c) => c.copy(showStats = true) } text "print detailed timing stats at the end"
     opt[Unit]("sequential") optional() action{ (_,c) => c.copy(sequential = true) } text "sequential execution (do not merge plans)"

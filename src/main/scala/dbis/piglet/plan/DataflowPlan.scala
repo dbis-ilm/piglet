@@ -16,6 +16,7 @@
  */
 package dbis.piglet.plan
 
+import dbis.piglet.Piglet.Lineage
 import dbis.piglet.expr._
 import dbis.piglet.op._
 import dbis.piglet.op.cmd._
@@ -34,6 +35,7 @@ import scala.collection.mutable.ListBuffer
  * @param msg a text describing the reason
  */
 case class InvalidPlanException(msg: String) extends Exception(msg)
+case class OperatorNotFoundException(msg: String) extends Exception(msg)
 
 /**
  * A DataflowPlan is a graph of operators representing a Piglet script and provides methods
@@ -379,11 +381,10 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    * of their input bags. If not, a SchemaException is raised.
    */
   def checkSchemaConformance(): Unit = {
-    val errors = operators.view.map{ op => (op, op.checkSchemaConformance) }
-                    .filter{ t => !t._2 }
+    val errorOps = operators.filterNot(_.checkSchemaConformance)
 
-    if(errors.nonEmpty) {
-      val str = errors.map(_._1).mkString(" and ")
+    if(errorOps.nonEmpty) {
+      val str = errorOps.mkString(" and ")
       throw SchemaException(str)
     }
     
@@ -405,6 +406,8 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    * @return the list of operators satisfying this predicate
    */
   def findOperator(pred: PigOperator => Boolean) : List[PigOperator] = operators.filter(n => pred(n))
+
+  def get(lineage: Lineage): Option[PigOperator] = operators.find(_.lineageSignature == lineage)
 
   /**
    * Checks whether the plan contains the given operator.

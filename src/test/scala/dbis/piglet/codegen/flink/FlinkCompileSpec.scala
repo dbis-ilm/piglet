@@ -393,6 +393,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       cleanString("""
          |case class _t2_Tuple (_0: String, _1: Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
          |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
+         |  override lazy val getNumBytes: Int = 0
          |}
          |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
        """.stripMargin)
@@ -717,10 +718,12 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """
       |case class _t2_Tuple (_0: Int, _1: String, _2: Double, _3: Int) extends java.io.Serializable with SchemaClass {
       |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2 + _c + _3
+      |override lazy val getNumBytes: Int = 0
       |}
       |implicit def convert_t2_Tuple(t: (Int, String, Double, Int)): _t2_Tuple = _t2_Tuple(t._1, t._2, t._3, t._4)
       |case class _t1_Tuple (_0: Int, _1: String, _2: Double) extends java.io.Serializable with SchemaClass {
       |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2
+      |override lazy val getNumBytes: Int = 0
       |}
       |implicit def convert_t1_Tuple(t: (Int, String, Double)): _t1_Tuple = _t1_Tuple(t._1, t._2, t._3)
       |""".stripMargin)
@@ -748,10 +751,12 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """
         |case class _t2_Tuple (_0: String, _1: Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
+        |  override lazy val getNumBytes: Int = 0
         |}
         |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
         |case class _t1_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + _1
+        |  override lazy val getNumBytes: Int = 0
         |}
         |implicit def convert_t1_Tuple(t: (String, String)): _t1_Tuple = _t1_Tuple(t._1, t._2)
         |""".stripMargin)

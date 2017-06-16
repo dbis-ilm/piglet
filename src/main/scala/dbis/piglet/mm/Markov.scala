@@ -35,6 +35,7 @@ object Op {
   * @param model The graph representing operators with their costs and the number of transitions on the edges
   */
 case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLogging {
+
   import Markov._
 
 
@@ -73,9 +74,9 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
 
     val a = model.get(Op(op)).inNeighbors.map(_.value.lineage).toList
     if(a.isEmpty)
-      None
+    None
     else
-      Some(a)
+    Some(a)
   }
 
   def size = model.size
@@ -87,11 +88,13 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     * @return Returns the weight of this edge or 0 if there is none
     */
   def rawWeight(parent: Op, child: Op): Long =
-    model.find( (parent ~%> child)(0) ) // the weight is not regarded for search
-        .map(_.weight)
-        .getOrElse(0L)
+  model.find( (parent ~%> child)(0) ) // the weight is not regarded for search
+    .map(_.weight)
+    .getOrElse(0L)
 
   def cost(op: Op): Option[T] = model.get(op).value.cost
+  def inputSize(op: Lineage): Option[Long] = model.get(op).value.inputSize
+  def outputSize(op: Lineage): Option[Long] = model.get(op).outNeighbors.headOption.flatMap(_.value.inputSize)
 
   /**
     * Get the cost (execution time and probability) from start to the specified node.
@@ -116,18 +119,18 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     // this assignment is needed by the type checker/compiler to bring the graph in scope
     val g = model
 
-//    logger.debug(g.toString())
+    //    logger.debug(g.toString())
 
     // get all actual source (LOAD) nodes
 
     val sources = (g get startNode).outNeighbors
 
-//    logger.debug(s"found sources (${sources.size}): ${sources.mkString(",")}")
+    //    logger.debug(s"found sources (${sources.size}): ${sources.mkString(",")}")
 
     // the node in the graph for the specified lineage
     val theOp: g.NodeT = g get lineage
 
-//    logger.debug(s"graph node for $lineage : $theOp ")
+    //    logger.debug(s"graph node for $lineage : $theOp ")
 
     /* The paths from all known source nodes to the op
      * An entry of None means that there is no path from that source to the op
@@ -226,9 +229,10 @@ object Markov {
   def empty = new Markov(Graph[Op, WDiEdge]())
 
 
-  def ProbMin(l: Traversable[(Double)]): Double = l.min
-  def ProbMax(l: Traversable[(Double)]): Double = l.max
-  def ProbProduct(l: Traversable[(Double)]): Double = l.product
+  def ProbMin(l: Traversable[Double]): Double = l.min
+  def ProbMax(l: Traversable[Double]): Double = l.max
+  def ProbProduct(l: Traversable[Double]): Double = l.product
+  def ProbAvg(l: Traversable[Double]): Double = l.sum / l.size
 
   def CostMin(l: Traversable[(Long, Double)]): (Long, Double) = l.minBy(_._1)
   def CostMax(l: Traversable[(Long, Double)]): (Long, Double) = l.maxBy(_._1)

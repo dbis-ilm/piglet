@@ -18,14 +18,14 @@
 package dbis.piglet.schema
 
 case class Field(name: String, fType: PigType = Types.ByteArrayType, lineage: List[String] = List.empty) {
-  override def toString = s"${nameWithLineage}: ${fType.descriptionString}"
+  override def toString = s"$nameWithLineage: ${fType.descriptionString}"
   def isBagType = fType.isInstanceOf[BagType]
 
   def nameWithLineage: String = {
     if (lineage.isEmpty) {
       name
     } else {
-      lineage :+ name mkString(Field.lineageSeparator)
+      lineage :+ name mkString Field.lineageSeparator
     }
   }
 }
@@ -78,7 +78,7 @@ case class TupleType(var fields: Array[Field],var className: String = "") extend
    *
    * @return the string repesentation
    */
-  override def toString = s"${name}(" + fields.mkString(",") + ")"
+  override def toString = s"$name(" + fields.mkString(",") + ")"
 
   override def descriptionString = "(" + fields.mkString(", ") + ")"
 
@@ -86,6 +86,7 @@ case class TupleType(var fields: Array[Field],var className: String = "") extend
 
   override def typeOfComponent(name: String): PigType = fields.find(f => f.name == name).head.fType
   override def typeOfComponent(pos: Int): PigType = fields(pos).fType
+
 }
 
 object TupleType {
@@ -118,7 +119,7 @@ case class BagType(var valueType: TupleType) extends ComplexType {
    *
    * @return the string repesentation
    */
-  override def toString = s"${name}{${valueType}}"
+  override def toString = s"$name{$valueType}"
 
   override def encode: String = s"{${valueType.encode}}"
 

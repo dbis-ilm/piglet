@@ -5,37 +5,40 @@ import dbis.piglet.expr._
 import dbis.piglet.op._
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema.Schema
+import dbis.piglet.tools.logging.PigletLogging
 
 /**
   * Created by kai on 06.12.16.
   */
-class ForeachEmitter extends CodeEmitter[Foreach] {
+class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
 
   override def template: String =
     """val <out> = <in>.map{t =>
       |<if (profiling)>
-      |accum_<lineage>.add(1)
+      |accum_<lineage>.incr(t.getNumBytes)
       |<endif>
       |<class>(<expr>)}""".stripMargin
   def templateNested: String =
     """val <out> = <in>.map{t =>
       |<if (profiling)>
-      |accum_<lineage>.add(1)
+      |accum_<lineage>.incr(t.getNumBytes)
       |<endif>
       |<expr>}""".stripMargin
 
   def templateFlatMap: String =
     """val <out> = <in>.flatMap{t =>
       |<if (profiling)>
-      |accum_<lineage>.add(1)
+      |accum_<lineage>.incr(t.getNumBytes)
       |<endif>
       |<expr>}""".stripMargin
 
   override def code(ctx: CodeGenContext, op: Foreach): String = {
-    if (!op.schema.isDefined)
+    if (op.schema.isEmpty)
       throw CodeGenException("FOREACH requires a schema definition")
     
     val className: String = ScalaEmitter.schemaClassName(op.schema.get.className)
+    logger.debug(s"class name for ${op.name} is $className")
+
     val expr = emitForeachExpr(ctx, op)
     // in case of a nested FOREACH the tuples are creates as part of the GENERATE clause
     // -> no need to give the schema class
@@ -57,16 +60,14 @@ class ForeachEmitter extends CodeEmitter[Foreach] {
     // val requiresPlainFlatten =  op.asInstanceOf[Foreach].containsFlatten(onBag = false)
     val requiresFlatMap = op.containsFlatten(onBag = true)
     op.generator match {
-      case GeneratorList(expr) => {
+      case GeneratorList(expr) =>
         if (requiresFlatMap)
           emitBagFlattenGenerator(CodeGenContext(ctx, Map("schema" -> op.inputSchema)), op, expr)
         else
           emitGenerator(CodeGenContext(ctx, Map("schema" -> op.inputSchema)), expr)
-      }
-      case GeneratorPlan(plan) => {
+      case GeneratorPlan(plan) =>
         val subPlan = op.subPlan.get
         emitNestedPlan(ctx, parent = op, plan = subPlan)
-      }
     }
   }
 
@@ -95,7 +96,7 @@ class ForeachEmitter extends CodeEmitter[Foreach] {
     require(op.schema.isDefined)
     val className = ScalaEmitter.schemaClassName(op.schema.get.className)
     // extract the flatten expression from the generator list
-    val flattenExprs = genExprs.filter(e => e.expr.traverseOr(op.inputSchema.getOrElse(null), Expr.containsFlattenOnBag))
+    val flattenExprs = genExprs.filter(e => e.expr.traverseOr(op.inputSchema.orNull, Expr.containsFlattenOnBag))
     // determine the remaining expressions
     val otherExprs = genExprs.diff(flattenExprs)
     if (flattenExprs.size == 1) {
@@ -106,12 +107,12 @@ class ForeachEmitter extends CodeEmitter[Foreach] {
         // we have to cross join the flatten expression with the others:
         // t._1.map(s => <class>(<expr))
         val exs = otherExprs.map(e => ScalaEmitter.emitExpr(ctx2, e.expr)).mkString(",")
-        s"${ScalaEmitter.emitExpr(ctx2, ex)}.map(s => ${className}($exs, s))"
+        s"${ScalaEmitter.emitExpr(ctx2, ex)}.map(s => $className($exs, s))"
       }
       else {
         // there is no other expression: we just construct an expression for flatMap:
         // (<expr>).map(t => <class>(t))
-        s"${ScalaEmitter.emitExpr(ctx, ex.a)}.map(t => ${className}(t._0))"
+        s"${ScalaEmitter.emitExpr(ctx, ex.a)}.map(t => $className(t._0))"
       }
     }
     else
@@ -131,9 +132,9 @@ class ForeachEmitter extends CodeEmitter[Foreach] {
     val className = ScalaEmitter.schemaClassName(parent.schema.get.className)
 
     "{\n" + plan.operators.map {
-      case Generate(expr) => s"""${className}(${emitGenerator(CodeGenContext(ctx, Map("schema" -> schema, "namedRef" -> true)), expr)})"""
+      case Generate(expr) => s"""$className(${emitGenerator(CodeGenContext(ctx, Map("schema" -> schema, "namedRef" -> true)), expr)})"""
       case n@ConstructBag(out, ref) => ref match {
-        case DerefTuple(r1, r2) => {
+        case DerefTuple(r1, r2) =>
           // there are two options of ConstructBag
           // 1. r1 refers to the input pipe of the outer operator (for automatically
           //    inserted ConstructBag operators)
@@ -149,20 +150,17 @@ class ForeachEmitter extends CodeEmitter[Foreach] {
             // println("pos2 = " + p1 + ", " + p2)
             s"""val ${n.outPipeName} = t._$p1.map(l => l._$p2).toList"""
           }
-        }
         case _ => "" // should not happen
       }
       case n@Distinct(out, in, _) => s"""val ${n.outPipeName} = ${n.inPipeName}.distinct"""
-      case n@Filter(out, in, pred, _) => {
+      case n@Filter(out, in, pred, _) =>
         val e = new FilterEmitter
         e.code(ctx, n)
-//        callST("filter", Map("out" -> n.outPipeName, "in" -> n.inPipeName,
-//          "pred" -> ScalaEmitter.emitPredicate(CodeGenContext(ctx, Map("schema" -> n.schema)), pred)))
-      }
-      case n@Limit(out, in, num) => {
+        //        callST("filter", Map("out" -> n.outPipeName, "in" -> n.inPipeName,
+        //          "pred" -> ScalaEmitter.emitPredicate(CodeGenContext(ctx, Map("schema" -> n.schema)), pred)))
+      case n@Limit(out, in, num) =>
         val e = new LimitEmitter
-        e.code(ctx, n)
-      } // ("limit", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "num" -> num))
+        e.code(ctx, n) // ("limit", Map("out" -> n.outPipeName, "in" -> n.inPipeName, "num" -> num))
       case OrderBy(out, in, orderSpec, _) => throw CodeGenException("nested ORDER BY not implemented")
       case _ => ""
     }.mkString("\n") + "}"

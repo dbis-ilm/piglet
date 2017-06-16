@@ -16,19 +16,14 @@
  */
 package dbis.piglet.codegen.scala_lang
 
-import java.net.URI
-
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenStrategy, CodeGenTarget}
 import dbis.piglet.expr.Expr
 import dbis.piglet.op._
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema._
-import dbis.piglet.tools.Conf
+import dbis.piglet.tools.logging.PigletLogging
 
 import scala.collection.mutable.ListBuffer
-import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.codegen.spark.SpatialFilterEmitter
-import dbis.piglet.codegen.spark.SpatialJoinEmitter
 
 abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
   // initialize target and emitters
@@ -103,7 +98,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
     * @param schemas the list of schemas for which we generate classes
     * @return a string representing the code
     */
-  override def emitSchemaHelpers(ctx: CodeGenContext, schemas: List[Schema]): String = {
+  override def emitSchemaHelpers(ctx: CodeGenContext, schemas: List[Schema], profiling: Boolean = false): String = {
     var converterCode = ""
 
     val classes = ListBuffer.empty[(String, String)]
@@ -111,7 +106,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
     for (schema <- schemas) {
       val values = ScalaEmitter.createSchemaInfo(schema)
 
-      classes += ScalaEmitter.emitSchemaClass(values)
+      classes += ScalaEmitter.emitSchemaClass(values, profiling)
       converterCode += ScalaEmitter.emitSchemaConverters(values)
     }
 

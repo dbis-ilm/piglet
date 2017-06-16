@@ -28,7 +28,7 @@ import dbis.piglet.expr.NamedField
  *
  * @param keyList a list of keys used for grouping
  */
-case class GroupingExpression(val keyList: List[Ref]) {
+case class GroupingExpression(keyList: List[Ref]) {
   /**
    * Construct the type of the grouping expression
    *
@@ -45,7 +45,7 @@ case class GroupingExpression(val keyList: List[Ref]) {
       ex.resultType(schema)
     }
 
-    if (keyList.size == 0) {
+    if (keyList.isEmpty) {
       // GROUP ALL
       Types.CharArrayType
     }
@@ -53,12 +53,10 @@ case class GroupingExpression(val keyList: List[Ref]) {
       typeForRef(keyList.head)
     }
     else {
-      val resList = keyList.map(r => {
-        r match {
-          case NamedField(n, _) => (n, typeForRef(r))
-          case _ => ("", typeForRef(r))
-        }
-      }).map{ case (n, t) => Field(n, t)}
+      val resList = keyList.map {
+        case r@NamedField(n, _) => (n, typeForRef(r))
+        case r => ("", typeForRef(r))
+      }.map{ case (n, t) => Field(n, t)}
       TupleType(resList.toArray)
     }
   }
@@ -85,7 +83,7 @@ case class Grouping(
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""GROUPBY%${groupExpr}%""" + super.lineageString
+    s"""GROUPBY%$groupExpr%""" + super.lineageString
   }
 
   override def constructSchema: Option[Schema] = {
@@ -96,7 +94,7 @@ case class Grouping(
     }
     val groupingType = groupExpr.resultType(inputSchema)
     // the group field gets the original grouping expression as lineage, e.g. rel.column
-    val fields = Array(Field("group", groupingType, List(s"${inPipeName}.${groupExpr.keyList.mkString}")),
+    val fields = Array(Field("group", groupingType, List(s"$inPipeName.${groupExpr.keyList.mkString}")),
       Field(inputs.head.name, BagType(inputType)))
     schema = Some(Schema(BagType(TupleType(fields))))
     schema
@@ -104,14 +102,12 @@ case class Grouping(
 
   override def checkSchemaConformance: Boolean = {
     inputSchema match {
-      case Some(s) => {
+      case Some(s) =>
         // if we know the schema we check all named fields
         ! groupExpr.keyList.filter(_.isInstanceOf[NamedField]).exists(f => s.indexOfField(f.asInstanceOf[NamedField]) == -1)
-      }
-      case None => {
+      case None =>
         // if we don't have a schema all expressions should contain only positional fields
         ! groupExpr.keyList.map(_.isInstanceOf[NamedField]).exists(b => b)
-      }
     }
   }
 

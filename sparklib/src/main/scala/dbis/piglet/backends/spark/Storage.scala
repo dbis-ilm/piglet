@@ -111,6 +111,7 @@ object PigStream extends java.io.Serializable {
 class RDFFileStorage[T: ClassTag] extends java.io.Serializable {
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
+  // TODO: use a real RDF library (Jena, raptor) to read RDF files
   def rdfize(line: String): Array[String] = {
     val fields = pattern.findAllIn(line).map(_.trim)
     fields.toArray.slice(0, 3)
@@ -130,7 +131,8 @@ object RDFFileStorage {
 
 class BinStorage[T: ClassTag] extends java.io.Serializable {
 
-  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[T] = sc.objectFile[T](path)
+  def load(sc: SparkContext, path: String, extract: (Any) => Any): RDD[T] = load(sc, path)
+  def load(sc: SparkContext, path: String): RDD[T] = sc.objectFile[T](path)
 
   def write(path: String, rdd: RDD[T]) = rdd.saveAsObjectFile(path)
 }

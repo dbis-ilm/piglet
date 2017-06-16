@@ -205,13 +205,7 @@ object Piglet extends PigletLogging {
 
 
 		// begin global analysis phase
-
-		// count occurrences of each operator in schedule
-    if(c.profiling.isDefined) {
-      DataflowProfiler.load(c.profiling.get)
-      logger.debug("starting stat server")
-      StatServer.start()
-    }
+    DataflowProfiler.load(Conf.programHome)
 
     logger.debug("start processing created dataflow plans")
 
@@ -222,41 +216,50 @@ object Piglet extends PigletLogging {
       dbis.piglet.codegen.scala_lang.JoinEmitter.joinKeyVars.clear()
 
       
-      // 3. now, we should apply optimizations
       var newPlan = plan
 
-      val mm = new MaterializationManager(Conf.materializationBaseDir)
-      // process explicit MATERIALIZE operators
-      if (c.profiling.isDefined) {
-        newPlan = processMaterializations(newPlan, mm)
-      }
+      val mm = new MaterializationManager(Conf.materializationBaseDir, c)
 
+      // 1. process EXPLICIT Materialize operators
+      // insert STORE or LOAD operators
+      newPlan = processMaterializations(newPlan, mm)
 
-      // rewrite WINDOW operators for Flink streaming
+      // 2. rewrite WINDOW operators for Flink streaming
       if (c.backend == "flinks")
         newPlan = processWindows(newPlan)
 
+      // 3. apply general optimization rules
       Rules.registerBackendRules(c.backend)
       newPlan = rewritePlan(newPlan)
 
+      // 4. check if we already have materialized results
+      // and insert LOAD operators
+      newPlan = mm.loadIntermediateResults(newPlan)
 
-      // find materialization points
-      //      profiler.foreach { p => p.addMaterializationPoints(newPlan) }
+
+      // 5. analyze plan if something can be materialized or
+      // if materialized results are present
+      val model = DataflowProfiler.analyze(newPlan)
+      // according to statistics, insert MATERIALIZE operators
+      newPlan = mm.insertMaterializationPoints(newPlan, model)
+      newPlan = processMaterializations(newPlan, mm)
+
+      // 6. after all optimizations have been performed, insert
+      // profiling operators (if desired)
       if(c.profiling.isDefined) {
-
-        val model = DataflowProfiler.analyze(newPlan)
-        mm.insertMaterializationPoints(newPlan, model)
-
         // after rewriting the plan, add the timing operations
         newPlan = insertTimings(newPlan)
       }
 
+      // for testing of scripts and Piglet features, consumers
+      // such as Dump and Store may be muted
       if(c.muteConsumer) {
         newPlan = mute(newPlan)
       }
 
       logger.debug("finished optimizations")
 
+      // for creating the Dot image
       PlanWriter.init(newPlan)
 
       if (c.showPlan) {
@@ -265,6 +268,7 @@ object Piglet extends PigletLogging {
         println("}")
       }
 
+      // 7. check if the plan is still valid
       try {
 
         newPlan.checkConsistency
@@ -284,12 +288,18 @@ object Piglet extends PigletLogging {
       val scriptName = path.getFileName.toString.replace(".pig", "")
       logger.debug(s"using script name: $scriptName")
 
-
+      // 8. compile the plan to code
       PigletCompiler.compilePlan(newPlan, scriptName, c) match {
         // the file was created --> execute it
-        case Some(jarFile) =>
+        case Some(jarFile) => {
           if (!c.compileOnly) {
-            // 4. and finally deploy/submit
+
+            if (c.profiling.isDefined) {
+              logger.debug("starting stat server")
+              StatServer.start()
+            }
+
+            // 9. and finally deploy/submit
             val runner = BackendManager.backend.runnerClass
             logger.debug(s"using runner class ${runner.getClass.toString}")
 
@@ -304,13 +314,12 @@ object Piglet extends PigletLogging {
             }
 
 
-
           } else
             logger.info("successfully compiled program - exiting.")
-            
-            
+
+
           // after execution we want to write the dot file  
-          if(c.profiling.isDefined && !c.compileOnly) {
+          if (c.profiling.isDefined && !c.compileOnly) {
 
             try {
               DataflowProfiler.collect()
@@ -327,7 +336,7 @@ object Piglet extends PigletLogging {
                 logger.error(s"error in profiler: $msg")
             }
 
-            newPlan.operators.foreach{ node =>
+            newPlan.operators.foreach { node =>
               val time = DataflowProfiler.getExectime(node.lineageSignature).map(t => t.avg().milliseconds)
 
               PlanWriter.nodes(node.lineageSignature).time = time
@@ -335,13 +344,13 @@ object Piglet extends PigletLogging {
 
             val scLineage = "sparkcontext"
             PlanWriter.nodes += scLineage -> Node(scLineage, DataflowProfiler.getExectime(scLineage).map(_.max.milliseconds), PlanWriter.quote("Spark Context"))
-            newPlan.sourceNodes.map(PlanWriter.signature).foreach { load => PlanWriter.edges += Edge(scLineage, load)}
+            newPlan.sourceNodes.map(PlanWriter.signature).foreach { load => PlanWriter.edges += Edge(scLineage, load) }
 
           }
 
-//          PlanWriter.writeDotFile(jarFile.getParent.resolve(s"$scriptName.dot"))
+          //          PlanWriter.writeDotFile(jarFile.getParent.resolve(s"$scriptName.dot"))
           PlanWriter.createImage(jarFile.getParent, scriptName)
-
+        }
         case None => logger.error(s"creating jar file failed for $path")
       }
     }

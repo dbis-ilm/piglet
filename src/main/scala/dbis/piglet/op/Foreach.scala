@@ -16,12 +16,11 @@
  */
 package dbis.piglet.op
 
-import dbis.piglet.plan.{InvalidPlanException, DataflowPlan}
+import dbis.piglet.expr.{ArithmeticExpr, Expr, Ref}
+import dbis.piglet.plan.{DataflowPlan, InvalidPlanException}
 import dbis.piglet.schema._
-import scala.collection.mutable.{ListBuffer, Map}
-import dbis.piglet.expr.ArithmeticExpr
-import dbis.piglet.expr.Ref
-import dbis.piglet.expr.Expr
+
+import scala.collection.mutable
 
 
 /**
@@ -34,8 +33,8 @@ trait ForeachGenerator {
 /**
  * GeneratorExpr represents a single expression of a Generator.
  *
- * @param expr
- * @param alias
+ * @param expr The GENERATE expression
+ * @param alias The used field
  */
 case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None) {
   override def toString = expr + (if (alias.isDefined) s" -> ${alias.get}" else "")
@@ -45,14 +44,14 @@ case class GeneratorExpr(expr: ArithmeticExpr, alias: Option[Field] = None) {
  * GeneratorList implements the ForeachGenerator trait and is used to represent
  * the FOREACH ... GENERATE operator.
  *
- * @param exprs
+ * @param exprs the GENERATE expression
  */
 case class GeneratorList(var exprs: List[GeneratorExpr]) extends ForeachGenerator {
   def constructFieldList(inputSchema: Option[Schema]): Array[Field] =
     exprs.map(e => {
       e.alias match {
         // if we have an explicit schema (i.e. a field) then we use it
-        case Some(f) => {
+        case Some(f) =>
           if (f.fType == Types.ByteArrayType) {
             // if the type was only bytearray, we should check the expression if we have a more
             // specific type
@@ -61,27 +60,25 @@ case class GeneratorList(var exprs: List[GeneratorExpr]) extends ForeachGenerato
           }
           else
             f
-        }
         // otherwise we take the field name from the expression and
         // the input schema
-        case None => {
+        case None =>
           val res = e.expr.resultType(inputSchema)
-          Field(e.expr.exprName, res)
-        }
+          Field(e.expr.exprName(), res)
       }
     }).toArray
 
-  def isNested() = false
+  def isNested = false
 }
 
 /**
  * GeneratorPlan implements the ForeachGenerator trait and is used to represent
  * a nested FOREACH.
  *
- * @param subPlan
+ * @param subPlan The list of operators in the nested GENERATE clause
  */
 case class GeneratorPlan(var subPlan: List[PigOperator]) extends ForeachGenerator {
-    def isNested() = true
+    def isNested = true
 }
 
 /**
@@ -101,9 +98,9 @@ case class Foreach(
 
   var subPlan: Option[DataflowPlan] = None
 
-  override def preparePlan: Unit = {
+  override def preparePlan(): Unit = {
     generator match {
-      case gen @ GeneratorPlan(opList) => {
+      case gen @ GeneratorPlan(opList) =>
         /*
          * Nested foreach require special handling: we construct a subplan for the operator list
          * and add our input pipe to the context of the plan.
@@ -111,9 +108,8 @@ case class Foreach(
         val plan = new DataflowPlan(opList, Some(List(inputs.head)))
         // println("--> " + plan.operators.mkString("\n"))
 
-        plan.operators.foreach(op =>
-          if (op.isInstanceOf[Generate]) {
-            val genOp = op.asInstanceOf[Generate]
+        plan.operators.foreach {
+          case op@(genOp: Generate) =>
 
             // we extract the input pipes of the GENERATE statements (which are hidden
             // inside the expressions
@@ -124,40 +120,39 @@ case class Foreach(
 
             genOp.parentOp = this
             genOp.setAdditionalPipesFromPlan(plan)
+          case op => op match {
+            case bag: ConstructBag =>
+              bag.parentOp = Some(this)
+            case _ =>
           }
-          else if (op.isInstanceOf[ConstructBag]) {
-            op.asInstanceOf[ConstructBag].parentOp = Some(this)
-          }
-        )
-        val lastOp = plan.operators.last
-        if (lastOp.isInstanceOf[Generate]) {
-          lastOp.asInstanceOf[Generate].parentOp = this
-          lastOp.constructSchema
         }
-        else
-          throw new InvalidPlanException("last statement in nested foreach must be a generate: " + lastOp)
+        val lastOp = plan.operators.last
+        lastOp match {
+          case generate: Generate =>
+            generate.parentOp = this
+            lastOp.constructSchema
+          case _ => throw InvalidPlanException("last statement in nested foreach must be a generate: " + lastOp)
+        }
 
         gen.subPlan = plan.operators
         subPlan = Some(plan)
-      }
-      case _ => {}
+      case _ =>
     }
   }
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = generator match {
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = generator match {
     case GeneratorList(exprs) => exprs.foreach(_.expr.resolveReferences(mapping))
-    case GeneratorPlan(plan) => {
+    case GeneratorPlan(plan) =>
       // TODO
-    }
   }
 
   override def checkConnectivity: Boolean = {
     def referencedInGenerate(op: Generate, pipe: Pipe): Boolean =
-      op.additionalPipes.filter(p => p.name == pipe.name).nonEmpty
+      op.additionalPipes.exists(p => p.name == pipe.name)
 
     generator match {
       case GeneratorList(expr) => true
-      case GeneratorPlan(plan) => {
+      case GeneratorPlan(plan) =>
         var result: Boolean = true
         val genOp = plan.last.asInstanceOf[Generate]
         plan.foreach { op => {
@@ -179,18 +174,19 @@ case class Foreach(
         }
         }
         result
-      }
     }
   }
 
 
   override def constructSchema: Option[Schema] = {
+
     generator match {
-      case gen@GeneratorList(expr) => {
+
+      case gen@GeneratorList(expr) =>
         val fields = gen.constructFieldList(inputSchema)
         schema = Some(Schema(BagType(TupleType(fields))))
-      }
-      case GeneratorPlan(_) => {
+
+      case GeneratorPlan(_) =>
         val plan = subPlan.get.operators
         // if we have ConstructBag operators in our subplan, we should add schema information
         plan.filter(p => p.isInstanceOf[ConstructBag]).foreach(p => p.asInstanceOf[ConstructBag].parentSchema = inputSchema)
@@ -206,8 +202,7 @@ case class Foreach(
           // schema.get.setBagName(outPipeName)
         }
         else
-          throw new InvalidPlanException("last statement in nested foreach must be a generate")
-      }
+          throw InvalidPlanException("last statement in nested foreach must be a generate")
     }
     schema
   }
@@ -215,26 +210,19 @@ case class Foreach(
   override def checkSchemaConformance: Boolean = {
     generator match {
       case GeneratorList(expr) => inputSchema match {
-        case Some(s) => {
-          // if we know the schema we check all named fields
-          expr.map(_.expr.traverseAnd(s, Expr.checkExpressionConformance)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
-        }
-        case None => {
-          // if we don't have a schema all expressions should contain only positional fields
-          expr.map(_.expr.traverseAnd(null, Expr.containsNoNamedFields)).foldLeft(true)((b1: Boolean, b2: Boolean) => b1 && b2)
-        }
+        case Some(s) =>expr.map(_.expr.traverseAnd(s, Expr.checkExpressionConformance)).forall(b2 => b2)
+        case None =>expr.map(_.expr.traverseAnd(null, Expr.containsNoNamedFields)).forall(b2 => b2)
       }
-      case GeneratorPlan(plan) => {
-        subPlan.get.checkSchemaConformance
+      case GeneratorPlan(plan) =>
+        subPlan.get.checkSchemaConformance()
         true
-      }
     }
   }
 
   /**
    * Looks for an operator in the subplan that produces a bag with the given name.
    *
-   * @param name
+   * @param name The name of the operator (output alias)
    * @return
    */
   def findOperatorInSubplan(name: String): Option[PigOperator] = subPlan match {
@@ -248,7 +236,7 @@ case class Foreach(
    */
   override def lineageString: String = {
     generator match {
-      case GeneratorList(expr) => s"""FOREACH%${expr}%""" + super.lineageString
+      case GeneratorList(expr) => s"""FOREACH%$expr%""" + super.lineageString
       case GeneratorPlan(plan) => s"""FOREACH""" + super.lineageString // TODO: implement lineageString for nested foreach
     }
   }
@@ -267,7 +255,7 @@ case class Foreach(
     }
   }
   
-  override def toString() = s"""FOREACH { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }
+  override def toString = s"""FOREACH { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }
                                 |  inSchema = $inputSchema
                                 |  outSchema = $schema)""".stripMargin
 

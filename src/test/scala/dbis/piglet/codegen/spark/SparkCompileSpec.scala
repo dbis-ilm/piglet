@@ -84,7 +84,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |      val conf = new SparkConf().setAppName("test_App")
         |      val sc = new SparkContext(conf)
         |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
-        |      val m = scala.collection.mutable.Map.empty[String,Option[Long]]
+        |      val m = scala.collection.mutable.Map.empty[String,Option[(Long,Long)]]
         |      PerfMonitor.sizes(sizesUrl,m)
         |      sc.stop()
         |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
@@ -123,7 +123,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |      val conf = new SparkConf().setAppName("test_App")
                                      |      val sc = new SparkContext(conf)
                                      |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
-                                     |      val m = scala.collection.mutable.Map.empty[String,Option[Long]]
+                                     |      val m = scala.collection.mutable.Map.empty[String,Option[(Long,Long)]]
                                      |      PerfMonitor.sizes(sizesUrl,m)
                                      |      sc.stop()
                                      |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
@@ -380,6 +380,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       cleanString("""
          |case class _t$1_Tuple (_0: String, _1: Iterable[_t$2_Tuple]) extends java.io.Serializable with SchemaClass {
          |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
+         |  override lazy val getNumBytes: Int = 0
          |}
          |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
        """.stripMargin)
@@ -991,7 +992,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(ctx, op))
     val expectedHelperClass = cleanString(
     """case class _t$2_HelperTuple (_t: _t$1_Tuple = null, _0: Long = 0, _1sum: Long = 0, _1cnt: Long = 0, _2: Int = 0)
-      |extends java.io.Serializable with SchemaClass { override def mkString(_c: String = ",") = "" }
+      |extends java.io.Serializable with SchemaClass { override def mkString(_c: String = ",") = "" override lazy val getNumBytes: Int = 0 }
       |""".stripMargin)
     generatedHelperClass should matchSnippet(expectedHelperClass)
     generatedCode should matchSnippet(expectedCode)
@@ -1139,10 +1140,12 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     """
       |case class _t$2_Tuple (_0: Int, _1: String, _2: Double, _3: Int) extends java.io.Serializable with SchemaClass {
       |  override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2 + _c + _3
+      |  override lazy val getNumBytes: Int = 0
       |}
       |implicit def convert_t2_Tuple(t: (Int, String, Double, Int)): _t2_Tuple = _t2_Tuple(t._1, t._2, t._3, t._4)
       |case class _t$1_Tuple (_0: Int, _1: String, _2: Double) extends java.io.Serializable with SchemaClass {
       |  override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2
+      |  override lazy val getNumBytes: Int = 0
       |}
       |implicit def convert_t1_Tuple(t: (Int, String, Double)): _t1_Tuple = _t1_Tuple(t._1, t._2, t._3)
       |""".stripMargin
@@ -1172,10 +1175,12 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
       """
         |case class _t$2_Tuple (_0: String, _1: Iterable[_t$1_Tuple]) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
+        |  override lazy val getNumBytes: Int = 0
         |}
         |implicit def convert_t$2_Tuple(t: (String, Iterable[_t$1_Tuple])): _t$2_Tuple = _t$2_Tuple(t._1, t._2)
         |case class _t$1_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + _1
+        |  override lazy val getNumBytes: Int = 0
         |}
         |implicit def convert_t$1_Tuple(t: (String, String)): _t$1_Tuple = _t$1_Tuple(t._1, t._2)
         |""".stripMargin

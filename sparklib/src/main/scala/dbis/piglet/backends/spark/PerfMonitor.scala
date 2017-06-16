@@ -2,9 +2,7 @@ package dbis.piglet.backends.spark
 
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
-import dbis.piglet.backends.spark.PerfMonitor.FIELD_DELIM
 import org.apache.spark.rdd.RDD
-import org.apache.spark.scheduler.{SparkListener, SparkListenerStageCompleted, SparkListenerTaskEnd}
 import org.apache.spark.util.AccumulatorV2
 import org.apache.spark.{NarrowDependency, ShuffleDependency}
 
@@ -38,8 +36,8 @@ object PerfMonitor {
   final val PARENT_DELIM = ","
   final val DEP_DELIM = "#"
 
-  def sizes(url: String, m: scala.collection.Map[String, Option[Long]]) = {
-    val dataString = m.filter(_._2.isDefined).map{case(k,v) => s"$k:${v.get}"}.mkString(FIELD_DELIM)
+  def sizes(url: String, m: scala.collection.Map[String, Option[(Long,Long)]]) = {
+    val dataString = m.filter(_._2.isDefined).map{case(k,v) => s"$k:${v.get._2}"}.mkString(FIELD_DELIM)
 //    scalaj.http.Http(url).method("HEAD").param("data",dataSring).asString
     request(url, dataString)
   }
@@ -84,30 +82,28 @@ object PerfMonitor {
   }
 }
 
-class SizeAccumulator(private var theValue: Option[Long] = None) extends AccumulatorV2[Option[Long],Option[Long]] {
+class SizeAccumulator(private var theValue: Option[(Long,Long)] = None) extends AccumulatorV2[Option[(Long,Long)],Option[(Long,Long)]] {
 
   override def isZero: Boolean = theValue.isEmpty
 
-  override def copy(): AccumulatorV2[Option[Long], Option[Long]] = if(theValue.isEmpty)
+  override def copy(): AccumulatorV2[Option[(Long,Long)], Option[(Long,Long)]] = if(theValue.isEmpty)
     new SizeAccumulator()
   else new SizeAccumulator(Some(theValue.get))
 
 
   override def reset(): Unit = theValue = None
+  
+  def incr(bytes: Long, n: Long = 1L): Unit = add(Some((n, bytes)))
 
-  def incr(n: Long = 1L): Unit = add(Some(n))
-
-  def add(n: Long = 1L): Unit = add(Some(n))
-
-  override def add(v: Option[Long]): Unit = if(theValue.isEmpty)
+  override def add(v: Option[(Long, Long)]): Unit = if(theValue.isEmpty)
     theValue = v
   else if(v.isDefined)
-    theValue = Some(theValue.get + v.get)
+    theValue = Some((theValue.get._1 + v.get._1, theValue.get._2 + v.get._2))
 
 
-  override def merge(other: AccumulatorV2[Option[Long], Option[Long]]): Unit = {
+  override def merge(other: AccumulatorV2[Option[(Long,Long)], Option[(Long,Long)]]): Unit = {
     add(other.value)
   }
 
-  override def value: Option[Long] = theValue
+  override def value: Option[(Long,Long)] = theValue
 }

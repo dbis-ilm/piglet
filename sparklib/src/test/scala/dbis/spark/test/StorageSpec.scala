@@ -26,15 +26,19 @@ import org.scalatest._
 import org.apache.commons.io.FileUtils
 
 case class Person(name: String, age: Int) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = s"${name}${delim}${age}"
+  override def mkString(delim: String) = s"$name$delim$age"
+
+  override lazy val getNumBytes: Int = name.getBytes.length + 4
 }
 
 case class DataRecord(col1: Int, col2: String) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = s"${col1}${delim}${col2}"
+  override def mkString(delim: String) = s"$col1$delim$col2"
+  override lazy val getNumBytes: Int = col2.getBytes.length + 4
 }
 
 case class DoubleRecord(col1: Double, col2: Double) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = s"${col1}${delim}${col2}"
+  override def mkString(delim: String) = s"$col1$delim$col2"
+  override lazy val getNumBytes: Int = 8 + 4
 }
 
 class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
@@ -100,8 +104,9 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
       (data: Array[String]) => Person(data(0), data(1).toInt), ",")
     BinStorage[Person]().write("person.ser", data)
 
-    val otherData = BinStorage[Person]().load(sc, "person.ser",
-      (data: Array[String]) => Person(data(0), data(1).toInt))
+    val otherData = BinStorage[Person]().load(sc, "person.ser"
+//      ,(data: Array[String]) => Person(data(0), data(1).toInt)
+    )
     otherData.collect().length should be (3)
     data.collect() should be (otherData.collect())
     FileUtils.deleteDirectory(new File("person.ser"))
@@ -112,8 +117,9 @@ class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
       (data: Array[String]) => DoubleRecord(data(0).toDouble, data(1).toDouble), ",")
     BinStorage[DoubleRecord]().write("values.ser", data)
 
-    val otherData = BinStorage[DoubleRecord]().load(sc, "values.ser",
-      (data: Array[String]) => DoubleRecord(data(0).toDouble, data(1).toDouble))
+    val otherData = BinStorage[DoubleRecord]().load(sc, "values.ser"
+//      ,(data: Array[String]) => DoubleRecord(data(0).toDouble, data(1).toDouble)
+    )
     otherData.collect().length should be (3)
     data.collect() should be (otherData.collect())
     FileUtils.deleteDirectory(new File("values.ser"))

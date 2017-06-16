@@ -19,10 +19,10 @@ package dbis.piglet.plan.rewriting.internals
 import java.net.URI
 
 import dbis.piglet.mm.MaterializationManager
-import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.op.{Load, Materialize, Store}
+import dbis.piglet.op.Materialize
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.BreadthFirstBottomUpWalker
+import dbis.piglet.tools.logging.PigletLogging
 import dbis.setm.SETM.timing
 
 import scala.collection.mutable.ListBuffer
@@ -37,11 +37,9 @@ trait MaterializationSupport extends PigletLogging {
 
     val materializes = ListBuffer.empty[Materialize]
 
-    BreadthFirstBottomUpWalker.walk(plan) { op =>
-      op match {
-        case o: Materialize => materializes += o
-        case _ =>
-      }
+    BreadthFirstBottomUpWalker.walk(plan) {
+      case o: Materialize => materializes += o
+      case _ =>
     }
 
     logger.debug(s"found ${materializes.size} materialize operators")
@@ -52,7 +50,7 @@ trait MaterializationSupport extends PigletLogging {
      * the ops will all still be in the plan, but they might be disconnected
      * if a load was inserted before
      */
-    for (materialize <- materializes if plan.containsOperator(materialize)) {
+    for (materialize <- materializes if newPlan.containsOperator(materialize)) {
 
       val data = mm.getDataFor(materialize.lineageSignature)
 
@@ -65,21 +63,9 @@ trait MaterializationSupport extends PigletLogging {
       if(data.isDefined) {
         logger.debug(s"found materialized data for materialize operator $materialize")
 
-        val loader = Load(materialize.inputs.head, new URI(data.get), materialize.constructSchema, Some("BinStorage"))
-        val matInput = materialize.inputs.head.producer
+        val path: URI = data.get
 
-        for (inPipe <- matInput.inputs) {
-          plan.disconnect(inPipe.producer, matInput)
-        }
-
-        newPlan = plan.replace(matInput, loader)
-
-        logger.info(s"replaced materialize op with loader $loader")
-
-        /* TODO: do we need to remove all other nodes that get disconnected now by hand
-         * or do they get removed during code generation (because there is no sink?)
-         */
-        newPlan = newPlan.remove(materialize)
+        newPlan = MaterializationManager.replaceWithLoad(materialize, path, newPlan)
 
       } else {
         /* there is a MATERIALIZE operator, for which no results could be found
@@ -89,16 +75,13 @@ trait MaterializationSupport extends PigletLogging {
         logger.debug(s"did not find materialized data for materialize operator $materialize")
 
         val file = mm.saveMapping(materialize.lineageSignature)
-        val storer = new Store(materialize.inputs.head, file, Some("BinStorage"))
 
-        newPlan = plan.insertAfter(materialize.inputs.head.producer, storer)
-        newPlan = newPlan.remove(materialize)
-
-        logger.info(s"inserted new store operator $storer")
+        newPlan = MaterializationManager.replaceWithStore(materialize, file, newPlan)
       }
     }
 
     newPlan
   }
+
 
 }

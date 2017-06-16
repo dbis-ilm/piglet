@@ -4,11 +4,11 @@ import dbis.piglet.codegen._
 import dbis.piglet.expr._
 import dbis.piglet.op.{CompEvent, GroupingExpression, PigOperator, SimplePattern}
 import dbis.piglet.schema._
+import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.udf.UDFTable
-import org.clapper.scalasti.ST
 
 
-object ScalaEmitter {
+object ScalaEmitter extends PigletLogging {
   // TODO: complex types
   val scalaTypeMappingTable = Map[PigType, String](
     Types.BooleanType -> "Boolean",
@@ -20,6 +20,7 @@ object ScalaEmitter {
     Types.ByteArrayType -> "String", //TODO: check this - maybe this should be Any
     Types.AnyType -> "String") //TODO: check this
 
+
   /**
     * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
     * bytearray which is mapped to String.
@@ -30,13 +31,12 @@ object ScalaEmitter {
     */
   def scalaTypeOfField(field: Ref, schema: Option[Schema]) : String = {
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         field match {
           case PositionalField(f) => scalaTypeMappingTable(s.field(f).fType)
           case nf @ NamedField(_, _) => scalaTypeMappingTable(s.field(nf).fType)
           case _ => "String"
         }
-      }
       case None => "String"
     }
   }
@@ -61,13 +61,12 @@ object ScalaEmitter {
       if (ctx.asBoolean("namedRef")) {
         // check if f exists in the schema
         ctx.schema match {
-          case Some(s) => {
+          case Some(s) =>
             val p = s.indexOfField(nf)
             if (p != -1)
               s"${ctx.asString("tuplePrefix")}._$p"
             else
-              f // TODO: check whether thus is a valid field (or did we check it already in checkSchemaConformance??)
-          }
+              f // TODO: check whether this is a valid field (or did we check it already in checkSchemaConformance??)
           case None =>
             // if we don't have a schema this is not allowed
             throw new CodeGenException(s"invalid field name $f (named ref not found)")
@@ -87,7 +86,7 @@ object ScalaEmitter {
         s"${ctx.asString("tuplePrefix")}.get($pos)"
     }
     case Value(v) => v.toString
-    case DerefMap(m, k) => s"${emitRef(ctx, m)}(${k})"
+    case DerefMap(m, k) => s"${emitRef(ctx, m)}($k)"
     case DerefTuple(r1, r2) =>
       if (ctx.asBoolean("aggregate"))
         s"${emitRef(CodeGenContext(ctx, Map("tuplePrefix" -> "t")), r1)}.map(e => e${emitRef(CodeGenContext(ctx, Map("schema" -> tupleSchema(ctx.schema, r1), "tuplePrefix" -> "")), r2)})"
@@ -106,7 +105,7 @@ object ScalaEmitter {
             if (p == -1)
               throw new CodeGenException(s"invalid field name $r2 in event ${r1.toString}")
 
-            s"rvalues.events(${res(0)._2})._$p)" //TODO: work more on other related values
+            s"rvalues.events(${res.head._2})._$p)" //TODO: work more on other related values
           }
 
 
@@ -115,7 +114,7 @@ object ScalaEmitter {
        s"${emitRef(CodeGenContext(ctx, Map("tuplePrefix" -> "t")), r1)}${emitRef(CodeGenContext(ctx, Map("schema" -> tupleSchema(ctx.schema, r1), "tuplePrefix" -> "")), r2)}"
 
     // }
-    case _ => { "" }
+    case _ => ""
   }
 
 
@@ -127,12 +126,12 @@ object ScalaEmitter {
     * @return a string representation of the generated Scala code
     */
   def emitPredicate(ctx: CodeGenContext, predicate: Predicate): String =  predicate match {
-    case Eq(left, right) => { s"${emitExpr(ctx, left)} == ${emitExpr(ctx, right)}"}
-    case Neq(left, right) => { s"${emitExpr(ctx, left)} != ${emitExpr(ctx, right)}"}
-    case Leq(left, right) => { s"${emitExpr(ctx, left)} <= ${emitExpr(ctx, right)}"}
-    case Lt(left, right) => { s"${emitExpr(ctx, left)} < ${emitExpr(ctx, right)}"}
-    case Geq(left, right) => { s"${emitExpr(ctx, left)} >= ${emitExpr(ctx, right)}"}
-    case Gt(left, right) => { s"${emitExpr(ctx, left)} > ${emitExpr(ctx, right)}"}
+    case Eq(left, right) => s"${emitExpr(ctx, left)} == ${emitExpr(ctx, right)}"
+    case Neq(left, right) => s"${emitExpr(ctx, left)} != ${emitExpr(ctx, right)}"
+    case Leq(left, right) => s"${emitExpr(ctx, left)} <= ${emitExpr(ctx, right)}"
+    case Lt(left, right) => s"${emitExpr(ctx, left)} < ${emitExpr(ctx, right)}"
+    case Geq(left, right) => s"${emitExpr(ctx, left)} >= ${emitExpr(ctx, right)}"
+    case Gt(left, right) => s"${emitExpr(ctx, left)} > ${emitExpr(ctx, right)}"
     case And(left, right) => s"${emitPredicate(ctx, left)} && ${emitPredicate(ctx, right)}"
     case Or(left, right) => s"${emitPredicate(ctx, left)} || ${emitPredicate(ctx, right)}"
     case Not(pred) => s"!(${emitPredicate(ctx, pred)})"
@@ -149,11 +148,10 @@ object ScalaEmitter {
     */
   def emitExpr(ctx: CodeGenContext,
                expr: ArithmeticExpr): String = expr match {
-    case CastExpr(t, e) => {
+    case CastExpr(t, e) =>
       // TODO: check for invalid type
       val targetType = scalaTypeMappingTable(t)
       s"${emitExpr(ctx, e)}.to$targetType"
-    }
     case PExpr(e) => s"(${emitExpr(ctx, e)})"
     case MSign(e) => s"-${emitExpr(ctx, e)}"
     case Add(e1, e2) => s"${emitExpr(ctx, e1)} + ${emitExpr(ctx, e2)}"
@@ -163,17 +161,15 @@ object ScalaEmitter {
     case RefExpr(e) => s"${emitRef(CodeGenContext(ctx, Map[String, Any]("tuplePrefix" -> "t")), e)}"
     case Func(f, params) => emitFuncCall(ctx, f, params)
     case FlattenExpr(e) => flattenExpr(ctx, e)
-    case ConstructTupleExpr(exprs) => {
+    case ConstructTupleExpr(exprs) =>
       val exType = expr.resultType(ctx.schema).asInstanceOf[TupleType]
-      val s = Schema(new BagType(exType))
+      val s = Schema(BagType(exType))
       s"${schemaClassName(s.className)}(${exprs.map(e => emitExpr(ctx, e)).mkString(",")})"
-    }
-    case ConstructBagExpr(exprs) => {
+    case ConstructBagExpr(exprs) =>
       val exType = expr.resultType(ctx.schema).asInstanceOf[BagType]
       val s = Schema(exType)
       s"List(${exprs.map(e => s"${schemaClassName(s.className)}(${emitExpr(ctx, e)})").mkString(",")})"
-    }
-    case ConstructMapExpr(exprs) => {
+    case ConstructMapExpr(exprs) =>
       val exType = expr.resultType(ctx.schema).asInstanceOf[MapType]
       val valType = exType.valueType
       val exprList = exprs.map(e => emitExpr(ctx, e))
@@ -181,24 +177,19 @@ object ScalaEmitter {
       val mapStr = exprList.zip(exprList.tail).zipWithIndex.filter{
         case (p, i) => i % 2 == 0
       }.map{case (p, i) => s"${p._1} -> ${p._2}"}.mkString(",")
-      s"Map[String,${scalaTypeMappingTable(valType)}](${mapStr})"
-    }
-    case ConstructMatrixExpr(ty, rows, cols, expr) => {
+      s"Map[String,${scalaTypeMappingTable(valType)}]($mapStr)"
+    case ConstructMatrixExpr(ty, rows, cols, mexpr) =>
       val mType = if (ty.charAt(1) == 'i') "Int" else "Double"
-      s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(ctx, expr)}.map(v => v._0).toArray)"
-    }
+      s"new DenseMatrix[$mType]($rows, $cols, ${emitExpr(ctx, mexpr)}.map(v => v._0).toArray)"
 
-    case ConstructGeometryExpr(expr,time) => {
-      val timeStr = time.map { t =>
-        t match {
-          case Instant(value) => s"Instant(${emitExpr(ctx, value)})"
-          case Interval(s, Some(e)) => s"Interval(${emitExpr(ctx, s)}, ${emitExpr(ctx, e)})"
-          case Interval(s, None) => s"Interval(${emitExpr(ctx, s)}, None)"
-          case _ => throw new CodeGenException(s"Unsupported temporal expression type $t")
-        }
+    case ConstructGeometryExpr(gexpr,time) =>
+      val timeStr = time.map {
+        case Instant(value) => s"Instant(${emitExpr(ctx, value)})"
+        case Interval(s, Some(e)) => s"Interval(${emitExpr(ctx, s)}, ${emitExpr(ctx, e)})"
+        case Interval(s, None) => s"Interval(${emitExpr(ctx, s)}, None)"
+        case t => throw new CodeGenException(s"Unsupported temporal expression type $t")
       }
-      s"STObject(new WKTReader().read(${emitExpr(ctx, expr)}) ${ if(timeStr.isDefined) s", $timeStr.get" else ""  } )"
-    }
+      s"STObject(new WKTReader().read(${emitExpr(ctx, gexpr)}) ${ if(timeStr.isDefined) s", $timeStr.get" else ""  } )"
 
     case _ => throw new CodeGenException(s"unsupported expression: $expr")
   }
@@ -214,7 +205,7 @@ object ScalaEmitter {
   def emitFuncCall(ctx: CodeGenContext, f: String, params: List[ArithmeticExpr]): String = {
     val pTypes = params.map(p => p.resultType(ctx.schema))
     UDFTable.findUDF(f, pTypes) match {
-      case Some(udf) => {
+      case Some(udf) =>
         // println(s"udf: $f found: " + udf)
         if (udf.isAggregate) {
           s"${udf.scalaName}(${emitExpr(CodeGenContext(ctx, Map[String, Any]("aggregate" -> true)), params.head)})"
@@ -237,10 +228,9 @@ object ScalaEmitter {
             emitExpr(ctx, e) + typeCast
           }
 
-          s"${udf.scalaName}(${paramExprList.mkString(",")})${mapStr}"
+          s"${udf.scalaName}(${paramExprList.mkString(",")})$mapStr"
         }
-      }
-      case None => {
+      case None =>
         // println(s"udf: $f not found")
         // check if we have have an alias in DataflowPlan
         if (ctx.udfAliases.nonEmpty && ctx.udfAliases.get.contains(f)) {
@@ -252,7 +242,6 @@ object ScalaEmitter {
           // we don't know the function yet, let's assume there is a corresponding Scala function
           s"$f(${params.map(e => emitExpr(ctx, e)).mkString(",")})"
         }
-      }
     }
   }
   
@@ -264,10 +253,21 @@ object ScalaEmitter {
     * @return a parameter map with class and extractor elements
     */
   def emitExtractorFunc(node: PigOperator, loaderFunc: Option[String]): Map[String, Any] = {
+
     def schemaExtractor(schema: Schema): String =
       schema.fields.zipWithIndex.map{case (f, i) =>
         // we cannot perform a "toAny" - therefore, we treat bytearray as String here
-        val t = ScalaEmitter.scalaTypeMappingTable(f.fType); s"data($i).to${if (t == "Any") "String" else t}"
+        logger.debug(s"$f (idx: $i)")
+
+        f.fType match {
+          case s: SimpleType =>
+            val t = ScalaEmitter.scalaTypeMappingTable(f.fType)
+            s"data($i).to${if (t == "Any") "String" else t}"
+//          case c: BagType =>
+//            s"data($i).toIterable[(String,String,String)]" // TODO determine correct type here!
+
+        }
+
       }.mkString(", ")
 
     def jdbcSchemaExtractor(schema: Schema): String =
@@ -275,19 +275,24 @@ object ScalaEmitter {
 
     var paramMap = Map[String, Any]()
     node.schema match {
-      case Some(s) => if (loaderFunc.nonEmpty && loaderFunc.get == "JdbcStorage")
+      case Some(s) if loaderFunc.nonEmpty && loaderFunc.get == "JdbcStorage" =>
       // JdbcStorage provides already types results, therefore we need an extractor which calls
       // only the appropriate get functions on sql.Row
         paramMap += ("extractor" ->
           s"""(data: org.apache.spark.sql.Row) => ${ScalaEmitter.schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
           "class" -> ScalaEmitter.schemaClassName(s.className))
-      else
+      case Some(s) if loaderFunc.nonEmpty && loaderFunc.get == "BinStorage" =>
+
+        val className = ScalaEmitter.schemaClassName(s.className)
+        paramMap += (
+          "class" -> className
+        )
+      case Some(s) =>
         paramMap += ("extractor" ->
           s"""(data: Array[String]) => ${ScalaEmitter.schemaClassName(s.className)}(${schemaExtractor(s)})""",
           "class" -> ScalaEmitter.schemaClassName(s.className))
-      case None => {
+      case None =>
         paramMap += ("extractor" -> "(data: Array[String]) => Record(data)", "class" -> "Record")
-      }
     }
     paramMap
   }
@@ -332,12 +337,12 @@ object ScalaEmitter {
       // we flatten a tuple
       val tupleType = field.fType.asInstanceOf[TupleType]
       // finally, produce a list of t.<refName>.<fieldPos>
-      tupleType.fields.zipWithIndex.map { case (f, i) => s"t.${refName}._$i" }.mkString(", ")
+      tupleType.fields.zipWithIndex.map { case (f, i) => s"t.$refName._$i" }.mkString(", ")
     }
     else if (field.fType.tc == TypeCode.BagType) {
       // we flatten a bag
       val bagType = field.fType.asInstanceOf[BagType]
-      s"t.${refName}"
+      s"t.$refName"
     }
     else
     // other types than tuple and bag cannot be flattened
@@ -354,7 +359,7 @@ object ScalaEmitter {
     val tp = ref match {
       case nf @ NamedField(f, _) => schema match {
         case Some(s) => if (f == s.element.name) s.element.valueType else s.field(nf).fType
-        case None => throw new SchemaException(s"unknown schema for field $f")
+        case None => throw SchemaException(s"unknown schema for field $f")
       }
       case PositionalField(p) => schema match {
         case Some(s) => s.field(p).fType
@@ -365,7 +370,10 @@ object ScalaEmitter {
     if (tp == None)
       None
     else
-      Some(new Schema( if (tp.isInstanceOf[BagType]) tp.asInstanceOf[BagType] else BagType(tp.asInstanceOf[TupleType])))
+      Some(new Schema( tp match {
+        case bagType: BagType => bagType
+        case _ => BagType(tp.asInstanceOf[TupleType])
+      }))
   }
 
   /**
@@ -374,23 +382,27 @@ object ScalaEmitter {
     * @param values
     * @return
     */
-  def emitSchemaClass(values: (String, String, String, String, String)): (String, String) = {
-    val (name, fieldNames, fieldTypes, fieldStr, toStr) = values
+  def emitSchemaClass(values: (String, String, String, String, String, String), profiling: Boolean): (String, String) = {
+    val (name, fieldNames, fieldTypes, fieldStr, toStr, byteLength) = values
 
-    val code = CodeEmitter.render("""  case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
-                                    |    override def mkString(_c: String = ",") = <string_rep>
-                                    |  }
-                                    |""".stripMargin, Map("name" -> name,
+    val params = Map("name" -> name,
       "fieldNames" -> fieldNames,
       "fieldTypes" -> fieldTypes,
       "fields"   -> fieldStr,
-      "string_rep" -> toStr))
+      "string_rep" -> toStr,
+      "byteslength" -> byteLength)
+
+    val code = CodeEmitter.render(""" case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+                                    |    override def mkString(_c: String = ",") = <string_rep>
+                                    |    override lazy val getNumBytes: Int = <if (profiling)>{ <byteslength> } <else> 0 <endif>
+                                    |  }
+                                    |""".stripMargin, params)
 
     (name, code)
   }
 
-  def emitSchemaConverters(values: (String, String, String, String, String)): String = {
-    val (name, fieldNames, fieldTypes, _, _) = values
+  def emitSchemaConverters(values: (String, String, String, String, String, String)): String = {
+    val (name, fieldNames, fieldTypes, _, _,_) = values
 
     CodeEmitter.render("""<if (fieldNames)>
                          |  implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
@@ -400,25 +412,83 @@ object ScalaEmitter {
     ))
   }
 
+
+  private def generateNumByteCode(i: Int, t: PigType, name: String): String = {
+
+    val b = t match {
+      case s: SimpleType =>
+        if(s.numBytes > 0) // for primitive types, we can directly decide the number of bytes
+          s.numBytes.toString
+        else { // otherwise we need to do some further processing
+          t.tc match {
+              // the code generator will use Scala String type for the following three
+            case TypeCode.CharArrayType | TypeCode.ByteArrayType | TypeCode.AnyType =>
+              s"$name.getBytes.length"
+            case _ =>
+              // anything else is not supported yet - but we should not get here
+              logger.warn(s"unsupported field type: $t for num byte generation")
+              0.toString
+          }
+        }
+
+//      case bag: BagType =>
+//        s"$name.size * ()"
+
+      case _ =>
+        s"""{
+          |var bos: java.io.ByteArrayOutputStream = null
+          |var out: java.io.ObjectOutputStream = null
+          |try {
+          |  bos = new java.io.ByteArrayOutputStream()
+          |  out = new java.io.ObjectOutputStream(bos)
+          |  out.writeObject($name)
+          |  out.flush()
+          |  bos.toByteArray.length
+          |} catch {
+          |case e: Throwable =>
+          | System.err.println(e.getMessage)
+          | 0
+          |}finally {
+          |  if(bos != null)
+          |   bos.close()
+          |
+          |  if(out != null)
+          |   out.close()
+          |}
+          |}
+          |
+        """.stripMargin
+    }
+
+    b
+  }
+
   def createSchemaInfo(schema: Schema) = {
+
     def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
-      case Some(n) => n
+      case Some(tname) => tname
       case None => f match {
         // if we have a bag without a name then we assume that we have got
         // a case class with _<field_name>_Tuple
         case BagType(v) => s"Iterable[_${v.className}_Tuple]"
-        case TupleType(f, c) => schemaClassName(c)
+        case TupleType(_, c) => schemaClassName(c)
         case MapType(v) => s"Map[String,${scalaTypeMappingTable(v)}]"
-        case MatrixType(v, rows, cols, rep) => s"DenseMatrix[${if (v.tc == TypeCode.IntType) "Int" else "Double"}]"
+        case MatrixType(v, _, _, _) => s"DenseMatrix[${if (v.tc == TypeCode.IntType) "Int" else "Double"}]"
         case _ => f.descriptionString
       }
     }
+
     val fieldList = schema.fields.toList
+
     // build the list of field names (_0, ..., _n)
+
     val fieldNames = if (fieldList.size==1) "t" else fieldList.indices.map(t => "t._"+(t+1)).mkString(", ")
+
     val fieldTypes = fieldList.map(f => s"${typeName(f.fType, f.name)}").mkString(", ")
+
     val fields = fieldList.zipWithIndex.map{ case (f, i) =>
       (s"_$i", s"${typeName(f.fType, f.name)}")}
+
     val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
 
     // construct the mkString method
@@ -433,9 +503,12 @@ object ScalaEmitter {
       }
     }.mkString(" + _c + ")
 
+
+    val bytesLength = fieldList.zipWithIndex.map{ case (f,i) => generateNumByteCode(i, f.fType, s"_$i")}.mkString(" + ")
+
     val name = schemaClassName(schema.className)
 
-    (name, fieldNames, fieldTypes, fieldStr, toStr)
+    (name, fieldNames, fieldTypes, fieldStr, toStr, bytesLength)
   }
 
   /**

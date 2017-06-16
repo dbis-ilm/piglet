@@ -17,19 +17,19 @@
 
 package dbis.piglet.op
 
+import dbis.piglet.expr.{NamedField, Ref}
+import dbis.piglet.op.cmd.DefineMacroCmd
 import dbis.piglet.plan.InvalidPlanException
 import dbis.piglet.schema.Schema
+
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.Map
-import dbis.piglet.expr.Ref
-import dbis.piglet.op.cmd.DefineMacroCmd
-import dbis.piglet.expr.NamedField
 
 /**
  *
  * @param out the output pipe (relation).
- * @param macroName
- * @param params
+ * @param macroName The name of the macro
+ * @param params The parameters
  */
 case class MacroOp(
     private val out: Pipe, 
@@ -37,7 +37,7 @@ case class MacroOp(
     params: Option[List[Ref]] = None
   ) extends PigOperator(out) {
 
-  val paramMapping = Map[String, Ref]()
+  val paramMapping = mutable.Map[String, Ref]()
 
   private var macroDef: Option[DefineMacroCmd] = None
 
@@ -57,18 +57,19 @@ case class MacroOp(
      * Adjust the input pipes: which of the params is a pipe?
      */
     params match {
-      case Some(p) => {
+      case Some(p) =>
         val pipeParams = cmd.pipeParamPositions()
         val inPipes = ListBuffer[Pipe]()
         pipeParams.foreach(i => {
           val ref = p(i)
-          if (ref.isInstanceOf[NamedField]) {
-            inPipes += Pipe(ref.asInstanceOf[NamedField].name)
+          ref match {
+            case field: NamedField =>
+              inPipes += Pipe(field.name)
+            case _ =>
           }
         })
         _inputs = inPipes.toList
-      }
-      case None => {}
+      case None =>
     }
     /*
      * TODO: Create unique pipe names.
@@ -83,14 +84,14 @@ case class MacroOp(
    */
   def buildParameterMapping(cmd: DefineMacroCmd): Unit = {
       if (cmd.params.isEmpty && params.isDefined || cmd.params.isDefined && params.isEmpty)
-        throw new InvalidPlanException(s"macro ${macroName}: parameter list doesn't match with definition")
+        throw InvalidPlanException(s"macro $macroName: parameter list doesn't match with definition")
     if (cmd.params.isDefined) {
       val defs = cmd.params.get
       val p = params.get
       if (defs.size != p.size)
-        throw new InvalidPlanException(s"macro ${macroName}: number of parameters doesn't match with definition")
+        throw InvalidPlanException(s"macro $macroName: number of parameters doesn't match with definition")
 
-      for (i <- 0 to defs.size-1) {
+      for (i <- defs.indices) {
         paramMapping += ("$" + defs(i) -> p(i))
       }
     }
@@ -98,7 +99,7 @@ case class MacroOp(
     paramMapping += ("$" + cmd.out.name -> NamedField(outPipeName))
   }
 
-  override def lineageString: String = s"""MACRO%${macroName}%""" + super.lineageString
+  override def lineageString: String = s"""MACRO%$macroName%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
     // TODO

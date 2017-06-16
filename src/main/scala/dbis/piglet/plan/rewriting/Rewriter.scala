@@ -152,7 +152,7 @@ object Rewriter extends PigletLogging
   private def processPigOperator(op: PigOperator, strategy: Strategy): Any = {
     // TODO: We apply foreachRecursively separately because it always succeeds,
     // so we'd otherwise run into an infinite loop
-    logger.debug(s"apply rewriting to $op")
+//    logger.debug(s"apply rewriting to $op")
     val newop = kiamarewrite(strategy)(op)
     newop
   }

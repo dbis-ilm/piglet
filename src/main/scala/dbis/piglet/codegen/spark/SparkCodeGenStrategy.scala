@@ -84,8 +84,6 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
   override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None, operators: Seq[Lineage] = Seq.empty): String = {
     var map = Map[String,Any]("name" -> scriptName)
 
-    logger.debug(operators.mkString("\n"))
-
     profiling.foreach { p =>
       val t = p.resolve(Conf.EXECTIMES_FRAGMENT).toString
       val s = p.resolve(Conf.SIZES_FRAGMENT).toString
@@ -126,7 +124,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
 
         s"""
          |<if (profiling)>
-         |  val m = scala.collection.mutable.Map.empty[String,Option[Long]]
+         |  val m = scala.collection.mutable.Map.empty[String,Option[(Long,Long)]]
          |  <lineages:{ l | m("<l>") = accum_<l>.value
          |  }>
          |  PerfMonitor.sizes(sizesUrl,m)

@@ -1,18 +1,11 @@
 package dbis.piglet.tools
 
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
 import java.io.File
 import java.net.URI
-import java.nio.file.Paths
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
-import java.nio.file.Path
-import scala.collection.JavaConverters._
+import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 
+import com.typesafe.config.{Config, ConfigFactory}
 import dbis.piglet.tools.logging.PigletLogging
-import java.nio.file.attribute.FileAttribute
-import java.net.URL
 
 /**
  * This is the global configuration object that contains all user-defined values
@@ -53,7 +46,7 @@ object Conf extends PigletLogging {
 
       // if the config file exists in the program home, use this one
       logger.info(s"using $userConf as config file")
-      ConfigFactory.parseFile(userConf.toFile())
+      ConfigFactory.parseFile(userConf.toFile)
 
     } else {
       // Otherwise, use the packaged one
@@ -67,7 +60,7 @@ object Conf extends PigletLogging {
     val dest = programHome.resolve(configFile)
 
     if(Files.exists(dest)) {
-      val bak = new File(s"${dest.toAbsolutePath().toString()}.bak").toPath()
+      val bak = new File(s"${dest.toAbsolutePath.toString}.bak").toPath
       logger.debug(s"create bakup file as $bak")
 
       Files.copy(dest, bak, StandardCopyOption.REPLACE_EXISTING)
@@ -83,7 +76,7 @@ object Conf extends PigletLogging {
   def replHistoryFile = programHome.resolve(appconf.getString("repl.history"))
 
   def materializationBaseDir = new URI(appconf.getString("materialization.basedir"))
-  def materializationMapFile = Paths.get(appconf.getString("materialization.mapfile")).toAbsolutePath()
+  lazy val materializationMapFile = programHome.resolve(Paths.get(appconf.getString("materialization.mapfile"))).toAbsolutePath
 
 
   def defaultBackend = appconf.getString("backends.default")
@@ -105,10 +98,15 @@ object Conf extends PigletLogging {
   def spatialJar = Paths.get(appconf.getString("features.spatial.jar"))
   
   def statServerPort = appconf.getInt("statserver.port")
-  def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url")).toURL()) else None
+  def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url")).toURL) else None
   
-  def opCountFile = "opcount"
-  def execTimesFile = "exectimes"
+  def profilingFile = "profilerstats"
+  def mmDefaultCostStrategy = appconf.getString("profiler.defaults.cost_strategy")
+  def mmDefaultProbStrategy = appconf.getString("profiler.defaults.prob_strategy")
+  def mmDefaultProbThreshold = appconf.getDouble("profiler.defaults.prob_threshold")
+  def mmDefaultMinBenefit = appconf.getDouble("profiler.defaults.benefit")
+
+//  def execTimesFile = "exectimes"
   
 //  def langfeatureImports(feature: String) = appconf.getStringList(s"langfeature.$feature.imports").asScala
 //  def langfeatureAdditionalJars(feature: String) = appconf.getStringList(s"langfeature.$feature.jars")

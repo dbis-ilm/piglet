@@ -17,25 +17,41 @@
 
 package dbis.piglet.tools
 
-import java.io.{File, FileInputStream, FileOutputStream, FileWriter, InputStream, OutputStream}
+import java.io.{FileOutputStream, InputStream, OutputStream}
+import java.net.{ConnectException, URI}
+import java.nio.file.{Files, Path}
 import java.util.jar.JarFile
 
-import dbis.piglet._
-import dbis.piglet.codegen._
-import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.backends.BackendManager
-import dbis.piglet.backends.BackendConf
-import java.nio.file.Path
-import java.nio.file.Files
-import java.nio.file.Paths
-
 import dbis.setm.SETM.timing
-import java.net.URI
-import java.net.ConnectException
+
+//object ByteUnits extends Enumeration {
+//  type ByteUnits = Value
+//  val Byte, KB, MB, GB, TB, ZB = Value
+//}
+//
+//import dbis.piglet.tools.ByteUnits._
+//case class ByteUnit(value: Long, unit: ByteUnits) {
+//  def +(other: ByteUnit): ByteUnit = ???
+//}
+//
+//
+//
+//object Tools {
+//  object Implicits {
+////    implicit def Byte(n: Long): ByteUnit = ByteUnit(n, ByteUnits.Byte)
+////    implicit def KB(n: Long): ByteUnit = ByteUnit(n, ByteUnits.KB)
+////    implicit def MB(n: Long): ByteUnit = ByteUnit(n, ByteUnits.MB)
+////    implicit def GB(n: Long): ByteUnit = ByteUnit(n, ByteUnits.GB)
+////    implicit def TB(n: Long): ByteUnit = ByteUnit(n, ByteUnits.TB)
+////    implicit def ZB(n: Long): ByteUnit = ByteUnit(n, ByteUnits.ZB)
+//  }
+//}
 
 object FileTools extends PigletLogging {
-  
+
+
+
   def recursiveDelete(dir: Path): Unit = recursiveDelete(dir.toString()) 
   def recursiveDelete(dir: String): Unit = {
     val path = scalax.file.Path.fromString(dir)
@@ -54,6 +70,7 @@ object FileTools extends PigletLogging {
     while ({ len = istream.read(bytes, 0, 1024); len != -1 })
       ostream.write(bytes, 0, len)
   }
+
 
   def extractJarToDir(jarName: String, outDir: Path): Unit = timing("extracting jar") {
 

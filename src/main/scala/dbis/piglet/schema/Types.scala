@@ -65,6 +65,25 @@ case class SimpleType(name: String, tc: TypeCode) extends java.io.Serializable w
     case TypeCode.ByteArrayType => "a"
     case _ => "_"
   }
+
+  /**
+    * Ask the type system for the number of bytes that each type requires.
+    *
+    * Primitive types require a fixed number of bytes (e.g., Int = 4 bytes).
+    * Other types, such as arrays depend on the number of elements and thus,
+    * cannot directly be decided here
+
+    * @return Returns a number > 0 if the type size can be decided here, or
+    *         <= 0 for other data types that need further calculations
+    */
+  lazy val numBytes = tc match {
+    case TypeCode.BooleanType => 1
+    case TypeCode.IntType => 4
+    case TypeCode.FloatType => 4
+    case TypeCode.LongType => 8
+    case TypeCode.DoubleType => 8
+    case _ => -1
+  }
 }
 
 case class GeometryType() extends PigType with java.io.Serializable {
@@ -75,7 +94,7 @@ case class GeometryType() extends PigType with java.io.Serializable {
 
   override def encode: String = "g"
 
-  override def descriptionString = name  
+  override def descriptionString = name
 }
 
 /**
@@ -141,25 +160,23 @@ object Types {
     // chararray and bytearray are compatible
     else if (t1 == CharArrayType && t2 == ByteArrayType || t1 == ByteArrayType && t2 == CharArrayType)
       true
-    else if (t1.isInstanceOf[BagType] && t2.isInstanceOf[BagType]) {
-      // two bags are compatible if their value types are compatible
-      val bag1 = t1.asInstanceOf[BagType]
-      val bag2 = t2.asInstanceOf[BagType]
-      typeCompatibility(bag1.valueType, bag2.valueType)
-    }
-    else if (t1.isInstanceOf[TupleType] && t2.isInstanceOf[TupleType]) {
-      // two tuples are compatible if they have the same number of fields + compatible fields
-      val tuple1 = t1.asInstanceOf[TupleType]
-      val tuple2 = t2.asInstanceOf[TupleType]
-      if (tuple1.fields.length == tuple2.fields.length) {
-        val fieldPairs = tuple1.fields.zip(tuple2.fields)
-        !fieldPairs.exists{case (f1: Field, f2: Field) => ! typeCompatibility(f1.fType, f2.fType)}
+    else t1 match {
+      case bag1: BagType if t2.isInstanceOf[BagType] =>
+        val bag2 = t2.asInstanceOf[BagType]
+        typeCompatibility(bag1.valueType, bag2.valueType)
+
+      case _ => t1 match {
+        case tuple1: TupleType if t2.isInstanceOf[TupleType] =>
+          val tuple2 = t2.asInstanceOf[TupleType]
+          if (tuple1.fields.length == tuple2.fields.length) {
+            val fieldPairs = tuple1.fields.zip(tuple2.fields)
+            !fieldPairs.exists { case (f1: Field, f2: Field) => !typeCompatibility(f1.fType, f2.fType) }
+          }
+          else
+            false
+        case _ => false
       }
-      else
-        false
     }
-    else
-      false
   }
 
   /**

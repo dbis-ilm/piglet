@@ -56,11 +56,12 @@ trait CodeGenStrategy {
 
   /**
    * Generate code for classes representing schema types.
-   *
+   * @param ctx The generator context
    * @param schemas the list of schemas for which we generate classes
+   * @param profiling Flag to enable profiling code
    * @return a string representing the code
    */
-  def emitSchemaHelpers(ctx: CodeGenContext, schemas: List[Schema]): String
+  def emitSchemaHelpers(ctx: CodeGenContext, schemas: List[Schema], profiling: Boolean): String
 
   /**
    * Generate code for the given Pig operator.
@@ -164,7 +165,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
     if(plan.code.nonEmpty)
       code = code + codeGen.emitEmbeddedCode(ctx, plan.code)
 
-    code += codeGen.emitSchemaHelpers(ctx, Schema.schemaList())
+    code += codeGen.emitSchemaHelpers(ctx, Schema.schemaList(), profiling.isDefined)
 
     val lineages = ListBuffer.empty[Lineage]
 

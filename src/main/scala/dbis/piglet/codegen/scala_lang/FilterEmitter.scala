@@ -10,7 +10,7 @@ class FilterEmitter extends CodeEmitter[Filter] {
   override def template: String =
     """val <out> = <in>.filter{t =>
       |<if (profiling)>
-      |accum_<lineage>.incr()
+      |accum_<lineage>.incr(t.getNumBytes)
       |<endif>
       |<pred>\}""".stripMargin
 

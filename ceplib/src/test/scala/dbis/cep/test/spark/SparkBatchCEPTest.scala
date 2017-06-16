@@ -32,7 +32,8 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.HashMap
 
 case class BatchDoubleRecord(col1: Int, col2: Int) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = s"${col1}${delim}${col2}"
+  override def mkString(delim: String) = s"$col1$delim$col2"
+  override lazy val getNumBytes: Int = 4 + 4
 }
 
 object OurBatchNFA {

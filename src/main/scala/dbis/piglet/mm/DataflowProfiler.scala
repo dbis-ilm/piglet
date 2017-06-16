@@ -32,7 +32,7 @@ case class Partition(lineage: Lineage, partitionId: Int)
 
 object DataflowProfiler extends PigletLogging {
 
-  protected[mm] var executionGraph: Markov = _
+  protected[mm] var profilingGraph: Markov = _
 
 //  private val cache = MutableMap.empty[String, MaterializationPoint]
 
@@ -48,27 +48,35 @@ object DataflowProfiler extends PigletLogging {
   def load(base: Path) = {
     logger.debug("init Dataflow profiler")
 
-    val opCountFile = base.resolve(Conf.opCountFile)
-    if(Files.exists(opCountFile)) {
-      val json = Source.fromFile(opCountFile.toFile).getLines().mkString("\n")
-      executionGraph = Markov.fromJson(json)
+    val profilingFile = base.resolve(Conf.profilingFile)
+    if(Files.exists(profilingFile)) {
+      val json = Source.fromFile(profilingFile.toFile).getLines().mkString("\n")
+      profilingGraph = Markov.fromJson(json)
     } else
-      executionGraph = Markov.empty
+      profilingGraph = Markov.empty
 
-    logger.debug(s"loaded markov model with size: ${executionGraph.size}")
-    logger.debug(s"total runs in markov is: ${executionGraph.totalRuns}")
+    logger.debug(s"loaded markov model with size: ${profilingGraph.size}")
+    logger.debug(s"total runs in markov is: ${profilingGraph.totalRuns}")
   }
 
   def reset() = {
     currentTimes.clear()
   }
 
+  /**
+    * Analyze the current plan.
+    *
+    * This will count the operator counts and number of transitions from Op A to Op B etc
+    * @param plan The plan to analyze
+    * @return Returns the updated model (Markov chain) that contains operator statistics from
+    *         previous runs as well as the updated counts
+    */
   def analyze(plan: DataflowPlan): Markov = timing("analyze plan") {
 
     // reset old values for parents and execution time
     reset()
 
-    executionGraph.incrRuns()
+    profilingGraph.incrRuns()
 
     /* walk over the plan and
      *   - count operator occurrences
@@ -76,20 +84,20 @@ object DataflowProfiler extends PigletLogging {
      */
 
     BreadthFirstTopDownWalker.walk(plan){
-      case _: TimingOp =>
+      case _: TimingOp => // ignore timing operators
       case op =>
         val lineage = op.lineageSignature
 
         if(op.isInstanceOf[Load])
-          executionGraph.add("start",lineage)
+          profilingGraph.add("start",lineage)
 
         op.outputs.flatMap(_.consumer).foreach{ c =>
           logger.debug(s"add to model ${op.name} -> ${c.name}")
-          executionGraph.add(lineage, c.lineageSignature)
+          profilingGraph.add(lineage, c.lineageSignature)
         }
     }
 
-    executionGraph
+    profilingGraph
   }
 
 
@@ -104,7 +112,7 @@ object DataflowProfiler extends PigletLogging {
       val partitionId = partition.partitionId
 
       // parent operators
-      val parentLineages = executionGraph.parents(lineage).getOrElse(List(Markov.startNode.lineage)) //parentsOf(lineage)
+      val parentLineages = profilingGraph.parents(lineage).getOrElse(List(Markov.startNode.lineage)) //parentsOf(lineage)
       // list of parent partitions per parent
       val parentPartitionIds = parentPartitionInfo(lineage)
 
@@ -140,7 +148,7 @@ object DataflowProfiler extends PigletLogging {
 
       val duration = time - earliestParentTime
 
-      executionGraph.updateCost(lineage, duration)
+      profilingGraph.updateCost(lineage, duration)
 
     }
 
@@ -148,8 +156,8 @@ object DataflowProfiler extends PigletLogging {
     val progStart = currentTimes(Partition("progstart", -1))
     val start = currentTimes(Partition("start", -1))
 
-    executionGraph.add("sparkcontext","start")
-    executionGraph.updateCost("sparkcontext", start - progStart)
+    profilingGraph.add("sparkcontext","start")
+    profilingGraph.updateCost("sparkcontext", start - progStart)
 
   }
 
@@ -180,23 +188,23 @@ object DataflowProfiler extends PigletLogging {
   }
 
   def addSizes(m: Map[Lineage, Option[Long]]) = m.foreach{ case(lineage, size) =>
-      executionGraph.updateSize(lineage, size)
+      profilingGraph.updateSize(lineage, size)
   }
 
-  def getExectime(op: Lineage): Option[T] = executionGraph.cost(op)
+  def getExectime(op: Lineage): Option[T] = profilingGraph.cost(op)
 
   def writeStatistics(c: CliParams): Unit = {
 
-    val opCountFile = c.profiling.get.resolve(Conf.opCountFile)
-    logger.debug(s"writing opcounts to $opCountFile with ${executionGraph.size} entries")
+    val opCountFile = Conf.programHome.resolve(Conf.profilingFile)
+    logger.debug(s"writing opcounts to $opCountFile with ${profilingGraph.size} entries")
 
-    val opJson = executionGraph.toJson
+    val opJson = profilingGraph.toJson
     Files.write(opCountFile,
       List(opJson).asJava,
       StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
   }
 
-
+  def opInputSize(op: Lineage) = profilingGraph.inputSize(op)
 
 
 //  def getMaterializationPoint(hash: String): Option[MaterializationPoint] = cache.get(hash)

@@ -145,7 +145,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
         val line = consoleReader.readLine(prompt)
         if (line == null) {
           consoleReader.getTerminal.restore()
-          consoleReader.shutdown()
+          consoleReader.close()
           finished = handler(EOF)
         }
         else if (line.isEmpty) {
@@ -236,11 +236,11 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return
     */
-  def handlePrettyPrint(buf: ListBuffer[PigOperator], profiling: Boolean): Boolean = {
+  def handlePrettyPrint(buf: ListBuffer[PigOperator], c: CliParams): Boolean = {
     var plan = new DataflowPlan(buf.toList)
 
-    if(profiling) {
-  	  val mm = new MaterializationManager(Conf.materializationBaseDir)
+    if(c.profiling.isDefined) {
+  	  val mm = new MaterializationManager(Conf.materializationBaseDir,c)
 			plan = processMaterializations(plan, mm)
     }
 
@@ -257,11 +257,11 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return false
     */
-  def handleDescribe(s: String, buf: ListBuffer[PigOperator], profiling: Boolean): Boolean = {
+  def handleDescribe(s: String, buf: ListBuffer[PigOperator], c: CliParams): Boolean = {
     var plan = new DataflowPlan(buf.toList)
 
-    if(profiling) {
-      val mm = new MaterializationManager(Conf.materializationBaseDir)
+    if(c.profiling.isDefined) {
+      val mm = new MaterializationManager(Conf.materializationBaseDir,c)
       plan = processMaterializations(plan, mm)
     }
 
@@ -335,7 +335,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       logger.debug("plan created.")
 
       if(c.profiling.isDefined) {
-        val mm = new MaterializationManager(Conf.materializationBaseDir)
+        val mm = new MaterializationManager(Conf.materializationBaseDir,c)
         plan = processMaterializations(plan, mm)
       }
 
@@ -448,10 +448,10 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     console {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
-      case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage; false
-      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf, c.profiling.isDefined)
+      case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage(); false
+      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf, c)
       case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => handleRewrite(buf)
-      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf, c.profiling.isDefined)
+      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf, c)
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
         s.toLowerCase.startsWith(s"display ") ||
         s.toLowerCase.startsWith(s"store ") ||

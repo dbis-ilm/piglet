@@ -168,7 +168,7 @@ trait DFPSupport {
       newPlan = plan
       loads = loads :+ rem
     } else {
-      var strat = manybu(buildRemovalStrategy(rem))
+      val strat = manybu(buildRemovalStrategy(rem))
 
       newPlan = rewritePlan(plan, strat)
     }
@@ -190,7 +190,7 @@ trait DFPSupport {
         rewritePlan(p, manybu(buildRemovalStrategy(op))))
       loads = loads ++ nodes.filter(_.isInstanceOf[Load])
     }
-    loads.toList.asInstanceOf[List[Load]].foreach ({ l: Load =>
+    loads.asInstanceOf[List[Load]].foreach ({ l: Load =>
       newPlan.operators = newPlan.operators.filterNot(_ == l)
     })
     newPlan

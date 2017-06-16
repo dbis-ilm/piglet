@@ -17,7 +17,8 @@
 package dbis.piglet.schema
 
 import dbis.piglet.expr.NamedField
-import scala.collection.mutable.Map
+
+import scala.collection.mutable
 
 /**
  * An exception indicating failures in schema handling.
@@ -75,7 +76,7 @@ case class Schema(var element: BagType, var className: String = "", var timestam
     "unambiguously")
   def indexOfField(nf: NamedField): Int = {
     if (! element.valueType.isInstanceOf[TupleType])
-      throw new SchemaException("schema type isn't a bag of tuples")
+      throw SchemaException("schema type isn't a bag of tuples")
     val tupleType = element.valueType
     tupleType.fields.count(_.name == nf.name) match {
       case 0 => -1
@@ -99,9 +100,10 @@ case class Schema(var element: BagType, var className: String = "", var timestam
         if (possibleField.length == 1) {
           tupleType.fields.indexOf(possibleField.head)
         } else {
-          throw new AmbiguousFieldnameException(s"""
-          | there is more than one field called ${nf.name} in $this
-          | and ${nf.lineage} was not enough to disambiguate it""".stripMargin)
+          throw AmbiguousFieldnameException(
+            s"""
+ there is more than one field called ${nf.name} in $this
+ and ${nf.lineage} was not enough to disambiguate it""".stripMargin)
         }
     }
   }
@@ -138,8 +140,8 @@ case class Schema(var element: BagType, var className: String = "", var timestam
 
   /**
    * Returns the field corresponding to the given [[dbis.piglet.expr.NamedField]]
-   * @param nf
-   * @return
+   * @param nf The [[NamedField]] to get the field of
+   * @return Returns the [[Field]] for the given [[NamedField]]
    */
   @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
   @throws[SchemaException]("if the schema doesn't contain a field with the given name")
@@ -208,7 +210,7 @@ case class Schema(var element: BagType, var className: String = "", var timestam
  * the schema code acts as the key.
  */
 object Schema {
-  private val schemaSet = Map[String, Schema]()
+  private val schemaSet = mutable.Map.empty[String, Schema]
   private var cnt = 0
 
   /**

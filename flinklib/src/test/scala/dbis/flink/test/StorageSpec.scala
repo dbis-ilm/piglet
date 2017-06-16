@@ -17,26 +17,23 @@
 
 package dbis.piglet.backends.flink.test
 
-import java.io.File
-
-import dbis.piglet.backends.flink.PigStorage
-import dbis.piglet.backends.{Record, SchemaClass}
-import dbis.piglet.backends.flink._
+import dbis.piglet.backends.SchemaClass
 import org.apache.flink.api.scala.ExecutionEnvironment
 import org.scalatest._
-import org.apache.commons.io.FileUtils
-import org.apache.flink.api.scala._
 
 case class Person(name: String, age: Int) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = s"${name}${delim}${age}"
+  override def mkString(delim: String) = s"$name$delim$age"
+  override lazy val getNumBytes: Int = name.getBytes.length + 4
 }
 
 case class DataRecord(col1: Int, col2: String) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = s"${col1}${delim}${col2}"
+  override def mkString(delim: String) = s"$col1$delim$col2"
+  override lazy val getNumBytes: Int = col2.getBytes.length + 4
 }
 
 case class DoubleRecord(col1: Double, col2: Double) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = s"${col1}${delim}${col2}"
+  override def mkString(delim: String) = s"$col1$delim$col2"
+  override lazy val getNumBytes: Int = 8 + 8
 }
 
 class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {

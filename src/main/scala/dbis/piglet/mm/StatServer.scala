@@ -1,16 +1,11 @@
 package dbis.piglet.mm
 
-import java.io.OutputStream
 import java.net.{InetSocketAddress, URLDecoder}
-import java.nio.charset.Charset
-import java.util.concurrent.{LinkedBlockingQueue, ThreadPoolExecutor, TimeUnit}
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.sun.net.httpserver.{HttpExchange, HttpHandler, HttpServer}
 import dbis.piglet.tools.Conf
 import dbis.piglet.tools.logging.PigletLogging
-
-import scala.concurrent.Future
 
 /**
   * The StatServer starts a HTTP Server on a specified port
@@ -18,30 +13,30 @@ import scala.concurrent.Future
   */
 object StatServer extends PigletLogging {
 
-  val allowedQueuedConnections = 100
+  private lazy val port = Conf.statServerPort
+  private lazy val allowedQueuedConnections = 100
+  private lazy val system = ActorSystem("pigletstats")
 
-  logger.debug("starting stat server")
-
-  val port = Conf.statServerPort
-  val server = HttpServer.create(new InetSocketAddress(port), allowedQueuedConnections)
-
-//  server.setExecutor(new ThreadPoolExecutor(5, 10, 10, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable](100)))
-
-  implicit private val system = ActorSystem("pigletstats")
-  val writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
-
-  server.createContext("/times", new TimesHandler(writer))
-  server.createContext("/sizes", new SizesHandler(writer))
-  logger.info(s"Stats server will listen on $port")
+  var server: HttpServer = _
+  var writer: ActorRef = _
 
   def start(): Unit = {
+    server = HttpServer.create(new InetSocketAddress(port), allowedQueuedConnections)
+    server.createContext("/times", new TimesHandler(writer))
+    server.createContext("/sizes", new SizesHandler(writer))
+    logger.info(s"Stats server will listen on $port")
+
+    writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
+
     server.start()
     logger.debug("started stat server")
   }
 
   def stop(): Unit = {
     logger.debug("closing stat servers")
-    server.stop(10) // 10 = timeout seconds
+    if(server != null)
+      server.stop(10) // 10 = timeout seconds
+
     system.terminate()
   }
 

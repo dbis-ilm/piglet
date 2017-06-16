@@ -315,9 +315,9 @@ abstract class PigOperator(
     println(indent(tab) + this.toString + s" { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
   }
 
-  def name = toString.split(PigOperator.p).head
+  lazy val name = toString.split(PigOperator.p).head
 }
 
 object PigOperator {
-  val p = "\\P{Alpha}"
+  private final val p = "\\P{Alpha}"
 }

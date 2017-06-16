@@ -33,7 +33,8 @@ import org.apache.flink.streaming.api.windowing.windows.GlobalWindow
 import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows
 
 case class StreamingDoubleRecord(col1: Int, col2: Int) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = s"${col1}${delim}${col2}"
+  override def mkString(delim: String) = s"$col1$delim$col2"
+  override lazy val getNumBytes: Int = 4 + 4
 }
 
 object OurStreamingNFA {
