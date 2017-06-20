@@ -2,10 +2,12 @@ package dbis.piglet.backends.spark
 
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
+import dbis.piglet.backends.SchemaClass
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.AccumulatorV2
 import org.apache.spark.{NarrowDependency, ShuffleDependency}
 
+import scala.collection.mutable
 import scala.collection.mutable.{Map => MutableMap}
 
 class UpdateMap[K,V](m: MutableMap[K,V]) {
@@ -80,6 +82,45 @@ object PerfMonitor {
 //    scalaj.http.Http(url).method("HEAD").param("data", dataString).asString
     request(url, dataString)
   }
+
+
+  def serializedSize(o: Any): Int = o match {
+    case Boolean => 1
+    case Short | Char => 2
+    case Int | Float  => 4
+    case Long | Double => 8
+    case s: String => s.getBytes.length
+    case t: SchemaClass => t.getNumBytes
+    case l: mutable.Iterable[_] =>
+      l.size * l.headOption.map(serializedSize).getOrElse(0)
+//      l.foldLeft(0)(_ + serializedSize(_))
+    case _ =>
+      println(s"Unknown type ${o.getClass.getName} use 0 size")
+      0
+
+  }
+
+//  {
+//    var bos: java.io.ByteArrayOutputStream = null
+//    var out: java.io.ObjectOutputStream = null
+//    try {
+//      bos = new java.io.ByteArrayOutputStream()
+//      out = new java.io.ObjectOutputStream(bos)
+//      out.writeObject(o)
+//      out.flush()
+//      bos.toByteArray.length
+//    } catch {
+//      case e: Throwable =>
+//        System.err.println(e.getMessage)
+//        0
+//    }finally {
+//      if(bos != null)
+//        bos.close()
+//
+//      if(out != null)
+//        out.close()
+//    }
+//  }
 }
 
 class SizeAccumulator(private var theValue: Option[(Long,Long)] = None) extends AccumulatorV2[Option[(Long,Long)],Option[(Long,Long)]] {

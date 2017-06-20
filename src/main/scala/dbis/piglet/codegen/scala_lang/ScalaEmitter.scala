@@ -423,7 +423,9 @@ object ScalaEmitter extends PigletLogging {
           t.tc match {
               // the code generator will use Scala String type for the following three
             case TypeCode.CharArrayType | TypeCode.ByteArrayType | TypeCode.AnyType =>
-              s"$name.getBytes.length"
+//              s"$name.getBytes.length"
+//              "0"
+              s"$name.length"
             case _ =>
               // anything else is not supported yet - but we should not get here
               logger.warn(s"unsupported field type: $t for num byte generation")
@@ -435,29 +437,8 @@ object ScalaEmitter extends PigletLogging {
 //        s"$name.size * ()"
 
       case _ =>
-        s"""{
-          |var bos: java.io.ByteArrayOutputStream = null
-          |var out: java.io.ObjectOutputStream = null
-          |try {
-          |  bos = new java.io.ByteArrayOutputStream()
-          |  out = new java.io.ObjectOutputStream(bos)
-          |  out.writeObject($name)
-          |  out.flush()
-          |  bos.toByteArray.length
-          |} catch {
-          |case e: Throwable =>
-          | System.err.println(e.getMessage)
-          | 0
-          |}finally {
-          |  if(bos != null)
-          |   bos.close()
-          |
-          |  if(out != null)
-          |   out.close()
-          |}
-          |}
-          |
-        """.stripMargin
+//        s"PerfMonitor.serializedSize($name)"
+        "0"
     }
 
     b
