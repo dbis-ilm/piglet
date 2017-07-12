@@ -4,9 +4,8 @@ import java.nio.file.{Files, StandardOpenOption}
 
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.op._
-import dbis.piglet.plan.rewriting.Rewriter
-import dbis.piglet.plan.{DataflowPlan, OperatorNotFoundException, PipeNameGenerator}
-import dbis.piglet.schema.Schema
+import dbis.piglet.plan.rewriting.internals.ProfilingSupport
+import dbis.piglet.plan.{DataflowPlan, OperatorNotFoundException}
 import dbis.piglet.tools._
 import dbis.piglet.tools.logging.PigletLogging
 import org.json4s._
@@ -88,6 +87,8 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
 
   def insertMaterializationPoints(plan: DataflowPlan, model: Markov): DataflowPlan = {
 
+
+
     if(c.profiling.isEmpty) {
       logger.info("profiling is disabled - won't try to find possible materialization points")
       return plan
@@ -95,29 +96,10 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
 
     logger.debug(s"analyzing plan for inserting materialization points")
 
-    val ps = c.profiling.get.getOrElse("prob_strategy",Conf.mmDefaultProbThreshold)
-    logger.debug(s"using prob strategy $ps")
-    val probStrategy = ps match {
-      case "min" => Markov.ProbMin _
-      case "max" => Markov.ProbMax _
-      case "avg" => Markov.ProbAvg _
-      case "product" => Markov.ProbProduct _
-      case x => throw new IllegalArgumentException(s"Invalid strategy for Prob $x (must be one of min|max|avg|product )")
-    }
+    val ps = c.profiling.get
 
-    val cs = c.profiling.get.getOrElse("cost_strategy",Conf.mmDefaultCostStrategy)
-    logger.debug(s"using cost strategy $cs")
-    val costStrategy = cs match {
-      case "min" => Markov.CostMin _
-      case "max" => Markov.CostMax _
-      case x => throw new IllegalArgumentException(s"Invalid strategy for Prob $x (must be one of min|max )")
-    }
-
-    val probThreshold = c.profiling.get.getOrElse("prob",Conf.mmDefaultProbThreshold.toString).toDouble
-    val minBenefit = c.profiling.get.getOrElse("benefit",Conf.mmDefaultMinBenefit.toString).toDouble.seconds
-
-    logger.debug(s"using prob threshold: $probThreshold")
-    logger.debug(s"using min benefit: $minBenefit")
+    logger.debug(s"using prob threshold: ${ps.probThreshold}")
+    logger.debug(s"using min benefit: ${ps.minBenefit}")
 
     val bytesPerSecWriting = 47.93590545654297 * 1024 * 1024 // Bytes/sec
 
@@ -127,7 +109,7 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
       case _: TimingOp =>
       case op if !candidates.contains(MaterializationPoint(op.lineageSignature,Duration.Undefined,-1,-1)) =>
         val sig = op.lineageSignature
-        model.totalCost(sig, probStrategy)(costStrategy) match {
+        model.totalCost(sig, ProbStrategy.func(ps.probStrategy))(CostStrategy.func(ps.costStrategy)) match {
           case Some((cost,prob)) =>
             val relProb = prob // / model.totalRuns
             val opOutputSize = model.outputSize(sig)
@@ -139,7 +121,7 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
                */
 
               val benefit = (cost - opOutputSize.get / bytesPerSecWriting).seconds
-              val decision = benefit > minBenefit && relProb > probThreshold
+              val decision = benefit > ps.minBenefit && relProb > ps.probThreshold
 
               if(decision) {
                 logger.debug(s"We should materialize ${op.name} with benefit of ${benefit.toSeconds}")
@@ -158,12 +140,14 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
         }
     }
 
-    // TODO: here we might have a long list of possible MaterializationPoint s - we should only select the most important ones?
+
+
+
+    // here we might have a long list of possible MaterializationPoint s - we should only select the most important ones
     // On the other hand, we already decided, that all these candidates are important!
 
 
     var newPlan = plan
-
 
     // for each candidate point ...
     candidates.sortBy(_.benefit)(Ordering[Duration].reverse) // descending ordering ...
@@ -186,11 +170,19 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
         }
 
         val storer = Store(theOp.outputs.head, path, Some("BinStorage"))
+        if(ps.cacheMode == CacheMode.NONE) {
+          newPlan.addOperator(Seq(storer), deferrConstruct = false)
+          newPlan = newPlan.insertAfter(theOp, storer)
 
-        newPlan.addOperator(Seq(storer), deferrConstruct = true)
+        } else {
+          logger.debug(s"adding cache operator afters $theOp  with cache-mode: ${ps.cacheMode}")
+          val cache = Cache(Pipe("dummy"), Pipe("dummy", producer= theOp), theOp.lineageSignature, ps.cacheMode)
 
-        newPlan = newPlan.insertAfter(theOp, storer)
-      }
+          newPlan.addOperator(Seq(storer, cache), deferrConstruct = true)
+          newPlan = newPlan.insertAfter(theOp, storer)
+          newPlan = ProfilingSupport.insertBetweenAll(theOp.outputs.head, theOp, cache, newPlan)
+        }
+    }
 
     newPlan
 

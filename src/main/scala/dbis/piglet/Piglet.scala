@@ -240,7 +240,7 @@ object Piglet extends PigletLogging {
       // 5. analyze plan if something can be materialized or
       // if materialized results are present
       val model = DataflowProfiler.analyze(newPlan)
-      // according to statistics, insert MATERIALIZE operators
+      // according to statistics, insert MATERIALIZE (STORE) operators
       newPlan = mm.insertMaterializationPoints(newPlan, model)
       newPlan = processMaterializations(newPlan, mm)
 
@@ -291,7 +291,7 @@ object Piglet extends PigletLogging {
       // 8. compile the plan to code
       PigletCompiler.compilePlan(newPlan, scriptName, c) match {
         // the file was created --> execute it
-        case Some(jarFile) => {
+        case Some(jarFile) =>
           if (!c.compileOnly) {
 
             if (c.profiling.isDefined) {
@@ -318,7 +318,7 @@ object Piglet extends PigletLogging {
             logger.info("successfully compiled program - exiting.")
 
 
-          // after execution we want to write the dot file  
+          // after execution we want to write the dot file
           if (c.profiling.isDefined && !c.compileOnly) {
 
             try {
@@ -350,7 +350,6 @@ object Piglet extends PigletLogging {
 
           //          PlanWriter.writeDotFile(jarFile.getParent.resolve(s"$scriptName.dot"))
           PlanWriter.createImage(jarFile.getParent, scriptName)
-        }
         case None => logger.error(s"creating jar file failed for $path")
       }
     }

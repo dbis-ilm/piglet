@@ -15,20 +15,26 @@ class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
   override def template: String =
     """val <out> = <in>.map{t =>
       |<if (profiling)>
-      |accum_<lineage>.incr(t.getNumBytes)
+      |if(scala.util.Random.nextInt(randFactor) == 0) {
+      |  accum.incr("<lineage>", t.getNumBytes)
+      |}
       |<endif>
       |<class>(<expr>)}""".stripMargin
   def templateNested: String =
     """val <out> = <in>.map{t =>
       |<if (profiling)>
-      |accum_<lineage>.incr(t.getNumBytes)
+      |if(scala.util.Random.nextInt(randFactor) == 0) {
+      |  accum.incr("<lineage>", t.getNumBytes)
+      |}
       |<endif>
       |<expr>}""".stripMargin
 
   def templateFlatMap: String =
     """val <out> = <in>.flatMap{t =>
       |<if (profiling)>
-      |accum_<lineage>.incr(t.getNumBytes)
+      |if(scala.util.Random.nextInt(randFactor) == 0) {
+      |  accum.incr("<lineage>", t.getNumBytes)
+      |}
       |<endif>
       |<expr>}""".stripMargin
 
@@ -37,7 +43,6 @@ class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
       throw CodeGenException("FOREACH requires a schema definition")
     
     val className: String = ScalaEmitter.schemaClassName(op.schema.get.className)
-    logger.debug(s"class name for ${op.name} is $className")
 
     val expr = emitForeachExpr(ctx, op)
     // in case of a nested FOREACH the tuples are creates as part of the GENERATE clause

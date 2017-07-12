@@ -1,8 +1,5 @@
 package dbis.piglet.op
 
-import dbis.piglet.schema.Schema
-import dbis.piglet.plan.PipeNameGenerator
-
 case class TimingOp (
     private[op] val out: Pipe, 
     private[op] val in: Pipe, 

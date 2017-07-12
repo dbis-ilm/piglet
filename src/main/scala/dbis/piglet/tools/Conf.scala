@@ -5,7 +5,11 @@ import java.net.URI
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 
 import com.typesafe.config.{Config, ConfigFactory}
+import dbis.piglet.mm.{CostStrategy, ProbStrategy}
+import dbis.piglet.op.CacheMode
 import dbis.piglet.tools.logging.PigletLogging
+
+import scala.concurrent.duration._
 
 /**
  * This is the global configuration object that contains all user-defined values
@@ -101,14 +105,17 @@ object Conf extends PigletLogging {
   def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url")).toURL) else None
   
   def profilingFile = "profilerstats"
-  def mmDefaultCostStrategy = appconf.getString("profiler.defaults.cost_strategy")
-  def mmDefaultProbStrategy = appconf.getString("profiler.defaults.prob_strategy")
+  def mmDefaultCostStrategy = CostStrategy.withName(appconf.getString("profiler.defaults.cost_strategy").toUpperCase)
+  def mmDefaultProbStrategy = ProbStrategy.withName(appconf.getString("profiler.defaults.prob_strategy").toUpperCase)
   def mmDefaultProbThreshold = appconf.getDouble("profiler.defaults.prob_threshold")
-  def mmDefaultMinBenefit = appconf.getDouble("profiler.defaults.benefit")
-
+  def mmDefaultMinBenefit = appconf.getDouble("profiler.defaults.benefit").seconds
+  def mmDefaultCacheMode = CacheMode.withName(appconf.getString("profiler.defaults.cache_mode").toUpperCase)
+  def mmDefaultFraction = appconf.getInt("profiler.defaults.fraction")
 //  def execTimesFile = "exectimes"
   
 //  def langfeatureImports(feature: String) = appconf.getStringList(s"langfeature.$feature.imports").asScala
 //  def langfeatureAdditionalJars(feature: String) = appconf.getStringList(s"langfeature.$feature.jars")
+
+
 
 }

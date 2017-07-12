@@ -257,8 +257,6 @@ object ScalaEmitter extends PigletLogging {
     def schemaExtractor(schema: Schema): String =
       schema.fields.zipWithIndex.map{case (f, i) =>
         // we cannot perform a "toAny" - therefore, we treat bytearray as String here
-        logger.debug(s"$f (idx: $i)")
-
         f.fType match {
           case s: SimpleType =>
             val t = ScalaEmitter.scalaTypeMappingTable(f.fType)
@@ -429,7 +427,7 @@ object ScalaEmitter extends PigletLogging {
             case _ =>
               // anything else is not supported yet - but we should not get here
               logger.warn(s"unsupported field type: $t for num byte generation")
-              0.toString
+              (-3).toString
           }
         }
 

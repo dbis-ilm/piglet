@@ -18,32 +18,24 @@ package dbis.piglet.codegen.spark
 
 import java.net.URI
 
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.Finders
-import org.scalatest.FlatSpec
-import org.scalatest.Matchers
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.CodeEmitter
 import dbis.piglet.codegen.scala_lang.JoinEmitter
+import dbis.piglet.mm.ProfilerSettings
 import dbis.piglet.udf.UDFTable
-// import dbis.piglet.codegen.spark.BatchCodeGen
-import dbis.piglet.op._
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
+import dbis.piglet.codegen.{CodeGenContext, CodeGenTarget}
 import dbis.piglet.expr._
-
-import dbis.piglet.codegen.CodeGenContext
-import dbis.piglet.codegen.CodeGenTarget
+import dbis.piglet.op._
 import dbis.piglet.parser.PigParser.parseScript
-
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.plan.rewriting.Rewriter.rewritePlan
-import dbis.piglet.plan.rewriting.Rules
+import dbis.piglet.plan.rewriting.{Rewriter, Rules}
 import dbis.piglet.schema._
 import dbis.piglet.tools.CodeMatchers
 import dbis.piglet.tools.TestTools.strToUri
-import dbis.piglet.plan.rewriting.Rewriter
-//import org.scalatest.junit.JUnitRunner
-import dbis.piglet.tools.TopoSort
 import dbis.piglet.codegen.CodeGenerator
+import dbis.piglet.tools.TopoSort
 
 class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers {
 
@@ -60,11 +52,13 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     val profiling = Some(new URI("http://localhost:5555/times"))
 
-    CodeEmitter.profiling = profiling
+    CodeEmitter.profiling = true
+
+    val ps = ProfilerSettings(url = profiling.get)
 
     val generatedCode = cleanString(codeGenerator.emitImport(ctx)
       + codeGenerator.emitHeader1(ctx, "test")
-      + codeGenerator.emitHeader2(ctx, "test", profiling)
+      + codeGenerator.emitHeader2(ctx, "test", Some(ps))
       + codeGenerator.emitFooter(ctx, new DataflowPlan(List.empty[PigOperator]), profiling))
 
     val expectedCode = cleanString("""
@@ -83,9 +77,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |      PerfMonitor.notify(url,"progstart",null,-1,System.currentTimeMillis)
         |      val conf = new SparkConf().setAppName("test_App")
         |      val sc = new SparkContext(conf)
+        |      val randFactor: Int = 10
+        |      val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
+        |      sc.register(accum,"accum")
         |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
-        |      val m = scala.collection.mutable.Map.empty[String,Option[(Long,Long)]]
-        |      PerfMonitor.sizes(sizesUrl,m)
+        |      PerfMonitor.sizes(sizesUrl, accum.value)
         |      sc.stop()
         |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
         |    }
@@ -99,11 +95,13 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val ctx = CodeGenContext(CodeGenTarget.Spark)
 
     val profiling = Some(new URI("http://localhost:5555/times"))
-    CodeEmitter.profiling = profiling
+    CodeEmitter.profiling = true
+
+    val ps = ProfilerSettings(url = profiling.get)
 
     val generatedCode = cleanString(codeGenerator.emitImport(ctx, Seq("import breeze.linalg._"))
       + codeGenerator.emitHeader1(ctx, "test")
-      + codeGenerator.emitHeader2(ctx, "test", profiling)
+      + codeGenerator.emitHeader2(ctx, "test", Some(ps))
       + codeGenerator.emitFooter(ctx, new DataflowPlan(List.empty[PigOperator]), profiling))
     val expectedCode = cleanString("""
                                      |import org.apache.spark.SparkContext
@@ -122,9 +120,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
                                      |      PerfMonitor.notify(url,"progstart",null,-1,System.currentTimeMillis)
                                      |      val conf = new SparkConf().setAppName("test_App")
                                      |      val sc = new SparkContext(conf)
+                                     |      val randFactor: Int = 10
+                                     |      val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
+                                     |      sc.register(accum,"accum")
                                      |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
-                                     |      val m = scala.collection.mutable.Map.empty[String,Option[(Long,Long)]]
-                                     |      PerfMonitor.sizes(sizesUrl,m)
+                                     |      PerfMonitor.sizes(sizesUrl, accum.value)
                                      |      sc.stop()
                                      |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
                                      |
@@ -136,7 +136,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for LOAD" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     val op = Load(Pipe("a"), file)
@@ -160,7 +160,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for LOAD with PigStorage" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
     val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     val op = Load(Pipe("a"), file, None, Some("PigStorage"), List("""",""""))
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
@@ -171,7 +171,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for LOAD with schema" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
     val ops = parseScript(
       """
         |A = LOAD 'file.csv' USING PigStorage(',') AS (f1: int, f2: chararray, f3: double);
@@ -189,7 +189,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for LOAD with RDFFileStorage" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
     Schema.init()
 
     val file = new java.io.File(".").getCanonicalPath + "/file.n3"
@@ -202,7 +202,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code to handle LOAD with PigStorage but without an explicit schema" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val ops = parseScript(
       """
@@ -224,7 +224,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for FILTER" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val op = Filter(Pipe("aa"), Pipe("bb"), Lt(RefExpr(PositionalField(1)), RefExpr(Value(42))))
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
@@ -234,7 +234,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for a complex FILTER" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val ops = parseScript(
       """b = LOAD 'file' AS (x: double, y:double, z1:int, z2: int);
@@ -248,7 +248,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for a FILTER with a function expression" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     Schema.init()
     val op = Filter(Pipe("a"), Pipe("b"), Gt(
@@ -261,7 +261,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for a FILTER with a function expression and boolean" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     Schema.init()
     val op =  Filter(Pipe("a"),Pipe("b"),And(
@@ -278,7 +278,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code a FILTER with an expression on a string literal" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val ops = parseScript("""b = LOAD 'file'; a = FILTER b BY $0 == 'aString';""")
     val plan = new DataflowPlan(ops)
@@ -513,7 +513,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     generatedCode should matchSnippet(expectedCode)
   }
 
-  it should "insert timing for join" in {
+  ignore should "insert timing for join" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     ctx.set("tuplePrefix", "t")
     JoinEmitter.joinKeyVars.clear() // make sure we start generated names with a
@@ -541,31 +541,33 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
               |out4 = DISTINCT out40;
               |
               |dump out4;""".stripMargin
-    
+
     val ops = parseScript(s)
-    
+
     val newPlan = Rewriter.insertTimings(Rewriter.rewritePlan(new DataflowPlan(ops)))
-    
+
     val joinOp = newPlan.findOperatorForAlias("out300").get.inputs.head.producer
     val schema1 = newPlan.findOperatorForAlias("out1").get.inputs.head.producer.schema.get
     val schema2 = newPlan.findOperatorForAlias("out2").get.inputs.head.producer.schema.get
-    
+
     // make sure that the schema is correct
     joinOp.inputs.map(_.producer.schema.get) should contain only (schema1, schema2)
-    
+
     // check if code is generated - especially for that operator that used to cause trouble
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, joinOp))
 
     // check if we can generate code for _all_ operators
     TopoSort(newPlan).foreach(codeGenerator.emitNode(ctx, _))
-    
-    
+
+
     val gen = new CodeGenerator(codeGenerator)
-    
-    val code = gen.generate("testscript", newPlan, Some(new java.net.URI("http://localhost:9000/")))
+
+    val ps = ProfilerSettings(url = new java.net.URI("http://localhost:9000/"))
+
+    gen.generate("testscript", newPlan, Some(ps))
 //    println(code)
   }
-  
+
   it should "contain code for multiple joins" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
     ctx.set("tuplePrefix", "t")
@@ -610,7 +612,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code a FOREACH statement with function expressions" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     Schema.init()
     // a = FOREACH b GENERATE TOMAP("field1", $0, "field2", $1);
@@ -629,7 +631,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for a FOREACH statement with another function expression" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     Schema.init()
     // a = FOREACH b GENERATE $0, COUNT($1) AS CNT;
@@ -645,7 +647,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for a FOREACH statement with a UDF expression" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     // aa = FOREACH bb GENERATE $0, distance($1, $2, 1.0, 2.0) AS dist;
     val ops = parseScript(
@@ -662,7 +664,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for a FOREACH statement with a UDF alias expression" in {
     // aa = FOREACH bb GENERATE $0, distance($1, $2, 1.0, 2.0) AS dist;
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val ops = parseScript(
       """bb = LOAD 'data.csv' AS (t1: int, t2: int, t3: int, t4: int);
@@ -683,7 +685,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for deref operator on maps in FOREACH statement" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val ops = parseScript(
     """
@@ -702,7 +704,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for deref operator on tuple in FOREACH statement" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val ops = parseScript(
       """
@@ -721,7 +723,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for a nested FOREACH statement" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val ops = parseScript(
       """daily = load 'data.csv' as (exchange, symbol);
@@ -747,7 +749,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
   it should "contain code for a FOREACH statement with constructors for tuple, bag, and map" in {
     val ctx = CodeGenContext(CodeGenTarget.Spark)
-    CodeEmitter.profiling = None
+    CodeEmitter.profiling = false
 
     val ops = parseScript(
       """data = load 'file' as (f1: int, f2: int, name:chararray);

@@ -56,4 +56,6 @@ object Pipe {
     new Pipe(n, producer, consumers)
 
   def unapply(p: Pipe): Option[(String, PigOperator, List[PigOperator])] = Some((p.name, p.producer, p.consumer))
+
+  def dummy = Pipe("dummy")
 }

@@ -6,6 +6,7 @@ import dbis.piglet.Piglet.Lineage
 import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenTarget}
 import dbis.piglet.expr.Expr
+import dbis.piglet.mm.ProfilerSettings
 import dbis.piglet.op._
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.Conf
@@ -81,19 +82,24 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
     * @param profiling add profiling code to the generated code
     * @return a string representing the header code
     */
-  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None, operators: Seq[Lineage] = Seq.empty): String = {
+  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[ProfilerSettings], operators: Seq[Lineage] = Seq.empty): String = {
     var map = Map[String,Any]("name" -> scriptName)
 
     profiling.foreach { p =>
-      val t = p.resolve(Conf.EXECTIMES_FRAGMENT).toString
-      val s = p.resolve(Conf.SIZES_FRAGMENT).toString
+      val profilingURL = p.url
+      val t = profilingURL.resolve(Conf.EXECTIMES_FRAGMENT).toString
+      val s = profilingURL.resolve(Conf.SIZES_FRAGMENT).toString
 
 //      map += ("profiling" -> t)
       map += ("profilingTimes" -> t)
       map += ("profilingSizes" -> s)
       map += ("lineages" -> operators)
+      map += ("randFactor" -> p.fraction)
     }
 
+//    <lineages:{ l | val accum_<l> = new dbis.piglet.backends.spark.SizeAccumulator()
+//    sc.register(accum_<l>,"accum_<l>")
+//      }>
 
     CodeEmitter.render(s"""  def main(args: Array[String]) {
                          |<if (profiling)>
@@ -104,10 +110,9 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
                          |val conf = new SparkConf().setAppName("<name>_App")
                     		 |val sc = new SparkContext(conf)
                          |<if (profiling)>
-                         |    <lineages:{ l | val accum_<l> = new dbis.piglet.backends.spark.SizeAccumulator()
-                         |    sc.register(accum_<l>,"accum_<l>")
-                         |     }>
-                         |
+                         |    val randFactor: Int = <randFactor>
+                         |    val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
+                         |    sc.register(accum,"accum")
                          |    PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
                          |<endif>
                          |""".stripMargin, map)
@@ -119,15 +124,17 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
       val url = u.resolve(Conf.EXECTIMES_FRAGMENT).toString
       Map("profiling" -> url,"lineages"->operators)
     }.getOrElse(Map.empty[String,String])
-      
+
+//    val m = scala.collection.mutable.Map.empty[String,Option[(Long,Long)]]
+//    <lineages:{ l | m("<l>") = accum_<l>.value
+//      }>
+//    PerfMonitor.sizes(sizesUrl,m)
+
       CodeEmitter.render(
 
         s"""
          |<if (profiling)>
-         |  val m = scala.collection.mutable.Map.empty[String,Option[(Long,Long)]]
-         |  <lineages:{ l | m("<l>") = accum_<l>.value
-         |  }>
-         |  PerfMonitor.sizes(sizesUrl,m)
+         |  PerfMonitor.sizes(sizesUrl, accum.value)
          |<endif>
          |  sc.stop()
          |<if (profiling)>

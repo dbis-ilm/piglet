@@ -11,13 +11,16 @@ class GroupingEmitter extends CodeEmitter[Grouping] {
   override def template: String = """<if (expr)>
                                     |        val <out> = <in>.groupBy{t =>
                                     |         <if (profiling)>
-                                    |          accum_<lineage>.incr(t.getNumBytes)
+                                    |          if(scala.util.Random.nextInt(randFactor) == 0)
+                                    |            accum.incr("<lineage>", t.getNumBytes)
                                     |        <endif>
                                     |        <expr>}.map{case (k,v) => <class>(<keyExtr>,v)}
                                     |<else>
                                     |        val <out> = <in>.coalesce(1).glom.map{t =>
                                     |         <if (profiling)>
-                                    |         accum_<lineage>.incr(t.getNumBytes)
+                                    |         if(scala.util.Random.nextInt(randFactor) == 0) {
+                                    |           accum.incr("<lineage>", t.size * t.headOption.map(_.getNumBytes).getOrElse(-1))
+                                    |         }
                                     |         <endif>
                                     |         <class>("all", t)}
                                     |<endif>""".stripMargin

@@ -10,7 +10,10 @@ class FilterEmitter extends CodeEmitter[Filter] {
   override def template: String =
     """val <out> = <in>.filter{t =>
       |<if (profiling)>
-      |accum_<lineage>.incr(t.getNumBytes)
+      |if(scala.util.Random.nextInt(randFactor) == 0) {
+      |  accum.incr("<lineage>", t.getNumBytes)
+      |}
+      |//PerfMonitor.sizes(url,"<lineage>", t.getNumBytes)
       |<endif>
       |<pred>\}""".stripMargin
 

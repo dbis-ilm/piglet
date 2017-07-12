@@ -1,34 +1,17 @@
 package dbis.piglet.codegen
 
-import dbis.piglet.backends.BackendManager
-import dbis.piglet.plan.DataflowPlan
-import java.nio.file.Path
-
-import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.parser.PigParser
-import dbis.piglet.plan.rewriting.Rewriter._
-import dbis.piglet.parser.PigParser
-import dbis.piglet.op.PigOperator
-import dbis.piglet.tools.FileTools
-import dbis.piglet.tools.ScalaCompiler
-import dbis.piglet.tools.JarBuilder
-import dbis.piglet.tools.CppCompiler
-import dbis.piglet.tools.CppCompilerConf
-import dbis.piglet.tools.Conf
-import dbis.setm.SETM.timing
-import java.nio.file.Paths
-import java.nio.file.Files
 import java.io.FileWriter
+import java.nio.file.{Files, Path, Paths}
+
+import dbis.piglet.expr.Expr
+import dbis.piglet.op.PigOperator
+import dbis.piglet.parser.PigParser
+import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.tools._
+import dbis.piglet.tools.logging.PigletLogging
+import dbis.setm.SETM.timing
 
 import scala.io.Source
-
-import scalax.file.{Path => xPath}
-import dbis.piglet.schema.Schema
-import java.net.URI
-
-import dbis.piglet.tools.CliParams
-import dbis.piglet.expr.Expr
-import dbis.piglet.mm.DataflowProfiler
 
 
 object PigletCompiler extends PigletLogging {
@@ -125,7 +108,7 @@ object PigletCompiler extends PigletLogging {
     logger.debug(s"successfully created code generator class ${codeGenerator.getClass.getName}")
 
     // generate the Scala code
-    val code = codeGenerator.generate(scriptName, plan, if(c.profiling.isDefined) Some(DataflowProfiler.url) else None)
+    val code = codeGenerator.generate(scriptName, plan, c.profiling)
 
     logger.debug("successfully generated program source code")
 

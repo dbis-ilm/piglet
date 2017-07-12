@@ -1,9 +1,11 @@
 package dbis.piglet.mm
 
+import java.net.URI
 import java.nio.file.{Files, Path, StandardOpenOption}
 
 import dbis.piglet.Piglet.Lineage
-import dbis.piglet.op.{Load, TimingOp}
+import dbis.piglet.op.CacheMode.CacheMode
+import dbis.piglet.op.{CacheMode, Load, TimingOp}
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf}
@@ -11,6 +13,7 @@ import dbis.setm.SETM.timing
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.{Map => MutableMap}
+import scala.concurrent.duration._
 import scala.io.Source
 
 
@@ -34,16 +37,12 @@ object DataflowProfiler extends PigletLogging {
 
   protected[mm] var profilingGraph: Markov = _
 
-//  private val cache = MutableMap.empty[String, MaterializationPoint]
-
-
   val parentPartitionInfo = MutableMap.empty[Lineage, MutableMap[Int, Seq[Seq[Int]]]]
   val currentTimes = MutableMap.empty[Partition, Long]
 
   // for json (de-)serialization
   implicit val formats = org.json4s.native.Serialization.formats(org.json4s.NoTypeHints)
 
-//  override def toString = cache.mkString(",")
 
   def load(base: Path) = {
     logger.debug("init Dataflow profiler")
@@ -188,7 +187,7 @@ object DataflowProfiler extends PigletLogging {
   }
 
   def addSizes(m: Map[Lineage, Option[Long]]) = m.foreach{ case(lineage, size) =>
-      profilingGraph.updateSize(lineage, size)
+      profilingGraph.updateSize(lineage, size.map(_*10))
   }
 
   def getExectime(op: Lineage): Option[T] = profilingGraph.cost(op)
@@ -206,72 +205,71 @@ object DataflowProfiler extends PigletLogging {
 
   def opInputSize(op: Lineage) = profilingGraph.inputSize(op)
 
-
-//  def getMaterializationPoint(hash: String): Option[MaterializationPoint] = cache.get(hash)
-//
-//  def addMaterializationPoint(matPoint: MaterializationPoint): Unit = {
-//    val entry = cache.getOrElse(matPoint.hash, matPoint)
-//    if (entry.parentHash.nonEmpty && cache.contains(entry.parentHash.get)) {
-//      // TODO: calculate _cumulative_ benefit
-//      val parent = cache(entry.parentHash.get)
-//      val benefit = parent.loadTime + entry.procTime - entry.loadTime
-//      entry.benefit = parent.benefit + benefit
-//    }
-//    entry.count += 1
-//    cache += (matPoint.hash -> entry)
-//  }
-//
-//  /**
-//   * Go over the plan and and check for existing runtime information for each op (lineage).
-//   * If something exists, create a materialization point that can be used later.
-//   */
-//  def addMaterializationPoints(plan: DataflowPlan) = timing("identify mat points") {
-//
-//    DepthFirstTopDownWalker.walk(plan) {
-//      case _ : TimingOp => // we want to ignore Timing operators
-//      case op: PigOperator =>
-//
-//      logger.debug( s"""checking storage service for runtime information for operator "${op.lineageSignature}" """)
-//      // check for the current operator, if we have some runtime/stage information
-//      val execInfo: Option[(Long, Double)] = executionGraph.totalCost(op.lineageSignature)(Markov.CostMax)
-//
-//
-//      // if we have information, create a (potential) materialization point
-//      if (execInfo.isDefined) {
-//        val (cost, probability) = execInfo.get
-//
-//        logger.debug( s"""found runtime information: cost: $cost  prob: $probability""")
-//
-//        /* XXX: calculate benefit
-//         * Here, we do not have the parent hash information.
-//         * But is it still needed? Since we have the program runtime duration
-//         * from beginning until the end the stage, we don't need to calculate
-//         * the cumulative benefit?
-//         */
-//        val mp = MaterializationPoint(op.lineageSignature,
-//          None, // currently, we do not consider the parent
-//          cost, // set the processing time
-//          0L, // TODO: calculate loading time at this point
-//          0L // TODO: calculate saving time at this point
-//        )
-//
-//        this.addMaterializationPoint(mp)
-//
-//      } else {
-//        logger.debug(s" found no runtime information")
-//      }
-//    }
-//  }
-  
-
-  lazy val url = if(Conf.statServerURL.isDefined) {
-      Conf.statServerURL.get.toURI
-    } else {
-      val addr = java.net.InetAddress.getLocalHost.getHostAddress
-      logger.debug(s"identified local address as $addr")
-      val u = java.net.URI.create(s"http://$addr:${Conf.statServerPort}/")
-      u
-    }
 }
 
 case class ProfilingException(msg: String) extends Exception
+
+
+object ProbStrategy extends Enumeration  {
+  type ProbStrategy = Value
+  val MIN, MAX, AVG, PRODUCT = Value
+
+  def func(s: ProbStrategy): (Traversable[Double]) => Double = s match {
+    case MIN => Markov.ProbMin
+    case MAX => Markov.ProbMax
+    case AVG => Markov.ProbAvg
+    case PRODUCT => Markov.ProbProduct
+  }
+}
+
+object CostStrategy extends Enumeration {
+  type CostStrategy = Value
+  val MIN, MAX = Value
+
+  def func(s: CostStrategy): (Traversable[(Long, Double)]) => (Long, Double) = s match {
+    case MIN => Markov.CostMin
+    case MAX => Markov.CostMax
+  }
+}
+
+import ProbStrategy.ProbStrategy
+import CostStrategy.CostStrategy
+
+case class ProfilerSettings(
+                             minBenefit: Duration = Conf.mmDefaultMinBenefit,
+                             probThreshold: Double = Conf.mmDefaultProbThreshold,
+                             costStrategy: CostStrategy = Conf.mmDefaultCostStrategy,
+                             probStrategy: ProbStrategy = Conf.mmDefaultProbStrategy,
+                             cacheMode: CacheMode = Conf.mmDefaultCacheMode,
+                             fraction: Int = Conf.mmDefaultFraction,
+                             url: URI = ProfilerSettings.profilingUrl
+                           )
+
+object ProfilerSettings extends PigletLogging {
+  def apply(m: Map[String, String]): ProfilerSettings = {
+    var ps = ProfilerSettings()
+
+    m.foreach { case (k,v) =>
+      k match {
+        case "prob" => ps = ps.copy(probThreshold = v.toDouble)
+        case "benefit" => ps = ps.copy(minBenefit = v.toDouble.seconds)
+        case "cost_strategy" => ps = ps.copy(costStrategy = CostStrategy.withName(v.toUpperCase))
+        case "prob_strategy" => ps = ps.copy(probStrategy = ProbStrategy.withName(v.toUpperCase))
+        case "cache_mode" => ps = ps.copy(cacheMode = CacheMode.withName(v.toUpperCase))
+        case "fraction" => ps = ps.copy(fraction = v.toInt)
+        case _ => logger warn s"unknown profiler settings key $k (value: $v) - ignoring"
+      }
+    }
+
+    ps
+  }
+
+  private lazy val profilingUrl = if(Conf.statServerURL.isDefined) {
+    Conf.statServerURL.get.toURI
+  } else {
+    val addr = java.net.InetAddress.getLocalHost.getHostAddress
+    logger.debug(s"identified local address as $addr")
+    val u = URI.create(s"http://$addr:${Conf.statServerPort}/")
+    u
+  }
+}

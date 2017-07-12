@@ -16,6 +16,7 @@
  */
 package dbis.piglet.codegen.scala_lang
 
+import dbis.piglet.codegen.spark.CacheEmitter
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenStrategy, CodeGenTarget}
 import dbis.piglet.expr.Expr
 import dbis.piglet.op._
@@ -59,6 +60,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
       case _: StreamOp => StreamOpEmitter.instance
       case _: TimingOp => TimingEmitter.instance
       case _: Matcher => MatcherEmitter.instance
+      case _: Cache => CacheEmitter.instance
       case _ => throw new IllegalArgumentException(s"no emitter for $op")      
     }
   

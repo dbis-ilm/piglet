@@ -43,7 +43,7 @@ abstract class CodeEmitter[O <: PigOperator] extends PigletLogging {
 
 object CodeEmitter {
 
-  protected[codegen] var profiling: Option[URI] = None
+  protected[codegen] var profiling: Boolean = false
 
   val sw = new java.io.StringWriter
 
@@ -59,7 +59,7 @@ object CodeEmitter {
     var st = ST(template)
     params.foreach { case (name, value) => st = st.add(name, value) }
 
-    st = st.add("profiling", profiling.isDefined)
+    st = st.add("profiling", profiling)
 
 //    st.render() match {
 //      case Success(code) => code

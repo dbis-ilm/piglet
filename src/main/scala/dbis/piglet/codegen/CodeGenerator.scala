@@ -17,6 +17,7 @@
 package dbis.piglet.codegen
 
 import dbis.piglet.Piglet.Lineage
+import dbis.piglet.mm.{DataflowProfiler, ProfilerSettings}
 import dbis.piglet.op.{PigOperator, TimingOp}
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema.Schema
@@ -105,7 +106,7 @@ trait CodeGenStrategy {
    * @param profiling add profiling code to the generated code
    * @return a string representing the header code
    */
-  def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI], operators:Seq[Lineage]=Seq.empty): String
+  def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[ProfilerSettings], operators:Seq[Lineage]=Seq.empty): String
 
   /**
    * Generate code needed for finishing the script.
@@ -144,11 +145,10 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
    *                Header2 and Footer
    * @return the string representation of the code
    */
-  def generate(scriptName: String, plan: DataflowPlan, profiling: Option[URI], forREPL: Boolean = false): String = timing("generate code") {
+  def generate(scriptName: String, plan: DataflowPlan, profiling: Option[ProfilerSettings], forREPL: Boolean = false): String = timing("generate code") {
     require(codeGen != null, "code generator undefined")
 
-
-    CodeEmitter.profiling = profiling
+    CodeEmitter.profiling = profiling.isDefined
 
     val aliases = if (plan.udfAliases != null) { Some(plan.udfAliases.toMap) } else None
 
@@ -210,7 +210,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
     }
 
     // generate the cleanup code
-    if (forREPL) code else code + codeGen.emitFooter(ctx, plan, profiling,lineages)
+    if (forREPL) code else code + codeGen.emitFooter(ctx, plan, profiling.map(_.url),lineages)
   }
 }
 

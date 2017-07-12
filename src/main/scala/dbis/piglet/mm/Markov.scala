@@ -3,7 +3,6 @@ package dbis.piglet.mm
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.tools.logging.PigletLogging
 
-
 import scalax.collection.mutable.Graph
 import scalax.collection.edge.Implicits._
 import scalax.collection.edge.WDiEdge
@@ -92,9 +91,11 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     .map(_.weight)
     .getOrElse(0L)
 
-  def cost(op: Op): Option[T] = model.get(op).value.cost
-  def inputSize(op: Lineage): Option[Long] = model.get(op).value.inputSize
-  def outputSize(op: Lineage): Option[Long] = model.get(op).outNeighbors.headOption.flatMap(_.value.inputSize)
+  def cost(lineage: Lineage): Option[T] = model.find(Op(lineage)).flatMap(_.value.cost)
+
+  def inputSize(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.value.inputSize)
+
+  def outputSize(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.outNeighbors.headOption.flatMap(_.value.inputSize))
 
   /**
     * Get the cost (execution time and probability) from start to the specified node.
@@ -119,10 +120,7 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     // this assignment is needed by the type checker/compiler to bring the graph in scope
     val g = model
 
-    //    logger.debug(g.toString())
-
     // get all actual source (LOAD) nodes
-
     val sources = (g get startNode).outNeighbors
 
     //    logger.debug(s"found sources (${sources.size}): ${sources.mkString(",")}")

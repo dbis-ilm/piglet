@@ -3,13 +3,12 @@ package dbis.piglet.tools
 import java.net.URI
 import java.io.File
 import java.nio.file.Files
-import java.nio.file.{Path,  Paths}
+import java.nio.file.{Path, Paths}
 
 import scala.collection.JavaConverters._
-
 import scopt.OptionParser
-
 import dbis.piglet.BuildInfo
+import dbis.piglet.mm.ProfilerSettings
 import dbis.piglet.tools.logging.LogLevel
 import dbis.piglet.tools.logging.LogLevel._
 
@@ -35,27 +34,27 @@ import dbis.piglet.tools.logging.LogLevel._
  * @param interactive Flag to start Piglet in interactive mode  
  */
 case class CliParams(
-  master: String = "local",
-  inputFiles: Seq[Path] = Seq.empty,
-  compileOnly: Boolean = false,
-  outDir: Path = Paths.get("."),
-  params: Map[String, String] = Map.empty,
-  backend: String = Conf.defaultBackend,
-  backendPath: Path = Paths.get("."),
-  updateConfig: Boolean = false,
-  showPlan: Boolean = false,
-  backendArgs: Map[String, String] = Map.empty,
-  profiling: Option[Map[String,String]] = None,
-//  profilingPort: Int = 8000,
-  logLevel: LogLevel = LogLevel.WARN,
-  sequential: Boolean = false,
-  keepFiles: Boolean = false,
-  showStats: Boolean = false,
-  paramFile: Option[Path] = None,
-  interactive: Boolean = false,
-  quiet: Boolean = false,
-  notifyURL: Option[URI] = None,
-  muteConsumer: Boolean = false
+                      master: String = "local",
+                      inputFiles: Seq[Path] = Seq.empty,
+                      compileOnly: Boolean = false,
+                      outDir: Path = Paths.get("."),
+                      params: Map[String, String] = Map.empty,
+                      backend: String = Conf.defaultBackend,
+                      backendPath: Path = Paths.get("."),
+                      updateConfig: Boolean = false,
+                      showPlan: Boolean = false,
+                      backendArgs: Map[String, String] = Map.empty,
+                      profiling: Option[ProfilerSettings] = None,
+                      //  profilingPort: Int = 8000,
+                      logLevel: LogLevel = LogLevel.WARN,
+                      sequential: Boolean = false,
+                      keepFiles: Boolean = false,
+                      showStats: Boolean = false,
+                      paramFile: Option[Path] = None,
+                      interactive: Boolean = false,
+                      quiet: Boolean = false,
+                      notifyURL: Option[URI] = None,
+                      muteConsumer: Boolean = false
 ) {
   
   require(!showPlan || (showPlan && !quiet), "show-plan and quiet cannot be active at the same time" )
@@ -100,9 +99,9 @@ object CliParams {
     opt[Unit]('k',"keep") optional() action { (x,c) => c.copy(keepFiles = true) } text "keep generated files"
     opt[String]('g', "log-level") optional() action { (x, c) => c.copy(logLevel = LogLevel.withName(x.toUpperCase())) } text "Set the log level: DEBUG, INFO, WARN, ERROR"
     opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text s"show the execution plan"
-    opt[Map[String,String]]("profiling") optional() valueName "prob=prob_thresh,cost=cost_thresh,cost_strategy=strategy,prob_strategy=strategy" action {
-      (x, c) => c.copy(profiling = Some(x))
-    } text "Activate profiling, where prob_thresh and cost_thresh are the respective threshold values and the strategy is one of (min|max|avg|product)"
+    opt[Map[String,String]]("profiling") optional() valueName "prob=<prob_thresh>,cost=<cost_thresh>,cost_strategy=<strategy>,prob_strategy=<strategy>,cache_mode=<mode>" action {
+      (x, c) => c.copy(profiling = Some(ProfilerSettings(x)))
+    } text "Activate profiling, where prob_thresh and cost_thresh are the respective threshold values and the strategy is one of (min|max|avg|product), and <mode> is the cache mode supported by spark"
 //    opt[Int]("profiling-url") optional() action { (x,c) => c.copy(profilingPort = x) } text ("Port to run profiling server on")
     opt[Unit]("show-stats") optional() action { (_,c) => c.copy(showStats = true) } text "print detailed timing stats at the end"
     opt[Unit]("sequential") optional() action{ (_,c) => c.copy(sequential = true) } text "sequential execution (do not merge plans)"

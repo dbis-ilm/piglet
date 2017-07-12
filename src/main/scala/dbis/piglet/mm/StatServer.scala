@@ -2,10 +2,12 @@ package dbis.piglet.mm
 
 import java.net.{InetSocketAddress, URLDecoder}
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import com.sun.net.httpserver.{HttpExchange, HttpHandler, HttpServer}
-import dbis.piglet.tools.Conf
+import dbis.piglet.tools.{Conf, FileTools}
 import dbis.piglet.tools.logging.PigletLogging
+
+import scala.concurrent.Await
 
 /**
   * The StatServer starts a HTTP Server on a specified port
@@ -21,12 +23,13 @@ object StatServer extends PigletLogging {
   var writer: ActorRef = _
 
   def start(): Unit = {
-    server = HttpServer.create(new InetSocketAddress(port), allowedQueuedConnections)
+    writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
+
+    server = HttpServer.create(new InetSocketAddress(java.net.InetAddress.getLocalHost.getHostAddress, port), allowedQueuedConnections)
     server.createContext("/times", new TimesHandler(writer))
     server.createContext("/sizes", new SizesHandler(writer))
     logger.info(s"Stats server will listen on $port")
 
-    writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
 
     server.start()
     logger.debug("started stat server")
@@ -37,6 +40,14 @@ object StatServer extends PigletLogging {
     if(server != null)
       server.stop(10) // 10 = timeout seconds
 
+    // send the PoisonPill to the writer actor to stop it
+    if(writer != null)
+      writer ! PoisonPill
+
+    // give the writer some time to process pending messages
+    Thread.sleep(3 * 1000)
+
+    // shutdown the Akka system
     system.terminate()
   }
 
@@ -52,10 +63,12 @@ trait StatsHandler {
 
 }
 
-class TimesHandler(private val writer: ActorRef) extends HttpHandler with StatsHandler{
+class TimesHandler(private val writer: ActorRef) extends HttpHandler with StatsHandler with PigletLogging {
 
   override def handle(httpExchange: HttpExchange): Unit = {
     val msg = getData(httpExchange.getRequestURI.getQuery)
+
+//    logger.debug(s"received time msg: $msg")
 
     httpExchange.sendResponseHeaders(200, -1)
     httpExchange.getRequestBody.close()
@@ -95,8 +108,6 @@ class StatsWriterActor extends Actor with PigletLogging  {
       val parents = arr(2)
       val currTime = arr(3).toLong
 
-//      logger.debug(s"$lineage -> $partitionId : $parents")
-
       val parentsList = parents.split(StatsWriterActor.DEP_DELIM)
                           .filter(_.nonEmpty)
                           .map { s =>
@@ -107,11 +118,15 @@ class StatsWriterActor extends Actor with PigletLogging  {
                           .toSeq
 
       // store info in profiler
+
       DataflowProfiler.addExecTime(lineage, partitionId, parentsList, currTime)
 
     case msg: SizeMsg =>
-//      logger.debug(s"received size msg: ${msg.values}")
       DataflowProfiler.addSizes(msg.values)
+
+
+    case msg =>
+      logger.debug(s"received unknown msg: $msg")
   }
 }
 
@@ -123,6 +138,8 @@ case class SizeMsg(private val sizes: String) extends StatMsg{
     a(0) -> Some(a(1).toLong)
   }.toMap
 }
+
+//case class SizeMsg(value: String)
 
 object StatsWriterActor {
   // keep in sync with [[dbis.piglet.backends.spark.PerfMonitor]]

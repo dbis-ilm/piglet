@@ -38,9 +38,8 @@ object PerfMonitor {
   final val PARENT_DELIM = ","
   final val DEP_DELIM = "#"
 
-  def sizes(url: String, m: scala.collection.Map[String, Option[(Long,Long)]]) = {
-    val dataString = m.filter(_._2.isDefined).map{case(k,v) => s"$k:${v.get._2}"}.mkString(FIELD_DELIM)
-//    scalaj.http.Http(url).method("HEAD").param("data",dataSring).asString
+  def sizes(url: String, m: scala.collection.mutable.Map[String, SizeStat]) = {
+    val dataString = m.map{case(lineage, SizeStat(_, bytes)) => s"$lineage:$bytes"}.mkString(FIELD_DELIM)
     request(url, dataString)
   }
 
@@ -65,6 +64,7 @@ object PerfMonitor {
      *  theoretically all parent partitions server as input for a partition
      */
     val parents = if(rdd != null) {
+
       val a = rdd.dependencies.map{
         case d: NarrowDependency[_] =>
           d.getParents(partitionId)
@@ -74,7 +74,9 @@ object PerfMonitor {
           println(s"Unknown dependency type: $d")
           Seq.empty[Int]
       }
+
       a.map(inner => inner.mkString(PARENT_DELIM)).mkString(DEP_DELIM)
+
     } else // no RDD given as input -> encode as empty string
       ""
 
@@ -92,11 +94,13 @@ object PerfMonitor {
     case s: String => s.getBytes.length
     case t: SchemaClass => t.getNumBytes
     case l: mutable.Iterable[_] =>
-      l.size * l.headOption.map(serializedSize).getOrElse(0)
+      l.size * l.headOption.map(serializedSize).getOrElse(-1)
 //      l.foldLeft(0)(_ + serializedSize(_))
+    case a: Array[_] =>
+      a.length * a.headOption.map(serializedSize).getOrElse(-1)
     case _ =>
       println(s"Unknown type ${o.getClass.getName} use 0 size")
-      0
+      -2
 
   }
 
@@ -121,6 +125,61 @@ object PerfMonitor {
 //        out.close()
 //    }
 //  }
+}
+
+case class SizeStat(var records: Long, var bytes: Long) extends Cloneable {
+  override def clone(): SizeStat = SizeStat(records, bytes)
+
+  def add(stat: SizeStat) = {
+    records += stat.records
+    bytes += stat.bytes
+  }
+}
+
+class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mutable.Map[String, SizeStat]] {
+
+  private val theValue = mutable.Map.empty[String, SizeStat]
+
+  override def isZero: Boolean = theValue.isEmpty
+
+  override def copy(): AccumulatorV2[MutableMap[String, SizeStat], MutableMap[String, SizeStat]] = {
+    val newAccum = new SizeAccumulator2()
+
+
+    theValue.foreach{ case (k,v) =>
+      newAccum.value += k -> v
+    }
+
+    newAccum
+  }
+
+  override def reset(): Unit = theValue.clear()
+
+  override def add(value: MutableMap[String, SizeStat]): Unit = {
+    value.foreach{ case (k,v) =>
+
+          if(theValue.contains(k)) {
+            theValue(k).add(v)
+          } else {
+            theValue += k -> v
+          }
+
+    }
+  }
+
+  def incr(lineage: String, bytes: Long) = {
+    if(theValue.contains(lineage)) {
+      theValue(lineage).add(SizeStat(1,bytes))
+    } else {
+      theValue += lineage -> SizeStat(1,bytes)
+    }
+  }
+
+  override def merge(other: AccumulatorV2[MutableMap[String, SizeStat], MutableMap[String, SizeStat]]): Unit = {
+    add(other.value)
+  }
+
+  override def value: MutableMap[String, SizeStat] = theValue
 }
 
 class SizeAccumulator(private var theValue: Option[(Long,Long)] = None) extends AccumulatorV2[Option[(Long,Long)],Option[(Long,Long)]] {

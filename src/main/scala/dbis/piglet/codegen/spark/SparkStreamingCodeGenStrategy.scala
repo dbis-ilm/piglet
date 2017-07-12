@@ -19,20 +19,12 @@ package dbis.piglet.codegen.spark
 import java.net.URI
 
 import dbis.piglet.Piglet.Lineage
-import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
 import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
-import dbis.piglet.op.Load
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenTarget}
+import dbis.piglet.mm.ProfilerSettings
+import dbis.piglet.op._
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.Conf
-import dbis.piglet.codegen.CodeGenTarget
-import dbis.piglet.op.PigOperator
-import dbis.piglet.op.Distinct
-import dbis.piglet.op.Window
-import dbis.piglet.op.SocketRead
-import dbis.piglet.op.OrderBy
-import dbis.piglet.op.Grouping
-import dbis.piglet.op.Store
-import dbis.piglet.op.Dump
 
 class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
   override val target = CodeGenTarget.SparkStreaming
@@ -113,10 +105,12 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
     * @param profiling add profiling code to the generated code
     * @return a string representing the header code
     */
-  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[URI] = None, operators: Seq[Lineage] = Seq.empty): String = {
+  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[ProfilerSettings] = None, operators: Seq[Lineage] = Seq.empty): String = {
     var map = Map("name" -> scriptName)
 
-    profiling.map { u => u.resolve(Conf.EXECTIMES_FRAGMENT).toString }
+    profiling.map { p =>
+      val u = p.url
+      u.resolve(Conf.EXECTIMES_FRAGMENT).toString }
       .foreach { s => map += ("profiling" -> s) }
 
 
