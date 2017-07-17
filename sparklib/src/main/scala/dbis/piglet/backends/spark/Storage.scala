@@ -23,18 +23,10 @@ import org.apache.spark.rdd._
 import org.apache.spark.sql._
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
-import java.io.ObjectOutputStream
-import java.io.ObjectInputStream
-import java.io.FileOutputStream
-
-import scala.tools.nsc.io._
-import scala.reflect.ClassTag
-import scala.collection.mutable.Queue
-import FileStreamReader.customFileStreamReader
-import org.apache.spark.streaming.scheduler.StreamingListener
-import org.apache.spark.streaming.scheduler.StreamingListenerReceiverStopped
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
+import scala.tools.nsc.io._
 
 //-----------------------------------------------------------------------------------------------------
 

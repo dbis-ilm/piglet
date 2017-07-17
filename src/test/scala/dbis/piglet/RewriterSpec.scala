@@ -122,7 +122,7 @@ class RewriterSpec extends FlatSpec
     val predicate1 = Lt(RefExpr(PositionalField(1)), RefExpr(Value("42")))
     val predicate2 = PPredicate(Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op2 = Filter(Pipe("b"), Pipe("a"), predicate1)
-    val op2_after = Filter(Pipe("c"), Pipe("a"), predicate1)
+//    val op2_after = Filter(Pipe("c"), Pipe("a"), predicate1)
     val op3 = Filter(Pipe("c"), Pipe("b"), predicate2)
     val op4 = Dump(Pipe("c"))
 
@@ -202,7 +202,7 @@ class RewriterSpec extends FlatSpec
         val filter2 = successors.head.asInstanceOf[Filter]
 
         if (filter1.pred != filter2.pred) {
-          val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+          val merged = Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
           Some(fixMerge(filter1, filter2, merged))
         } else {
           None
@@ -229,14 +229,14 @@ class RewriterSpec extends FlatSpec
       val filter2 = successors.head.asInstanceOf[Filter]
 
       if (filter1.pred != filter2.pred) {
-        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+        val merged = Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
         Some(fixMerge(filter1, filter2, merged))
       } else {
         None
       }
     }
 
-    addTypedStrategy(strategy _)
+    addTypedStrategy(strategy)
 
     performFilterMergeTest()
     performNotMergeTest()
@@ -248,7 +248,7 @@ class RewriterSpec extends FlatSpec
       case SuccE(filter1 @ Filter(_, _, pred1, _),
                  filter2 @ Filter(_, _, pred2, _))
           if pred1 != pred2 =>
-        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(pred1, pred2))
+        val merged = Filter(filter2.outputs.head, filter1.inputs.head, And(pred1, pred2))
         Some(fixMerge(filter1, filter2, merged))
       case _ => None
     }
@@ -263,7 +263,7 @@ class RewriterSpec extends FlatSpec
   it should "merge Filter operations via binary strategies" in {
     def strategy(filter1: Filter, filter2: Filter): Option[Filter] = {
       if (filter1.pred != filter2.pred) {
-        val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+        val merged = Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
         Some(fixMerge(filter1, filter2, merged))
       } else {
         None
@@ -284,7 +284,7 @@ class RewriterSpec extends FlatSpec
   it should "merge Filter operations via binary strategies and anonymous functions" in {
     addBinaryPigOperatorStrategy({ (filter1: Filter, filter2: Filter) =>
                                    if (filter1.pred != filter2.pred) {
-                                     val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+                                     val merged = Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
                                      Some(fixMerge(filter1, filter2, merged))
                                    } else {
                                      None
@@ -313,11 +313,11 @@ class RewriterSpec extends FlatSpec
 
   it should "order Filter operations before Order By ones with an extra function" in {
     var x = 0
-    def f(o: OrderBy, f: Filter): Option[Tuple2[Filter,OrderBy]] = {
+    def f(o: OrderBy, f: Filter): Option[(Filter, OrderBy)] = {
       x += 1
       Some(f, o)
     }
-    reorder[OrderBy, Filter](f _)
+    reorder[OrderBy, Filter](f)
     performReorderingTest()
     x shouldBe 1
   }
@@ -512,16 +512,16 @@ class RewriterSpec extends FlatSpec
   it should "apply rewriting rule R1" in {
     RDFRuleset.registerRules()
     val URLs = Table(
-      ("url"),
-      ("http://www.example.com"),
-      ("https://www.example.com")
+      "url",
+      "http://www.example.com",
+      "https://www.example.com"
     )
     forAll(URLs) { (url: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI(url), None)
       val op2 = Dump(Pipe("a"))
       val plan = rewritePlan(new DataflowPlan(List(op1, op2)))
       val source = plan.sourceNodes.headOption.value
-      source shouldBe Load(Pipe("a"), url, op1.schema, Some("pig.SPARQLLoader"),
+      source shouldBe Load(Pipe("a"), url, op1.schema, Some("RDFFileStorage"),
         List("SELECT * WHERE { ?s ?p ?o }"))
     }
   }
@@ -540,7 +540,7 @@ class RewriterSpec extends FlatSpec
     val op4 = Dump(Pipe("c"))
     val plan = rewritePlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
-    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("pig.SPARQLLoader"),
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("RDFFileStorage"),
       List("""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }"""))
     plan.operators should not contain op3
   }
@@ -563,13 +563,13 @@ class RewriterSpec extends FlatSpec
     val op4 = Dump(Pipe("c"))
     val plan = rewritePlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
-    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("pig.SPARQLLoader"),
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("RDFFileStorage"),
       List("""SELECT * WHERE { ?s ?p ?o }"""))
   }
 
   it should "apply rewriting rule L2" in {
     RDFRuleset.registerRules()
-    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table("grouping column", "subject", "predicate", "object")
     forAll (possibleGroupers) { (g: String) =>
       val op1 = RDFLoad(Pipe("a"), new URI("hdfs://somewhere"), Some(g))
       val op2 = Dump(Pipe("a"))
@@ -593,17 +593,17 @@ class RewriterSpec extends FlatSpec
     val op4 = Dump(Pipe("c"))
     val plan = rewritePlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
-    source.outputs.flatMap(_.consumer) should contain only(op2)
+    source.outputs.flatMap(_.consumer) should contain only op2
 
     val sink = plan.sinkNodes.headOption.value
     sink shouldBe op4
-    sink.inputs.map(_.producer) should contain only(op2)
+    sink.inputs.map(_.producer) should contain only op2
   }
 
   it should "apply rewriting rule F2" in {
     Rewriter toReplace () applyRule F2
     val patterns = Table(
-      ("Pattern"),
+      "Pattern",
       (TriplePattern(Value("subjectv"), PositionalField(1), PositionalField(2)),
         Filter(Pipe("b"), Pipe("a"), Eq(RefExpr(NamedField("subject")), RefExpr(Value("subjectv"))))),
       (TriplePattern(PositionalField(0), Value("predicatev"), PositionalField(2)),
@@ -619,7 +619,7 @@ class RewriterSpec extends FlatSpec
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
     }
 
-    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table("grouping column", "subject", "predicate", "object")
 
     forAll (possibleGroupers) { (g: String) =>
       forAll(patterns) { (p: (TriplePattern, Filter)) =>
@@ -636,7 +636,7 @@ class RewriterSpec extends FlatSpec
   it should "apply rewriting rule F3" in {
     Rewriter toReplace () applyRule F3
     val patterns = Table(
-      ("Pattern"),
+      "Pattern",
       // s p o bound
       (TriplePattern(Value("subjectv"), Value("predicatev"), Value("objectv")),
         Filter(Pipe("b"), Pipe("a"), And(
@@ -669,7 +669,7 @@ class RewriterSpec extends FlatSpec
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only p._2
     }
 
-    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table("grouping column", "subject", "predicate", "object")
 
     // Apply F3 only to plain triples
     forAll (possibleGroupers) { (g: String) =>
@@ -708,7 +708,7 @@ class RewriterSpec extends FlatSpec
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only f
     }
 
-    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table("grouping column", "subject", "predicate", "object")
 
     // Test that F4 is only applied if the BGP filters by the grouping column
     forAll (possibleGroupers) { (g: String) =>
@@ -769,7 +769,7 @@ class RewriterSpec extends FlatSpec
                 Some(Field("cnt", Types.ByteArrayType)))))))),
         Filter(Pipe("b"), Pipe("pipePClecYbNXF"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))))
 
-    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table("grouping column", "subject", "predicate", "object")
 
     forAll (possibleGroupers) { (g: String) =>
       forAll(patterns) { (p: TriplePattern, grouped_by: String, fo: Foreach, fi: Filter) =>
@@ -854,7 +854,7 @@ class RewriterSpec extends FlatSpec
                 Some(Field("cnt", Types.ByteArrayType)))))))),
         Filter(Pipe("b"), Pipe("pipePClecYbNXF"), Gt(RefExpr(NamedField("cnt")), RefExpr(Value(0))))))
 
-    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table("grouping column", "subject", "predicate", "object")
 
     forAll (possibleGroupers) { (g: String) =>
       forAll(patterns) { (p: TriplePattern, bound_columns: List[String], fo: Foreach, fi: Filter) =>
@@ -982,7 +982,7 @@ class RewriterSpec extends FlatSpec
       plan.sinkNodes.headOption.value.inputs.map(_.producer) should contain only op2
     }
 
-    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table("grouping column", "subject", "predicate", "object")
 
     // Test that F7 is not applied if the pattern doesn't filter by the grouping column
     forAll (possibleGroupers) { (g: String) =>
@@ -1296,9 +1296,9 @@ class RewriterSpec extends FlatSpec
             Gt(RefExpr(NamedField("cnt1")), RefExpr(Value(0))))
         )))
 
-    val possibleGroupers = Table(("grouping column"), ("subject"), ("predicate"), ("object"))
+    val possibleGroupers = Table("grouping column", "subject", "predicate", "object")
 
-    val wrapped = buildTypedCaseWrapper(J2 _)
+    val wrapped = buildTypedCaseWrapper(J2)
 
     forAll (possibleGroupers) { (g: String) =>
       forAll(patterns) { (p: List[TriplePattern], fo: Foreach, fi: Filter) =>
@@ -1639,7 +1639,7 @@ class RewriterSpec extends FlatSpec
     val rewrittenPlan = rewritePlan(plan)
     val op = rewrittenPlan.findOperatorForAlias("tmp")
     op shouldNot be (None)
-    rewrittenPlan.checkSchemaConformance
+    rewrittenPlan.checkSchemaConformance()
   }
 
   "The SparkRuleset" should "merge OrderBy and Limit operators to Top" in {
@@ -1921,14 +1921,14 @@ class RewriterSpec extends FlatSpec
 
   // THESIS
   it should "apply patterns via applyPattern with a condition added by when" in {
-    Rewriter when { t: OrderBy => t.outputs.length > 0 } applyPattern {
+    Rewriter when { t: OrderBy => t.outputs.nonEmpty } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by whenMatches" in {
-    Rewriter whenMatches[OrderBy, Filter] { case t: OrderBy if t.outputs.length > 0 => } applyPattern {
+    Rewriter whenMatches[OrderBy, Filter] { case t: OrderBy if t.outputs.nonEmpty => } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
@@ -1936,42 +1936,42 @@ class RewriterSpec extends FlatSpec
 
   // THESIS
   it should "apply patterns via applyPattern with a condition added by unless" in {
-    Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
+    Rewriter unless { t: OrderBy => t.outputs.isEmpty } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by unlessMatches" in {
-    Rewriter unlessMatches[OrderBy, Filter] { case t: OrderBy if t.outputs.length == 0 => } applyPattern {
+    Rewriter unlessMatches[OrderBy, Filter] { case t: OrderBy if t.outputs.isEmpty => } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by and" in {
-    Rewriter when[OrderBy, Filter] { _ => true} and { t: OrderBy => t.outputs.length > 0 } applyPattern {
+    Rewriter when[OrderBy, Filter] { _ => true} and { t: OrderBy => t.outputs.nonEmpty } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by or" in {
-    Rewriter when[OrderBy, Filter] { _ => false} or { t: OrderBy => t.outputs.length > 0 } applyPattern {
+    Rewriter when[OrderBy, Filter] { _ => false} or { t: OrderBy => t.outputs.nonEmpty } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by andMatches" in {
-    Rewriter when[OrderBy, Filter] { _ => true} andMatches { case t: OrderBy if t.outputs.length > 0 => } applyPattern {
+    Rewriter when[OrderBy, Filter] { _ => true} andMatches { case t: OrderBy if t.outputs.nonEmpty => } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
   }
 
   it should "apply patterns via applyPattern with a condition added by orMatches" in {
-    Rewriter when[OrderBy, Filter] { _ => false } orMatches { case t: OrderBy if t.outputs.length > 0 => } applyPattern {
+    Rewriter when[OrderBy, Filter] { _ => false } orMatches { case t: OrderBy if t.outputs.nonEmpty => } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
@@ -2001,7 +2001,7 @@ class RewriterSpec extends FlatSpec
     var lastPipename = "B"
     val newfilters = 0 until 3 map { i: Int =>
       val name = PipeNameGenerator.generate()
-      val filter = new Filter(Pipe(name), Pipe(lastPipename), Gt(RefExpr(NamedField("a")), RefExpr(Value(i))))
+      val filter = Filter(Pipe(name), Pipe(lastPipename), Gt(RefExpr(NamedField("a")), RefExpr(Value(i))))
       lastPipename = name
       filter
     }
@@ -2023,7 +2023,7 @@ class RewriterSpec extends FlatSpec
     val dump = newPlan.sinkNodes.last
 
     newfilters(2).outputs.flatMap(_.consumer) should contain only dump
-    dump.inputs.map(_.producer) should contain only (newfilters(2))
+    dump.inputs.map(_.producer) should contain only newfilters(2)
   }
 
   it should "allow creating a new data flow ignoring the old" in {
@@ -2035,7 +2035,7 @@ class RewriterSpec extends FlatSpec
     var lastPipename = "B"
     val newfilters = 0 until 3 map { i: Int =>
       val name = PipeNameGenerator.generate()
-      val filter = new Filter(Pipe(name), Pipe(lastPipename), Gt(RefExpr(NamedField("a")), RefExpr(Value(i))))
+      val filter = Filter(Pipe(name), Pipe(lastPipename), Gt(RefExpr(NamedField("a")), RefExpr(Value(i))))
       lastPipename = name
       filter
     }
@@ -2055,7 +2055,7 @@ class RewriterSpec extends FlatSpec
     val dump = newPlan.sinkNodes.last
 
     newfilters(2).outputs.flatMap(_.consumer) should contain only dump
-    dump.inputs.map(_.producer) should contain only (newfilters(2))
+    dump.inputs.map(_.producer) should contain only newfilters(2)
   }
 
   it should "allow merging operators" in {
@@ -2075,7 +2075,7 @@ class RewriterSpec extends FlatSpec
 
   // THESIS
   it should "allow swapping operators" in {
-    Rewriter unless { t: OrderBy => t.outputs.length == 0 } applyPattern {
+    Rewriter unless { t: OrderBy => t.outputs.isEmpty } applyPattern {
       case SuccE(o: OrderBy, succ: Filter) => Functions.swap(o, succ)
     }
     performReorderingTest()
@@ -2132,16 +2132,16 @@ class RewriterSpec extends FlatSpec
     var op1 = OrderBy(Pipe("b"), Pipe("a"), List())
     var op2 = OrderBy(Pipe("b"), Pipe("d"), List())
     var op3 = OrderBy(Pipe("d"), Pipe("b", op2), List())
-    performConnectTest(op1, op3, true)
+    performConnectTest(op1, op3, overwrite = true)
 
     op1 = OrderBy(Pipe("b"), Pipe("a"), List())
     op2 = OrderBy(Pipe("c"), Pipe("d"), List())
-    performConnectTest(op1, op2, true)
+    performConnectTest(op1, op2, overwrite = true)
 
     op1 = OrderBy(Pipe("b"), Pipe("a"), List())
     op2 = OrderBy(Pipe("c"), Pipe("b"), List())
     op1.outputs = List(Pipe("b"), Pipe("c"))
-    performConnectTest(op1, op2, true)
+    performConnectTest(op1, op2, overwrite = true)
   }
 
   // This is the last test because it takes by far the longest. Please keep it down here to reduce waiting times for

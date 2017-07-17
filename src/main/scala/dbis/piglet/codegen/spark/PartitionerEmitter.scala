@@ -23,8 +23,7 @@ class PartitionerEmitter extends CodeEmitter[Partition]  {
       "in" -> op.inPipeName,
       "method" -> methodClass,
       "params" -> op.params.mkString(",") ,
-      "keyby" -> {if(SpatialEmitterHelper.geomIsFirstPos(op.field, op)) "" 
-                  else s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputSchema)), op.field)})"}
+      "keyby" -> SpatialEmitterHelper.keyByCode(op.inputSchema, op.field, ctx)
 		))
     
   }

@@ -16,7 +16,8 @@ class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
     """val <out> = <in>.map{t =>
       |<if (profiling)>
       |if(scala.util.Random.nextInt(randFactor) == 0) {
-      |  accum.incr("<lineage>", t.getNumBytes)
+      |  //accum.incr("<lineage>", t.getNumBytes)
+      |  accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
       |}
       |<endif>
       |<class>(<expr>)}""".stripMargin
@@ -24,7 +25,8 @@ class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
     """val <out> = <in>.map{t =>
       |<if (profiling)>
       |if(scala.util.Random.nextInt(randFactor) == 0) {
-      |  accum.incr("<lineage>", t.getNumBytes)
+      |  //accum.incr("<lineage>", t.getNumBytes)
+      |  accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
       |}
       |<endif>
       |<expr>}""".stripMargin
@@ -33,7 +35,8 @@ class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
     """val <out> = <in>.flatMap{t =>
       |<if (profiling)>
       |if(scala.util.Random.nextInt(randFactor) == 0) {
-      |  accum.incr("<lineage>", t.getNumBytes)
+      |  //accum.incr("<lineage>", t.getNumBytes)
+      |  accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
       |}
       |<endif>
       |<expr>}""".stripMargin

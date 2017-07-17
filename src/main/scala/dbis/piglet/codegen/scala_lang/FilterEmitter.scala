@@ -11,7 +11,8 @@ class FilterEmitter extends CodeEmitter[Filter] {
     """val <out> = <in>.filter{t =>
       |<if (profiling)>
       |if(scala.util.Random.nextInt(randFactor) == 0) {
-      |  accum.incr("<lineage>", t.getNumBytes)
+      |  //accum.incr("<lineage>", t.getNumBytes)
+      |  accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
       |}
       |//PerfMonitor.sizes(url,"<lineage>", t.getNumBytes)
       |<endif>

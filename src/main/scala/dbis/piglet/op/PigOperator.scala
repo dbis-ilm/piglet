@@ -124,7 +124,7 @@ abstract class PigOperator(
     inputs.foreach(p => validPipeName(p.name))
   }
 
-  def inputSchema = if (inputs.nonEmpty) inputs.head.inputSchema else None
+  def inputSchema = inputs.headOption.flatMap(_.inputSchema)//if (inputs.nonEmpty) inputs.head.inputSchema else None
 
   def preparePlan(): Unit = {}
 

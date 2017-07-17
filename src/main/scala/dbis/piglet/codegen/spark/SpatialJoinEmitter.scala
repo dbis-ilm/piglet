@@ -25,7 +25,7 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
   def code(ctx: CodeGenContext, op: SpatialJoin): String = {
     
     if(op.schema.isEmpty)
-      throw new SchemaException("Schema must be defiend for spatial join operator")
+      throw SchemaException("Schema must be defiend for spatial join operator")
     
     
     val vsize = op.inputs.head.inputSchema.get.fields.length // number of fields in left relation
@@ -37,13 +37,13 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
       "out" -> op.outPipeName,
       "className" -> ScalaEmitter.schemaClassName(op.schema.get.className),
       "fields" -> fieldList,
-      "predicate" -> op.predicate.predicateType.toString().toUpperCase(),
-      "rel1" -> op.inPipeNames(0),
-      "rel2" -> op.inPipeNames(1),
-      "keyby1" -> {if(SpatialEmitterHelper.geomIsFirstPos(op.predicate.left, op)) "" 
-                   else s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs(0).inputSchema)), op.predicate.left)})"},
-      "keyby2" -> {if(SpatialEmitterHelper.geomIsFirstPos(op.predicate.right, op)) "" 
-                   else s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs(1).inputSchema)), op.predicate.right)})"},
+      "predicate" -> op.predicate.predicateType.toString.toUpperCase(),
+      "rel1" -> op.inPipeNames.head,
+      "rel2" -> op.inPipeNames.last,
+      "keyby1" -> SpatialEmitterHelper.keyByCode(op.inputs.head.inputSchema, op.predicate.left, ctx),
+      "keyby2" -> SpatialEmitterHelper.keyByCode(op.inputs.last.inputSchema, op.predicate.right, ctx),
+//      "keyby1" -> s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs.head.inputSchema)), op.predicate.left)})",
+//      "keyby2" -> s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs.last.inputSchema)), op.predicate.right)})",
       "liveindex" -> indexTemplate(op.index)
     )
 

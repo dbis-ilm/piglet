@@ -18,10 +18,10 @@ class SpatialFilterEmitter extends CodeEmitter[SpatialFilter] {
   
   override def code(ctx: CodeGenContext, op: SpatialFilter): String = render(Map("out" -> op.outPipeName,
           "in" -> op.inPipeName,
-          "predicate" -> op.pred.predicateType.toString().toLowerCase(),
+          "predicate" -> op.pred.predicateType.toString.toLowerCase(),
           "other" -> ScalaEmitter.emitExpr(ctx, op.pred.expr),
           "liveindex" -> indexTemplate(op.idx),
-          "keyby" -> s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputSchema)), op.pred.field)})"
+          "keyby" -> SpatialEmitterHelper.keyByCode(op.inputSchema, op.pred.field, ctx)
 //          {
 //            if(SpatialEmitterHelper.geomIsFirstPos(op.pred.field, op)) 
 //              "" 

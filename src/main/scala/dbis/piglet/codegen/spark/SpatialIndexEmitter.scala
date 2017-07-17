@@ -16,8 +16,7 @@ class SpatialIndexEmitter extends CodeEmitter[IndexOp] {
       "in" -> op.inPipeName,
       "method" -> IndexMethod.methodName(op.method),
       "params" -> op.params.mkString(","),
-      "keyby" -> {if(SpatialEmitterHelper.geomIsFirstPos(op.field, op)) "" 
-                  else s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputSchema)), op.field)})"} 
+      "keyby" -> SpatialEmitterHelper.keyByCode(op.inputSchema, op.field, ctx)
     ) )
 }
 
