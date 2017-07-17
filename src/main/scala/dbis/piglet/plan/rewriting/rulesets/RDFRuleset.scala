@@ -79,7 +79,7 @@ object RDFRuleset extends Ruleset {
           if (sop == op && (uri.getScheme == "http" || uri.getScheme == "https")) {
 
             Some(Load(op.outputs.head, op.uri, op.schema, Some("pig.SPARQLLoader"),
-              List(""""CONSTRUCT * WHERE ${RDF.triplePatternsToString(bf.get.patterns)}"""")))
+              List(s""""CONSTRUCT * WHERE ${RDF.triplePatternsToString(bf.get.patterns)}"""")))
           } else {
             None
           }
