@@ -2,8 +2,10 @@ package dbis.piglet.op
 
 import dbis.piglet.schema._
 import java.net.URI
+
 import org.kiama.rewriting.Rewriter.everything
-import scala.collection.mutable.Map
+
+import scala.collection.mutable
 
 case class RDFLoad(private val out: Pipe, uri: URI, grouped: Option[String]) extends PigOperator(out) {
 
@@ -46,7 +48,7 @@ object RDFLoad {
     */
  // lazy final val groupedSchemas = {
   def groupedSchemas = {
-    var m = Map[String, Schema]()
+    val m = mutable.Map[String, Schema]()
     val columns = List[String]("subject", "predicate", "object")
     for (grouping_column <- columns) {
       val fields = columns.filterNot(_ == grouping_column).map {

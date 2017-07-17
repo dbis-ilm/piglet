@@ -57,7 +57,7 @@ object RDFRuleset extends Ruleset {
     val uri = op.uri
 
     if (uri.getScheme == "http" || uri.getScheme == "https") {
-      Some(Load(op.outputs.head, uri, op.schema, Some("pig.SPARQLLoader"), List("SELECT * WHERE { ?s ?p ?o }")))
+      Some(Load(op.outputs.head, uri, op.schema, Some("pig.SPARQLLoader"), List(""""SELECT * WHERE { ?s ?p ?o }"""")))
     } else {
       None
     }
@@ -75,9 +75,11 @@ object RDFRuleset extends Ruleset {
       if (bf.isDefined && bf.get.schema == op.schema) {
         // This is the function we'll use for replacing RDFLoad with Load
         def replacer = buildOperatorReplacementStrategy { sop: Any =>
-          if (sop == op) {
+          val uri = op.uri
+          if (sop == op && (uri.getScheme == "http" || uri.getScheme == "https")) {
+
             Some(Load(op.outputs.head, op.uri, op.schema, Some("pig.SPARQLLoader"),
-              List("CONSTRUCT * WHERE " + RDF.triplePatternsToString(bf.get.patterns))))
+              List(s""""CONSTRUCT * WHERE ${RDF.triplePatternsToString(bf.get.patterns)}"""")))
           } else {
             None
           }
