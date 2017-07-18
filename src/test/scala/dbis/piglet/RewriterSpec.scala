@@ -236,7 +236,7 @@ class RewriterSpec extends FlatSpec
       }
     }
 
-    addTypedStrategy(strategy)
+    addTypedStrategy(strategy _)
 
     performFilterMergeTest()
     performNotMergeTest()
@@ -284,7 +284,7 @@ class RewriterSpec extends FlatSpec
   it should "merge Filter operations via binary strategies and anonymous functions" in {
     addBinaryPigOperatorStrategy({ (filter1: Filter, filter2: Filter) =>
                                    if (filter1.pred != filter2.pred) {
-                                     val merged = Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
+                                     val merged = new Filter(filter2.outputs.head, filter1.inputs.head, And(filter1.pred, filter2.pred))
                                      Some(fixMerge(filter1, filter2, merged))
                                    } else {
                                      None
@@ -313,11 +313,11 @@ class RewriterSpec extends FlatSpec
 
   it should "order Filter operations before Order By ones with an extra function" in {
     var x = 0
-    def f(o: OrderBy, f: Filter): Option[(Filter, OrderBy)] = {
+    def f(o: OrderBy, f: Filter): Option[Tuple2[Filter,OrderBy]] = {
       x += 1
       Some(f, o)
     }
-    reorder[OrderBy, Filter](f)
+    reorder[OrderBy, Filter](f _)
     performReorderingTest()
     x shouldBe 1
   }
@@ -521,8 +521,8 @@ class RewriterSpec extends FlatSpec
       val op2 = Dump(Pipe("a"))
       val plan = rewritePlan(new DataflowPlan(List(op1, op2)))
       val source = plan.sourceNodes.headOption.value
-      source shouldBe Load(Pipe("a"), url, op1.schema, Some("RDFFileStorage"),
-        List("SELECT * WHERE { ?s ?p ?o }"))
+      source shouldBe Load(Pipe("a"), url, op1.schema, Some("pig.SPARQLLoader"),
+        List(""""SELECT * WHERE { ?s ?p ?o }""""))
     }
   }
 
@@ -540,8 +540,8 @@ class RewriterSpec extends FlatSpec
     val op4 = Dump(Pipe("c"))
     val plan = rewritePlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
-    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("RDFFileStorage"),
-      List("""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }"""))
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("pig.SPARQLLoader"),
+      List(""""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }""""))
     plan.operators should not contain op3
   }
 
@@ -563,8 +563,8 @@ class RewriterSpec extends FlatSpec
     val op4 = Dump(Pipe("c"))
     val plan = rewritePlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
-    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("RDFFileStorage"),
-      List("""SELECT * WHERE { ?s ?p ?o }"""))
+    source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("pig.SPARQLLoader"),
+      List(""""SELECT * WHERE { ?s ?p ?o }""""))
   }
 
   it should "apply rewriting rule L2" in {
@@ -1298,7 +1298,7 @@ class RewriterSpec extends FlatSpec
 
     val possibleGroupers = Table("grouping column", "subject", "predicate", "object")
 
-    val wrapped = buildTypedCaseWrapper(J2)
+    val wrapped = buildTypedCaseWrapper(J2 _)
 
     forAll (possibleGroupers) { (g: String) =>
       forAll(patterns) { (p: List[TriplePattern], fo: Foreach, fi: Filter) =>
