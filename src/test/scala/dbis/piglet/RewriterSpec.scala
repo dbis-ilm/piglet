@@ -522,7 +522,7 @@ class RewriterSpec extends FlatSpec
       val plan = rewritePlan(new DataflowPlan(List(op1, op2)))
       val source = plan.sourceNodes.headOption.value
       source shouldBe Load(Pipe("a"), url, op1.schema, Some("pig.SPARQLLoader"),
-        List("SELECT * WHERE { ?s ?p ?o }"))
+        List(""""SELECT * WHERE { ?s ?p ?o }""""))
     }
   }
 
@@ -541,7 +541,7 @@ class RewriterSpec extends FlatSpec
     val plan = rewritePlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
     source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("pig.SPARQLLoader"),
-      List("""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }"""))
+      List(""""CONSTRUCT * WHERE { $0 "firstName" "Stefan" }""""))
     plan.operators should not contain op3
   }
 
@@ -564,7 +564,7 @@ class RewriterSpec extends FlatSpec
     val plan = rewritePlan(new DataflowPlan(List(op1, op2, op3, op4)))
     val source = plan.sourceNodes.headOption.value
     source shouldBe Load(Pipe("a"), "http://example.com", op1.schema, Some("pig.SPARQLLoader"),
-      List("""SELECT * WHERE { ?s ?p ?o }"""))
+      List(""""SELECT * WHERE { ?s ?p ?o }""""))
   }
 
   it should "apply rewriting rule L2" in {
