@@ -264,10 +264,21 @@ object ScalaEmitter {
     * @return a parameter map with class and extractor elements
     */
   def emitExtractorFunc(node: PigOperator, loaderFunc: Option[String]): Map[String, Any] = {
+
+//    val pattern = "\{(\([a-z]\))+\}"
+
     def schemaExtractor(schema: Schema): String =
       schema.fields.zipWithIndex.map{case (f, i) =>
-        // we cannot perform a "toAny" - therefore, we treat bytearray as String here
-        val t = ScalaEmitter.scalaTypeMappingTable(f.fType); s"data($i).to${if (t == "Any") "String" else t}"
+        f.fType match {
+          case _: SimpleType =>
+            // we cannot perform a "toAny" - therefore, we treat bytearray as String here
+            val t = ScalaEmitter.scalaTypeMappingTable(f.fType)
+            s"data($i).to${if (t == "Any") "String" else t}"
+          case b: BagType =>
+            ""
+//            s"data($i).toIterable[(${b.valueType.fields.map(f => ScalaEmitter.scalaTypeMappingTable(f.fType)).mkString(",")})]"
+        }
+
       }.mkString(", ")
 
     def jdbcSchemaExtractor(schema: Schema): String =

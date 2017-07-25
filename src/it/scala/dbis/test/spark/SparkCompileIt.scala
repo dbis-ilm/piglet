@@ -67,6 +67,7 @@ class SparkCompileIt extends FlatSpec with CompileIt{
     ("jdbc.pig", "jdbc.out", "truth/jdbc-data.data", true, "spark"),
     ("simple_matrix.pig", "simple-matrix.out", "truth/simple-matrix-res.data", true, "spark"),
 
+    ("bgpfilter.pig", "bgpfilter.out", "truth/bgpfilter.data", false, "spark"),
     ("rdf_starjoin_plain.pig", "rdf_starjoin_plain.out", "truth/rdf_starjoin_plain.data", false, "spark"),
     ("rdf_pathjoin_plain.pig", "rdf_pathjoin_plain.out", "truth/rdf_pathjoin_plain.data", false, "spark"),
    // ("aggrwogrouping.pig", "aggrwogrouping.out", "truth/aggrwogrouping.data", true, "plain", "spark")
