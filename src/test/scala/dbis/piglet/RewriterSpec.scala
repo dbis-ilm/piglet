@@ -25,7 +25,7 @@ import dbis.piglet.parser.PigParser
 import dbis.piglet.plan.rewriting.Extractors._
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.rewriting.Rules._
-import dbis.piglet.plan.rewriting.rulesets.{SparkRuleset, RDFRuleset, GeneralRuleset}
+import dbis.piglet.plan.rewriting.rulesets.{GeneralRuleset, RDFRuleset, SparkRuleset}
 import dbis.piglet.plan.rewriting.rulesets.GeneralRuleset._
 import dbis.piglet.plan.rewriting.rulesets.RDFRuleset._
 import dbis.piglet.plan.rewriting.{Functions, Rewriter}
@@ -37,6 +37,7 @@ import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers, PrivateMethodTester}
 import dbis.piglet.plan.rewriting.internals.{Column, RDF}
+import dbis.piglet.tools.TopoSort
 
 import scala.util.Random
 
@@ -631,6 +632,29 @@ class RewriterSpec extends FlatSpec
         plan.findOperatorForAlias("b").value should matchPattern { case SuccE(_, `op3`) => }
       }
     }
+  }
+
+  ignore should "rewrite a BGP with single filter TP to normal filter (F2) " in {
+    val plan = new DataflowPlan(parseScript(
+      s"""A = RDFLOAD('file');
+         |B = BGP_FILTER A BY { ?s "testkeyword" ?o };
+         |DUMP B;
+       """.stripMargin))
+
+
+    RDFRuleset.registerRules()
+    val rewrittenPlan = rewritePlan(plan)
+
+    val ops = TopoSort(rewrittenPlan)
+//
+    ops.length shouldBe 3
+
+
+    ops.head shouldBe a[Load]
+    ops(1) shouldBe a[Filter]
+    ops.last shouldBe a[Dump]
+
+
   }
 
   it should "apply rewriting rule F3" in {

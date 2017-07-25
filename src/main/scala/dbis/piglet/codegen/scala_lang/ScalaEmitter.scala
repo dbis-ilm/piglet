@@ -6,6 +6,7 @@ import dbis.piglet.op.{CompEvent, GroupingExpression, PigOperator, SimplePattern
 import dbis.piglet.schema._
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.udf.UDFTable
+import org.clapper.scalasti.ST
 
 
 object ScalaEmitter extends PigletLogging {
@@ -19,7 +20,6 @@ object ScalaEmitter extends PigletLogging {
     Types.CharArrayType -> "String",
     Types.ByteArrayType -> "String", //TODO: check this - maybe this should be Any
     Types.AnyType -> "String") //TODO: check this
-
 
   /**
     * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
@@ -253,17 +253,16 @@ object ScalaEmitter extends PigletLogging {
     * @return a parameter map with class and extractor elements
     */
   def emitExtractorFunc(node: PigOperator, loaderFunc: Option[String]): Map[String, Any] = {
-
     def schemaExtractor(schema: Schema): String =
       schema.fields.zipWithIndex.map{case (f, i) =>
-        // we cannot perform a "toAny" - therefore, we treat bytearray as String here
         f.fType match {
-          case s: SimpleType =>
+          case _: SimpleType =>
+            // we cannot perform a "toAny" - therefore, we treat bytearray as String here
             val t = ScalaEmitter.scalaTypeMappingTable(f.fType)
             s"data($i).to${if (t == "Any") "String" else t}"
-//          case c: BagType =>
-//            s"data($i).toIterable[(String,String,String)]" // TODO determine correct type here!
-
+          case b: BagType =>
+            ""
+//            s"data($i).toIterable[(${b.valueType.fields.map(f => ScalaEmitter.scalaTypeMappingTable(f.fType)).mkString(",")})]"
         }
 
       }.mkString(", ")
