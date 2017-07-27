@@ -259,8 +259,14 @@ object Piglet extends PigletLogging {
 
       logger.debug("finished optimizations")
 
+      val scriptName = path.getFileName.toString.replace(".pig", "")
+      logger.debug(s"using script name: $scriptName")
+
       // for creating the Dot image
       PlanWriter.init(newPlan)
+      val imgPath = path.resolveSibling(scriptName)
+      logger.debug(s"path to dot file: $imgPath")
+      PlanWriter.createImage(imgPath, scriptName)
 
       if (c.showPlan) {
         println("final plan = {")
@@ -285,8 +291,7 @@ object Piglet extends PigletLogging {
       }
 
 
-      val scriptName = path.getFileName.toString.replace(".pig", "")
-      logger.debug(s"using script name: $scriptName")
+
 
       // 8. compile the plan to code
       PigletCompiler.compilePlan(newPlan, scriptName, c) match {

@@ -18,26 +18,26 @@ package dbis.piglet
 
 import java.net.URI
 
-import dbis.piglet.parser.PigParser.parseScript
-import dbis.piglet.op._
 import dbis.piglet.expr._
+import dbis.piglet.op._
 import dbis.piglet.parser.PigParser
+import dbis.piglet.parser.PigParser.parseScript
 import dbis.piglet.plan.rewriting.Extractors._
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.rewriting.Rules._
-import dbis.piglet.plan.rewriting.rulesets.{GeneralRuleset, RDFRuleset, SparkRuleset}
+import dbis.piglet.plan.rewriting.internals.RDF
 import dbis.piglet.plan.rewriting.rulesets.GeneralRuleset._
 import dbis.piglet.plan.rewriting.rulesets.RDFRuleset._
+import dbis.piglet.plan.rewriting.rulesets.{GeneralRuleset, RDFRuleset, SparkRuleset}
 import dbis.piglet.plan.rewriting.{Functions, Rewriter}
 import dbis.piglet.plan.{DataflowPlan, PipeNameGenerator}
 import dbis.piglet.schema.{BagType, Schema, TupleType, _}
 import dbis.piglet.tools.TestTools._
+import dbis.piglet.tools.TopoSort
 import org.kiama.rewriting.Rewriter.strategyf
 import org.scalatest.OptionValues._
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers, PrivateMethodTester}
-import dbis.piglet.plan.rewriting.internals.{Column, RDF}
-import dbis.piglet.tools.TopoSort
 
 import scala.util.Random
 

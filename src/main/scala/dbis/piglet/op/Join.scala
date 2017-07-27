@@ -16,10 +16,8 @@
  */
 package dbis.piglet.op
 
-import dbis.piglet.schema._
-import scala.collection.mutable.ArrayBuffer
-import java.util.concurrent.TimeUnit
 import dbis.piglet.expr.Ref
+import dbis.piglet.schema._
 
 
 /**
@@ -34,11 +32,11 @@ case class Join(
     private val out:Pipe, 
     private val in: List[Pipe], 
     fieldExprs: List[List[Ref]],
-    timeWindow: Tuple2[Int,String] = null.asInstanceOf[Tuple2[Int,String]]
+    timeWindow: (Int, String) = null.asInstanceOf[(Int, String)]
   ) extends PigOperator(List(out), in) {
 
   override def lineageString: String = {
-    s"""JOIN%${fieldExprs}%""" + super.lineageString
+    s"""JOIN%$fieldExprs%""" + super.lineageString
   }
 
   override def constructSchema: Option[Schema] = {

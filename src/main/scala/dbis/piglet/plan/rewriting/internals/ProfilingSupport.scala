@@ -54,7 +54,7 @@ trait ProfilingSupport extends PigletLogging {
         // add timing op to list of operators
 //        plan.operators = plan.operators :+ timingOp
 
-        val timingOp = TimingOp(Pipe("dummy", consumers = opOutPipe.consumer), Pipe("dummy", producer = op), op.lineageSignature)
+        val timingOp = TimingOp(Pipe(opOutPipe.name, consumers = opOutPipe.consumer), Pipe(PipeNameGenerator.generate(), producer = op), op.lineageSignature)
 
         ProfilingSupport.insertBetweenAll(opOutPipe, op, timingOp, plan)
 
@@ -84,22 +84,29 @@ object ProfilingSupport {
     val oldName = oldPipe.name
     val newName = PipeNameGenerator.generate()
 
-    val newInPipe = Pipe(newName, producer = oldOp) // op is producer & timing should be the only consumer
-    val newOutPipe = Pipe(oldName, consumers = oldPipe.consumer )    // timing should be only producer & op's consumer are consumers
+    val newInPipe = Pipe(newName, producer = oldOp, consumers = List(newOp)) // op is producer & timing should be the only consumer
+//    val newOutPipe = Pipe(oldName, producer = newOp, consumers = oldPipe.consumer)    // timing should be only producer & op's consumer are consumers
 
 
-    newOutPipe.consumer.foreach{ c =>
-      val idx = c.inputs.indexWhere(_.name == oldName)
-      val (l1,l2) = c.inputs.splitAt(idx)
-      c.inputs = l1 ++ List(newOutPipe) ++ l2.drop(1) // the first element in l2 is the one we want to replace
-    }
+//    oldPipe.consumer.foreach{ c =>
+//
+//      val idx = c.inputs.indexWhere(_.name == oldName)
+//      val (l1,l2) = c.inputs.splitAt(idx)
+//      c.inputs = l1 ++ List(newOutPipe) ++ l2.drop(1) // the first element in l2 is the one we want to replace
+//
+//    }
 
-    newOp.outputs = List(newOutPipe)
-    newOp.inputs = List(newInPipe)
+//    newOp.outputs = List(newOutPipe)
+//    val idx0 = newOp.outputs.indexWhere(_.name == oldName)
+//    val (l10,l20) = newOp.outputs.splitAt(idx0)
+//    newOp.outputs = l10 ++ List(newOutPipe) ++ l20.drop(1)
 
 
-    newInPipe.consumer = List(newOp)
-    newOutPipe.producer = newOp
+
+      newOp.inputs = List(newInPipe)
+//
+//    newInPipe.consumer = List(newOp)
+//    newOutPipe.producer = newOp
 
     val idx = oldOp.outputs.indexWhere(_.name == oldName)
     val (l1,l2) = oldOp.outputs.splitAt(idx)

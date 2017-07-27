@@ -4,8 +4,8 @@ import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenException}
 import dbis.piglet.expr.Ref
 import dbis.piglet.op.Join
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Set
 
 /**
   * Created by kai on 12.12.16.
@@ -20,8 +20,8 @@ class JoinEmitter extends CodeEmitter[Join] {
   /**
     *
     * @param ctx an object representing context information for code generation
-    * @param joinExpr
-    * @return
+    * @param joinExpr The expression to compare elements with
+    * @return Returns the string representing the join key field
     */
   def emitJoinKey(ctx: CodeGenContext, joinExpr: List[Ref]): String = {
     if (joinExpr.size == 1)
@@ -31,7 +31,7 @@ class JoinEmitter extends CodeEmitter[Join] {
   }
 
   override def code(ctx: CodeGenContext, op: Join): String = {
-    if (!op.schema.isDefined)
+    if (op.schema.isEmpty)
       throw CodeGenException("schema required in JOIN")
 
     val rels = op.inputs
@@ -112,7 +112,7 @@ class JoinEmitter extends CodeEmitter[Join] {
 
 
 object JoinEmitter {
-  val joinKeyVars = Set[String]()
+  val joinKeyVars = mutable.Set[String]()
   
   lazy val instance = new JoinEmitter
 }
