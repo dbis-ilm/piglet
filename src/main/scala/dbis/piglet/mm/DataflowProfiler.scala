@@ -111,38 +111,65 @@ object DataflowProfiler extends PigletLogging {
       val partitionId = partition.partitionId
 
       // parent operators
-      val parentLineages = profilingGraph.parents(lineage).getOrElse(List(Markov.startNode.lineage)) //parentsOf(lineage)
+      val parentLineages = profilingGraph.parents(lineage).getOrElse(List(Markov.startNode.lineage))
+
       // list of parent partitions per parent
       val parentPartitionIds = parentPartitionInfo(lineage)
+
 
       /* for each parent operator, get the times for the respective parent partitions.
        * and at the end take the min (first processed parent partition) or max (last processed parent partition) value
        */
       val parentTimes = parentPartitionIds(partitionId).zipWithIndex.flatMap{ case (list, idx) =>
-          val parentLineage = parentLineages(idx)
 
-          list.map{ pId =>
-            val p = if(parentLineage == Markov.startNode.lineage)
-                Partition(parentLineage, -1) // for "start" we only have one value with partition id -1
+        val parentLineage = parentLineages(idx)
+        val parentMaxPartitionId = 0
+
+        list.map{ pId =>
+          val p = if(parentLineage == Markov.startNode.lineage)
+              Partition(parentLineage, -1) // for "start" we only have one value with partition id -1
 //            else if(parentLineage == "progstart")
 //              Partition(parentLineage, -1)
-              else
-                Partition(parentLineage,pId)
+          else {
+            val theParentId = if(pId > parentMaxPartitionId) parentMaxPartitionId else pId
+            Partition(parentLineage, theParentId)
+          }
 
-            if(currentTimes.contains(p))
-              currentTimes(p)
-            else {
-              logger.error("currentTimes: ")
-              logger.error(currentTimes.mkString("\n"))
-              throw ProfilingException(s"no $p in list of current execution times")
-            }
+          if(currentTimes.contains(p))
+            currentTimes(p)
+          else {
+//              logger.error("currentTimes: ")
+//              val sortedTimes = currentTimes.toList.sortWith{ (l,r) =>
+//                val (Partition(leftLineage, leftPartId),_) = l
+//                val (Partition(rightLineage, rightPartId),_) = r
+//
+//                val comp = leftLineage.compareTo(rightLineage)
+//
+//                if(comp < 0)
+//                  true
+//                else if(comp == 0)
+//                  leftPartId < rightPartId
+//                else
+//                  false
+//              }
+//              logger.error(sortedTimes.mkString("\n"))
+
+
+
+              val msg = s"no $p in list of current execution times (as parent for $partition)"
+              logger.warn(msg)
+//              throw ProfilingException(s"no $p in list of current execution times (as parent for $partition)")
+            -1L
           }
         }
+      }.filter(_ >= 0)
 
       val earliestParentTime = if(parentTimes.nonEmpty) {
         parentTimes.max
       } else {
-        throw ProfilingException(s"no parent time for $lineage on partition $partitionId")
+//        throw ProfilingException(s"no parent time for $lineage on partition $partitionId")
+
+        time + 1
       }
 
       val duration = time - earliestParentTime

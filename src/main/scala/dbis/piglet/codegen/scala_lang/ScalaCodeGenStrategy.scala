@@ -112,16 +112,15 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
       converterCode += ScalaEmitter.emitSchemaConverters(values)
     }
 
-    val p = "_t([0-9]+)_Tuple".r
 
     val sortedClasses = classes.sortWith { case (left, right) =>
       val leftNum = left._1 match {
-        case p(group) => group.toInt
+        case ScalaCodeGenStrategy.TupleClassPattern(group) => group.toInt
         case _ => throw new IllegalArgumentException(s"unexpected class name: $left")
       }
 
       val rightNum = right._1 match {
-        case p(group) => group.toInt
+        case ScalaCodeGenStrategy.TupleClassPattern(group) => group.toInt
         case _ => throw new IllegalArgumentException(s"unexpected class name: $left")
       }
 
@@ -144,4 +143,8 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
 
     emitter.helper(ctx, node)
   }
+}
+
+object ScalaCodeGenStrategy {
+  final val TupleClassPattern = "_t([0-9]+)_Tuple".r
 }

@@ -265,7 +265,6 @@ object Piglet extends PigletLogging {
       // for creating the Dot image
       PlanWriter.init(newPlan)
       val imgPath = path.resolveSibling(scriptName)
-      logger.debug(s"path to dot file: $imgPath")
       PlanWriter.createImage(imgPath, scriptName)
 
       if (c.showPlan) {

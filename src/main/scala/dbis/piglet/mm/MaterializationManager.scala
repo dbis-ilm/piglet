@@ -5,7 +5,7 @@ import java.nio.file.{Files, StandardOpenOption}
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.op._
 import dbis.piglet.plan.rewriting.internals.ProfilingSupport
-import dbis.piglet.plan.{DataflowPlan, OperatorNotFoundException}
+import dbis.piglet.plan.{DataflowPlan, OperatorNotFoundException, PipeNameGenerator}
 import dbis.piglet.tools._
 import dbis.piglet.tools.logging.PigletLogging
 import org.json4s._
@@ -176,10 +176,12 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
 
         } else {
           logger.debug(s"adding cache operator afters $theOp  with cache-mode: ${ps.cacheMode}")
-          val cache = Cache(Pipe("dummy"), Pipe("dummy", producer= theOp), theOp.lineageSignature, ps.cacheMode)
+
+          val cache = Cache(Pipe(theOp.outPipeName), Pipe(PipeNameGenerator.generate(), producer= theOp), theOp.lineageSignature, ps.cacheMode)
 
           newPlan.addOperator(Seq(storer, cache), deferrConstruct = true)
           newPlan = newPlan.insertAfter(theOp, storer)
+          cache.outputs = theOp.outputs
           newPlan = ProfilingSupport.insertBetweenAll(theOp.outputs.head, theOp, cache, newPlan)
         }
     }
@@ -202,7 +204,10 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
         case Some(uri) =>
           logger.info(s"loading materialized results for ${op.name} $sig")
 
-          val loader = Load(op.outputs.head, uri, op.schema, Some("BinStorage"))
+//          val loader = Load(op.outputs.head, uri, op.schema, Some("BinStorage"))
+          //FIXME: could be a problem when restoring the result of a SPLIT operator. Then we would have to insert multiple LOADs?
+          val loader = Load(Pipe(op.outPipeName), uri, op.schema, Some("BinStorage"))
+//          loader.outputs.head.producer = loader
           logger.debug(s"replacing ${op.name} with $loader")
 
           // add the new Load op to the list of operators in the plan
@@ -214,18 +219,24 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
           // remove Op and all its predecessors from plan
           newPlan = newPlan.remove(op, removePredecessors = true)
 
+
           // for each consumer (Pipe) of Op
-          opConsumers.foreach { s =>
+          opConsumers.foreach { outPipe =>
             // for each consumer of that pipe
-            s.consumer.foreach { c =>
+            outPipe.consumer.foreach { consumer =>
               // make this consumer a consumer of the new Load
-              loader.addConsumer(s.name, c)
+              loader.addConsumer(outPipe.name, consumer)
               // and remove the old pipe and add Load as producer
-              c.inputs = c.inputs.filter(_.name == s.name) ++ loader.outputs
+              consumer.inputs = consumer.inputs.filter(_.name == outPipe.name) ++ loader.outputs
+
+//              val idx = consumer.inputs.indexWhere(_.name == outPipe.name)
+//              val (l1,l2) = consumer.inputs.splitAt(idx)
+//              consumer.inputs = l1 ++ loader.outputs.filter(_.name == outPipe.name) ++ l2.drop(1)
+
 
               // update the schema of the consumers to adapt to new input op
               // actually the schema should be the same, but somehow types were not correctly inferred in consumers
-              c.constructSchema
+              consumer.constructSchema
             }
           }
 

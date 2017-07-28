@@ -104,6 +104,9 @@ object PlanWriter extends PigletLogging {
     */
   private def writeDotFile(file: Path, graph: String): Unit = {
     logger.info(s"writing dot file to $file")
+    if(Files.notExists(file.getParent)) {
+      Files.createDirectories(file.getParent)
+    }
     Files.write(file, List(graph).asJava, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
   }
   

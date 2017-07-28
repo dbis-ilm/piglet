@@ -68,8 +68,9 @@ object PerfMonitor {
       val a = rdd.dependencies.map{
         case d: NarrowDependency[_] =>
           d.getParents(partitionId)
-        case _: ShuffleDependency[_,_,_] =>
-          rdd.partitions.indices
+        case s: ShuffleDependency[_,_,_] =>
+          0 until s.partitioner.numPartitions
+//          rdd.partitions.indices
         case d@ _ =>
           println(s"Unknown dependency type: $d")
           Seq.empty[Int]
