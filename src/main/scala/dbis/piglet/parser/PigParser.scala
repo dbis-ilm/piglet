@@ -411,12 +411,12 @@ class PigParser extends JavaTokenParsers with PigletLogging {
       new RDFLoad(Pipe(b), uri, grouped)
   }
 
-  lazy val nullKeyword = "devnull".ignoreCase
-  
+  lazy val mute = "mute".ignoreCase
+
   /*
    * DUMP <A>
    */
-  def dumpStmt: Parser[PigOperator] = dumpKeyword ~ bag ~ (nullKeyword?) ^^ { case _ ~ b ~ nuller => Dump(Pipe(b), nuller.isDefined) }
+  def dumpStmt: Parser[PigOperator] = dumpKeyword ~ bag ~ (mute?) ^^ { case _ ~ b ~ nuller => Dump(Pipe(b), nuller.isDefined) }
 
   /*
    * DISPLAY <A>
