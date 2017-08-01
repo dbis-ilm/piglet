@@ -32,7 +32,7 @@ object NamedField {
   }
 
   def fromStringList(s: List[String]): NamedField = {
-    require(s.length != 0, "s has to contain at least one element, the name of the field")
+    require(s.nonEmpty, "s has to contain at least one element, the name of the field")
     if (s.length == 1) {
       NamedField(s.head)
     } else {

@@ -18,9 +18,10 @@
 package dbis.piglet.expr
 
 import dbis.piglet.schema._
-import dbis.piglet.udf.{UDFTable, UDF}
+import dbis.piglet.tools.logging.PigletLogging
+import dbis.piglet.udf.UDFTable
 
-import scala.collection.mutable.Map
+import scala.collection.mutable
 
 trait ArithmeticExpr extends Expr
 
@@ -30,36 +31,42 @@ case class RefExpr(var r: Ref) extends ArithmeticExpr {
 
   override def resultType(schema: Option[Schema]): PigType = schema match {
     case Some(s) => r match {
-      case nf @ NamedField(n, _) => try {
+      case nf : NamedField => try {
         val f = s.field(nf)
         f.fType
       }
       catch {
-        case e: SchemaException => Types.AnyType
+        case e: SchemaException =>
+//          logger.warn("cannot find result type",e)
+          Types.AnyType
       }
       case PositionalField(p) => val f = s.field(p); f.fType
-      case Value(v) => if (v.isInstanceOf[String]) Types.CharArrayType
-                      else if (v.isInstanceOf[Int]) Types.IntType
-                      else if (v.isInstanceOf[Double]) Types.DoubleType
-                      else Types.ByteArrayType
-      case DerefTuple(t, c) => {
+      case Value(v) => v match {
+        case _: String => Types.CharArrayType
+        case _ => v match {
+          case _: Int => Types.IntType
+          case _: Double => Types.DoubleType
+          case _ => Types.ByteArrayType
+        }
+      }
+      case DerefTuple(t, c) =>
         // in case of tuple.NamedField or tuple.PositionalField, we need
         // to detemine the field type
         val bagField = t match {
           case NamedField(n, _) => s.field(n)
           case PositionalField(p) =>  s.field(p)
-          case _ => throw new SchemaException(s"unknown bag in the schema")
+          case _ => throw SchemaException(s"unknown bag in the schema")
         }
-        val tupleType = if (bagField.fType.isInstanceOf[TupleType])
-          bagField.fType.asInstanceOf[TupleType]
-        else bagField.fType.asInstanceOf[BagType].valueType
+        val tupleType = bagField.fType match {
+          case tupleType1: TupleType => tupleType1
+          case _ => bagField.fType.asInstanceOf[BagType].valueType
+        }
         val fieldType: PigType = c match {
           case NamedField(n, _) => tupleType.fields.filter { p => p.name == n}.head.fType
-          case PositionalField(p) => tupleType.fields(p).fType 
+          case PositionalField(p) => tupleType.fields(p).fType
           case _ => null
         }
         if (fieldType != null) fieldType else Types.ByteArrayType
-      }
       //case DerefMap(m, k) =>
       case _ => Types.ByteArrayType
     }
@@ -73,8 +80,8 @@ case class RefExpr(var r: Ref) extends ArithmeticExpr {
 
   override def toString = r.toString
 
-  def resolveReferences(mapping: Map[String, Ref]): Unit = r match {
-    case nf@NamedField(n, _) => {
+  def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = r match {
+    case NamedField(n, _) =>
       val newVal = replaceReference(n, mapping)
       if (newVal != n) {
         /*
@@ -84,12 +91,14 @@ case class RefExpr(var r: Ref) extends ArithmeticExpr {
          */
         r = Value(newVal)
       }
+    case v@Value(n) => n match {
+      case str: String => v.v = replaceReference(str, mapping)
+      case _ =>
     }
-    case v@Value(n) => if (n.isInstanceOf[String]) v.v = replaceReference(n.asInstanceOf[String], mapping)
-    case _ => {}
+    case _ =>
   }
 
-  def replaceReference(s: String, mapping: Map[String, Ref]): Any = {
+  def replaceReference(s: String, mapping: mutable.Map[String, Ref]): Any = {
     if (s.startsWith("$") && mapping.contains(s)) {
       val s2 = mapping(s) match {
         case NamedField(n, _) => n
@@ -113,16 +122,15 @@ case class FlattenExpr(a: ArithmeticExpr) extends ArithmeticExpr {
 
   override def resultType(schema: Option[Schema]): PigType = {
     val bType = a.resultType(schema) // that's a BagType, extract the component type
-    if (bType.isInstanceOf[ComplexType]) {
-      val cType = bType.asInstanceOf[ComplexType]
-      cType.typeOfComponent(0)
-    }
-    else {
-      a.resultType(schema)
+    bType match {
+      case cType: ComplexType =>
+        cType.typeOfComponent(0)
+      case _ =>
+        a.resultType(schema)
     }
   }
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = a.resolveReferences(mapping)
 }
 
 case class PExpr(a: ArithmeticExpr) extends ArithmeticExpr {
@@ -136,7 +144,7 @@ case class PExpr(a: ArithmeticExpr) extends ArithmeticExpr {
 
   override def resultType(schema: Option[Schema]): PigType = a.resultType(schema)
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = a.resolveReferences(mapping)
 }
 
 case class CastExpr(t: PigType, a: ArithmeticExpr) extends ArithmeticExpr {
@@ -150,7 +158,7 @@ case class CastExpr(t: PigType, a: ArithmeticExpr) extends ArithmeticExpr {
 
   override def resultType(schema: Option[Schema]): PigType = t
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = a.resolveReferences(mapping)
 }
 
 case class MSign(a: ArithmeticExpr) extends ArithmeticExpr {
@@ -162,7 +170,7 @@ case class MSign(a: ArithmeticExpr) extends ArithmeticExpr {
   }
   override def resultType(schema: Option[Schema]): PigType = a.resultType(schema)
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = a.resolveReferences(mapping)
 }
 
 case class Add(override val left: ArithmeticExpr,  override val right: ArithmeticExpr) extends BinaryExpr(left, right) with ArithmeticExpr {
@@ -213,7 +221,7 @@ case class Func(f: String, params: List[ArithmeticExpr]) extends ArithmeticExpr 
     }
   }
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = params.foreach(_.resolveReferences(mapping))
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = params.foreach(_.resolveReferences(mapping))
 }
 
 trait ConstructExpr extends ArithmeticExpr {
@@ -229,7 +237,7 @@ trait ConstructExpr extends ArithmeticExpr {
       exprs.map(_.traverseOr(schema, traverser)).exists(b => b)
   }
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = exprs.foreach(_.resolveReferences(mapping))
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = exprs.foreach(_.resolveReferences(mapping))
 
   def exprListToTuple(schema: Option[Schema]): Array[Field] =
     exprs.map(e => e.resultType(schema)).zipWithIndex.map(f => Field("", f._1)).toArray
@@ -287,7 +295,7 @@ case class ConstructMatrixExpr(typeString: String, rows: Int, cols: Int, ex: Ari
     val t = if (typeString.charAt(1) == 'i') Types.IntType else Types.DoubleType
     val k = if (typeString.charAt(0) == 's') MatrixRep.SparseMatrix else MatrixRep.DenseMatrix
     if (ex.resultType(schema).tc != TypeCode.BagType )
-      throw new SchemaException(s"matrix construction requires a bag parameter")
+      throw SchemaException(s"matrix construction requires a bag parameter")
     MatrixType(t, rows, cols, k)
   }
 }
@@ -301,7 +309,7 @@ case class ConstructGeometryExpr(ex: ArithmeticExpr, time: Option[TempEx]) exten
   
   override def resultType(schema: Option[Schema]): PigType = {
     if(ex.resultType(schema).tc != TypeCode.CharArrayType)
-      throw new SchemaException(s"geometry construction requires a string parameter, but is ${ex.resultType(schema).tc}")
+      throw SchemaException(s"geometry construction requires a string parameter, but is ${ex.resultType(schema).tc}")
     
     GeometryType()
   }

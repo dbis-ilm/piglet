@@ -88,15 +88,23 @@ case class Grouping(
 
   override def constructSchema: Option[Schema] = {
     // tuple(group: typeOfGroupingExpr, in:bag(inputSchema))
-    val inputType = inputSchema match {
+    val inSchema = inputSchema
+    val inputType = inSchema match {
       case Some(s) => s.element.valueType
       case None => TupleType(Array(Field("", Types.ByteArrayType)))
     }
+
     val groupingType = groupExpr.resultType(inputSchema)
+
     // the group field gets the original grouping expression as lineage, e.g. rel.column
-    val fields = Array(Field("group", groupingType, List(s"$inPipeName.${groupExpr.keyList.mkString}")),
-      Field(inputs.head.name, BagType(inputType)))
-    schema = Some(Schema(BagType(TupleType(fields))))
+    val groupField = Field("group", groupingType, List(s"$inPipeName.${groupExpr.keyList.mkString}"))
+
+    val aggField = Field(inputs.head.name, BagType(inputType))
+
+    val fields = Array(groupField, aggField)
+
+
+    schema = Some(Schema(fields))
     schema
   }
 
@@ -107,7 +115,7 @@ case class Grouping(
         ! groupExpr.keyList.filter(_.isInstanceOf[NamedField]).exists(f => s.indexOfField(f.asInstanceOf[NamedField]) == -1)
       case None =>
         // if we don't have a schema all expressions should contain only positional fields
-        ! groupExpr.keyList.map(_.isInstanceOf[NamedField]).exists(b => b)
+        ! groupExpr.keyList.exists(_.isInstanceOf[NamedField])
     }
   }
 
@@ -117,6 +125,13 @@ case class Grouping(
     println(indent(tab + 2) + "outSchema = " + schema)
     println(indent(tab + 2) + "group on = " + groupExpr)
   }
+
+  override def toString: String =
+    s"""GROUPING { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }
+       |  inSchema  = $inputSchema
+       |  outSchema = $schema
+       |  group on  = $groupExpr
+     """.stripMargin
 
 }
 

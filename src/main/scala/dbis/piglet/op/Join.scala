@@ -47,7 +47,7 @@ case class Join(
       case None => List(Field("", Types.ByteArrayType))
     })
     
-    schema = Some(Schema(BagType(TupleType(newFields.toArray))))
+    schema = Some(Schema(newFields.toArray))
     schema
   }
 

@@ -6,6 +6,7 @@ import dbis.piglet.Piglet.Lineage
 import dbis.piglet.op._
 import dbis.piglet.plan.rewriting.internals.ProfilingSupport
 import dbis.piglet.plan.{DataflowPlan, OperatorNotFoundException, PipeNameGenerator}
+import dbis.piglet.schema.{Field, Schema}
 import dbis.piglet.tools._
 import dbis.piglet.tools.logging.PigletLogging
 import org.json4s._
@@ -101,25 +102,25 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
     logger.debug(s"using prob threshold: ${ps.probThreshold}")
     logger.debug(s"using min benefit: ${ps.minBenefit}")
 
-    val bytesPerSecWriting = 47.93590545654297 * 1024 * 1024 // Bytes/sec
+    /* This was measured using HDFSIO tools to benchmark HDFS performance for our cluster
+        The value was given in MB/sec but since we collect the statistics in Bytes/sec
+        we have to convert its
+     */
+    val bytesPerSecWriting = 47.93590545654297 * 1024 * 1024 // MB/sec --> Bytes/sec
 
     val candidates = mutable.ListBuffer.empty[MaterializationPoint]
 
     DepthFirstTopDownWalker.walk(plan) {
       case _: TimingOp =>
-      case op if !candidates.contains(MaterializationPoint(op.lineageSignature,Duration.Undefined,-1,-1)) =>
+      case op if !candidates.contains(MaterializationPoint.dummy(op.lineageSignature)) =>
         val sig = op.lineageSignature
+
         model.totalCost(sig, ProbStrategy.func(ps.probStrategy))(CostStrategy.func(ps.costStrategy)) match {
           case Some((cost,prob)) =>
             val relProb = prob // / model.totalRuns
             val opOutputSize = model.outputSize(sig)
 
             if(opOutputSize.isDefined) {
-
-              /*
-               * FIXME: here we compare time (cost) with num records (outputSize)
-               */
-
               val benefit = (cost - opOutputSize.get / bytesPerSecWriting).seconds
               val decision = benefit > ps.minBenefit && relProb > ps.probThreshold
 
@@ -192,9 +193,9 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
 
 
   def loadIntermediateResults(plan: DataflowPlan): DataflowPlan = {
-    var newPlan = plan
+//    val newPlan = plan
 
-    DepthFirstTopDownWalker.walk(newPlan) { op =>
+    DepthFirstTopDownWalker.walk(plan) { op =>
 
       val sig = op.lineageSignature
 
@@ -206,37 +207,55 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
 
 //          val loader = Load(op.outputs.head, uri, op.schema, Some("BinStorage"))
           //FIXME: could be a problem when restoring the result of a SPLIT operator. Then we would have to insert multiple LOADs?
+
+//          val newSchema = op.schema.map{ oldSchema =>
+//            val newFields = oldSchema.fields.map{ field => Field(field.name, field.fType) }
+//
+//            Schema(newFields)
+//
+//          }
+
           val loader = Load(Pipe(op.outPipeName), uri, op.schema, Some("BinStorage"))
 //          loader.outputs.head.producer = loader
           logger.debug(s"replacing ${op.name} with $loader")
 
           // add the new Load op to the list of operators in the plan
-          newPlan.addOperator(Seq(loader), deferrConstruct = true)
+          plan.addOperator(Seq(loader), deferrConstruct = true)
 
           // the consumers of op
           val opConsumers = op.outputs
 
-          // remove Op and all its predecessors from plan
-          newPlan = newPlan.remove(op, removePredecessors = true)
 
+          /* remove Op and all its predecessors from plan
+              we cannot use the DataflowPlan#remove method here. Somehow it messes up the pipes so that
+              we don't have correct schema
+           */
+//          newPlan = newPlan.remove(op, removePredecessors = true)
+          val opAncestors = BreadthFirstBottomUpWalker.collect(plan, Seq(op))
+          plan.operators = plan.operators.filterNot(opAncestors.contains) // ++ Seq(loader)
 
+          // just to be sure, clear the outputs of op
+          op.outputs = List.empty
+
+          /* for every consumer that reads from op, make it read from our new Load now
+
+              Usually, an operator has only one output pipe, from which multiple consumers
+              can read. However, SPLIT for example produces multiple outputs
+
+              For ever old consumer we have to:
+                - set it as consumer of Load
+                - remove the old operator from producer and add the load as a new producer
+           */
           // for each consumer (Pipe) of Op
           opConsumers.foreach { outPipe =>
             // for each consumer of that pipe
             outPipe.consumer.foreach { consumer =>
+
               // make this consumer a consumer of the new Load
               loader.addConsumer(outPipe.name, consumer)
+
               // and remove the old pipe and add Load as producer
-              consumer.inputs = consumer.inputs.filter(_.name == outPipe.name) ++ loader.outputs
-
-//              val idx = consumer.inputs.indexWhere(_.name == outPipe.name)
-//              val (l1,l2) = consumer.inputs.splitAt(idx)
-//              consumer.inputs = l1 ++ loader.outputs.filter(_.name == outPipe.name) ++ l2.drop(1)
-
-
-              // update the schema of the consumers to adapt to new input op
-              // actually the schema should be the same, but somehow types were not correctly inferred in consumers
-              consumer.constructSchema
+              consumer.inputs = loader.outputs ++ consumer.inputs.filterNot(_.name == outPipe.name)
             }
           }
 
@@ -245,7 +264,8 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
 
     }
 
-    newPlan
+    plan.constructPlan(plan.operators)
+    plan
   }
 
   /**

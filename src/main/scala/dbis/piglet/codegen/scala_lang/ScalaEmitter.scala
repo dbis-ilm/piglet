@@ -6,7 +6,6 @@ import dbis.piglet.op.{CompEvent, GroupingExpression, PigOperator, SimplePattern
 import dbis.piglet.schema._
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.udf.UDFTable
-import org.clapper.scalasti.ST
 
 
 object ScalaEmitter extends PigletLogging {
@@ -43,8 +42,8 @@ object ScalaEmitter extends PigletLogging {
 
   /**
     *
-    * @param name
-    * @return
+    * @param name Creates a a class name from template with the given name/identifier
+    * @return Returns the tuple class name
     */
   def schemaClassName(name: String) = s"_${name}_Tuple"
 
@@ -80,7 +79,7 @@ object ScalaEmitter extends PigletLogging {
         s"${ctx.asString("tuplePrefix")}._$pos" // s"$tuplePrefix.$f"
       }
     case PositionalField(pos) => ctx.schema match {
-      case Some(s) => s"${ctx.asString("tuplePrefix")}._$pos"
+      case Some(_) => s"${ctx.asString("tuplePrefix")}._$pos"
       case None =>
         // if we don't have a schema the Record class is used
         s"${ctx.asString("tuplePrefix")}.get($pos)"
@@ -93,12 +92,12 @@ object ScalaEmitter extends PigletLogging {
       else if (ctx.contains("events")) {
           val evs = ctx.params("events").asInstanceOf[Some[CompEvent]].get
           // we try to find r1 in the specification of the events and retrieve the position (or -1 if not found)
-          val res = evs.complex.zipWithIndex.filter { case (e, pos) => e.simplePattern.asInstanceOf[SimplePattern].name == r1.toString }
+          val res = evs.complex.zipWithIndex.filter { case (e, _) => e.simplePattern.asInstanceOf[SimplePattern].name == r1.toString }
           if (res.length != 1)
             s"${emitRef(CodeGenContext(ctx, Map("tuplePrefix" -> "t")), r1)}${emitRef(CodeGenContext(ctx, Map("schema" -> tupleSchema(ctx.schema, r1))), r2)}"
           else {
             val p = r2 match {
-              case nf@NamedField(f, _) => ctx.schema.get.indexOfField(nf)
+              case nf:NamedField => ctx.schema.get.indexOfField(nf)
               case PositionalField(pos) => pos
               case _ => 0
             }
@@ -175,8 +174,8 @@ object ScalaEmitter extends PigletLogging {
       val exprList = exprs.map(e => emitExpr(ctx, e))
       // convert the list (e1, e2, e3, e4) into a list of (e1 -> e2, e3 -> e4)
       val mapStr = exprList.zip(exprList.tail).zipWithIndex.filter{
-        case (p, i) => i % 2 == 0
-      }.map{case (p, i) => s"${p._1} -> ${p._2}"}.mkString(",")
+        case (_, i) => i % 2 == 0
+      }.map{case (p, _) => s"${p._1} -> ${p._2}"}.mkString(",")
       s"Map[String,${scalaTypeMappingTable(valType)}]($mapStr)"
     case ConstructMatrixExpr(ty, rows, cols, mexpr) =>
       val mType = if (ty.charAt(1) == 'i') "Int" else "Double"
@@ -260,7 +259,7 @@ object ScalaEmitter extends PigletLogging {
             // we cannot perform a "toAny" - therefore, we treat bytearray as String here
             val t = ScalaEmitter.scalaTypeMappingTable(f.fType)
             s"data($i).to${if (t == "Any") "String" else t}"
-          case b: BagType =>
+          case _: BagType =>
             ""
 //            s"data($i).toIterable[(${b.valueType.fields.map(f => ScalaEmitter.scalaTypeMappingTable(f.fType)).mkString(",")})]"
         }
@@ -323,7 +322,7 @@ object ScalaEmitter extends PigletLogging {
     // the actual field
     val (refName, field) = e match {
       case RefExpr(r) => r match {
-        case nf@NamedField(n, _) => ("_" + ctx.schema.get.indexOfField(nf), ctx.schema.get.field(nf))
+        case nf:NamedField => ("_" + ctx.schema.get.indexOfField(nf), ctx.schema.get.field(nf))
         case PositionalField(p) => ("_" + p.toString, ctx.schema.get.field(p))
         // either a named or a positional field: all other cases are not allowed!?
         case _ => throw new CodeGenException("invalid flatten expression: argument isn't a reference")
@@ -334,11 +333,11 @@ object ScalaEmitter extends PigletLogging {
       // we flatten a tuple
       val tupleType = field.fType.asInstanceOf[TupleType]
       // finally, produce a list of t.<refName>.<fieldPos>
-      tupleType.fields.zipWithIndex.map { case (f, i) => s"t.$refName._$i" }.mkString(", ")
+      tupleType.fields.zipWithIndex.map { case (_, i) => s"t.$refName._$i" }.mkString(", ")
     }
     else if (field.fType.tc == TypeCode.BagType) {
       // we flatten a bag
-      val bagType = field.fType.asInstanceOf[BagType]
+//      val bagType = field.fType.asInstanceOf[BagType]
       s"t.$refName"
     }
     else
@@ -347,9 +346,9 @@ object ScalaEmitter extends PigletLogging {
   }
 
   /**
-    *
-    * @param schema
-    * @param ref
+    * Creates a tuple schema
+    * @param schema The input schema
+    * @param ref The reference
     * @return
     */
   def tupleSchema(schema: Option[Schema], ref: Ref): Option[Schema] = {
@@ -376,7 +375,7 @@ object ScalaEmitter extends PigletLogging {
   /**
     * Generate code for a class representing a schema type.
     *
-    * @param values
+    * @param values Input values
     * @return
     */
   def emitSchemaClass(values: (String, String, String, String, String, String), profiling: Boolean): (String, String) = {
@@ -476,7 +475,7 @@ object ScalaEmitter extends PigletLogging {
     val toStr = fieldList.zipWithIndex.map{
       case (f, i) => f.fType match {
         case BagType(_) => s""""{" + _$i.mkString(",") + "}""""
-        case MapType(v) => s""""[" + _$i.map{ case (k,v) => s"$$k#$$v" }.mkString(",") + "]""""
+        case MapType(_) => s""""[" + _$i.map{ case (k,v) => s"$$k#$$v" }.mkString(",") + "]""""
         case _ => s"_$i" + (if (f.fType.tc != TypeCode.CharArrayType && fields.length == 1) ".toString" else "")
       }
     }.mkString(" + _c + ")

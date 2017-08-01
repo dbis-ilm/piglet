@@ -96,7 +96,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
    * @param ops the list of pig operators produced by the parser
    */
   def constructPlan(ops: List[PigOperator]) : Unit = {
-    def unquote(s: String): String = s.substring(1, s.length - 1)
+//    def unquote(s: String): String = s.substring(1, s.length - 1)
 
     // This maps a String (the relation name, a string) to the pipe that writes it and the list of
     // operators that read it.
@@ -226,7 +226,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
           val newPipes = op.inputs.map(p => pipes(p.name))
           op.inputs = newPipes
         }
-        op.preparePlan
+        op.preparePlan()
         op.constructSchema
       })
     }

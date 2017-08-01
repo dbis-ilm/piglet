@@ -5,12 +5,14 @@ import dbis.piglet.Piglet.Lineage
 import scala.concurrent.duration.Duration
 
 /**
- * A MaterializationPoint object represents information about a possible materialization of the result
- * of a dataflow operator. It is identified by a hash of the lineage string of the operator and collects
- * profile information.
- *
- * @param lineage the MD5 hash of the lineage string of the operator
- * @param benefit the cumulative benefit of this materialization point compared to the root operator
+  * A MaterializationPoint object represents information about a possible materialization of the result
+  * of a dataflow operator. It is identified by a hash of the lineage string of the operator and collects
+  * profile information.
+  *
+  * @param lineage the MD5 hash of the lineage string of the operator
+  * @param benefit the cumulative benefit of this materialization point compared to the root operator
+  * @param prob The probability for re-using this operator
+  * @param cost The duration that this operator takes
  */
 case class MaterializationPoint(lineage: Lineage, benefit: Duration, prob: Double, cost: Long) {
   override def hashCode(): Int = lineage.hashCode
@@ -19,4 +21,9 @@ case class MaterializationPoint(lineage: Lineage, benefit: Duration, prob: Doubl
     case MaterializationPoint(l,_,_,_) => l equals lineage
     case _ => false
   }
+}
+
+
+object MaterializationPoint {
+  def dummy(lineage: Lineage): MaterializationPoint = MaterializationPoint(lineage, Duration.Undefined, -1,-1)
 }

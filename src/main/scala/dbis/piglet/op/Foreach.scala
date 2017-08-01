@@ -257,7 +257,7 @@ case class Foreach(
   
   override def toString = s"""FOREACH { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }
                                 |  inSchema = $inputSchema
-                                |  outSchema = $schema)""".stripMargin
+                                |  outSchema = $schema""".stripMargin
 
   override def printOperator(tab: Int): Unit = {
     println(indent(tab) + this.toString())
