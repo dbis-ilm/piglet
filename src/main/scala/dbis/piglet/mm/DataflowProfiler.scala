@@ -32,8 +32,10 @@ object T {
 }
 
 case class Partition(lineage: Lineage, partitionId: Int)
+case class SizeInfo(lineage: Lineage, records: Long, bytes: Long)
 
 object DataflowProfiler extends PigletLogging {
+
 
   protected[mm] var profilingGraph: Markov = _
 
@@ -213,8 +215,15 @@ object DataflowProfiler extends PigletLogging {
 
   }
 
-  def addSizes(m: Map[Lineage, Option[Long]]) = m.foreach{ case(lineage, size) =>
-      profilingGraph.updateSize(lineage, size.map(_*10))
+
+  def addSizes(m: Array[SizeInfo], factor: Int) = m.foreach{
+    case SizeInfo(lineage, records, bytes) =>
+      val bytesPerRecord = bytes / records
+      val totalRecords = records * factor
+
+      logger.debug(s"add size info for $lineage : records=$records * $factor = $totalRecords,  bpr = $bytes / $records = $bytesPerRecord")
+
+      profilingGraph.updateSize(SizeInfo(lineage, records = totalRecords, bytes = bytesPerRecord))
   }
 
   def getExectime(op: Lineage): Option[T] = profilingGraph.cost(op)
@@ -230,7 +239,7 @@ object DataflowProfiler extends PigletLogging {
       StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
   }
 
-  def opInputSize(op: Lineage) = profilingGraph.inputSize(op)
+  def opInputSize(op: Lineage) = profilingGraph.resultRecords(op)
 
 }
 
@@ -287,7 +296,6 @@ object ProfilerSettings extends PigletLogging {
         case _ => logger warn s"unknown profiler settings key $k (value: $v) - ignoring"
       }
     }
-
     ps
   }
 

@@ -11,8 +11,34 @@ import scala.collection.mutable.ArrayBuffer
   * Created by kai on 12.12.16.
   */
 class JoinEmitter extends CodeEmitter[Join] {
-  override def template: String = """val <out> = <rel1>_kv.join(<rel2>_kv).map{case (k,(v,w)) => <class>(<fields>)}""".stripMargin
-  def mwayJoinTemplate: String = """val <out> = <rel1>_kv<rel2: {rel | .join(<rel>_kv)}>.map{case (k,<pairs>) => <class>(<fields>)}""".stripMargin
+  override def template: String =
+    """val <out> = <rel1>_kv.join(<rel2>_kv).map{
+      |  case (k,(v,w)) =>
+      |  val res <class>(<fields>)
+      |  <if (profiling)>
+      |  if(scala.util.Random.nextInt(randFactor) == 0) {
+      |    accum.incr("<lineage>", res.getNumBytes)
+      |     //accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(res))
+      |  }
+      |  <endif>
+      |  res
+      |}""".stripMargin
+
+
+  def mwayJoinTemplate: String =
+    """val <out> = <rel1>_kv<rel2: {rel | .join(<rel>_kv)}>.map{
+      |  case (k,<pairs>) =>
+      |    val res = <class>(<fields>)
+      |    <if (profiling)>
+      |    if(scala.util.Random.nextInt(randFactor) == 0) {
+      |      accum.incr("<lineage>", res.getNumBytes)
+      |      //accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(res))
+      |    }
+      |    <endif>
+      |    res
+      |}""".stripMargin
+
+
   def keymapTemplate: String =
     """<rels,keys:{ rel,key |val <rel>_kv = <rel>.map(t => (<key>,t))
       | }>""".stripMargin

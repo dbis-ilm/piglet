@@ -18,7 +18,6 @@
 package dbis.piglet.expr
 
 import dbis.piglet.schema._
-import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.udf.UDFTable
 
 import scala.collection.mutable
@@ -36,7 +35,7 @@ case class RefExpr(var r: Ref) extends ArithmeticExpr {
         f.fType
       }
       catch {
-        case e: SchemaException =>
+        case _: SchemaException =>
 //          logger.warn("cannot find result type",e)
           Types.AnyType
       }

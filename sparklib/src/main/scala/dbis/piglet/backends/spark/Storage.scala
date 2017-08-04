@@ -33,7 +33,7 @@ import scala.tools.nsc.io._
 class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
   
   def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t", 
-      skipFirstRow: Boolean = false, skipEmpty: Boolean = false, comments: String = ""): RDD[T] = {
+      skipFirstRow: Boolean = false, skipEmpty: Boolean = false, comments: String = "", lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = {
         
     val raw = sc.textFile(path)
     val nonEmpty = if(skipEmpty) raw.filter { line => line.nonEmpty } else raw
@@ -43,9 +43,20 @@ class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
       nonComment.filter { line => line != header }
     } else 
       nonComment
-      
-    
-    content.map(line => line.split(delim, -1)).map(extract)
+
+
+
+    val rawArr = content.map(line => line.split(delim, -1))
+
+    if(lineageAndAccum.isDefined) {
+      val (lineage, accum) = lineageAndAccum.get
+      rawArr.map{ arr =>
+        val t = extract(arr)
+        accum.incr(lineage,t.getNumBytes)
+        t
+      }
+    } else
+      rawArr.map(extract)
   }
 
   def write(path: String, rdd: RDD[T], delim: String = ",") = rdd.map(_.mkString(delim)).saveAsTextFile(path)

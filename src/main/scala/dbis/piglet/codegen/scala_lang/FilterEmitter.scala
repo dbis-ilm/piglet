@@ -9,14 +9,15 @@ import dbis.piglet.op.Filter
 class FilterEmitter extends CodeEmitter[Filter] {
   override def template: String =
     """val <out> = <in>.filter{t =>
-      |<if (profiling)>
-      |if(scala.util.Random.nextInt(randFactor) == 0) {
-      |  //accum.incr("<lineage>", t.getNumBytes)
-      |  accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
-      |}
-      |//PerfMonitor.sizes(url,"<lineage>", t.getNumBytes)
-      |<endif>
-      |<pred>\}""".stripMargin
+      |  val res = <pred>
+      |  <if (profiling)>
+      |  if(res && scala.util.Random.nextInt(randFactor) == 0) {
+      |    accum.incr("<lineage>", t.getNumBytes)
+      |    //accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
+      |  }
+      |  <endif>
+      |  res
+      |\}""".stripMargin
 
 
   override def code(ctx: CodeGenContext, op: Filter): String = {

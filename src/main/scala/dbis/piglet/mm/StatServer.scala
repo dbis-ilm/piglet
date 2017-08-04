@@ -22,8 +22,10 @@ object StatServer extends PigletLogging {
   var server: HttpServer = _
   var writer: ActorRef = _
 
-  def start(): Unit = {
-    writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
+  def start(profilerSettings: ProfilerSettings): Unit = {
+//    writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
+
+    writer = system.actorOf(Props(new StatsWriterActor(profilerSettings)), name = "statswriter")
 
     server = HttpServer.create(new InetSocketAddress(java.net.InetAddress.getLocalHost.getHostAddress, port), allowedQueuedConnections)
     server.createContext("/times", new TimesHandler(writer))
@@ -92,7 +94,7 @@ class SizesHandler(private val writer: ActorRef) extends HttpHandler with StatsH
   * An Akka Actor for asynchronously processing the messages that the HTTP received
   *
   */
-class StatsWriterActor extends Actor with PigletLogging  {
+class StatsWriterActor(profilerSettings: ProfilerSettings) extends Actor with PigletLogging  {
 
   /* Receive the message string, split it into its components and send it to the
    * DataflowProfiler
@@ -122,7 +124,8 @@ class StatsWriterActor extends Actor with PigletLogging  {
       DataflowProfiler.addExecTime(lineage, partitionId, parentsList, currTime)
 
     case msg: SizeMsg =>
-      DataflowProfiler.addSizes(msg.values)
+      logger.debug(s"reiceived size msg: $msg")
+      DataflowProfiler.addSizes(msg.values, profilerSettings.fraction)
 
 
     case msg =>
@@ -132,11 +135,15 @@ class StatsWriterActor extends Actor with PigletLogging  {
 
 sealed trait StatMsg
 case class TimeMsg(time: String) extends  StatMsg
-case class SizeMsg(private val sizes: String) extends StatMsg{
+case class SizeMsg(private val sizes: String) extends StatMsg {
+
   lazy val values = sizes.split(StatsWriterActor.FIELD_DELIM).map{s =>
     val a = s.split(":")
-    a(0) -> Some(a(1).toLong)
-  }.toMap
+    val lineage = a(0)
+    val numRecords = a(1).toLong
+    val numBytes = a(2).toLong
+    SizeInfo(lineage, records = numRecords, bytes = numBytes)
+  }
 }
 
 //case class SizeMsg(value: String)

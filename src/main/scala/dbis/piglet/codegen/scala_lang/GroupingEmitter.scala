@@ -10,21 +10,34 @@ import dbis.piglet.schema.TupleType
 class GroupingEmitter extends CodeEmitter[Grouping] {
   override def template: String = """<if (expr)>
                                     |        val <out> = <in>.groupBy{t =>
-                                    |         <if (profiling)>
+                                    |         <if (profiling)>/*
                                     |          if(scala.util.Random.nextInt(randFactor) == 0)
-                                    |             accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
-                                    |            //accum.incr("<lineage>", t.getNumBytes)
-                                    |        <endif>
-                                    |        <expr>}.map{case (k,v) => <class>(<keyExtr>,v)}
+                                    |             //accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
+                                    |            accum.incr("<lineage>", t.getNumBytes)
+                                    |        */<endif>
+                                    |        <expr>}.map{case (k,v) =>
+                                    |           val t = <class>(<keyExtr>,v)
+                                    |           <if (profiling)>
+                                    |           if(scala.util.Random.nextInt(randFactor) == 0)
+                                    |             accum.incr("<lineage>", t.getNumBytes)
+                                    |           <endif>
+                                    |           t
+                                  |           }
                                     |<else>
                                     |        val <out> = <in>.coalesce(1).glom.map{t =>
-                                    |         <if (profiling)>
+                                    |         <if (profiling)>/*
                                     |         if(scala.util.Random.nextInt(randFactor) == 0) {
-                                    |           accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
-                                    |           //accum.incr("<lineage>", t.size * t.headOption.map(_.getNumBytes).getOrElse(-1))
+                                    |           accum.incr("<lineage>", t.size * t.headOption.map(_.getNumBytes).getOrElse(-1))
                                     |         }
-                                    |         <endif>
-                                    |         <class>("all", t)}
+                                    |         */<endif>
+                                    |         val res = <class>("all", t)
+                                    |         if(scala.util.Random.nextInt(randFactor) == 0) {
+                                    |           //accum.incr("<lineage>", t.size * t.headOption.map(_.getNumBytes).getOrElse(-1))
+                                    |           accum.incr("<lineage>", res.getNumBytes)
+                                    |           //accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(res))
+                                    |         }
+                                    |         res
+                                  |         }
                                     |<endif>""".stripMargin
 
 

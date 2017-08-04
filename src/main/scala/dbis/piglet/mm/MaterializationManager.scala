@@ -6,7 +6,6 @@ import dbis.piglet.Piglet.Lineage
 import dbis.piglet.op._
 import dbis.piglet.plan.rewriting.internals.ProfilingSupport
 import dbis.piglet.plan.{DataflowPlan, OperatorNotFoundException, PipeNameGenerator}
-import dbis.piglet.schema.{Field, Schema}
 import dbis.piglet.tools._
 import dbis.piglet.tools.logging.PigletLogging
 import org.json4s._
@@ -106,39 +105,59 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
         The value was given in MB/sec but since we collect the statistics in Bytes/sec
         we have to convert its
      */
-    val bytesPerSecWriting = 47.93590545654297 * 1024 * 1024 // MB/sec --> Bytes/sec
 
-    val candidates = mutable.ListBuffer.empty[MaterializationPoint]
+
+    val candidates = mutable.Set.empty[MaterializationPoint]
 
     DepthFirstTopDownWalker.walk(plan) {
       case _: TimingOp =>
-      case op if !candidates.contains(MaterializationPoint.dummy(op.lineageSignature)) =>
+      case op if
+        !candidates.contains(MaterializationPoint.dummy(op.lineageSignature)) && // only if not already analyzed
+          op.outputs.nonEmpty => // not sink operator
         val sig = op.lineageSignature
 
         model.totalCost(sig, ProbStrategy.func(ps.probStrategy))(CostStrategy.func(ps.costStrategy)) match {
           case Some((cost,prob)) =>
             val relProb = prob // / model.totalRuns
-            val opOutputSize = model.outputSize(sig)
+
+            val outRecords = model.resultRecords(sig).map(_ * ps.fraction)
+            val outputBPR = model.bytesPerRecord(sig)
+
+            // total number of bytes
+            val opOutputSize = outRecords.flatMap(r => outputBPR.map(_ * r))
 
             if(opOutputSize.isDefined) {
-              val benefit = (cost - opOutputSize.get / bytesPerSecWriting).seconds
-              val decision = benefit > ps.minBenefit && relProb > ps.probThreshold
+              logger.debug(s"${op.name} (${op.lineageSignature})\t: " +
+                s"cost=${cost.milliseconds.toSeconds} \t prob=$relProb\t" +
+                s"sampled records =${model.resultRecords(sig).getOrElse("n/a")} r | ${model.bytesPerRecord(sig).getOrElse("n/a")} bytes/r\t" +
+                s"real records=${outRecords.getOrElse("n/a")} r")
+
+
+              val writingTime = (opOutputSize.get / Conf.BytesPerSecWriting).seconds
+              val readingTime = (opOutputSize.get / Conf.BytesPerSecReading).seconds
+
+              logger.debug(s"\twriting for ${op.name} ($sig) with ${opOutputSize.get} bytes would take ${writingTime.toSeconds} seconds")
+              logger.debug(s"\treading for ${op.name} ($sig) with ${opOutputSize.get} bytes would take ${readingTime.toSeconds} seconds")
+
+              val benefit = cost.milliseconds - readingTime
+
+              val costDecision = readingTime < cost.milliseconds - ps.minBenefit
+
+              val decision = costDecision && relProb > ps.probThreshold
 
               if(decision) {
-                logger.debug(s"We should materialize ${op.name} with benefit of ${benefit.toSeconds}")
+                logger.debug(s"\t--> We should materialize ${op.name} with benefit of ${benefit.toSeconds} and prob = $relProb")
                 candidates += MaterializationPoint(sig, benefit, relProb, cost)
               } else
-                logger.debug(s"We should NOT materialize ${op.name} with benefit of ${benefit.toSeconds}")
+              logger.debug(s"\t--> We should NOT materialize ${op.name} with benefit of ${benefit.toSeconds} and prob = $relProb")
 
             }
 
-            logger.debug(s"${op.name} (${op.lineageSignature})\t: " +
-              s"cost=$cost \t prob=$relProb\t" +
-              s"inputsize=${model.inputSize(sig).getOrElse("")}\t" +
-              s"outputsize=${opOutputSize.getOrElse("")}")
 
           case None =>
+            logger.debug(s"no profiling info for ${op.name} ($sig)")
         }
+      case op => logger.debug(s"irgendwas mit dummy for $op")
     }
 
 
@@ -151,7 +170,7 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
     var newPlan = plan
 
     // for each candidate point ...
-    candidates.sortBy(_.benefit)(Ordering[Duration].reverse) // descending ordering ...
+    candidates.toSeq.sortBy(_.benefit)(Ordering[Duration].reverse) // descending ordering ...
       .headOption                                            // ... so that we will materialize the one with the greatest benefit
       .foreach{ case MaterializationPoint(lineage, _,_,_) =>
 

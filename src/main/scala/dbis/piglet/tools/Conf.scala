@@ -104,13 +104,18 @@ object Conf extends PigletLogging {
   def statServerPort = appconf.getInt("statserver.port")
   def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url")).toURL) else None
   
-  def profilingFile = "profilerstats"
+  def profilingFile = "profilerstats.json"
   def mmDefaultCostStrategy = CostStrategy.withName(appconf.getString("profiler.defaults.cost_strategy").toUpperCase)
   def mmDefaultProbStrategy = ProbStrategy.withName(appconf.getString("profiler.defaults.prob_strategy").toUpperCase)
   def mmDefaultProbThreshold = appconf.getDouble("profiler.defaults.prob_threshold")
   def mmDefaultMinBenefit = appconf.getDouble("profiler.defaults.benefit").seconds
   def mmDefaultCacheMode = CacheMode.withName(appconf.getString("profiler.defaults.cache_mode").toUpperCase)
   def mmDefaultFraction = appconf.getInt("profiler.defaults.fraction")
+
+
+  val BytesPerSecWriting = 47.93590545654297 * 1024 * 1024 // MB/sec --> Bytes/sec
+  val BytesPerSecReading = 83.33333587646484 * 1024 * 1024 // MB/sec --> Bytes/sec
+
 //  def execTimesFile = "exectimes"
   
 //  def langfeatureImports(feature: String) = appconf.getStringList(s"langfeature.$feature.imports").asScala

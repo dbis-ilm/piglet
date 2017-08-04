@@ -52,6 +52,8 @@ object Piglet extends PigletLogging {
     // set the log level as defined in the parameters
 		logger.setLevel(c.logLevel)
 
+    c.profiling.foreach(ps => logger.debug(ps.toString))
+
 
     /* Copy config file to the user's home directory
      * IMPORTANT: This must be the first call to Conf
@@ -300,7 +302,7 @@ object Piglet extends PigletLogging {
 
             if (c.profiling.isDefined) {
               logger.debug("starting stat server")
-              StatServer.start()
+              StatServer.start(c.profiling.get)
             }
 
             // 9. and finally deploy/submit

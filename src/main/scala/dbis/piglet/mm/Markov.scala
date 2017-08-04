@@ -14,9 +14,9 @@ import scalax.collection.io.json.descriptor.predefined.WDi
   * @param lineage The lineage for the operator
   * @param cost The operator cost (execution time)
   */
-case class Op(lineage: Lineage, var cost: Option[T] = None, var inputSize: Option[Long] = None) {
+case class Op(lineage: Lineage, var cost: Option[T] = None, var resultRecords: Option[Long] = None, var bytesPerRecord: Option[Long] = None) {
   override def equals(obj: scala.Any): Boolean = obj match {
-    case Op(l,_,_) => l equals lineage
+    case Op(l,_,_,_) => l equals lineage
     case _ => false
   }
 
@@ -93,9 +93,12 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
 
   def cost(lineage: Lineage): Option[T] = model.find(Op(lineage)).flatMap(_.value.cost)
 
-  def inputSize(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.value.inputSize)
+  def resultRecords(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.value.resultRecords)
+  def bytesPerRecord(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.value.bytesPerRecord)
 
-  def outputSize(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.outNeighbors.headOption.flatMap(_.value.inputSize))
+//  def outputRecords(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.outNeighbors.headOption.flatMap(_.value.resultRecords))
+//  def outputBytesPerRecord(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.outNeighbors.headOption.flatMap(_.value.bytesPerRecord))
+
 
   /**
     * Get the cost (execution time and probability) from start to the specified node.
@@ -176,9 +179,10 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
       a.cost = Some(T(cost))
   }
 
-  def updateSize(lineage: Lineage, size: Option[Long]) = {
-    val a = model.get(Op(lineage)).value
-    a.inputSize = size
+  def updateSize(size: SizeInfo) = {
+    val a = model.get(Op(size.lineage)).value
+    a.resultRecords = Some(size.records)
+    a.bytesPerRecord = Some(size.bytes)
   }
 
   /**
@@ -200,7 +204,7 @@ object Markov {
   // used to serialize the nodes to JSON
   private val nodeDescriptor = new NodeDescriptor[Op](typeId = "operators"){
     def id(node: Any) = node match {
-      case Op(l,_,_) => l
+      case Op(l,_,_,_) => l
     }
   }
 

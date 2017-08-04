@@ -14,32 +14,40 @@ class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
 
   override def template: String =
     """val <out> = <in>.map{t =>
-      |<if (profiling)>
-      |if(scala.util.Random.nextInt(randFactor) == 0) {
-      |  //accum.incr("<lineage>", t.getNumBytes)
-      |  accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
-      |}
-      |<endif>
-      |<class>(<expr>)}""".stripMargin
+      |  val res = <class>(<expr>)
+      |  <if (profiling)>
+      |  if(scala.util.Random.nextInt(randFactor) == 0) {
+      |   accum.incr("<lineage>", res.getNumBytes)
+      |   //accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(res))
+      |  }
+      |  <endif>
+      |  res
+      |}""".stripMargin
+
+
   def templateNested: String =
     """val <out> = <in>.map{t =>
-      |<if (profiling)>
-      |if(scala.util.Random.nextInt(randFactor) == 0) {
-      |  //accum.incr("<lineage>", t.getNumBytes)
-      |  accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
-      |}
-      |<endif>
-      |<expr>}""".stripMargin
+      |  val res = <expr>
+      |  <if (profiling)>
+      |  if(scala.util.Random.nextInt(randFactor) == 0) {
+      |   //accum.incr("<lineage>", t.getNumBytes)
+      |   accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(res))
+      |  }
+      |  <endif>
+      |  res
+      |}""".stripMargin
 
   def templateFlatMap: String =
     """val <out> = <in>.flatMap{t =>
-      |<if (profiling)>
-      |if(scala.util.Random.nextInt(randFactor) == 0) {
-      |  //accum.incr("<lineage>", t.getNumBytes)
-      |  accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(t))
-      |}
-      |<endif>
-      |<expr>}""".stripMargin
+      |  val res = <expr>
+      |  <if (profiling)>
+      |  if(scala.util.Random.nextInt(randFactor) == 0) {
+      |    //accum.incr("<lineage>", t.getNumBytes)
+      |    accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(res))
+      |  }
+      |  <endif>
+      |  res
+      |}""".stripMargin
 
   override def code(ctx: CodeGenContext, op: Foreach): String = {
     if (op.schema.isEmpty)

@@ -39,7 +39,7 @@ object PerfMonitor {
   final val DEP_DELIM = "#"
 
   def sizes(url: String, m: scala.collection.mutable.Map[String, SizeStat]) = {
-    val dataString = m.map{case(lineage, SizeStat(_, bytes)) => s"$lineage:$bytes"}.mkString(FIELD_DELIM)
+    val dataString = m.map{case(lineage, SizeStat(records, bytes)) => s"$lineage:$records:$bytes"}.mkString(FIELD_DELIM)
     request(url, dataString)
   }
 
@@ -137,13 +137,16 @@ case class SizeStat(var records: Long, var bytes: Long) extends Cloneable {
   }
 }
 
+
 class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mutable.Map[String, SizeStat]] {
 
-  private val theValue = mutable.Map.empty[String, SizeStat]
+  type Lineage = String
+
+  private val theValue = mutable.Map.empty[Lineage, SizeStat]
 
   override def isZero: Boolean = theValue.isEmpty
 
-  override def copy(): AccumulatorV2[MutableMap[String, SizeStat], MutableMap[String, SizeStat]] = {
+  override def copy(): AccumulatorV2[MutableMap[Lineage, SizeStat], MutableMap[Lineage, SizeStat]] = {
     val newAccum = new SizeAccumulator2()
 
 
@@ -156,7 +159,7 @@ class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mut
 
   override def reset(): Unit = theValue.clear()
 
-  override def add(value: MutableMap[String, SizeStat]): Unit = {
+  override def add(value: MutableMap[Lineage, SizeStat]): Unit = {
     value.foreach{ case (k,v) =>
 
           if(theValue.contains(k)) {
@@ -168,7 +171,7 @@ class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mut
     }
   }
 
-  def incr(lineage: String, bytes: Long) = {
+  def incr(lineage: Lineage, bytes: Long) = {
     if(theValue.contains(lineage)) {
       theValue(lineage).add(SizeStat(1,bytes))
     } else {
@@ -176,35 +179,35 @@ class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mut
     }
   }
 
-  override def merge(other: AccumulatorV2[MutableMap[String, SizeStat], MutableMap[String, SizeStat]]): Unit = {
+  override def merge(other: AccumulatorV2[MutableMap[Lineage, SizeStat], MutableMap[Lineage, SizeStat]]): Unit = {
     add(other.value)
   }
 
-  override def value: MutableMap[String, SizeStat] = theValue
+  override def value: MutableMap[Lineage, SizeStat] = theValue
 }
 
-class SizeAccumulator(private var theValue: Option[(Long,Long)] = None) extends AccumulatorV2[Option[(Long,Long)],Option[(Long,Long)]] {
-
-  override def isZero: Boolean = theValue.isEmpty
-
-  override def copy(): AccumulatorV2[Option[(Long,Long)], Option[(Long,Long)]] = if(theValue.isEmpty)
-    new SizeAccumulator()
-  else new SizeAccumulator(Some(theValue.get))
-
-
-  override def reset(): Unit = theValue = None
-  
-  def incr(bytes: Long, n: Long = 1L): Unit = add(Some((n, bytes)))
-
-  override def add(v: Option[(Long, Long)]): Unit = if(theValue.isEmpty)
-    theValue = v
-  else if(v.isDefined)
-    theValue = Some((theValue.get._1 + v.get._1, theValue.get._2 + v.get._2))
-
-
-  override def merge(other: AccumulatorV2[Option[(Long,Long)], Option[(Long,Long)]]): Unit = {
-    add(other.value)
-  }
-
-  override def value: Option[(Long,Long)] = theValue
-}
+//class SizeAccumulator(private var theValue: Option[(Long,Long)] = None) extends AccumulatorV2[Option[(Long,Long)],Option[(Long,Long)]] {
+//
+//  override def isZero: Boolean = theValue.isEmpty
+//
+//  override def copy(): AccumulatorV2[Option[(Long,Long)], Option[(Long,Long)]] = if(theValue.isEmpty)
+//    new SizeAccumulator()
+//  else new SizeAccumulator(Some(theValue.get))
+//
+//
+//  override def reset(): Unit = theValue = None
+//
+//  def incr(bytes: Long, n: Long = 1L): Unit = add(Some((n, bytes)))
+//
+//  override def add(v: Option[(Long, Long)]): Unit = if(theValue.isEmpty)
+//    theValue = v
+//  else if(v.isDefined)
+//    theValue = Some((theValue.get._1 + v.get._1, theValue.get._2 + v.get._2))
+//
+//
+//  override def merge(other: AccumulatorV2[Option[(Long,Long)], Option[(Long,Long)]]): Unit = {
+//    add(other.value)
+//  }
+//
+//  override def value: Option[(Long,Long)] = theValue
+//}
