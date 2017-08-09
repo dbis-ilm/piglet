@@ -22,7 +22,7 @@ import java.nio.file.{Path, Paths}
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.PigletCompiler
 import dbis.piglet.mm.{DataflowProfiler, MaterializationManager, ProfilingException, StatServer}
-import dbis.piglet.plan.{DataflowPlan, InvalidPlanException, PlanMerger}
+import dbis.piglet.plan.{DataflowPlan, InvalidPlanException, PlanMerger, PrettyPrinter}
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.rewriting.Rules
 import dbis.piglet.schema.SchemaException
@@ -241,10 +241,14 @@ object Piglet extends PigletLogging {
 
       // 5. analyze plan if something can be materialized or
       // if materialized results are present
-      val model = DataflowProfiler.analyze(newPlan)
-      // according to statistics, insert MATERIALIZE (STORE) operators
-      newPlan = mm.insertMaterializationPoints(newPlan, model)
-      newPlan = processMaterializations(newPlan, mm)
+      if(c.profiling.isDefined) {
+        val model = DataflowProfiler.analyze(newPlan)
+
+        // according to statistics, insert MATERIALIZE (STORE) operators
+        newPlan = mm.insertMaterializationPoints(newPlan, model)
+      }
+//      newPlan = processMaterializations(newPlan, mm)
+
 
       // 6. after all optimizations have been performed, insert
       // profiling operators (if desired)

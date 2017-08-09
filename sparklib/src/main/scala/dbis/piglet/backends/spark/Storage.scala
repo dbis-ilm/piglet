@@ -30,7 +30,7 @@ import scala.tools.nsc.io._
 
 //-----------------------------------------------------------------------------------------------------
 
-class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
+class PigStorage[T <: SchemaClass :ClassTag](fraction: Int = 1) extends java.io.Serializable {
   
   def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t", 
       skipFirstRow: Boolean = false, skipEmpty: Boolean = false, comments: String = "", lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = {
@@ -52,7 +52,10 @@ class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
       val (lineage, accum) = lineageAndAccum.get
       rawArr.map{ arr =>
         val t = extract(arr)
-        accum.incr(lineage,t.getNumBytes)
+        if(scala.util.Random.nextInt(fraction) == 0) {
+//          accum.incr(lineage, t.getNumBytes)
+            accum.incr(lineage, PerfMonitor.estimateSize(t))
+        }
         t
       }
     } else
@@ -63,15 +66,15 @@ class PigStorage[T <: SchemaClass :ClassTag] extends java.io.Serializable {
 }
 
 object PigStorage extends java.io.Serializable {
-  def apply[T <: SchemaClass: ClassTag](): PigStorage[T] = {
-    new PigStorage[T]
+  def apply[T <: SchemaClass: ClassTag](fraction: Int = 1): PigStorage[T] = {
+    new PigStorage[T](fraction)
   }
 }
 
 //-----------------------------------------------------------------------------------------------------
 
-class TextLoader[T <: SchemaClass :ClassTag] extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[T] = {
+class TextLoader[T <: SchemaClass :ClassTag](franction: Int = -1) extends java.io.Serializable {
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = {
     sc.textFile(path).map(line => extract(Array(line)))  //.map(line => Record(Array(line)))
   }
 
@@ -82,8 +85,8 @@ class TextLoader[T <: SchemaClass :ClassTag] extends java.io.Serializable {
 }
 
 object TextLoader extends java.io.Serializable {
-  def apply[T <: SchemaClass: ClassTag](): TextLoader[T] = {
-    new TextLoader[T]
+  def apply[T <: SchemaClass: ClassTag](fraction: Int = -1): TextLoader[T] = {
+    new TextLoader[T](fraction)
   }
 }
 
@@ -111,7 +114,7 @@ object PigStream extends java.io.Serializable {
 
 //-----------------------------------------------------------------------------------------------------
 
-class RDFFileStorage[T: ClassTag] extends java.io.Serializable {
+class RDFFileStorage[T: ClassTag](fraction: Int = -1) extends java.io.Serializable {
   val pattern = "([^\"]\\S*|\".+?\")\\s*".r
 
   // TODO: use a real RDF library (Jena, raptor) to read RDF files
@@ -120,34 +123,34 @@ class RDFFileStorage[T: ClassTag] extends java.io.Serializable {
     fields.toArray.slice(0, 3)
   }
 
-  def load(sc: SparkContext, path: String, extract: (Array[String]) => T): RDD[T] =
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] =
     sc.textFile(path).map(line => extract(rdfize(line)))
 }
 
 object RDFFileStorage {
-  def apply[T: ClassTag](): RDFFileStorage[T] = {
-    new RDFFileStorage[T]
+  def apply[T: ClassTag](fraction: Int = -1): RDFFileStorage[T] = {
+    new RDFFileStorage[T](fraction )
   }
 }
 
 //-----------------------------------------------------------------------------------------------------
 
-class BinStorage[T: ClassTag] extends java.io.Serializable {
+class BinStorage[T: ClassTag](fraction: Int = -1) extends java.io.Serializable {
 
-  def load(sc: SparkContext, path: String, extract: (Any) => Any): RDD[T] = load(sc, path)
-  def load(sc: SparkContext, path: String): RDD[T] = sc.objectFile[T](path)
+  def load(sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = sc.objectFile[T](path)
+//  def load(sc: SparkContext, path: String, lineageAndAccum: Option[(String, SizeAccumulator2)]): RDD[T] =
 
   def write(path: String, rdd: RDD[T]) = rdd.saveAsObjectFile(path)
 }
 
 object BinStorage {
-  def apply[T: ClassTag](): BinStorage[T] = new BinStorage[T]
+  def apply[T: ClassTag](fraction: Int = -1): BinStorage[T] = new BinStorage[T](fraction)
 }
 
 //-----------------------------------------------------------------------------------------------------
 
-class JsonStorage extends java.io.Serializable {
-  def load(sc: SparkContext, path: String): RDD[List[Any]] = {
+class JsonStorage(fraction: Int = -1) extends java.io.Serializable {
+  def load(sc: SparkContext, path: String, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[List[Any]] = {
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     // TODO: convert a DataFrame to a RDD with generic components
     sqlContext.read.json(path).rdd.map(_.toSeq.map(v => v.toString).toList)
@@ -155,13 +158,13 @@ class JsonStorage extends java.io.Serializable {
 }
 
 object JsonStorage {
-  def apply(): JsonStorage = new JsonStorage
+  def apply(fraction: Int = -1): JsonStorage = new JsonStorage(fraction)
 }
 
 //-----------------------------------------------------------------------------------------------------
 
-class JdbcStorage[T <: SchemaClass: ClassTag] extends java.io.Serializable {
-  def load(sc: SparkContext, table: String, extract: Row => T, driver: String, url: String): RDD[T] = {
+class JdbcStorage[T <: SchemaClass: ClassTag](fraction: Int = -1) extends java.io.Serializable {
+  def load(sc: SparkContext, table: String, extract: Row => T, driver: String, url: String, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = {
     // sc.addJar("/Users/kai/Projects/h2/bin/h2-1.4.189.jar")
     var params = scala.collection.immutable.Map[String, String]()
     params += ("driver" -> driver)
@@ -183,5 +186,5 @@ class JdbcStorage[T <: SchemaClass: ClassTag] extends java.io.Serializable {
 }
 
 object JdbcStorage {
-  def apply[T <: SchemaClass: ClassTag](): JdbcStorage[T] = new JdbcStorage[T]
+  def apply[T <: SchemaClass: ClassTag](fraction: Int = -1): JdbcStorage[T] = new JdbcStorage[T](fraction)
 }

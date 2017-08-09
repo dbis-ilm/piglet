@@ -82,28 +82,29 @@ object PerfMonitor {
       ""
 
     val dataString = s"$lineage$FIELD_DELIM$partitionId$FIELD_DELIM$parents$FIELD_DELIM$time"
-//    scalaj.http.Http(url).method("HEAD").param("data", dataString).asString
     request(url, dataString)
   }
 
 
-  def serializedSize(o: Any): Int = o match {
-    case Boolean => 1
-    case Short | Char => 2
-    case Int | Float  => 4
-    case Long | Double => 8
-    case s: String => s.getBytes.length
-    case t: SchemaClass => t.getNumBytes
-    case l: mutable.Iterable[_] =>
-      l.size * l.headOption.map(serializedSize).getOrElse(-1)
-//      l.foldLeft(0)(_ + serializedSize(_))
-    case a: Array[_] =>
-      a.length * a.headOption.map(serializedSize).getOrElse(-1)
-    case _ =>
-      println(s"Unknown type ${o.getClass.getName} use 0 size")
-      -2
+//  def serializedSize(o: Any): Int = o match {
+//    case Boolean => 1
+//    case Short | Char => 2
+//    case Int | Float  => 4
+//    case Long | Double => 8
+//    case s: String => s.getBytes.length
+//    case t: SchemaClass => t.getNumBytes
+//    case l: mutable.Iterable[_] =>
+//      l.size * l.headOption.map(serializedSize).getOrElse(-1)
+////      l.foldLeft(0)(_ + serializedSize(_))
+//    case a: Array[_] =>
+//      a.length * a.headOption.map(serializedSize).getOrElse(-1)
+//    case _ =>
+//      println(s"Unknown type ${o.getClass.getName} use 0 size")
+//      -2
+//
+//  }
 
-  }
+  def estimateSize(o: AnyRef): Long = org.apache.spark.util.SizeEstimator.estimate(o)
 
 //  {
 //    var bos: java.io.ByteArrayOutputStream = null

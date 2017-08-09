@@ -161,16 +161,17 @@ trait DFPSupport {
     */
   //noinspection ScalaDocMissingParameterDescription
   def remove(plan: DataflowPlan, rem: PigOperator, removePredecessors: Boolean = false): DataflowPlan = {
-    var loads: List[PigOperator] = List.empty
+    var loads: List[Load] = List.empty
     var newPlan: DataflowPlan = null
 
-    if (rem.isInstanceOf[Load]) {
-      newPlan = plan
-      loads = loads :+ rem
-    } else {
-      val strat = manybu(buildRemovalStrategy(rem))
+    rem match {
+      case load: Load =>
+        newPlan = plan
+        loads = loads :+ load
+      case _ =>
+        val strat = manybu(buildRemovalStrategy(rem))
 
-      newPlan = rewritePlan(plan, strat)
+        newPlan = rewritePlan(plan, strat)
     }
 
     if (removePredecessors) {
@@ -188,11 +189,13 @@ trait DFPSupport {
 
       newPlan = nodes.filterNot(_.isInstanceOf[Load]).foldLeft(newPlan)((p: DataflowPlan, op: PigOperator) =>
         rewritePlan(p, manybu(buildRemovalStrategy(op))))
-      loads = loads ++ nodes.filter(_.isInstanceOf[Load])
+
+      loads = loads ++ nodes.filter(_.isInstanceOf[Load]).map(_.asInstanceOf[Load])
     }
-    loads.asInstanceOf[List[Load]].foreach ({ l: Load =>
+    loads.foreach{ l: Load =>
       newPlan.operators = newPlan.operators.filterNot(_ == l)
-    })
+    }
+
     newPlan
   }
 

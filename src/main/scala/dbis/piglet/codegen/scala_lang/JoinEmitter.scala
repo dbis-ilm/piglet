@@ -14,14 +14,14 @@ class JoinEmitter extends CodeEmitter[Join] {
   override def template: String =
     """val <out> = <rel1>_kv.join(<rel2>_kv).map{
       |  case (k,(v,w)) =>
-      |  val res <class>(<fields>)
-      |  <if (profiling)>
-      |  if(scala.util.Random.nextInt(randFactor) == 0) {
-      |    accum.incr("<lineage>", res.getNumBytes)
-      |     //accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(res))
-      |  }
-      |  <endif>
-      |  res
+      |    val res = <class>(<fields>)
+      |    <if (profiling)>
+      |    if(scala.util.Random.nextInt(randFactor) == 0) {
+      |      //accum.incr("<lineage>", res.getNumBytes)
+      |      accum.incr("<lineage>", PerfMonitor.estimateSize(res))
+      |    }
+      |    <endif>
+      |    res
       |}""".stripMargin
 
 
@@ -31,8 +31,8 @@ class JoinEmitter extends CodeEmitter[Join] {
       |    val res = <class>(<fields>)
       |    <if (profiling)>
       |    if(scala.util.Random.nextInt(randFactor) == 0) {
-      |      accum.incr("<lineage>", res.getNumBytes)
-      |      //accum.incr("<lineage>", org.apache.spark.util.SizeEstimator.estimate(res))
+      |      //accum.incr("<lineage>", res.getNumBytes)
+      |      accum.incr("<lineage>", PerfMonitor.estimateSize(res))
       |    }
       |    <endif>
       |    res
@@ -105,7 +105,8 @@ class JoinEmitter extends CodeEmitter[Join] {
           "rel1" -> rels.head.name,
           "class" -> className,
           "rel2" -> rels.tail.map(_.name),
-          "fields" -> fieldList)) + "\n"
+          "fields" -> fieldList,
+          "lineage" -> op.lineageSignature)) + "\n"
     }
     else {
       var pairs = "(v1,v2)"
@@ -126,7 +127,8 @@ class JoinEmitter extends CodeEmitter[Join] {
           "class" -> className,
           "rel2" -> rels.tail.map(_.name),
           "pairs" -> pairs,
-          "fields" -> fieldList.mkString(", "))) + "\n"
+          "fields" -> fieldList.mkString(", "),
+          "lineage" -> op.lineageSignature)) + "\n"
     }
     JoinEmitter.joinKeyVars += rels.head.name
     JoinEmitter.joinKeyVars ++= rels.tail.map(_.name)

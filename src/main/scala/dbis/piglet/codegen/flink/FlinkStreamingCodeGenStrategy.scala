@@ -85,11 +85,11 @@ class FlinkStreamingCodeGenStrategy extends FlinkCodeGenStrategy {
    * @param profiling add profiling code to the generated code
    * @return a string representing the header code
    */
-  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[ProfilerSettings] = None, operators: Seq[Lineage] = Seq.empty): String = {
+  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[ProfilerSettings] = None): String = {
     CodeEmitter.render("""  def main(args: Array[String]) {<\n>""", Map.empty)
   }
 
-  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None, operators:Seq[Lineage]=Seq.empty): String = {
+  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
     val params = Map("name" -> "Starting Query")
     CodeEmitter.render("""    env.execute("<name>")
                          |<if (hook)>

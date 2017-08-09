@@ -15,21 +15,16 @@
  * limitations under the License.
  */
 
-package dbis.piglet.backends.spark.test
+package dbis.piglet.backends.spark
 
 import java.io.File
 
-import dbis.piglet.backends.{SchemaClass, Record}
-import dbis.piglet.backends.spark._
+import dbis.piglet.backends.{Record, SchemaClass}
+import org.apache.commons.io.FileUtils
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest._
-import org.apache.commons.io.FileUtils
 
-case class Person(name: String, age: Int) extends java.io.Serializable with SchemaClass {
-  override def mkString(delim: String) = s"$name$delim$age"
 
-  override lazy val getNumBytes: Int = name.getBytes.length + 4
-}
 
 case class DataRecord(col1: Int, col2: String) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = s"$col1$delim$col2"

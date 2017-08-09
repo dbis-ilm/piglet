@@ -1,6 +1,6 @@
 package dbis.piglet.tools
 
-import dbis.piglet.op.PigOperator
+import dbis.piglet.op.{Empty, PigOperator}
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.logging.PigletLogging
 
@@ -149,7 +149,7 @@ object DepthFirstTopDownWalker extends Walker[PigOperator] {
 
 object TopoSort {
 	
-  def apply(plan: DataflowPlan) = {
+  def apply(plan: DataflowPlan, ignoreEmpty: Boolean = true) = {
     
     val l = ListBuffer.empty[PigOperator]
     val s = mutable.Queue(plan.sourceNodes.toSeq: _*)
@@ -162,7 +162,7 @@ object TopoSort {
       if(!l.contains(n))
     	  l.append(n)
     	  
-      for(consumer <- n.outputs.flatMap(_.consumer)) {
+      for(consumer <- n.outputs.flatMap(_.consumer) if !ignoreEmpty || (ignoreEmpty && !consumer.isInstanceOf[Empty])) {
         
         m(consumer) += 1
         if(m(consumer) >= consumer.inputs.size)
@@ -171,16 +171,18 @@ object TopoSort {
      
     }
 
-    if(l.size != plan.operators.size) {
-      val diff = plan.operators.diff(l)
+    val planOps = if(ignoreEmpty) plan.operators.filterNot(_.isInstanceOf[Empty]) else plan.operators
 
-      println(s"l: ${l.size}  vs ops ${plan.operators.size}: ${diff.mkString("\n")}")
+    if(l.size != planOps.size) {
+      val diff = planOps.diff(l)
 
-      plan.operators.foreach(println)
+      println(s"l: ${l.size}  vs ops ${planOps.size}: ${diff.mkString("\n")}")
+
+      planOps.foreach(println)
       println("---")
       l.foreach(println)
 
-      if(l.size > plan.operators.size)
+      if(l.size > planOps.size)
         throw new IllegalStateException("we found too many operators")
       else
         throw new IllegalStateException("we lost some operators")

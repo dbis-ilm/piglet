@@ -56,7 +56,7 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     */
   def add(parent: Op, child: Op): Unit = {
 
-    require(parent != child || (parent == startNode && child == startNode), "an operator cannot be child of itself (parent must be != child): $parent")
+    require(parent != child || (parent == startNode && child == startNode), s"an operator cannot be child of itself (parent must be != child): $parent")
     val newWeight = rawWeight(parent, child) + 1
 
     logger debug s"upserting edge $parent -> $child with new weight $newWeight"

@@ -24,7 +24,7 @@ object PrettyPrinter extends org.kiama.output.PrettyPrinter{
   }
 
   def show(op: PigOperator): Doc = {
-    val prettyInputs = op.inputs.map(p => show(p.producer)).toList
+    val prettyInputs = op.inputs.map(p => show(p.producer))
     parens (
       value(op)
       <> nest(

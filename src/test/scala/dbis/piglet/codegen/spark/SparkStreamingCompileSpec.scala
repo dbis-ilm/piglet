@@ -230,7 +230,7 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (t._0,t))
       |val c_kv = c.map(t => (t._0,t))
-      |val a = b_kv.join(c_kv).map{case (k,(v,w)) => _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2)}""".stripMargin)
+      |val a = b_kv.join(c_kv).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -254,7 +254,7 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (Array(t._0,t._1).mkString,t))
       |val c_kv = c.map(t => (Array(t._1,t._2).mkString,t))
-      |val a = b_kv.join(c_kv).map{case (k,(v,w)) => _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2)}""".stripMargin)
+      |val a = b_kv.join(c_kv).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -279,7 +279,7 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
                                      |val b_kv = b.map(t => (t._0,t))
                                      |val c_kv = c.map(t => (t._0,t))
                                      |val d_kv = d.map(t => (t._0,t))
-                                     |val a = b_kv.join(c_kv).join(d_kv).map{case (k,((v1,v2),v3)) => _t$1_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2)}""".stripMargin)
+                                     |val a = b_kv.join(c_kv).join(d_kv).map{ case (k,((v1,v2),v3)) => val res = _t$1_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2) res }""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -314,7 +314,7 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
 
     val op = Filter(Pipe("a"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
-    val expectedCode = cleanString("val a = b.filter{t => t.get(1) < 42}")
+    val expectedCode = cleanString("val a = b.filter{t => val res = t.get(1) < 42 res }")
     assert(generatedCode == expectedCode)
   }
 

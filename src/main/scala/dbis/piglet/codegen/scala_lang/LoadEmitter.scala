@@ -9,12 +9,13 @@ import dbis.piglet.op.Load
   */
 class LoadEmitter extends CodeEmitter[Load] {
   override def template: String =
-    """    val <out> = <func>[<class>]().load(sc, "<file>"<if (extractor)>, <extractor><endif><if (params)>, <params><endif>)""".stripMargin
+    """    val <out> = <func>[<class>](<if (profiling)>randFactor<endif>).load(sc, "<file>"<if (extractor)>, <extractor><endif><if (params)>, <params><endif>, <if (profiling)>lineageAndAccum = Some(("<lineage>",accum))<else>lineageAndAccum = None<endif>)""".stripMargin
 
   override def code(ctx: CodeGenContext, op: Load): String = {
     var paramMap = ScalaEmitter.emitExtractorFunc(op, op.loaderFunc)
     paramMap += ("out" -> op.outPipeName)
     paramMap += ("file" -> op.file.toString)
+    paramMap += ("lineage" -> op.lineageSignature)
     if (op.loaderFunc.isEmpty)
       paramMap += ("func" -> BackendManager.backend.defaultConnector)
     else {

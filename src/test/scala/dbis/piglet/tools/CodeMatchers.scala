@@ -50,16 +50,15 @@ object SnippetMatcher {
     val keys = pattern.findAllMatchIn(template).map(p => p.toString).toList
     val pattern2 = "[0-9]+".r
     var offs = 0
-    for (i <- 0 until keys.length) {
+    for (i <- keys.indices) {
       // now we look for the number that we use to replace the $i string
-      if (snippet.size < positions(i) + offs  + 1) return false
+      if (snippet.length < positions(i) + offs  + 1) return false
       pattern2.findFirstIn(snippet.substring(positions(i) + offs)) match {
-        case Some(s) => {
-          replacements += (keys(i) -> s)
+        case Some(snip) =>
+          replacements += (keys(i) -> snip)
           // if it was longer than one digit we have to correct the position
-          offs += s.length - 1
-        }
-        case None => {}
+          offs += snip.length - 1
+        case None =>
       }
     }
     var s = template

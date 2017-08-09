@@ -2,7 +2,6 @@ package dbis.piglet.codegen.spark
 
 import java.net.URI
 
-import dbis.piglet.Piglet.Lineage
 import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenTarget}
 import dbis.piglet.expr.Expr
@@ -82,7 +81,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
     * @param profiling add profiling code to the generated code
     * @return a string representing the header code
     */
-  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[ProfilerSettings], operators: Seq[Lineage] = Seq.empty): String = {
+  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[ProfilerSettings]): String = {
     var map = Map[String,Any]("name" -> scriptName)
 
     profiling.foreach { p =>
@@ -93,7 +92,6 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
 //      map += ("profiling" -> t)
       map += ("profilingTimes" -> t)
       map += ("profilingSizes" -> s)
-      map += ("lineages" -> operators)
       map += ("randFactor" -> p.fraction)
     }
 
@@ -118,11 +116,11 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
                          |""".stripMargin, map)
   }
 
-  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None, operators: Seq[Lineage] = Seq.empty): String = {
+  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
 
     val map = profiling.map { u => 
       val url = u.resolve(Conf.EXECTIMES_FRAGMENT).toString
-      Map("profiling" -> url,"lineages"->operators)
+      Map("profiling" -> url)
     }.getOrElse(Map.empty[String,String])
 
 //    val m = scala.collection.mutable.Map.empty[String,Option[(Long,Long)]]

@@ -18,7 +18,6 @@ package dbis.piglet.codegen.spark
 
 import java.net.URI
 
-import dbis.piglet.Piglet.Lineage
 import dbis.piglet.codegen.scala_lang.ScalaCodeGenStrategy
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenTarget}
 import dbis.piglet.mm.ProfilerSettings
@@ -105,7 +104,7 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
     * @param profiling add profiling code to the generated code
     * @return a string representing the header code
     */
-  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[ProfilerSettings] = None, operators: Seq[Lineage] = Seq.empty): String = {
+  override def emitHeader2(ctx: CodeGenContext, scriptName: String, profiling: Option[ProfilerSettings] = None): String = {
     var map = Map("name" -> scriptName)
 
     profiling.map { p =>
@@ -123,7 +122,7 @@ class SparkStreamingCodeGenStrategy extends ScalaCodeGenStrategy {
                          |""".stripMargin, map)
   }
 
-  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None, operators:Seq[Lineage]=Seq.empty): String = {
+  override def emitFooter(ctx: CodeGenContext, plan: DataflowPlan, profiling: Option[URI] = None): String = {
     /*
      * We want to force the termination with the help of a timeout,
      * if all source nodes are Load operators as text files are not continuous.

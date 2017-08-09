@@ -74,7 +74,12 @@ trait MaterializationSupport extends PigletLogging {
          */
         logger.debug(s"did not find materialized data for materialize operator $materialize")
 
-        val file = mm.saveMapping(materialize.lineageSignature)
+        val sig = materialize.lineageSignature
+
+        val file = mm.generatePath(sig)
+
+        if(!mm.c.compileOnly)
+          mm.saveMapping(sig, file)
 
         newPlan = MaterializationManager.replaceWithStore(materialize, file, newPlan)
       }

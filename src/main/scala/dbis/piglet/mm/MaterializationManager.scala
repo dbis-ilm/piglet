@@ -48,11 +48,14 @@ object MaterializationManager extends PigletLogging {
 
     var newPlan = plan
 
+    val producer = materialize.inputs.head.producer
 
-    val storer = Store(materialize.inputs.head, path, Some("BinStorage"))
+    val p = producer.outputs.filter(_.name == materialize.inputs.head.name).head
+    val storer = Store(p, path, Some("BinStorage"))
 
-    newPlan = newPlan.insertAfter(materialize.inputs.head.producer, storer)
+    newPlan.addOperator(Seq(storer))
     newPlan = newPlan.remove(materialize)
+    newPlan = newPlan.insertAfter(producer, storer)
 
     logger.info(s"inserted new store operator $storer")
 
@@ -64,7 +67,7 @@ object MaterializationManager extends PigletLogging {
 /**
   * Manage where materialized intermediate results are stored
   */
-class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends PigletLogging {
+class MaterializationManager(private val matBaseDir: URI, val c: CliParams) extends PigletLogging {
 
   implicit val formats = Serialization.formats(NoTypeHints)
 
@@ -86,8 +89,6 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
   }
 
   def insertMaterializationPoints(plan: DataflowPlan, model: Markov): DataflowPlan = {
-
-
 
     if(c.profiling.isEmpty) {
       logger.info("profiling is disabled - won't try to find possible materialization points")
@@ -114,13 +115,14 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
       case op if
         !candidates.contains(MaterializationPoint.dummy(op.lineageSignature)) && // only if not already analyzed
           op.outputs.nonEmpty => // not sink operator
+
         val sig = op.lineageSignature
 
         model.totalCost(sig, ProbStrategy.func(ps.probStrategy))(CostStrategy.func(ps.costStrategy)) match {
           case Some((cost,prob)) =>
             val relProb = prob // / model.totalRuns
 
-            val outRecords = model.resultRecords(sig).map(_ * ps.fraction)
+            val outRecords = model.resultRecords(sig)
             val outputBPR = model.bytesPerRecord(sig)
 
             // total number of bytes
@@ -129,8 +131,7 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
             if(opOutputSize.isDefined) {
               logger.debug(s"${op.name} (${op.lineageSignature})\t: " +
                 s"cost=${cost.milliseconds.toSeconds} \t prob=$relProb\t" +
-                s"sampled records =${model.resultRecords(sig).getOrElse("n/a")} r | ${model.bytesPerRecord(sig).getOrElse("n/a")} bytes/r\t" +
-                s"real records=${outRecords.getOrElse("n/a")} r")
+                s"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = ${opOutputSize.map(_ / 1024 / 1024).getOrElse("n/a")} MiB")
 
 
               val writingTime = (opOutputSize.get / Conf.BytesPerSecWriting).seconds
@@ -139,25 +140,27 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
               logger.debug(s"\twriting for ${op.name} ($sig) with ${opOutputSize.get} bytes would take ${writingTime.toSeconds} seconds")
               logger.debug(s"\treading for ${op.name} ($sig) with ${opOutputSize.get} bytes would take ${readingTime.toSeconds} seconds")
 
-              val benefit = cost.milliseconds - readingTime
-
               val costDecision = readingTime < cost.milliseconds - ps.minBenefit
 
               val decision = costDecision && relProb > ps.probThreshold
 
+              val benefit = cost.milliseconds - readingTime
               if(decision) {
                 logger.debug(s"\t--> We should materialize ${op.name} with benefit of ${benefit.toSeconds} and prob = $relProb")
                 candidates += MaterializationPoint(sig, benefit, relProb, cost)
               } else
               logger.debug(s"\t--> We should NOT materialize ${op.name} with benefit of ${benefit.toSeconds} and prob = $relProb")
 
+            } else {
+              logger.debug(s"no size info for ${op.name} ($sig)")
             }
 
 
           case None =>
             logger.debug(s"no profiling info for ${op.name} ($sig)")
         }
-      case op => logger.debug(s"irgendwas mit dummy for $op")
+
+      case _ =>
     }
 
 
@@ -180,14 +183,15 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
           case None => throw OperatorNotFoundException(lineage)
         }
 
-        val path = if(c.compileOnly) {
+      val path = generatePath(lineage)
+
+      if(c.compileOnly) {
           // if in compile only, we will not execute the script and thus not actually write the intermediate
           // results. Hence, we only create the path that would be used, but to not save the mapping
-          generatePath(lineage)
-        } else {
-          // ... that will be replaced with a Store op.
-          saveMapping(lineage) // we save a mapping from the lineage of the actual op (not the materialize) to the path
-        }
+      } else {
+        // ... that will be replaced with a Store op.
+        saveMapping(lineage, path) // we save a mapping from the lineage of the actual op (not the materialize) to the path
+      }
 
         val storer = Store(theOp.outputs.head, path, Some("BinStorage"))
         if(ps.cacheMode == CacheMode.NONE) {
@@ -301,32 +305,22 @@ class MaterializationManager(private val matBaseDir: URI, c: CliParams) extends 
    * @param lineage The identifier (lineage) of an operator
    * @return Returns the path where to store the result for this operator
    */
-  private def generatePath(lineage: Lineage): URI = matBaseDir.resolve(lineage)
+  def generatePath(lineage: Lineage): URI = matBaseDir.resolve(lineage)
   
-  /**
-    * Saves a mapping of the lineage of an operator to its materialization location.
-    * @param lineage The lineage of the operator to save
-    * @return Returns the Path to materialized results
-    */
-  def saveMapping(lineage: Lineage): URI = {
-    val matFile = generatePath(lineage)
-    saveMapping(lineage, matFile)
-    matFile
-  }
-  
-  
+
   /**
    * Persist the given mapping of a hashcode to a specific file name.
    * 
    * @param lineage The hash code of the sub plan to persist
    * @param matFile The path to the file in which the results were materialized
    */
-  private def saveMapping(lineage: Lineage, matFile: URI) = {
+  def saveMapping(lineage: Lineage, matFile: URI) = {
+
+    require(!c.compileOnly, "writing materialization mapping info in compile-only mode will break things!")
+
     materializations += lineage -> matFile
 
     val json = write(materializations.map{case(k,v) => (k,v.toString)})
-
-
 
     Files.write(Conf.materializationMapFile,
       List(json).asJava,

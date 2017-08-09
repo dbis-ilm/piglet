@@ -109,19 +109,19 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
          |""".stripMargin))
     plan.additionalJars.toList should equal (List("myfile.jar"))
     plan.operators.length should equal (2)
-    plan.operators.filter(_.isInstanceOf[RegisterCmd]).length should equal (0)
+    plan.operators.count(_.isInstanceOf[RegisterCmd]) should equal (0)
   }
 
   it should "compute identical lineage signatures for two operators with the same plans" in {
     val op1 = Load(Pipe("a"), "input/file.csv")
     val op2 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op3 = Grouping(Pipe("c"), Pipe("b"), GroupingExpression(List(PositionalField(0))))
-    val plan1 = new DataflowPlan(List(op1, op2, op3))
+    new DataflowPlan(List(op1, op2, op3))
 
     val op4 = Load(Pipe("a"), "input/file.csv")
     val op5 = Filter(Pipe("b"), Pipe("a"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))))
     val op6 = Grouping(Pipe("c"), Pipe("b"), GroupingExpression(List(PositionalField(0))))
-    val plan2 = new DataflowPlan(List(op4, op5, op6))
+    new DataflowPlan(List(op4, op5, op6))
     assert(op3.lineageSignature == op6.lineageSignature)
   }
 
@@ -130,17 +130,16 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |a = load 'file.csv' as (f1:int, f2:chararray, f3:double);
         |b = filter a by f1 > 0;
         |""".stripMargin))
-    val loadSchema = plan.operators(0).schema
-    loadSchema should not be (None)
+    val loadSchema = plan.operators.head.schema
+    loadSchema should not be None
     val filterSchema = plan.operators(1).schema
-    filterSchema should not be (None)
+    filterSchema should not be None
     loadSchema should equal (filterSchema)
     filterSchema match {
-      case Some(s) => {
+      case Some(s) =>
         s.field(0) should equal (Field("f1", Types.IntType))
         s.field(1) should equal (Field("f2", Types.CharArrayType))
         s.field(2) should equal (Field("f3", Types.DoubleType))
-      }
       case None => fail()
     }
   }
@@ -152,11 +151,10 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |""".stripMargin))
     val schema = plan.operators(1).schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.field(0) should equal (Field("subject", Types.CharArrayType))
         s.field(1) should equal (Field("predicate", Types.CharArrayType))
         s.field(2) should equal (Field("object", Types.ByteArrayType))
-      }
       case None => fail()
     }
   }
@@ -168,11 +166,10 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |""".stripMargin))
     val schema = plan.operators(1).schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.field(0) should equal (Field("", Types.DoubleType))
         s.field(1) should equal (Field("f1", Types.DoubleType))
         s.field(2) should equal (Field("f3", Types.ByteArrayType))
-      }
       case None => fail()
     }
   }
@@ -184,12 +181,11 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |""".stripMargin))
     val schema = plan.operators(1).schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.field(0) should equal (Field("", Types.IntType))
         s.field(1) should equal (Field("f1", TupleType(Array(Field("", Types.IntType),
                                                                 Field("", Types.IntType),
                                                                 Field("", Types.FloatType)))))
-      }
       case None => fail()
     }
   }
@@ -201,7 +197,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |""".stripMargin))
     val schema = plan.operators(1).schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.fields.length should equal (2)
         s.field(0).name should equal("group")
         s.field(0).fType should equal(Types.IntType)
@@ -209,7 +205,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
                                                                       Field("f2", Types.DoubleType),
                                                                       Field("f3", MapType(Types.ByteArrayType))
         )))))
-      }
       case None => fail()
     }
   }
@@ -221,7 +216,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
                                               |""".stripMargin))
     val schema = plan.operators(1).schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.fields.length should equal (2)
         s.field(0).name should equal ("group")
         s.field(0).lineage should be (List("a.f1"))
@@ -230,7 +225,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
           Field("f2", Types.DoubleType),
           Field("f3", MapType(Types.ByteArrayType))
         )))))
-      }
       case None => fail()
     }
   }
@@ -242,7 +236,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
                                               |""".stripMargin))
     val schema = plan.operators(1).schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.fields.length should equal (2)
         s.field(0).name should be ("group")
         s.field(0).fType should be (TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.IntType))))
@@ -250,7 +244,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
           Field("f2", Types.IntType),
           Field("f3", MapType(Types.ByteArrayType))
         )))))
-      }
       case None => fail()
     }
   }
@@ -262,7 +255,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
                                               |""".stripMargin))
     val schema = plan.operators(1).schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.fields.length should equal (2)
         s.field(0).name should be ("group")
         s.field(0).fType should be (Types.CharArrayType)
@@ -270,7 +263,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
           Field("f2", Types.DoubleType),
           Field("f3", MapType(Types.ByteArrayType))
         )))))
-      }
       case None => fail()
     }
     plan.operators(1).checkSchemaConformance should be (true)
@@ -315,7 +307,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
                                                | """.stripMargin))
     val schema = plan.operators.last.schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.fields.length should equal (6)
         s.field(0) should equal(Field("f1", Types.IntType, List("a")))
         s.field(1) should equal(Field("f2", Types.CharArrayType, List("a")))
@@ -323,7 +315,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         s.field(3) should equal(Field("f10", Types.IntType, List("b")))
         s.field(4) should equal(Field("f11", Types.DoubleType, List("b")))
         s.field(5) should equal(Field("f12", Types.ByteArrayType, List("b")))
-      }
       case None => fail()
     }
   }
@@ -336,7 +327,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |""".stripMargin))
     val schema = plan.operators.last.schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.fields.length should equal (6)
         s.field(0) should equal(Field("f1", Types.IntType, List("a")))
         s.field(1) should equal(Field("f2", Types.CharArrayType, List("a")))
@@ -344,7 +335,6 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         s.field(3) should equal(Field("f10", Types.IntType, List("b")))
         s.field(4) should equal(Field("f11", Types.DoubleType, List("b")))
         s.field(5) should equal(Field("f12", Types.ByteArrayType, List("b")))
-      }
       case None => fail()
     }
   }
@@ -357,12 +347,11 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |""".stripMargin))
     val schema = plan.operators.last.schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.fields.length should equal (3)
         s.field(0) should equal(Field("f1", Types.IntType))
         s.field(1) should equal(Field("f2", Types.CharArrayType))
         s.field(2) should equal(Field("f3", Types.DoubleType))
-      }
       case None => fail()
     }
   }
@@ -385,12 +374,11 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |""".stripMargin))
     val schema = plan.operators.last.schema
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         s.fields.length should equal (3)
         s.field(0) should equal(Field("f1", Types.DoubleType))
         s.field(1) should equal(Field("f2", Types.CharArrayType))
         s.field(2) should equal(Field("f3", Types.FloatType))
-      }
       case None => fail()
     }
   }
@@ -406,7 +394,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
      * just let it check the conformance, if the exception is thrown, 
      * the test will fail anyway
      */
-    plan.checkSchemaConformance
+    plan.checkSchemaConformance()
 //    an [SchemaException] should not be thrownBy plan.checkSchemaConformance 
   }
 
@@ -437,7 +425,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |           uniq_sym = distinct sym;
         |           generate group, COUNT(uniq_sym);
         |};""".stripMargin)
-    val plan = new DataflowPlan(ops)
+    val _ = new DataflowPlan(ops)
   }
 
   it should "check connectivity of a plan with a nested FOREACH" in {
@@ -533,7 +521,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     op.outputs should have size 1
 
     val output = op.outputs.headOption.value
-    output.consumer should contain only(d)
+    output.consumer should contain only d
   }
 
   it should "be consistent after exchanging two operators" in {
@@ -547,7 +535,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     val plan = new DataflowPlan(List(op1, op2, op3, op4))
     val newPlan = plan.swap(op2, op3)
 
-    newPlan.sourceNodes.headOption.value.outputs.head.consumer should contain only(op3)
+    newPlan.sourceNodes.headOption.value.outputs.head.consumer should contain only op3
     val sinkInput = newPlan.sinkNodes.headOption.value.inputs.headOption.value
     sinkInput.name shouldBe "c"
     sinkInput.producer shouldBe op2
@@ -575,7 +563,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     val op4 = Dump(Pipe("lalala"))
 
     val plan = new DataflowPlan(List(op1, op2, op3, op4)).remove(op3, removePredecessors = true)
-    plan.operators should contain only(op4)
+    plan.operators should contain only op4
   }
 
   it should "return an empty DataflowPlan when the last operator in the plan is removed" in {
@@ -615,13 +603,13 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     val opB = plan.findOperatorForAlias("B")
     val opC = plan.findOperatorForAlias("C")
     val opD = plan.findOperatorForAlias("D")
-    opB.get.configParams should contain key ("parallelismHint")
+    opB.get.configParams should contain key "parallelismHint"
     opB.get.configParams("parallelismHint") should be (Value(5))
-    opC.get.configParams should contain key ("parallelismHint")
+    opC.get.configParams should contain key "parallelismHint"
     opC.get.configParams("parallelismHint") should be (Value(5))
     opC.get.configParams should not contain key ("some")
-    opD.get.configParams should contain key ("parallelismHint")
-    opD.get.configParams should contain key ("some")
+    opD.get.configParams should contain key "parallelismHint"
+    opD.get.configParams should contain key "some"
     opD.get.configParams("parallelismHint") should be (Value(3))
     opD.get.configParams("some") should be (Value("\"thing\""))
   }
@@ -661,7 +649,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
         |C = FOREACH B GENERATE A.name, AVG(A.value);
         |DUMP C;
       """.stripMargin))
-    plan.checkSchemaConformance
+    plan.checkSchemaConformance()
   }
 
   "Setting operators" should "add all their relation names to the PipeNameGenerator as known names" in {
@@ -670,7 +658,7 @@ class DataflowPlanSpec extends FlatSpec with Matchers with PrivateMethodTester {
     val op1 = OrderBy(Pipe("b"), Pipe("a"), List())
     val op2 = OrderBy(Pipe("c"), Pipe("b"), List())
     val op3 = OrderBy(Pipe("d"), Pipe("b"), List())
-    val plan = new DataflowPlan(List(op0, op1, op2, op3))
+    val _ = new DataflowPlan(List(op0, op1, op2, op3))
 
     val generatedMethod = PrivateMethod[MutableSet[String]]('generated)
     val generatedSet = PipeNameGenerator invokePrivate generatedMethod()
