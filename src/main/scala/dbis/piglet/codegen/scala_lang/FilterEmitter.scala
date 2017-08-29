@@ -1,6 +1,6 @@
 package dbis.piglet.codegen.scala_lang
 
-import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenException}
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
 import dbis.piglet.op.Filter
 
 /**

@@ -48,14 +48,14 @@ object ScalaCompiler extends PigletLogging {
     
     logger.debug(s"""compiling source file '${sourceFiles.mkString(",")}' to target dir '$targetDir'""")
     
-    val target = AbstractFile.getDirectory(targetDir.toFile())
+    val target = AbstractFile.getDirectory(targetDir.toFile)
     val settings = new Settings
     /*
     settings.deprecation.value = true // enable detailed deprecation warnings
     settings.unchecked.value = true // enable detailed unchecked warnings
     settings.usejavacp.value = true
 */
-    settings.classpath.append(targetDir.toString())
+    settings.classpath.append(targetDir.toString)
 
     settings.outputDirs.setSingleOutput(target)
     settings.embeddedDefaults[Probe]
@@ -69,7 +69,7 @@ object ScalaCompiler extends PigletLogging {
 
     
     val sources = sourceFiles.map { f => 
-        new BatchSourceFile(f.toString(), Source.fromFile(f.toFile()).mkString) 
+        new BatchSourceFile(f.toString, Source.fromFile(f.toFile).mkString)
       }.toList
     
     val run = new Run

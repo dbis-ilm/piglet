@@ -1,10 +1,8 @@
 package dbis.piglet.tools
 
-import org.apache.commons.exec._
-import org.apache.commons.exec.environment.EnvironmentUtils
-import com.typesafe.config.ConfigFactory
 import dbis.piglet.backends.CppConfig
 import dbis.piglet.tools.logging.PigletLogging
+import org.apache.commons.exec._
 
 object CppCompilerConf extends PigletLogging {
  

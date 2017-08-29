@@ -76,6 +76,12 @@ class MaterializationManager(private val matBaseDir: URI, val c: CliParams) exte
 
   require(matBaseDir != null, "Base directory for materialization must not be null")
 
+
+  /**
+    * Already existing materializations
+    *
+    * They're read from file and stored as a mapping from lineage --> file name
+    */
   var materializations: Map[Lineage, URI] = if (Files.exists(Conf.materializationMapFile)) {
     val json = Source.fromFile(Conf.materializationMapFile.toFile).getLines().mkString("\n")
 
@@ -88,6 +94,13 @@ class MaterializationManager(private val matBaseDir: URI, val c: CliParams) exte
     Map.empty[Lineage, URI]
   }
 
+
+  /**
+    * Checks the complete plan for potential materialization points
+    * @param plan The plan
+    * @param model The markov model that represents previously collected statistics
+    * @return Returns a new plan with inserted materialization points
+    */
   def insertMaterializationPoints(plan: DataflowPlan, model: Markov): DataflowPlan = {
 
     if(c.profiling.isEmpty) {
@@ -102,25 +115,26 @@ class MaterializationManager(private val matBaseDir: URI, val c: CliParams) exte
     logger.debug(s"using prob threshold: ${ps.probThreshold}")
     logger.debug(s"using min benefit: ${ps.minBenefit}")
 
-    /* This was measured using HDFSIO tools to benchmark HDFS performance for our cluster
-        The value was given in MB/sec but since we collect the statistics in Bytes/sec
-        we have to convert its
-     */
-
-
+    // we add all potential points into a list first
     val candidates = mutable.Set.empty[MaterializationPoint]
 
+    // traverse the plan and see if the current operator should be materialized
     DepthFirstTopDownWalker.walk(plan) {
-      case _: TimingOp =>
+      case _: TimingOp => // ignore timing ops
+
       case op if
         !candidates.contains(MaterializationPoint.dummy(op.lineageSignature)) && // only if not already analyzed
           op.outputs.nonEmpty => // not sink operator
 
         val sig = op.lineageSignature
 
+        // try to get total costs up to this operator from the model
         model.totalCost(sig, ProbStrategy.func(ps.probStrategy))(CostStrategy.func(ps.costStrategy)) match {
+
           case Some((cost,prob)) =>
             val relProb = prob // / model.totalRuns
+            val probDecision = relProb > ps.probThreshold
+
 
             val outRecords = model.resultRecords(sig)
             val outputBPR = model.bytesPerRecord(sig)
@@ -140,9 +154,11 @@ class MaterializationManager(private val matBaseDir: URI, val c: CliParams) exte
               logger.debug(s"\twriting for ${op.name} ($sig) with ${opOutputSize.get} bytes would take ${writingTime.toSeconds} seconds")
               logger.debug(s"\treading for ${op.name} ($sig) with ${opOutputSize.get} bytes would take ${readingTime.toSeconds} seconds")
 
+
               val costDecision = readingTime < cost.milliseconds - ps.minBenefit
 
-              val decision = costDecision && relProb > ps.probThreshold
+              // if the costs and probability satisfy our criteria add as potential mat point
+              val decision = costDecision && probDecision
 
               val benefit = cost.milliseconds - readingTime
               if(decision) {
@@ -164,10 +180,7 @@ class MaterializationManager(private val matBaseDir: URI, val c: CliParams) exte
     }
 
 
-
-
     // here we might have a long list of possible MaterializationPoint s - we should only select the most important ones
-    // On the other hand, we already decided, that all these candidates are important!
 
 
     var newPlan = plan
