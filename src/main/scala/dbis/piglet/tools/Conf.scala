@@ -102,7 +102,7 @@ object Conf extends PigletLogging {
   def spatialJar = Paths.get(appconf.getString("features.spatial.jar"))
   
   def statServerPort = appconf.getInt("statserver.port")
-  def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url")).toURL) else None
+  def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url"))) else None
   
   def profilingFile = "profilerstats.json"
   def mmDefaultCostStrategy = CostStrategy.withName(appconf.getString("profiler.defaults.cost_strategy").toUpperCase)

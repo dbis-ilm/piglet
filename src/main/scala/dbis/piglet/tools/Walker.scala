@@ -67,7 +67,7 @@ object BreadthFirstBottomUpWalker extends Walker[PigOperator] {
 
 	override def walk(plan: DataflowPlan, startNodes: Seq[PigOperator] = Seq.empty)(visit: (PigOperator => Unit)) = doIt(plan, startNodes, Some(visit))
 
-  override def collect(plan: DataflowPlan, startNodes: Seq[PigOperator]): Set[PigOperator] = doIt(plan, startNodes, None).toSet
+  override def collect(plan: DataflowPlan, startNodes: Seq[PigOperator] = Seq.empty): Set[PigOperator] = doIt(plan, startNodes, None).toSet
 
 }
 

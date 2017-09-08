@@ -5,7 +5,7 @@ import java.nio.file.{Files, Path, StandardOpenOption}
 
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.op.CacheMode.CacheMode
-import dbis.piglet.op.{CacheMode, Load, TimingOp}
+import dbis.piglet.op.{CacheMode, Empty, Load, TimingOp}
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf}
@@ -92,7 +92,11 @@ object DataflowProfiler extends PigletLogging {
         if(op.isInstanceOf[Load])
           profilingGraph.add("start",lineage)
 
-        op.outputs.flatMap(_.consumer).foreach{ c =>
+        op.outputs.flatMap(_.consumer).withFilter{
+          case _: Empty => false
+          case _ => true
+        }
+        .foreach{ c =>
           logger.debug(s"add to model ${op.name} -> ${c.name}")
           profilingGraph.add(lineage, c.lineageSignature)
         }
@@ -122,55 +126,13 @@ object DataflowProfiler extends PigletLogging {
       /* for each parent operator, get the times for the respective parent partitions.
        * and at the end take the min (first processed parent partition) or max (last processed parent partition) value
        */
-      val parentTimes = parentPartitionIds(partitionId).zipWithIndex.flatMap{ case (list, idx) =>
-
-        val parentLineage = parentLineages(idx)
-        val parentMaxPartitionId = 0
-
-        list.map{ pId =>
-          val p = if(parentLineage == Markov.startNode.lineage)
-              Partition(parentLineage, -1) // for "start" we only have one value with partition id -1
-//            else if(parentLineage == "progstart")
-//              Partition(parentLineage, -1)
-          else {
-            val theParentId = if(pId > parentMaxPartitionId) parentMaxPartitionId else pId
-            Partition(parentLineage, theParentId)
-          }
-
-          if(currentTimes.contains(p))
-            currentTimes(p)
-          else {
-//              logger.error("currentTimes: ")
-//              val sortedTimes = currentTimes.toList.sortWith{ (l,r) =>
-//                val (Partition(leftLineage, leftPartId),_) = l
-//                val (Partition(rightLineage, rightPartId),_) = r
-//
-//                val comp = leftLineage.compareTo(rightLineage)
-//
-//                if(comp < 0)
-//                  true
-//                else if(comp == 0)
-//                  leftPartId < rightPartId
-//                else
-//                  false
-//              }
-//              logger.error(sortedTimes.mkString("\n"))
-
-
-
-              val msg = s"no $p in list of current execution times (as parent for $partition)"
-              logger.warn(msg)
-//              throw ProfilingException(s"no $p in list of current execution times (as parent for $partition)")
-            -1L
-          }
-        }
-      }.filter(_ >= 0)
+      val parentTimes = getEarliestParentTimes(partitionId, parentPartitionIds, parentLineages)
 
       val earliestParentTime = if(parentTimes.nonEmpty) {
         parentTimes.max
       } else {
 //        throw ProfilingException(s"no parent time for $lineage on partition $partitionId")
-
+        logger.debug(s"no parent time for $lineage on partition $partitionId")
         time + 1
       }
 
@@ -190,12 +152,57 @@ object DataflowProfiler extends PigletLogging {
   }
 
 
+  private def getEarliestParentTimes(partitionId: Int, parentPartitionIds: MutableMap[Int, Seq[Seq[Int]]], parentLineages: List[Lineage]) =
+    parentPartitionIds(partitionId).zipWithIndex.flatMap { case (list, idx) =>
 
-  def addExecTime(lineage: Lineage, partitionId: Int, parentPartitions: Seq[Seq[Int]], time: Long) = {
+      val parentLineage = parentLineages(idx)
+      val parentMaxPartitionId = parentPartitionIds.valuesIterator.flatMap(_.flatten).max
+
+      list.map { pId =>
+        val p = if (parentLineage == Markov.startNode.lineage)
+          Partition(parentLineage, -1) // for "start" we only have one value with partition id -1
+        //            else if(parentLineage == "progstart")
+        //              Partition(parentLineage, -1)
+        else {
+          val theParentId = if (pId > parentMaxPartitionId) parentMaxPartitionId else pId
+          Partition(parentLineage, theParentId)
+        }
+
+        if (currentTimes.contains(p))
+          currentTimes(p)
+        else {
+          //              logger.error("currentTimes: ")
+          //              val sortedTimes = currentTimes.toList.sortWith{ (l,r) =>
+          //                val (Partition(leftLineage, leftPartId),_) = l
+          //                val (Partition(rightLineage, rightPartId),_) = r
+          //
+          //                val comp = leftLineage.compareTo(rightLineage)
+          //
+          //                if(comp < 0)
+          //                  true
+          //                else if(comp == 0)
+          //                  leftPartId < rightPartId
+          //                else
+          //                  false
+          //              }
+          //              logger.error(sortedTimes.mkString("\n"))
+
+
+          val msg = s"no $p in list of current execution times (as parent for $parentLineage:$partitionId)"
+          logger.warn(msg)
+          //              throw ProfilingException(s"no $p in list of current execution times (as parent for $partition)")
+          -1L
+        }
+      }
+    }.filter(_ >= 0)
+
+
+  def addExecTime(lineage: Lineage, partitionId: Int, parentPartitions: Seq[Seq[Int]], time: Long): Unit = {
 
     val p = Partition(lineage, partitionId)
     if(currentTimes.contains(p)) {
       logger.warn(s"we already have a time for $p : oldTime: ${currentTimes(p)}  newTime: $time  (diff: ${currentTimes(p) - time}ms")
+      return
     }
     currentTimes +=  p -> time
 
@@ -299,9 +306,7 @@ object ProfilerSettings extends PigletLogging {
     ps
   }
 
-  private lazy val profilingUrl = if(Conf.statServerURL.isDefined) {
-    Conf.statServerURL.get.toURI
-  } else {
+  private lazy val profilingUrl = Conf.statServerURL.getOrElse {
     val addr = java.net.InetAddress.getLocalHost.getHostAddress
     logger.debug(s"identified local address as $addr")
     val u = URI.create(s"http://$addr:${Conf.statServerPort}/")

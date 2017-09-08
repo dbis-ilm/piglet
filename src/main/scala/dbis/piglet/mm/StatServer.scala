@@ -4,10 +4,8 @@ import java.net.{InetSocketAddress, URLDecoder}
 
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import com.sun.net.httpserver.{HttpExchange, HttpHandler, HttpServer}
-import dbis.piglet.tools.{Conf, FileTools}
+import dbis.piglet.tools.Conf
 import dbis.piglet.tools.logging.PigletLogging
-
-import scala.concurrent.Await
 
 /**
   * The StatServer starts a HTTP Server on a specified port
@@ -138,10 +136,10 @@ case class TimeMsg(time: String) extends  StatMsg
 case class SizeMsg(private val sizes: String) extends StatMsg {
 
   lazy val values = sizes.split(StatsWriterActor.FIELD_DELIM).map{s =>
-    val a = s.split(":")
+    val a = s.split(StatsWriterActor.SIZE_DELIM)
     val lineage = a(0)
     val numRecords = a(1).toLong
-    val numBytes = a(2).toLong
+    val numBytes = a(2).toLong / 2
     SizeInfo(lineage, records = numRecords, bytes = numBytes)
   }
 }
@@ -153,4 +151,5 @@ object StatsWriterActor {
   final val FIELD_DELIM = ";"
   final val PARENT_DELIM = ","
   final val DEP_DELIM = "#"
+  final val SIZE_DELIM = ":"
 }

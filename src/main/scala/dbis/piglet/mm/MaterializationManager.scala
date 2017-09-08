@@ -143,16 +143,19 @@ class MaterializationManager(private val matBaseDir: URI, val c: CliParams) exte
             val opOutputSize = outRecords.flatMap(r => outputBPR.map(_ * r))
 
             if(opOutputSize.isDefined) {
+
+              val opSizeBytes = opOutputSize.get
+
               logger.debug(s"${op.name} (${op.lineageSignature})\t: " +
                 s"cost=${cost.milliseconds.toSeconds} \t prob=$relProb\t" +
-                s"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = ${opOutputSize.map(_ / 1024 / 1024).getOrElse("n/a")} MiB")
+                s"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = ${opSizeBytes / 1024 / 1024} MiB")
 
 
-              val writingTime = (opOutputSize.get / Conf.BytesPerSecWriting).seconds
-              val readingTime = (opOutputSize.get / Conf.BytesPerSecReading).seconds
+              val writingTime = (opSizeBytes / Conf.BytesPerSecWriting).seconds
+              val readingTime = (opSizeBytes / Conf.BytesPerSecReading).seconds
 
-              logger.debug(s"\twriting for ${op.name} ($sig) with ${opOutputSize.get} bytes would take ${writingTime.toSeconds} seconds")
-              logger.debug(s"\treading for ${op.name} ($sig) with ${opOutputSize.get} bytes would take ${readingTime.toSeconds} seconds")
+              logger.debug(s"\twriting for ${op.name} ($sig) with $opSizeBytes bytes would take ${writingTime.toSeconds} seconds")
+              logger.debug(s"\treading for ${op.name} ($sig) with $opSizeBytes bytes would take ${readingTime.toSeconds} seconds")
 
 
               val costDecision = readingTime < cost.milliseconds - ps.minBenefit
