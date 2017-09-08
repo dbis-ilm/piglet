@@ -1,14 +1,12 @@
 package dbis.piglet.tools
 
 import java.io._
-import org.apache.hadoop.conf._
-import org.apache.hadoop.fs.FileSystem
-import org.apache.hadoop.fs._
-import org.apache.hadoop.hdfs.DistributedFileSystem
-import collection.JavaConversions._
+import java.nio.file.{Files, Paths}
+
 import dbis.piglet.tools.logging.PigletLogging
-import java.nio.file.{Paths, Files}
-import HdfsCommand.HdfsCommand
+import org.apache.hadoop.conf._
+import org.apache.hadoop.fs.{FileSystem, _}
+import org.apache.hadoop.hdfs.DistributedFileSystem
 
 /**
  * Created by kai on 06.08.15.
@@ -30,8 +28,8 @@ object HDFSService extends PigletLogging {
     logger.warn(s"HDFS hdfs site file does not exist at: $hdfsSite")
     
   
-  private val hdfsCoreSitePath = new Path(coreSite.toString())
-  private val hdfsHDFSSitePath = new Path(hdfsSite.toString())
+  private val hdfsCoreSitePath = new Path(coreSite.toString)
+  private val hdfsHDFSSitePath = new Path(hdfsSite.toString)
 
   conf.addResource(hdfsCoreSitePath)
   conf.addResource(hdfsHDFSSitePath)
@@ -43,12 +41,12 @@ object HDFSService extends PigletLogging {
   
   
   def process(cmd: HdfsCommand.HdfsCommand, params: List[String]): Unit = {
-    logger.debug(s"HDFSService: process '${cmd}' with parameters ${params.mkString(",")}")
+    logger.debug(s"HDFSService: process '$cmd' with parameters ${params.mkString(",")}")
 //    HdfsCommand.withName(cmd.toUpperCase())
     cmd match {
-      case HdfsCommand.COPYTOLOCAL => copyToLocal(params(0), params(1))
-      case HdfsCommand.COPYTOREMOTE => copyToRemote(params(0), params(1))
-      case HdfsCommand.RM => if (params.head == "-r") removeDirectory(params(1), true) else removeFile(params.head)
+      case HdfsCommand.COPYTOLOCAL => copyToLocal(params.head, params(1))
+      case HdfsCommand.COPYTOREMOTE => copyToRemote(params.head, params(1))
+      case HdfsCommand.RM => if (params.head == "-r") removeDirectory(params(1), recursively = true) else removeFile(params.head)
       case HdfsCommand.RMDIR => removeDirectory(params.head)
       case HdfsCommand.MKDIR => createDirectory(params.head)
       case HdfsCommand.LS => listFiles(if (params.isEmpty) "." else params.head)
@@ -57,7 +55,7 @@ object HDFSService extends PigletLogging {
 //      case _ => throw new java.lang.IllegalArgumentException("unknown fs command '" + cmd + "'")
     }
   }
-  
+
   private def statusString(fs: FileStatus): String = {
     def millisToDate(m: Long): String = {
       val d = new java.util.Date(m)
@@ -69,6 +67,8 @@ object HDFSService extends PigletLogging {
       s"${"%2d".format(fs.getReplication)} ${fs.getOwner} ${fs.getGroup} ${"%10d".format(fs.getLen)} " +
       s"${millisToDate(fs.getModificationTime)} ${fs.getPath.getName}"
   }
+
+  def lastModified(path: String): Long = fileSystem.getFileStatus(new Path(path)).getModificationTime
 
   def mergeToLocal(fileList: List[String], toName: String): Boolean = {
     def appendToFile(inPath: Path, out: BufferedWriter) = {
@@ -94,7 +94,7 @@ object HDFSService extends PigletLogging {
         }
       }
     }
-    writer.close
+    writer.close()
     true
   }
 

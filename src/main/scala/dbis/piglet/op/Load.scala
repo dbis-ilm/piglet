@@ -20,8 +20,10 @@ import java.net.URI
 
 import dbis.piglet.expr.{Ref, Value}
 import dbis.piglet.schema.Schema
+import dbis.piglet.tools.HDFSService
 
 import scala.collection.mutable
+import scala.util.Try
 
 /**
  * Load represents the LOAD operator of Pig.
@@ -39,6 +41,9 @@ case class Load(
     loaderFunc: Option[String] = None,
     loaderParams: List[String] = null) extends PigOperator(List(out), List(), loadSchema) {
 
+
+  private lazy val lastModified: Try[Long] = Try(HDFSService.lastModified(file.toString))
+
 //  override def constructSchema: Option[Schema] = schema
 
   /**
@@ -47,7 +52,7 @@ case class Load(
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""LOAD%$file%""" + super.lineageString
+    s"""LOAD%$file%${lastModified.getOrElse(-1)}%""" + super.lineageString
   }
 
   override def printOperator(tab: Int): Unit = {
@@ -81,3 +86,4 @@ case class Load(
   }
 
 }
+
