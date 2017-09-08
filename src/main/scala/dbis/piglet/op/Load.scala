@@ -20,20 +20,20 @@ import java.net.URI
 
 import dbis.piglet.expr.{Ref, Value}
 import dbis.piglet.schema.Schema
-import dbis.piglet.tools.HDFSService
+import dbis.piglet.tools.{CliParams, HDFSService}
 
 import scala.collection.mutable
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
- * Load represents the LOAD operator of Pig.
- *
- * @param out the output pipe (relation).
- * @param file the name of the file to be loaded
- * @param loadSchema The schema of the underlying file content
- * @param loaderFunc The name of the loader function to use (PigStorage, ...)
- * @param loaderParams Parameters (delimiter, ...)
- */
+  * Load represents the LOAD operator of Pig.
+  *
+  * @param out the output pipe (relation).
+  * @param file the name of the file to be loaded
+  * @param loadSchema The schema of the underlying file content
+  * @param loaderFunc The name of the loader function to use (PigStorage, ...)
+  * @param loaderParams Parameters (delimiter, ...)
+  */
 case class Load(
     private val out: Pipe, 
     var file: URI,
@@ -42,7 +42,11 @@ case class Load(
     loaderParams: List[String] = null) extends PigOperator(List(out), List(), loadSchema) {
 
 
-  private lazy val lastModified: Try[Long] = Try(HDFSService.lastModified(file.toString))
+  private lazy val lastModified: Option[Try[Long]] = if(CliParams.values.profiling.isDefined) {
+    Some(Try(HDFSService.lastModified(file.toString)))
+  } else {
+    None
+  }
 
 //  override def constructSchema: Option[Schema] = schema
 
@@ -52,7 +56,11 @@ case class Load(
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""LOAD%$file%${lastModified.getOrElse(-1)}%""" + super.lineageString
+    s"""LOAD%$file%${lastModified match {
+      case None => -1
+      case Some(Failure(_)) => -2
+      case Some(Success(v)) => v
+    }}%""" + super.lineageString
   }
 
   override def printOperator(tab: Int): Unit = {

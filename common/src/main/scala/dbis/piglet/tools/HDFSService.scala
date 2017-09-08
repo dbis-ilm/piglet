@@ -8,6 +8,9 @@ import org.apache.hadoop.conf._
 import org.apache.hadoop.fs.{FileSystem, _}
 import org.apache.hadoop.hdfs.DistributedFileSystem
 
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
+
 /**
  * Created by kai on 06.08.15.
  */
@@ -68,7 +71,8 @@ object HDFSService extends PigletLogging {
       s"${millisToDate(fs.getModificationTime)} ${fs.getPath.getName}"
   }
 
-  def lastModified(path: String): Long = fileSystem.getFileStatus(new Path(path)).getModificationTime
+  def lastModified(path: String, timeout: FiniteDuration = 3.seconds): Long =
+    Await.result(Future { fileSystem.getFileStatus(new Path(path)).getModificationTime }, timeout)
 
   def mergeToLocal(fileList: List[String], toName: String): Boolean = {
     def appendToFile(inPath: Path, out: BufferedWriter) = {
