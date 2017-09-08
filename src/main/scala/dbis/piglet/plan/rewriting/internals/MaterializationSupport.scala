@@ -21,7 +21,7 @@ import java.net.URI
 import dbis.piglet.mm.MaterializationManager
 import dbis.piglet.op.Materialize
 import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.tools.BreadthFirstBottomUpWalker
+import dbis.piglet.tools.{BreadthFirstBottomUpWalker, CliParams}
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.setm.SETM.timing
 
@@ -78,7 +78,7 @@ trait MaterializationSupport extends PigletLogging {
 
         val file = mm.generatePath(sig)
 
-        if(!mm.c.compileOnly)
+        if(!CliParams.values.compileOnly)
           mm.saveMapping(sig, file)
 
         newPlan = MaterializationManager.replaceWithStore(materialize, file, newPlan)

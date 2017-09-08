@@ -22,9 +22,9 @@ import java.nio.file.{Path, Paths}
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.PigletCompiler
 import dbis.piglet.mm.{DataflowProfiler, MaterializationManager, ProfilingException, StatServer}
-import dbis.piglet.plan.{DataflowPlan, InvalidPlanException, PlanMerger, PrettyPrinter}
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.rewriting.Rules
+import dbis.piglet.plan.{DataflowPlan, InvalidPlanException, PlanMerger}
 import dbis.piglet.schema.SchemaException
 import dbis.piglet.tools._
 import dbis.piglet.tools.logging.PigletLogging
@@ -42,24 +42,23 @@ object Piglet extends PigletLogging {
   def main(args: Array[String]): Unit = {
 
     // Parse CLI parameters
-    val c = CliParams.parse(args)
+    CliParams.parse(args)
 
-    
     // start statistics collector SETM if needed
-    startCollectStats(c.showStats, c.quiet)
+    startCollectStats(CliParams.values.showStats, CliParams.values.quiet)
     
 
     // set the log level as defined in the parameters
-		logger.setLevel(c.logLevel)
+		logger.setLevel(CliParams.values.logLevel)
 
-    c.profiling.foreach(ps => logger.debug(ps.toString))
+    CliParams.values.profiling.foreach(ps => logger.debug(ps.toString))
 
 
     /* Copy config file to the user's home directory
      * IMPORTANT: This must be the first call to Conf
      * Otherwise, the config file was already loaded before we could copy the new one
      */
-    if (c.updateConfig) {
+    if (CliParams.values.updateConfig) {
       // in case of --update we just copy the config file and exit
       Conf.copyConfigFile()
       println(s"Config file copied to ${Conf.programHome} - exitting now")
@@ -71,7 +70,7 @@ object Piglet extends PigletLogging {
     
 
     // get the input files
-    val files = c.inputFiles.takeWhile { p => !p.getFileName.startsWith("-") }
+    val files = CliParams.values.inputFiles.takeWhile { p => !p.getFileName.startsWith("-") }
     if (files.isEmpty) {
       // because the file argument was optional we have to check it here
       println("Error: Missing argument <file>...\nTry --help for more information.")
@@ -84,17 +83,17 @@ object Piglet extends PigletLogging {
      * this way, we can override the values in the file via CLI
      */
 
-    if(c.params.nonEmpty)
-    	logger.debug(s"provided parameters: ${c.params.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
+    if(CliParams.values.params.nonEmpty)
+    	logger.debug(s"provided parameters: ${CliParams.values.params.map{ case (k,v) => s"$k -> $v"}.mkString("\n")}")
 
 
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    run(c)  // this little call starts the whole processing!
+    run()  // this little call starts the whole processing!
     //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     
     
     // at the end, show the statistics
-    if(c.showStats) {
+    if(CliParams.values.showStats) {
       // collect and print runtime stats
       collectStats()
     }
@@ -105,30 +104,30 @@ object Piglet extends PigletLogging {
   /**
     * Start compiling the Pig script into a the desired program
     */
-  def run(c: CliParams): Unit = {
+  def run(): Unit = {
     var success = true
     try {
 
       // initialize backend
-      BackendManager.init(c.backend)
+      BackendManager.init(CliParams.values.backend)
 
       if (BackendManager.backend.raw) {
-        if (c.compileOnly) {
+        if (CliParams.values.compileOnly) {
           logger.error("Raw backends do not support compile-only mode! Aborting")
           return
         }
 
-        if (c.profiling.isDefined) {
+        if (CliParams.values.profiling.isDefined) {
           logger.error("Raw backends do not support profiling yet! Aborting")
           return
         }
 
         // process each file separately - one after the other
-        c.inputFiles.foreach { file => runRaw(file, c.master, c.backendArgs) }
+        CliParams.values.inputFiles.foreach { file => runRaw(file, CliParams.values.master, CliParams.values.backendArgs) }
 
       } else {
         // no raw backend, generate code and submit job
-        runWithCodeGeneration(c)
+        runWithCodeGeneration()
       }
 
     } catch {
@@ -138,11 +137,11 @@ object Piglet extends PigletLogging {
         logger.debug("Stackstrace: ", e)
         success = false
     } finally {
-      if(c.notifyURL.isDefined) {
+      if(CliParams.values.notifyURL.isDefined) {
         
-        val stringURI = c.notifyURL.get.toString
+        val stringURI = CliParams.values.notifyURL.get.toString
           .replace("[success]", if(success) "Success" else "Failed")
-          .replace("[name]", c.inputFiles.map(_.getFileName.toString()).mkString(","))
+          .replace("[name]", CliParams.values.inputFiles.map(_.getFileName.toString()).mkString(","))
           .replace("[time]", java.time.LocalDateTime.now().toString)
 
         logger.debug(s"notification url: $stringURI")  
@@ -171,19 +170,17 @@ object Piglet extends PigletLogging {
   /**
    * Run with the provided set of files using the specified backend, that is _not_ a raw backend.
    *
-   * @param c Parameter settings / configuration
-   * 
    */
-  def runWithCodeGeneration(c: CliParams): Unit = timing("run with generation") {
+  def runWithCodeGeneration(): Unit = timing("run with generation") {
 
 
     logger.debug("start parsing input files")
 
     var schedule = ListBuffer.empty[(DataflowPlan,Path)]
 
-    for(file <- c.inputFiles) {
+    for(file <- CliParams.values.inputFiles) {
       // foreach file, generate the data flow plan and store it in our schedule
-      PigletCompiler.createDataflowPlan(file, c.params, c.backend) match {
+      PigletCompiler.createDataflowPlan(file, CliParams.values.params, CliParams.values.backend) match {
         case Some(v) => schedule += ((v, file))
         case None => // in case of an error (no plan genrated for file) abort current execution
           throw InvalidPlanException(s"failed to create dataflow plan for $file - aborting")
@@ -195,7 +192,7 @@ object Piglet extends PigletLogging {
      * if we have got more than one plan and we should not execute them
      * sequentially, then try to merge them into one plan
      */
-    if(schedule.size > 1 && !c.sequential) {
+    if(schedule.size > 1 && !CliParams.values.sequential) {
       logger.debug("Start merging plans")
 
       // merge plans into one plan
@@ -220,18 +217,18 @@ object Piglet extends PigletLogging {
       
       var newPlan = plan
 
-      val mm = new MaterializationManager(Conf.materializationBaseDir, c)
+      val mm = new MaterializationManager(Conf.materializationBaseDir)
 
       // 1. process EXPLICIT Materialize operators
       // insert STORE or LOAD operators
       newPlan = processMaterializations(newPlan, mm)
 
       // 2. rewrite WINDOW operators for Flink streaming
-      if (c.backend == "flinks")
+      if (CliParams.values.backend == "flinks")
         newPlan = processWindows(newPlan)
 
       // 3. apply general optimization rules
-      Rules.registerBackendRules(c.backend)
+      Rules.registerBackendRules(CliParams.values.backend)
       newPlan = rewritePlan(newPlan)
 
       // 4. check if we already have materialized results
@@ -241,7 +238,7 @@ object Piglet extends PigletLogging {
 
       // 5. analyze plan if something can be materialized or
       // if materialized results are present
-      if(c.profiling.isDefined) {
+      if(CliParams.values.profiling.isDefined) {
         val model = DataflowProfiler.analyze(newPlan)
 
         // according to statistics, insert MATERIALIZE (STORE) operators
@@ -252,14 +249,14 @@ object Piglet extends PigletLogging {
 
       // 6. after all optimizations have been performed, insert
       // profiling operators (if desired)
-      if(c.profiling.isDefined) {
+      if(CliParams.values.profiling.isDefined) {
         // after rewriting the plan, add the timing operations
         newPlan = insertTimings(newPlan)
       }
 
       // for testing of scripts and Piglet features, consumers
       // such as Dump and Store may be muted
-      if(c.muteConsumer) {
+      if(CliParams.values.muteConsumer) {
         newPlan = mute(newPlan)
       }
 
@@ -273,7 +270,7 @@ object Piglet extends PigletLogging {
       val imgPath = path.resolveSibling(scriptName)
       PlanWriter.createImage(imgPath, scriptName)
 
-      if (c.showPlan) {
+      if (CliParams.values.showPlan) {
         println("final plan = {")
         newPlan.printPlan(2)
         println("}")
@@ -299,25 +296,25 @@ object Piglet extends PigletLogging {
 
 
       // 8. compile the plan to code
-      PigletCompiler.compilePlan(newPlan, scriptName, c) match {
+      PigletCompiler.compilePlan(newPlan, scriptName) match {
         // the file was created --> execute it
         case Some(jarFile) =>
-          if (!c.compileOnly) {
+          if (!CliParams.values.compileOnly) {
 
-            if (c.profiling.isDefined) {
+            if (CliParams.values.profiling.isDefined) {
               logger.debug("starting stat server")
-              StatServer.start(c.profiling.get)
+              StatServer.start(CliParams.values.profiling.get)
             }
 
             // 9. and finally deploy/submit
             val runner = BackendManager.backend.runnerClass
             logger.debug(s"using runner class ${runner.getClass.toString}")
 
-            logger.info( s"""starting job at "$jarFile" using backend "${c.backend}" """)
+            logger.info( s"""starting job at "$jarFile" using backend "${CliParams.values.backend}" """)
 
             timing("job execution") {
               val start = System.currentTimeMillis()
-              runner.execute(c.master, scriptName, jarFile, c.backendArgs, c.profiling.isDefined)
+              runner.execute(CliParams.values.master, scriptName, jarFile, CliParams.values.backendArgs, CliParams.values.profiling.isDefined)
 
               logger.info(s"program execution finished in ${System.currentTimeMillis() - start} ms")
 
@@ -329,7 +326,7 @@ object Piglet extends PigletLogging {
 
 
           // after execution we want to write the dot file
-          if (c.profiling.isDefined && !c.compileOnly) {
+          if (CliParams.values.profiling.isDefined && !CliParams.values.compileOnly) {
 
             try {
               DataflowProfiler.collect()
@@ -339,7 +336,7 @@ object Piglet extends PigletLogging {
                * us to easily react on errors: We don't want to write the statistics if
                * there was an error...
                */
-              DataflowProfiler.writeStatistics(c)
+              DataflowProfiler.writeStatistics()
 
             } catch {
               case ProfilingException(msg) =>
@@ -366,7 +363,7 @@ object Piglet extends PigletLogging {
 
 
     // if the StatServer was created, stop it now
-    if(c.profiling.isDefined)
+    if(CliParams.values.profiling.isDefined)
       StatServer.stop()
 
   }

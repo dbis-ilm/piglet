@@ -67,7 +67,7 @@ object MaterializationManager extends PigletLogging {
 /**
   * Manage where materialized intermediate results are stored
   */
-class MaterializationManager(private val matBaseDir: URI, val c: CliParams) extends PigletLogging {
+class MaterializationManager(private val matBaseDir: URI) extends PigletLogging {
 
   implicit val formats = Serialization.formats(NoTypeHints)
 
@@ -103,14 +103,14 @@ class MaterializationManager(private val matBaseDir: URI, val c: CliParams) exte
     */
   def insertMaterializationPoints(plan: DataflowPlan, model: Markov): DataflowPlan = {
 
-    if(c.profiling.isEmpty) {
+    if(CliParams.values.profiling.isEmpty) {
       logger.info("profiling is disabled - won't try to find possible materialization points")
       return plan
     }
 
     logger.debug(s"analyzing plan for inserting materialization points")
 
-    val ps = c.profiling.get
+    val ps = CliParams.values.profiling.get
 
     logger.debug(s"using prob threshold: ${ps.probThreshold}")
     logger.debug(s"using min benefit: ${ps.minBenefit}")
@@ -201,7 +201,7 @@ class MaterializationManager(private val matBaseDir: URI, val c: CliParams) exte
 
       val path = generatePath(lineage)
 
-      if(c.compileOnly) {
+      if(CliParams.values.compileOnly) {
           // if in compile only, we will not execute the script and thus not actually write the intermediate
           // results. Hence, we only create the path that would be used, but to not save the mapping
       } else {
@@ -332,7 +332,7 @@ class MaterializationManager(private val matBaseDir: URI, val c: CliParams) exte
    */
   def saveMapping(lineage: Lineage, matFile: URI) = {
 
-    require(!c.compileOnly, "writing materialization mapping info in compile-only mode will break things!")
+    require(!CliParams.values.compileOnly, "writing materialization mapping info in compile-only mode will break things!")
 
     materializations += lineage -> matFile
 

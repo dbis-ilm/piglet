@@ -236,11 +236,11 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return
     */
-  def handlePrettyPrint(buf: ListBuffer[PigOperator], c: CliParams): Boolean = {
+  def handlePrettyPrint(buf: ListBuffer[PigOperator]): Boolean = {
     var plan = new DataflowPlan(buf.toList)
 
-    if(c.profiling.isDefined) {
-  	  val mm = new MaterializationManager(Conf.materializationBaseDir,c)
+    if(CliParams.values.profiling.isDefined) {
+  	  val mm = new MaterializationManager(Conf.materializationBaseDir)
 			plan = processMaterializations(plan, mm)
     }
 
@@ -257,11 +257,11 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return false
     */
-  def handleDescribe(s: String, buf: ListBuffer[PigOperator], c: CliParams): Boolean = {
+  def handleDescribe(s: String, buf: ListBuffer[PigOperator]): Boolean = {
     var plan = new DataflowPlan(buf.toList)
 
-    if(c.profiling.isDefined) {
-      val mm = new MaterializationManager(Conf.materializationBaseDir,c)
+    if(CliParams.values.profiling.isDefined) {
+      val mm = new MaterializationManager(Conf.materializationBaseDir)
       plan = processMaterializations(plan, mm)
     }
 
@@ -305,7 +305,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @param buf the list of PigOperators
     * @return false
     */
-  def executeScript(s: String, buf: ListBuffer[PigOperator], c: CliParams): Boolean = {
+  def executeScript(s: String, buf: ListBuffer[PigOperator]): Boolean = {
     try {
       if (s.toLowerCase.startsWith("dump ")) {
         // if we have multiple dumps in our script then only the first one
@@ -334,8 +334,8 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       var plan = new DataflowPlan(buf.toList)
       logger.debug("plan created.")
 
-      if(c.profiling.isDefined) {
-        val mm = new MaterializationManager(Conf.materializationBaseDir,c)
+      if(CliParams.values.profiling.isDefined) {
+        val mm = new MaterializationManager(Conf.materializationBaseDir)
         plan = processMaterializations(plan, mm)
       }
 
@@ -357,10 +357,10 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       nextScriptName()
 
       
-      PigletCompiler.compilePlan(plan, scriptName(), c) match {
+      PigletCompiler.compilePlan(plan, scriptName()) match {
         case Some(jarFile) =>
           val runner = BackendManager.backend.runnerClass
-          runner.execute(c.master, scriptName(), jarFile, c.backendArgs, c.profiling.isDefined)
+          runner.execute(CliParams.values.master, scriptName(), jarFile, CliParams.values.backendArgs, CliParams.values.profiling.isDefined)
           FileTools.recursiveDelete(scriptName())
 
         case None => Console.err.println("failed to build jar file for job")
@@ -422,15 +422,15 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
   def main(args: Array[String]): Unit = {
 
     // parse cli params
-    val c = CliParams.parse(args)
+    CliParams.parse(args)
     
     println(s"Welcome to PigREPL ver. ${BuildInfo.version} (built at ${BuildInfo.builtAtString})")
     
-    logger.setLevel(c.logLevel)
+    logger.setLevel(CliParams.values.logLevel)
     
-    logger debug s"""Running REPL with backend "${c.backend}" """
+    logger debug s"""Running REPL with backend "${CliParams.values.backend}" """
 
-    BackendManager.init(c.backend)
+    BackendManager.init(CliParams.values.backend)
     if (BackendManager.backend.raw)
       throw new NotImplementedError("RAW backends are currently not supported in REPL. Use PigCompiler instead!")
 
@@ -449,13 +449,13 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       case EOF => println("Ctrl-d"); true
       case Line(s, buf) if s.equalsIgnoreCase(s"quit") => true
       case Line(s, buf) if s.equalsIgnoreCase(s"help") => usage(); false
-      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf, c)
+      case Line(s, buf) if s.equalsIgnoreCase(s"prettyprint") => handlePrettyPrint(buf)
       case Line(s, buf) if s.equalsIgnoreCase(s"rewrite") => handleRewrite(buf)
-      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf, c)
+      case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf)
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
         s.toLowerCase.startsWith(s"display ") ||
         s.toLowerCase.startsWith(s"store ") ||
-        s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf, c)
+        s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf)
       case Line(s, _) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
       case Line(s, buf) => try {
         buf ++= PigParser.parseScript(s, resetSchema = false)

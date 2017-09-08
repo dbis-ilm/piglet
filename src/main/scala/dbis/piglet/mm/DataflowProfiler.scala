@@ -8,7 +8,7 @@ import dbis.piglet.op.CacheMode.CacheMode
 import dbis.piglet.op.{CacheMode, Empty, Load, TimingOp}
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf}
+import dbis.piglet.tools.{BreadthFirstTopDownWalker, Conf}
 import dbis.setm.SETM.timing
 
 import scala.collection.JavaConverters._
@@ -235,7 +235,7 @@ object DataflowProfiler extends PigletLogging {
 
   def getExectime(op: Lineage): Option[T] = profilingGraph.cost(op)
 
-  def writeStatistics(c: CliParams): Unit = {
+  def writeStatistics(): Unit = {
 
     val opCountFile = Conf.programHome.resolve(Conf.profilingFile)
     logger.debug(s"writing opcounts to $opCountFile with ${profilingGraph.size} entries")
@@ -275,8 +275,8 @@ object CostStrategy extends Enumeration {
   }
 }
 
-import ProbStrategy.ProbStrategy
-import CostStrategy.CostStrategy
+import dbis.piglet.mm.CostStrategy.CostStrategy
+import dbis.piglet.mm.ProbStrategy.ProbStrategy
 
 case class ProfilerSettings(
                              minBenefit: Duration = Conf.mmDefaultMinBenefit,

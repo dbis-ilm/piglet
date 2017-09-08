@@ -90,14 +90,13 @@ object PigletCompiler extends PigletLogging {
    *
    * @param plan The plan to compile
    * @param scriptName The name of the script (used as program and file name)
-   * @param c Paramters
    */
-  def compilePlan(plan: DataflowPlan, scriptName: String, c: CliParams): Option[Path] = timing("compile plan") {
+  def compilePlan(plan: DataflowPlan, scriptName: String): Option[Path] = timing("compile plan") {
 
     // compile it into Scala code for Spark
-    val generatorClass = Conf.backendGenerator(c.backend)
+    val generatorClass = Conf.backendGenerator(CliParams.values.backend)
     logger.debug(s"using generator class: $generatorClass")
-    val extension = Conf.backendExtension(c.backend)
+    val extension = Conf.backendExtension(CliParams.values.backend)
     logger.debug(s"file extension for generated code: $extension")
 //    val args = Array(templateFile).asInstanceOf[Array[AnyRef]]
 //    logger.debug(s"""arguments to generator class: "${args.mkString(",")}" """)
@@ -108,13 +107,13 @@ object PigletCompiler extends PigletLogging {
     logger.debug(s"successfully created code generator class ${codeGenerator.getClass.getName}")
 
     // generate the Scala code
-    val code = codeGenerator.generate(scriptName, plan, c.profiling)
+    val code = codeGenerator.generate(scriptName, plan, CliParams.values.profiling)
 
     logger.debug("successfully generated program source code")
 
     // write it to a file
 
-    val outputDir = c.outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
+    val outputDir = CliParams.values.outDir.resolve(scriptName) //new File(s"$outDir${File.separator}${scriptName}")
 
     logger.debug(s"outputDir: $outputDir")
 
@@ -141,12 +140,12 @@ object PigletCompiler extends PigletLogging {
     if (extension.equalsIgnoreCase("scala")) {
       
       val libraryJars = collection.mutable.ArrayBuffer(
-          c.backendPath.resolve(Conf.backendJar(c.backend)).toString, // the backend library (sparklib, flinklib, etc)
-          c.backendPath.resolve(Conf.commonJar).toString) // common lib
+          CliParams.values.backendPath.resolve(Conf.backendJar(CliParams.values.backend)).toString, // the backend library (sparklib, flinklib, etc)
+          CliParams.values.backendPath.resolve(Conf.commonJar).toString) // common lib
       
       // if the plan contains geometry expressions, we need to add the spatial library           
       if(plan.checkExpressions(Expr.containsGeometryType))
-        libraryJars += c.backendPath.resolve(Conf.spatialJar).toString
+        libraryJars += CliParams.values.backendPath.resolve(Conf.spatialJar).toString
           
       // extract all additional jar files to output
       (libraryJars ++= plan.additionalJars).foreach{jarFile => 
@@ -166,7 +165,7 @@ object PigletCompiler extends PigletLogging {
       if (JarBuilder(outputDirectory, jarFile, verbose = false)) {
         logger.debug(s"created job's jar file at $jarFile")
 
-        if(!c.keepFiles) {
+        if(!CliParams.values.keepFiles) {
           // remove directory $outputDirectory
           FileTools.recursiveDelete(outputDirectory)
         }
@@ -174,7 +173,7 @@ object PigletCompiler extends PigletLogging {
       } else
         None
     }
-    else if (CppCompiler.compile(outputDirectory.toString, outputFile.toString, CppCompilerConf.cppConf(c.backend))) {
+    else if (CppCompiler.compile(outputDirectory.toString, outputFile.toString, CppCompilerConf.cppConf(CliParams.values.backend))) {
       logger.info(s"created job's file at $outputFile")
       Some(outputFile)
     }

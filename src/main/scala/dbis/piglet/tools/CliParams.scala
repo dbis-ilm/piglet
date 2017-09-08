@@ -113,9 +113,15 @@ object CliParams {
     version("version") text "prints this version info"
     arg[File]("<file>...") unbounded() optional() action { (x, c) => c.copy(inputFiles = c.inputFiles :+ x.toPath) } text "Pig script files to execute"
   }
-  
-  def parse(args: Array[String]): CliParams = optparser.parse(args, CliParams()).getOrElse{
-    throw new IllegalStateException("Error parsing parameter options")
+
+  private var _values: CliParams = _
+
+  def values = _values
+
+  def parse(args: Array[String]): Unit = {
+    _values = optparser.parse(args, CliParams()).getOrElse{
+      throw new IllegalStateException("Error parsing parameter options")
+    }
   }
   
 }
