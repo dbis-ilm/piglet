@@ -34,6 +34,8 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
       case _: SpatialJoin => SpatialJoinEmitter.instance
       case _: IndexOp => SpatialIndexEmitter.instance
       case _: Partition => PartitionerEmitter.instance
+      case _: Cache => CacheEmitter.instance
+      case _: Delay => DelayEmitter.instance
       case _ => super.emitterForNode(op)      
     }
   

@@ -16,24 +16,33 @@
  */
 package dbis.piglet.op
 
+import scala.concurrent.duration.FiniteDuration
+
 /**
  * Delay represents the DELAY operator of Pig.
  *
  * @param out the output pipe (relation).
  * @param in the input pipe.
- * @param size the percentage of input tuples that is passed to the output pipe
+ * @param sampleFactor the percentage of input tuples that is passed to the output pipe
  * @param wtime the time for delaying the processing
  *
  */
 case class Delay(
-    private val out: Pipe, 
-    private val in: Pipe, 
-    size: Double, 
-    wtime: Int
+                  private val out: Pipe,
+                  private val in: Pipe,
+                  sampleFactor: Int,
+                  wtime: (FiniteDuration, FiniteDuration)
   ) extends PigOperator(out, in) {
 
   override def lineageString: String = {
-    s"""DELAY%${size}%${wtime}%""" + super.lineageString
+    s"""DELAY%$sampleFactor%$wtime%""" + super.lineageString
   }
+
+  override def toString =
+    s"""DELAY
+      |  sample factor = $sampleFactor
+      |  waiting time = ${wtime._1} - ${wtime._2}""".stripMargin
+
+  override def printOperator(tab: Int): Unit = toString.split("\n").foreach(line => println(s"${" "*tab}$line"))
 
 }

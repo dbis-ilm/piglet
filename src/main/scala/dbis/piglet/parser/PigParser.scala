@@ -682,7 +682,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     /* spatial statements */
     spatialFilterStmt | spatialJoinStmt | /*indexStmt |*/ partitionStmt |
     /* misc Pig Latin extensions */
-    materializeStmt | rscriptStmt |
+    materializeStmt | delayStmt | rscriptStmt |
     /* standard Pig Latin statements */
     loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt |  joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
@@ -939,6 +939,22 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   def partitionStmt = bag ~ "=" ~ partitionKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ partitionMethod ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ ((method, params)) => Partition(Pipe(out), Pipe(in), field, method, params)
   } 
+
+  /* ---------------------------------------------------------------------------------------------------------------- */
+
+
+  /* ------------------------------------------------------------ */
+  /*        Pig profiling
+   * ------------------------------------------------------------
+   */
+  import scala.concurrent.duration._
+
+  lazy val delayKeyword = "delay".ignoreCase
+
+  def delayStmt = bag ~ "=" ~ delayKeyword ~ bag ~ byKeyword ~ "(" ~ num ~ "," ~ num ~ "," ~ num ~ ")" ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ _ ~ min ~ _ ~ max ~ _ ~ sample ~ _ => Delay(Pipe(out), Pipe(in), sample, (min.seconds, max.seconds))
+  }
+
 
   /* ---------------------------------------------------------------------------------------------------------------- */
 
