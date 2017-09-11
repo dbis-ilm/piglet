@@ -71,8 +71,10 @@ object HDFSService extends PigletLogging {
       s"${millisToDate(fs.getModificationTime)} ${fs.getPath.getName}"
   }
 
-  def lastModified(path: String, timeout: FiniteDuration = 3.seconds): Long =
+  def lastModified(path: String, timeout: FiniteDuration = 3.seconds): Long = {
+    import scala.concurrent.ExecutionContext.Implicits.global
     Await.result(Future { fileSystem.getFileStatus(new Path(path)).getModificationTime }, timeout)
+  }
 
   def mergeToLocal(fileList: List[String], toName: String): Boolean = {
     def appendToFile(inPath: Path, out: BufferedWriter) = {

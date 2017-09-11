@@ -78,7 +78,7 @@ trait MaterializationSupport extends PigletLogging {
 
         val file = mm.generatePath(sig)
 
-        if(!CliParams.values.compileOnly)
+      if(!CliParams.values.compileOnly)
           mm.saveMapping(sig, file)
 
         newPlan = MaterializationManager.replaceWithStore(materialize, file, newPlan)
