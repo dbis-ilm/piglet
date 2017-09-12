@@ -17,7 +17,11 @@ import CacheMode.CacheMode
 case class Cache (private[op] val out: Pipe,
                   private[op] val in: Pipe,
                   operatorId: String,
-                  cacheMode: CacheMode) extends PigOperator(out, in, in.producer.schema ) {
+                  cacheMode: CacheMode) extends PigOperator(out, in) {
+
+  if(in.producer != null) {
+    schema = in.producer.schema
+  }
 
   override def printOperator(tab: Int): Unit = {
     println(indent(tab)+s"CACHE { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")}")
@@ -33,4 +37,6 @@ case class Cache (private[op] val out: Pipe,
 
 
   override def toString = s"CACHE { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")}, schema = $schema , cache-mode: $cacheMode }"
+
+  override def lineageString = s"CACHE%$operatorId%$cacheMode%${super.lineageString}"
 }

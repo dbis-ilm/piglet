@@ -261,6 +261,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   lazy val splitKeyword = "split".ignoreCase
   lazy val ifKeyword = "if".ignoreCase
   lazy val materializeKeyword = "materialize".ignoreCase
+  lazy val cacheKeyword = "cache".ignoreCase
   lazy val rscriptKeyword = "rscript".ignoreCase
   lazy val rdfLoadKeyword = "rdfload".ignoreCase
   lazy val groupedOnKeyword = "grouped on".ignoreCase
@@ -637,6 +638,21 @@ class PigParser extends JavaTokenParsers with PigletLogging {
    */
   def materializeStmt: Parser[PigOperator] = materializeKeyword ~ bag ^^ { case _ ~ b => Materialize(Pipe(b))}
 
+
+  def cacheModeStmt = ident ^^ { mode => CacheMode.withName(mode.toUpperCase) }
+  /*
+   * <A> = CACHE <B> <MODE>
+   */
+  def cacheStmt = bag ~ "=" ~ cacheKeyword ~ bag ~ (cacheModeStmt?) ^^ {
+    case out ~ _ ~ _ ~ in ~ mode =>
+      val theMode = mode match {
+        case Some(m) => m
+        case None => CacheMode.NONE
+      }
+
+      Cache(Pipe(out), Pipe(in), in, theMode) //operatorId is set to "in" - it's just for distinguishing in equals
+  }
+
   def rscriptStmt: Parser[PigOperator] = bag ~ "=" ~ rscriptKeyword ~ bag ~ usingKeyword ~ pigStringLiteral ~ (loadSchemaClause?) ^^{
     case out ~ _ ~ _ ~ in ~ _ ~ script ~ schema => RScript(Pipe(out), Pipe(in), script, schema)
   }
@@ -682,7 +698,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     /* spatial statements */
     spatialFilterStmt | spatialJoinStmt | /*indexStmt |*/ partitionStmt |
     /* misc Pig Latin extensions */
-    materializeStmt | delayStmt | rscriptStmt |
+    materializeStmt | cacheStmt | delayStmt | rscriptStmt |
     /* standard Pig Latin statements */
     loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
     distinctStmt |  joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
