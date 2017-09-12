@@ -34,8 +34,10 @@ case class Delay(
                   wtime: (FiniteDuration, FiniteDuration)
   ) extends PigOperator(out, in) {
 
+  private val r = System.currentTimeMillis()
+
   override def lineageString: String = {
-    s"""DELAY%$sampleFactor%$wtime%""" + super.lineageString
+    s"""DELAY%$sampleFactor%$wtime%$r%""" + super.lineageString
   }
 
   override def toString =

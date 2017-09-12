@@ -17,6 +17,6 @@ case class Partition(
 ) extends PigOperator(out, in) {
   
   override def lineageString = 
-    s"""PARTITION%${method}%$field%${params.mkString}"""+super.lineageString
+    s"""PARTITION%$method%$field%${params.mkString}"""+super.lineageString
   
 }
