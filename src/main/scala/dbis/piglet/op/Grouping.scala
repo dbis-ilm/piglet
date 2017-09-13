@@ -119,19 +119,14 @@ case class Grouping(
     }
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"GROUPING { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-    println(indent(tab + 2) + "group on = " + groupExpr)
-  }
 
   override def toString: String =
-    s"""GROUPING { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }
+    s"""GROUPING
+       |  out = ${outPipeNames.mkString(",")}
+       |  in = ${inPipeNames.mkString(",")}
        |  inSchema  = $inputSchema
        |  outSchema = $schema
-       |  group on  = $groupExpr
-     """.stripMargin
+       |  group on  = $groupExpr""".stripMargin
 
 }
 

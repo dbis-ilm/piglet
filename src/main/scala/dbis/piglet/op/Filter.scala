@@ -40,10 +40,10 @@ case class Filter(
   ) extends PigOperator(out, in) {
 
   /**
-   * Returns the lineage string describing the sub-plan producing the input for this operator.
-   *
-   * @return a string representation of the sub-plan.
-   */
+    * Returns the lineage string describing the sub-plan producing the input for this operator.
+    *
+    * @return a string representation of the sub-plan.
+    */
   override def lineageString: String = {
     s"""FILTER%$pred%""" + super.lineageString
   }
@@ -61,15 +61,12 @@ case class Filter(
     }
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"FILTER { out = $outPipeName , in = $inPipeName }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-    println(indent(tab + 2) + "expr = " + pred)
-  }
-  
-  override def toString = s"""|FILTER { out = $outPipeName , in = $inPipeName }
-                              |  schema = $inputSchema
-                              |  expr = $pred""".stripMargin
 
+  override def toString =
+    s"""FILTER
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  schema = $inputSchema
+       |  expr = $pred
+       |  ${if (windowMode) "window mode" else ""}""".stripMargin
 }

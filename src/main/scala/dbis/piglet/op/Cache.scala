@@ -23,10 +23,6 @@ case class Cache (private[op] val out: Pipe,
     schema = in.producer.schema
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab)+s"CACHE { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")}")
-    println(s"${indent(tab + 2)} schema = $schema , cache-mode: $cacheMode")
-  }
 
   override def equals(other: Any) = other match {
     case o: Cache => operatorId == o.operatorId && outPipeName == o.outPipeName
@@ -35,8 +31,13 @@ case class Cache (private[op] val out: Pipe,
 
   override def hashCode() = (operatorId+outPipeName).hashCode()
 
-
-  override def toString = s"CACHE { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")}, schema = $schema , cache-mode: $cacheMode }"
+  override def toString =
+    s"""CACHE
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  operatorId = $operatorId
+       |  mode = $cacheMode
+     """.stripMargin
 
   override def lineageString = s"CACHE%$operatorId%$cacheMode%${super.lineageString}"
 }

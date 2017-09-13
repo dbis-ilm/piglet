@@ -33,9 +33,11 @@ case class Distinct(
     s"""DISTINCT%""" + super.lineageString
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"DISTINCT { out = ${outPipeName} , in = ${inPipeName} }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-  }
+  override def toString =
+    s"""DISTINCT
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  inSchema = $inputSchema
+       |  outSchema = $schema""".stripMargin
+
 }

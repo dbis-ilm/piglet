@@ -31,4 +31,10 @@ case class Tuplify(private val out: Pipe, private val in: Pipe, ref: Ref) extend
 
   // TODO
   override def checkSchemaConformance: Boolean = true
+
+  override def toString =
+    s"""TUPLIFY
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  ref = $ref""".stripMargin
 }

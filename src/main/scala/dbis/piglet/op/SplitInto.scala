@@ -18,14 +18,15 @@ package dbis.piglet.op
 
 import dbis.piglet.expr.Predicate
 
-case class SplitBranch(val output: Pipe, val expr: Predicate) {
-  protected[op] def lineageSignature = s"""SPLITBRANCH($expr)"""  
+case class SplitBranch(output: Pipe, expr: Predicate) {
+  protected[op] def lineageSignature = s"""SPLITBRANCH($expr)"""
+
+  override def toString = s"${output.name} $expr"
 }
 
 /**
  * SplitInto represents the SPLIT INTO operator of Pig.
  *
- * @param initialInPipeName the names of the input pipe.
  * @param splits a list of split branches (output pipe + condition)
  */
 case class SplitInto(private val in: Pipe, splits: List[SplitBranch]) extends PigOperator(splits.map(s => s.output), List(in)) {
@@ -35,4 +36,12 @@ case class SplitInto(private val in: Pipe, splits: List[SplitBranch]) extends Pi
    override def lineageString: String = {
     s"""SPLIT%${splits.map(_.lineageSignature).mkString("%")}%""" + super.lineageString
   }
+
+  override def toString =
+    s"""SPLITINTO
+       |  out = ${outPipeNames.mkString(",")}
+       |  in = $inPipeName
+       |  inSchema = $inputSchema
+       |  splits = ${splits.mkString(",")}
+     """.stripMargin
 }

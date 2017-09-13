@@ -31,4 +31,8 @@ case class Display(private val in: Pipe) extends PigOperator(List(), List(in)) {
   override def lineageString: String = {
     s"""DISPLAY%""" + super.lineageString
   }
+
+  override def toString =
+    s"""DISPLAY
+       |  in = $inPipeName""".stripMargin
 }

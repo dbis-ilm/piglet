@@ -14,5 +14,9 @@ case class Materialize(private val in: Pipe) extends PigOperator(List(), List(in
   override def lineageString: String = {
     s"""MATERIALIZE%""" + super.lineageString
   }
-  
+
+  override def toString =
+    s"""MATERIALIZE
+       |  in = $inPipeName
+     """.stripMargin
 }

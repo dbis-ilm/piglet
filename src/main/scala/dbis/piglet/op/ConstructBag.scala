@@ -41,11 +41,11 @@ case class ConstructBag(
 
   override def constructSchema: Option[Schema] = {
     parentSchema match {
-      case Some(s) => {
+      case Some(s) =>
         // first, we determine the field in the schema
         val field = refExpr match {
           case DerefTuple(t, r) => t match {
-            case nf@NamedField(n, _) => {
+            case nf@NamedField(n, _) =>
               // Either we refer to the input pipe (inputSchema) ...
               if (parentOp.isDefined && parentOp.get.inPipeName == n)
               // then we create a temporary pseudo field ...
@@ -53,11 +53,10 @@ case class ConstructBag(
               else
               // ... or we refer to a real field of the schema
                 s.field(nf)
-            }
             case PositionalField(p) => s.field(p)
-            case _ => throw new InvalidPlanException("unexpected expression in ConstructBag")
+            case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
           }
-          case _ => throw new InvalidPlanException("unexpected expression in ConstructBag")
+          case _ => throw InvalidPlanException("unexpected expression in ConstructBag")
         }
         // 2. we extract the type (which should be a BagType, MapType or TupleType)
         if (!field.fType.isInstanceOf[ComplexType])
@@ -74,22 +73,21 @@ case class ConstructBag(
         }
         // construct a schema from the component type
         //        val resSchema = new Schema(new BagType(new TupleType(Array(Field(componentName, componentType))), outPipeName))
-        val resSchema = Schema(if (componentType.isInstanceOf[BagType])
-          componentType.asInstanceOf[BagType]
-        else
-          BagType(TupleType(Array(Field(componentName, componentType)))))
+        val resSchema = Schema(componentType match {
+          case bagType: BagType => bagType
+          case _ => BagType(TupleType(Array(Field(componentName, componentType))))
+        })
         schema = Some(resSchema)
-
-      }
       case None => None
     }
     schema
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"CONSTRUCT_BAG { out = ${outPipeNames.mkString(",")}  }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-    println(indent(tab + 2) + "ref = " + refExpr)
+  override def toString: String = {
+    s"""CONSTRUCT_BAG
+       |  out = ${outPipeNames.mkString(",")}
+       |  inSchema = $inputSchema
+       |  outSchema = $schema
+       |  ref = $refExpr""".stripMargin
   }
 }

@@ -23,6 +23,15 @@ case class IndexOp(
 ) extends PigOperator(out, in) {
   
   override def lineageString = 
-    s"""INDEX%${method}%$field%${params.mkString}"""+super.lineageString
+    s"""INDEX%$method%$field%${params.mkString}"""+super.lineageString
+
+  override def toString =
+    s"""INDEX
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  field = $field
+       |  index method = $method
+       |  params = ${params.mkString(",")}
+     """.stripMargin
   
 }

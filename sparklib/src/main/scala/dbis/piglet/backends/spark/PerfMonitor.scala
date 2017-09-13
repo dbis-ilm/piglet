@@ -2,7 +2,6 @@ package dbis.piglet.backends.spark
 
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
-import dbis.piglet.backends.SchemaClass
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.AccumulatorV2
 import org.apache.spark.{NarrowDependency, ShuffleDependency}
@@ -162,13 +161,11 @@ class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mut
 
   override def add(value: MutableMap[Lineage, SizeStat]): Unit = {
     value.foreach{ case (k,v) =>
-
-          if(theValue.contains(k)) {
-            theValue(k).add(v)
-          } else {
-            theValue += k -> v
-          }
-
+      if(theValue.contains(k)) {
+        theValue(k).add(v)
+      } else {
+        theValue += k -> v
+      }
     }
   }
 
@@ -186,29 +183,3 @@ class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mut
 
   override def value: MutableMap[Lineage, SizeStat] = theValue
 }
-
-//class SizeAccumulator(private var theValue: Option[(Long,Long)] = None) extends AccumulatorV2[Option[(Long,Long)],Option[(Long,Long)]] {
-//
-//  override def isZero: Boolean = theValue.isEmpty
-//
-//  override def copy(): AccumulatorV2[Option[(Long,Long)], Option[(Long,Long)]] = if(theValue.isEmpty)
-//    new SizeAccumulator()
-//  else new SizeAccumulator(Some(theValue.get))
-//
-//
-//  override def reset(): Unit = theValue = None
-//
-//  def incr(bytes: Long, n: Long = 1L): Unit = add(Some((n, bytes)))
-//
-//  override def add(v: Option[(Long, Long)]): Unit = if(theValue.isEmpty)
-//    theValue = v
-//  else if(v.isDefined)
-//    theValue = Some((theValue.get._1 + v.get._1, theValue.get._2 + v.get._2))
-//
-//
-//  override def merge(other: AccumulatorV2[Option[(Long,Long)], Option[(Long,Long)]]): Unit = {
-//    add(other.value)
-//  }
-//
-//  override def value: Option[(Long,Long)] = theValue
-//}

@@ -296,13 +296,11 @@ abstract class PigOperator(
     this
   }
 
-  /**
-    * Returns a string of whitespaces for indenting a line by the given number.
-    *
-    * @param tab number of tabs to indent
-    * @return a string with whitespaces
-    */
-  def indent(tab: Int): String = " " * PigOperator.TAB_SIZE * tab
+
+  override def toString =
+    s"""PigOperator
+       |  out = ${outPipeNames.mkString(",")}
+       |  in = ${inPipeNames.mkString(",")}""".stripMargin
 
   /**
     * Prints a description of the operator to standard output but indent it by the given
@@ -311,15 +309,11 @@ abstract class PigOperator(
     *
     * @param tab the number of characters for indenting the output
     */
-  def printOperator(tab: Int): Unit = {
-    println(indent(tab) + this.toString + s" { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
-  }
+  def printOperator(tab: Int): Unit = toString.split("\n").withFilter(_.trim.nonEmpty).foreach(line => println(s"${" "*tab}$line"))
 
   lazy val name = toString.split(PigOperator.namePattern).head
 }
 
 object PigOperator {
   private final val namePattern = "\\P{Alpha}"
-
-  var TAB_SIZE = 1
 }

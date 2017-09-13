@@ -34,7 +34,7 @@ import dbis.piglet.expr.DerefMap
  */
 case class Generate(exprs: List[GeneratorExpr]) extends PigOperator(List(), List()) {
 
-  var parentOp: Foreach = null
+  var parentOp: Foreach = _
 
   /**
    * A list of additional pipes from the context (i.e., the nested
@@ -69,7 +69,7 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator(List(), List
    * Check all generate expressions and derive from the NamedField objects all possible
    * input pipes. Input pipes are pipes which are output pipes of other operators.
    *
-   * @param plan
+   * @param plan The
    */
   def findInputPipes(plan: DataflowPlan): List[Pipe] = {
     val traverse = new NamedFieldExtractor
@@ -99,7 +99,7 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator(List(), List
     if (parentOp != null)
       parentOp.inputSchema match {
         case Some(s) => fieldList ++= s.fields
-        case None => {}
+        case None =>
       }
 
     fieldList.toList
@@ -120,8 +120,8 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator(List(), List
         // is n just a simple field in our input?
         schema.indexOfField(nf) != -1 ||
         // otherwise we check whether n refers to a pipe
-        additionalPipes.filter(p => p.name == n).nonEmpty
-      case PositionalField(p) => (p < schema.fields.length)
+        additionalPipes.exists(p => p.name == n)
+      case PositionalField(p) => p < schema.fields.length
       case Value(v) => true // okay
       case DerefStreamingTuple(r1, r2) => true // TODO: is r1 a valid ref?
       case DerefTuple(r1, r2) => true // TODO: is r1 a valid ref?
@@ -133,12 +133,12 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator(List(), List
   // TODO: eliminate replicated code
   def constructFieldList(exprs: List[GeneratorExpr]): Array[Field] = {
     // println("GENERATE.constructFieldList: " + exprs.mkString(","))
-    val inSchema = Some(new Schema(new BagType(new TupleType(collectInputFields().toArray))))
+    val inSchema = Some(new Schema(BagType(new TupleType(collectInputFields().toArray))))
     // println("inSchema = " + inSchema)
     exprs.map(e => {
       e.alias match {
         // if we have an explicit schema (i.e. a field) then we use it
-        case Some(f) => {
+        case Some(f) =>
           if (f.fType == Types.ByteArrayType) {
             // if the type was only bytearray, we should check the expression if we have a more
             // specific type
@@ -147,24 +147,24 @@ case class Generate(exprs: List[GeneratorExpr]) extends PigOperator(List(), List
           }
           else
             f
-        }
         // otherwise we take the field name from the expression and
         // the input schema
-        case None => {
+        case None =>
           var res = e.expr.resultType(inSchema)
           // println(" ===> " + e + " type = " + res)
           Field("", res)
-        }
       }
     }).toArray
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"GENERATE { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
-    println(indent(tab + 2) + "inSchema = " + parentOp.schema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-    println(indent(tab + 2) + "exprs = " + exprs.mkString(","))
-  }
+  override def toString =
+    s"""GENERATE
+       |  out = ${outPipeNames.mkString(",")}
+       |  in = ${inPipeNames.mkString("m")}
+       |  inSchema = ${parentOp.schema}
+       |  outSchema = $schema
+       |  expr = ${exprs.mkString(",")}""".stripMargin
+
 
 }
 

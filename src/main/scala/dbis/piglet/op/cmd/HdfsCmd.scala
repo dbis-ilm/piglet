@@ -38,10 +38,10 @@ case class HdfsCmd(cmd: HdfsCommand.HdfsCommand, params: List[String]) extends P
 
   def paramString(): String = params.map(p => s""""$p"""").mkString(",")
 
-
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"HDFS (cmd = ${cmd}, params = ${params.mkString(" ")})")
-  }
+  override def toString =
+    s"""HDFS COMMAND
+       |  cmd = $cmd
+       |  params = ${params.mkString(",")}""".stripMargin
 
 }
 

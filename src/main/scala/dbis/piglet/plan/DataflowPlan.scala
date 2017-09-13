@@ -426,7 +426,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
 //    operators.foreach(_.printOperator(tab))
     TopoSort(this).foreach{op =>
       op.printOperator(tab)
-      println(s"${op.indent(tab+PigOperator.TAB_SIZE)}${op.lineageSignature}")
+      println(s"${" "*tab}  lineage = ${op.lineageSignature}")
     }
   }
 

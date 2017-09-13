@@ -24,6 +24,8 @@ import dbis.piglet.expr.Expr
 import dbis.piglet.expr.SpatialFilterPredicate
 import dbis.piglet.op.IndexMethod.IndexMethod
 
+import scala.collection.mutable
+
 /**
  * SpatialFilter represents the SPATIALFILTER operator.
  *
@@ -44,30 +46,30 @@ case class SpatialFilter(
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""SPATIALFILTER%${pred}%${idx}""" + super.lineageString
+    s"""SPATIALFILTER%$pred%$idx""" + super.lineageString
   }
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = pred.resolveReferences(mapping)
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = pred.resolveReferences(mapping)
 
   override def checkSchemaConformance: Boolean = {
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         // if we know the schema we check all named fields
         pred.traverseAnd(s, Expr.checkExpressionConformance)
-      }
-      case None => {
+      case None =>
         // if we don't have a schema all expressions should contain only positional fields
         pred.traverseAnd(null, Expr.containsNoNamedFields)
-      }
     }
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"SPATIALFILTER { out = ${outPipeName} , in = ${inPipeName} }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-    println(indent(tab + 2) + "expr = " + pred)
-    println(indent(tab + 2) + s"withIdx = $idx")
-  }
+
+  override def toString =
+    s"""SPATIALFILTER
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  schema = $schema
+       |  expr = $pred
+       |  idx = $idx""".stripMargin
+
 
 }

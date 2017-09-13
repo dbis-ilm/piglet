@@ -29,7 +29,7 @@ import scala.collection.mutable.ArrayBuffer
 case class Cross(
     private val out: Pipe, 
     private val in: List[Pipe], 
-    timeWindow: Tuple2[Int,String]= null.asInstanceOf[Tuple2[Int,String]]
+    timeWindow: (Int, String)= null.asInstanceOf[(Int, String)]
   ) extends PigOperator(List(out), in) {
 
 //  require(in.size == 2, "Only two inputs allowed for CROSS, currently!")
@@ -49,6 +49,11 @@ case class Cross(
     schema = Some(Schema(BagType(TupleType(newFields.toArray))))
     schema
   }
+
+  override def toString =
+    s"""CROSS
+       |  out = ${outPipeNames.mkString(",")}
+       |  in = ${inPipeNames.mkString(",")}""".stripMargin
 
 }
 

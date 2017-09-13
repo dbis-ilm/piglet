@@ -21,7 +21,7 @@ case class SpatialJoin(
   
   
   override def lineageString: String = {
-    s"""JOIN%${predicate.toString()}%index=${index}%""" + super.lineageString
+    s"""JOIN%${predicate.toString()}%$index%""" + super.lineageString
   }
 
   override def constructSchema: Option[Schema] = {
@@ -36,13 +36,13 @@ case class SpatialJoin(
     schema
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"SPATIALJOIN { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }")
-    println(indent(tab + 2) + s"predicate: ${predicate.toString()}")
-    println(indent(tab + 2) + "inSchema = {}")
-    println(indent(tab + 2) + "outSchema = " + schema)
-    println(indent(tab + 2) + s"index = $index")
-  }
-  
-  
+  override def toString =
+    s"""SPATIALJOIN
+       |  out = $outPipeName
+       |  in = ${inPipeNames.mkString(",")}
+       |  inSchema = {${inputs.map(_.producer.schema).mkString(",")}}
+       |  outSchema = $schema
+       |  predicate = $predicate
+       |  index = $index""".stripMargin
+
 }

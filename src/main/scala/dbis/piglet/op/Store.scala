@@ -38,19 +38,14 @@ case class Store(
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""STORE%${file}%""" + super.lineageString
+    s"""STORE%$file%""" + super.lineageString
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"STORE { in = ${inPipeName} }")
-    println(indent(tab + 2) + "file = " + file.toString)
-    if (func.isDefined) {
-      println(indent(tab + 2) + "func = " + func.get)
-    }
-  }
-  
-  override def toString() = s"""STORE { in = $inPipeName }
-                                |  file = ${file.toString()}
-                                |  ${func.getOrElse("")}""".stripMargin
+  override def toString =
+    s"""STORE
+       |  in = $inPipeName
+       |  func = $func
+       |  file = $file
+       |  params = ${params.mkString(",")}""".stripMargin
 
 }

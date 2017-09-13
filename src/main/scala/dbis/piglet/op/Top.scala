@@ -32,5 +32,12 @@ case class Top(
     num: Int
   ) extends PigOperator(out, in) {
 
-  override def lineageString: String = s"""TOP${num}""" + super.lineageString
+  override def lineageString: String = s"""TOP$num""" + super.lineageString
+
+  override def toString =
+    s"""TOP
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  order = ${orderSpec.mkString(",")}
+       |  num = $num""".stripMargin
 }

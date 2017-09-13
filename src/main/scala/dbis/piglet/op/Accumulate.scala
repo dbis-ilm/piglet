@@ -72,10 +72,12 @@ case class Accumulate(
     // TODO: second we check if the function arguments refer to valid fields
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"ACCUMULATE { out = ${outPipeName} , in = ${inPipeName} }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-    println(indent(tab + 2) + "exprs = " + generator.exprs.mkString(","))
+  override def toString: String= {
+    s"""ACCUMULATE
+        |  out = $outPipeName
+        |  in = $inPipeName
+        |  inSchema = $inputSchema
+        |  outSchema = $schema
+        |  exprs = ${generator.exprs.mkString(",")}""".stripMargin
   }
 }

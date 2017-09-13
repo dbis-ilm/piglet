@@ -38,7 +38,7 @@ case class StreamOp(
     var resSchema: Option[Schema] = None
   ) extends PigOperator(List(out), List(in), resSchema) {
 
-  override def lineageString: String = s"""STREAM%${opName}%""" + super.lineageString
+  override def lineageString: String = s"""STREAM%$opName%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
     // TODO
@@ -54,12 +54,15 @@ case class StreamOp(
     schema
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"STREAM_THROUGH { out = ${outPipeName} , in = ${inPipeName} }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-    println(indent(tab + 2) + "function = " + opName)
-  }
+  override def toString =
+    s"""STREAM_THROUGH
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  inSchema = $inputSchema
+       |  outSchema = $schema
+       |  resSchema = $resSchema
+       |  func = $opName
+       |  params = ${params.map(_.mkString(","))}""".stripMargin
 
 }
 

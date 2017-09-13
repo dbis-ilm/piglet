@@ -51,13 +51,12 @@ case class Join(
     schema
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + this.toString()) 
-  }
-  
-  override def toString = s"""JOIN { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }
-                              |  inSchema = { ${inputs.map(p => s"${p.name}: ${p.producer.schema}").mkString(", ")} }
-                              |  outSchema = $schema)""".stripMargin
+  override def toString = s"""JOIN
+                              |  out = ${outPipeNames.mkString(",")}
+                              |  in = ${inPipeNames.mkString(",")}
+                              |  inSchema =  ${inputs.map(p => s"${p.name}: ${p.producer.schema}").mkString(", ")}
+                              |  outSchema = $schema
+                              |  exprs = ${fieldExprs.mkString(",")}""".stripMargin
 
 }
 

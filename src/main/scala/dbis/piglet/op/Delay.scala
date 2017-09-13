@@ -42,9 +42,11 @@ case class Delay(
 
   override def toString =
     s"""DELAY
-      |  sample factor = $sampleFactor
-      |  waiting time = ${wtime._1} - ${wtime._2}""".stripMargin
+        |  out = $outPipeName
+        |  in = $inPipeName
+        |  sample factor = $sampleFactor
+        |  waiting time = ${wtime._1} - ${wtime._2}""".stripMargin
 
-  override def printOperator(tab: Int): Unit = toString.split("\n").foreach(line => println(s"${" "*tab}$line"))
+
 
 }

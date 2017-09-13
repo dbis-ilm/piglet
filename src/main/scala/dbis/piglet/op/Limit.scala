@@ -26,7 +26,13 @@ package dbis.piglet.op
 case class Limit(private val out: Pipe, private val in: Pipe, num: Int) extends PigOperator(out, in) {
 
   override def lineageString: String = {
-    s"""LIMIT%${num}%""" + super.lineageString
+    s"""LIMIT%$num%""" + super.lineageString
   }
+
+  override def toString =
+    s"""LIMIT
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  num = $num""".stripMargin
 
 }

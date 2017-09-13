@@ -85,7 +85,7 @@ case class Matcher(
     pattern: Pattern,
     events: CompEvent,
     mode: String = "skip_till_next_match",
-    within: Tuple2[Int, String] = (0, "SECONDS")
+    within: (Int, String) = (0, "SECONDS")
   ) extends PigOperator(out) {
 
   /**
@@ -108,4 +108,14 @@ case class Matcher(
   override def lineageString: String = {
     s"""Matcher""" + super.lineageString
   }
+
+  override def toString =
+    s"""MATCHER
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  pattern = $pattern
+       |  events = $events
+       |  mode = $mode
+       |  within = $within
+     """.stripMargin
 }

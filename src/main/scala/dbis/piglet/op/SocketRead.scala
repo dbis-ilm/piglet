@@ -46,6 +46,16 @@ case class SocketRead(private val out: Pipe,
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""SOCKET_READ%${addr}%${mode}""" + super.lineageString
+    s"""SOCKET_READ%$addr%$mode""" + super.lineageString
   }
+
+  override def toString =
+    s"""SOCKET READ
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  schema = $schema
+       |  stream schema = $streamSchema
+       |  stream func = $streamFunc
+       |  stream params = ${if(streamParams != null) { streamParams.mkString(",")} else "null" }
+     """.stripMargin
 }

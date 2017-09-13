@@ -35,7 +35,14 @@ case class WindowApply(
     schema
   }
   override def lineageString: String = {
-    s"""WINDOWAPPLY%${fname}%""" + super.lineageString
+    s"""WINDOWAPPLY%$fname%""" + super.lineageString
   }
+
+  override def toString =
+    s"""WINDOWAPPLY
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  fname = $fname
+     """.stripMargin
 
 }

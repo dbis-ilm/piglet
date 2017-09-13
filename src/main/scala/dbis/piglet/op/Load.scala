@@ -63,21 +63,13 @@ case class Load(
     }}%""" + super.lineageString
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"LOAD { out = ${outputs.map(_.name).mkString(",")} }")
-    println(indent(tab + 2) + "file = " + file.toString)
-    if (loaderFunc.isDefined) {
-      println(indent(tab + 2) + "func = " + loaderFunc.get)
-    }
-    println(indent(tab + 2) + "outSchema = " + schema)
-  }
 
   override def toString: String =
-    s"""LOAD { out = ${outputs.map(_.name).mkString(",")}
+    s"""LOAD
+       |  out = ${outputs.map(_.name).mkString(",")}
        |  file = ${file.toString}
        |  func = $loaderFunc
-       |  out schema = $schema
-       |}""".stripMargin
+       |  outSchema = $schema""".stripMargin
 
 
   override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = {

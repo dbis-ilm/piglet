@@ -38,6 +38,14 @@ case class SocketWrite(
    * @return a string representation of the sub-plan.
    */
   override def lineageString: String = {
-    s"""SOCKET_WRITE%${addr}%${mode}%""" + super.lineageString
+    s"""SOCKET_WRITE%$addr%$mode%""" + super.lineageString
   }
+
+  override def toString =
+    s"""SOCKET_WRITE
+       |  in = $inPipeName
+       |  addr = $addr
+       |  mode = $mode
+       |  func = $func
+       |  params = ${params.mkString(",")}""".stripMargin
 }

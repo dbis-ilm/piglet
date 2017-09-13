@@ -27,10 +27,10 @@ package dbis.piglet.op
   * @param applyData informations(func name, output schema, func body) needed for window apply function
   */
 case class Window(
-    private val out:Pipe, 
-    private val in: Pipe, 
-    window: Tuple2[Int,String], 
-    slide: Tuple2[Int,String]
+                   private val out:Pipe,
+                   private val in: Pipe,
+                   window: (Int, String),
+                   slide: (Int, String)
   ) extends PigOperator(out, in) {
 
   /** 
@@ -39,6 +39,14 @@ case class Window(
     * @return a string representation of the sub-plan.
     */
   override def lineageString: String = { 
-    s"""WINDOW%${window}%""" + super.lineageString
+    s"""WINDOW%$window%""" + super.lineageString
   }
+
+  override def toString =
+    s"""WINDOW
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  window = $window
+       |  slide = $slide
+     """.stripMargin
 }

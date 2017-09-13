@@ -18,5 +18,14 @@ case class Partition(
   
   override def lineageString = 
     s"""PARTITION%$method%$field%${params.mkString}"""+super.lineageString
-  
+
+  override def toString =
+    s"""PARTITION
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  schema = $schema
+       |  field = $field
+       |  method = $method
+       |  params = ${params.mkString(",")}
+     """.stripMargin
 }

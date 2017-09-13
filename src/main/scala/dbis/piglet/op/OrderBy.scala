@@ -29,18 +29,13 @@ import dbis.piglet.op.OrderByDirection._
 
 /**
  *
- * @param field
- * @param dir
+ * @param field The field on which is to be sorted
+ * @param dir The direction (ascending or descending)
  */
-case class OrderBySpec(field: Ref, dir: OrderByDirection)
+case class OrderBySpec(field: Ref, dir: OrderByDirection) {
+  override def toString = s"$field $dir"
+}
 
-/**
- *
- * @param initialOutPipeName the name of the initial output pipe (relation) which is needed to construct the plan, but
- *                           can be changed later.
- * @param initialInPipeName
- * @param orderSpec
- */
 case class OrderBy(
     private val out: Pipe, 
     private val in: Pipe, 
@@ -48,29 +43,30 @@ case class OrderBy(
     var windowMode: Boolean = false
   ) extends PigOperator(out, in) {
 
-  override def lineageString: String = s"""ORDERBY%${orderSpec}%""" + super.lineageString
+  override def lineageString: String = s"""ORDERBY%$orderSpec%""" + super.lineageString
 
   override def checkSchemaConformance: Boolean = {
     schema match {
-      case Some(s) => {
+      case Some(s) =>
         // if we know the schema we check all named fields
         // TODO
-      }
-      case None => {
+      case None =>
         // if we don't have a schema then the OrderBySpec list should contain only positional fields
-        orderSpec.filter(s => s.field match {
+        orderSpec.count(s => s.field match {
           case PositionalField(n) => true
           case _ => false
-        }).size == orderSpec.size
-      }
+        }) == orderSpec.size
     }
     true
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"ORDER BY { out = ${outPipeName} , in = ${inPipeName} }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-    println(indent(tab + 2) + "by = " + orderSpec.mkString(","))
-  }
+  override def toString =
+    s"""ORDER BY
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  inSchema = $inputSchema
+       |  outSchema = $schema
+       |  by = ${orderSpec.mkString(",")}
+     """.stripMargin
+
 }

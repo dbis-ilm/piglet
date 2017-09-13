@@ -255,15 +255,25 @@ case class Foreach(
     }
   }
   
-  override def toString = s"""FOREACH { out = ${outPipeNames.mkString(",")} , in = ${inPipeNames.mkString(",")} }
-                                |  inSchema = $inputSchema
-                                |  outSchema = $schema""".stripMargin
+  override def toString = {
+    val nested = generator match {
+      case GeneratorList(exprs) => exprs.mkString(",")
+      case GeneratorPlan(_) => "<nested plan>"
+    }
+
+    s"""FOREACH
+       |  out = ${outPipeNames.mkString(",")}
+       |  in = ${inPipeNames.mkString(",")}
+       |  inSchema = $inputSchema
+       |  outSchema = $schema
+       |  generator = $nested""".stripMargin
+  }
 
   override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + this.toString())
+    super.printOperator(tab)
     generator match {
-      case GeneratorList(exprs) => println(indent(tab + 2) + "exprs = " + exprs.mkString(","))
-      case GeneratorPlan(_) => subPlan.get.printPlan(tab + 5)
+      case GeneratorPlan(_) => subPlan.get.printPlan(2 * tab)
+      case _ =>
     }
   }
 }

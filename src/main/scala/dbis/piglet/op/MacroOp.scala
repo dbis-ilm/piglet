@@ -110,5 +110,12 @@ case class MacroOp(
     // TODO
     super.constructSchema
   }
+
+  override def toString =
+    s"""MACRO
+       |  out = $outPipeName
+       |  name = $macroName
+       |  params = ${params.map(_.mkString(","))}
+     """.stripMargin
 }
 

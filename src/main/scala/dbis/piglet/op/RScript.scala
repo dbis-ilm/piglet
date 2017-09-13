@@ -23,12 +23,20 @@ import dbis.piglet.schema.Schema
  */
 case class RScript(
     private val out: Pipe, 
-    private val in: Pipe, 
-    val script: String, 
-    val loadSchema: Option[Schema] = None
+    private val in: Pipe,
+    script: String,
+    loadSchema: Option[Schema] = None
   ) extends PigOperator(List(out), List(in), loadSchema) {
 
   override def lineageString: String = s"""STREAM%""" + super.lineageString
+
+  override def toString =
+    s"""RScript
+       |  out = $outPipeName
+       |  in = $inPipeName
+       |  script = $script
+       |  load schema = $loadSchema
+     """.stripMargin
 
 }
 

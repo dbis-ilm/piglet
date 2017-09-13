@@ -45,7 +45,7 @@ case class Union(private val out: Pipe, private val in: List[Pipe]) extends PigO
     }
 
     // case 1: one of the input schema isn't known -> output schema = None
-    if (inputs.exists(p => p.producer.schema == None)) {
+    if (inputs.exists(p => p.producer.schema.isEmpty)) {
       schema = None
     }
     else {
@@ -64,10 +64,12 @@ case class Union(private val out: Pipe, private val in: List[Pipe]) extends PigO
     schema
   }
 
-  override def printOperator(tab: Int): Unit = {
-    println(indent(tab) + s"UNION { out = ${outPipeName} , in = ${inPipeNames.mkString(",")} }")
-    println(indent(tab + 2) + "inSchema = " + inputSchema)
-    println(indent(tab + 2) + "outSchema = " + schema)
-  }
+  override def toString =
+    s"""UNION
+       |  out = $outPipeName
+       |  in = { ${inPipeNames.mkString(",")} }
+       |  inSchema = $inputSchema
+       |  outSchema = $schema""".stripMargin
+
 }
 

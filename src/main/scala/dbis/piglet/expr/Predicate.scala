@@ -16,20 +16,20 @@
  */
 package dbis.piglet.expr
 
-import dbis.piglet.schema.{Types, PigType, Schema}
+import dbis.piglet.schema.{PigType, Schema, Types}
 
-import scala.collection.mutable.Map
+import scala.collection.mutable
 
 trait Predicate extends Expr
 
-case class BoolLiteral(val b: Boolean) extends Predicate {
+case class BoolLiteral(b: Boolean) extends Predicate {
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
 
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
 
   override def traverseOr(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean = traverser(schema, this)
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = {}
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = {}
 }
 
 case class Eq(override val left: ArithmeticExpr, override val right: ArithmeticExpr) extends BinaryExpr(left, right) with Predicate {
@@ -125,7 +125,7 @@ case class And(a: Predicate, b: Predicate) extends Predicate {
 
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = {
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = {
     a.resolveReferences(mapping)
     b.resolveReferences(mapping)
   }
@@ -143,7 +143,7 @@ case class Or(a: Predicate, b: Predicate) extends Predicate {
 
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = {
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = {
     a.resolveReferences(mapping)
     b.resolveReferences(mapping)
   }
@@ -161,7 +161,7 @@ case class Not(a: Predicate) extends Predicate {
 
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = a.resolveReferences(mapping)
 
   override def toString = s"NOT ${a.toString}"
 }
@@ -169,7 +169,7 @@ case class Not(a: Predicate) extends Predicate {
 /**
  * A parenthesized predicate.
  *
- * @param a
+ * @param a The predicate
  */
 case class PPredicate(a: Predicate) extends Predicate {
   override def traverseAnd(schema: Schema, traverser: (Schema, Expr) => Boolean): Boolean =
@@ -181,7 +181,7 @@ case class PPredicate(a: Predicate) extends Predicate {
 
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = a.resolveReferences(mapping)
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = a.resolveReferences(mapping)
 
   override def toString = s"(${a.toString})"
 
@@ -201,7 +201,7 @@ case class SpatialJoinPredicate(left: Ref, right: Ref, predicateType: SpatialPre
 
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = {} //a.resolveReferences(mapping)
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = {} //a.resolveReferences(mapping)
 
   override def toString = s"$predicateType(${left.toString},${right.toString})"  
   
@@ -215,7 +215,7 @@ case class SpatialFilterPredicate(field: Ref, expr: ArithmeticExpr, predicateTyp
 
   override def resultType(schema: Option[Schema]): PigType = Types.BooleanType
 
-  override def resolveReferences(mapping: Map[String, Ref]): Unit = {} //a.resolveReferences(mapping)
+  override def resolveReferences(mapping: mutable.Map[String, Ref]): Unit = {} //a.resolveReferences(mapping)
 
   override def toString = s"$predicateType(${expr.toString})"  
   

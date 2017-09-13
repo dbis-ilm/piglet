@@ -32,4 +32,7 @@ case class Describe(private val in: Pipe) extends PigOperator(List(), List(in)) 
     s"""DESCRIBE%""" + super.lineageString
   }
 
+  override def toString =
+    s"""DESCRIBE
+       |  in = $inPipeName""".stripMargin
 }
