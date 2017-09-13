@@ -45,7 +45,6 @@ case class CliParams(
                       showPlan: Boolean = false,
                       backendArgs: Map[String, String] = Map.empty,
                       profiling: Option[ProfilerSettings] = None,
-                      //  profilingPort: Int = 8000,
                       logLevel: LogLevel = LogLevel.WARN,
                       sequential: Boolean = false,
                       keepFiles: Boolean = false,
@@ -114,7 +113,7 @@ object CliParams {
     arg[File]("<file>...") unbounded() optional() action { (x, c) => c.copy(inputFiles = c.inputFiles :+ x.toPath) } text "Pig script files to execute"
   }
 
-  private var _values: CliParams = _
+  private var _values: CliParams = CliParams()
 
   def values = _values
 
