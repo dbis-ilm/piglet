@@ -46,6 +46,5 @@ case class Store(
        |  in = $inPipeName
        |  func = $func
        |  file = $file
-       |  params = ${params.mkString(",")}""".stripMargin
-
+       |  params = ${if(params != null) params.mkString(",") else "null" }""".stripMargin
 }

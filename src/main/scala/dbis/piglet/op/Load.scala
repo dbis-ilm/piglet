@@ -42,11 +42,7 @@ case class Load(
     loaderParams: List[String] = null) extends PigOperator(List(out), List(), loadSchema) {
 
 
-  private lazy val lastModified: Option[Try[Long]] = if(CliParams.values.profiling.isDefined) {
-    Some(Try(HDFSService.lastModified(file.toString)))
-  } else {
-    None
-  }
+  private lazy val lastModified: Option[Try[Long]] = CliParams.values.profiling.map(_ => Try(HDFSService.lastModified(file.toString)))
 
 //  override def constructSchema: Option[Schema] = schema
 
