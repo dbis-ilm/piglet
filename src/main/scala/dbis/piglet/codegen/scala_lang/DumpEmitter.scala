@@ -6,14 +6,14 @@ import dbis.piglet.op.Dump
 /**
   * Created by kai on 05.12.16.
   */
-class DumpEmitter extends CodeEmitter[Dump] {//
+class DumpEmitter extends CodeEmitter[Dump] {
   override def template: String = """<if(mute)><in>.foreach{t=><if (profiling)>
                                     |if(scala.util.Random.nextInt(randFactor) == 0) {
-                                    |  accum.incr("<lineage>", t.getNumBytes)
+                                    |  accum.incr("<lineage>", PerfMonitor.estimateSize(t))
                                     |}<endif>}<else>
                                     |<in><if (profiling)>.map{t =>
                                     |  if(scala.util.Random.nextInt(randFactor) == 0) {
-                                    |    accum.incr("<lineage>", t.getNumBytes)
+                                    |    accum.incr("<lineage>", PerfMonitor.estimateSize(t))
                                     |  }
                                     |  t
                                     |}<endif>.collect.foreach(t => println(t.mkString()))<endif>""".stripMargin
