@@ -20,7 +20,7 @@ object CodeGenException {
 abstract class CodeEmitter[O <: PigOperator] extends PigletLogging {
   def template: String
 
-  def render: String = CodeEmitter.render(template, Map[String, Any]())
+//  def render: String = CodeEmitter.render(template, Map[String, Any]())
 
   /**
    * Invoke a given string template with a map of key-value pairs used for replacing
@@ -29,7 +29,7 @@ abstract class CodeEmitter[O <: PigOperator] extends PigletLogging {
    * @param params the map of key-value pairs
    * @return the text from the template
    */
-  def render(params: Map[String, Any]): String = CodeEmitter.render(template, params)
+  def render(params: Map[String, Any] = Map.empty): String = CodeEmitter.render(template, params)
 
   def helper(ctx: CodeGenContext, node: O): String = ""
 

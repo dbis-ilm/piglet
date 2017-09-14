@@ -11,6 +11,7 @@ import scala.collection.mutable.ArrayBuffer
   * Created by kai on 12.12.16.
   */
 class JoinEmitter extends CodeEmitter[Join] {
+//  .partitionBy(new org.apache.spark.HashPartitioner(32))
   override def template: String =
     """val <out> = <rel1>_kv.join(<rel2>_kv).map{
       |  case (k,(v,w)) =>

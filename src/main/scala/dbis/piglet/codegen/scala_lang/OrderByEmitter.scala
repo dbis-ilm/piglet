@@ -1,14 +1,23 @@
 package dbis.piglet.codegen.scala_lang
 
-import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenException}
-import dbis.piglet.op.{OrderBy, OrderByDirection, OrderBySpec, PigOperator}
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
+import dbis.piglet.op.{OrderBy, OrderByDirection, OrderBySpec}
 import dbis.piglet.schema.Types
 
 /**
   * Created by kai on 09.12.16.
   */
 class OrderByEmitter extends CodeEmitter[OrderBy] {
-  override def template: String = """val <out> = <in>.keyBy(t => <key>).sortByKey(<asc>).map{case (k,v) => v}""".stripMargin
+  override def template: String =
+    """val <out> = <in>.keyBy(t => <key>).sortByKey(<asc>).map{case (_,v) =>
+      |  <if (profiling)>
+      |  if(scala.util.Random.nextInt(randFactor) == 0) {
+      |    accum.incr("<lineage>", PerfMonitor.estimateSize(v))
+      |  }
+      |  <endif>
+      |  v
+      |}""".stripMargin
+
   def helperTemplate: String = """case class <params.cname>(<params.fields>) extends Ordered[<params.cname>] {
                                  |        def compare(that: <params.cname>) = <params.cmpExpr>
                                  |    }""".stripMargin
@@ -33,7 +42,7 @@ class OrderByEmitter extends CodeEmitter[OrderBy] {
     if (orderSpec.size == 1)
       ScalaEmitter.emitRef(ctx, orderSpec.head.field)
     else
-      s"custKey_${out}_${in}(${orderSpec.map(r => ScalaEmitter.emitRef(ctx, r.field)).mkString(",")})"
+      s"custKey_${out}_$in(${orderSpec.map(r => ScalaEmitter.emitRef(ctx, r.field)).mkString(",")})"
   }
 
   override def helper(ctx: CodeGenContext, op: OrderBy): String = {
@@ -71,7 +80,7 @@ class OrderByEmitter extends CodeEmitter[OrderBy] {
       params += "cname" -> s"custKey_${op.outPipeName}_${op.inPipeName}"
       var col = 0
       params += "fields" -> op.orderSpec.map(o => {
-        col += 1;
+        col += 1
         s"c$col: ${ScalaEmitter.scalaTypeOfField(o.field, op.schema)}"
       }).mkString(", ")
       params += "cmpExpr" -> genCmpExpr(1)
@@ -89,7 +98,7 @@ class OrderByEmitter extends CodeEmitter[OrderBy] {
   override def code(ctx: CodeGenContext, op: OrderBy): String = {
     val key = emitSortKey(CodeGenContext(ctx, Map("schema" -> op.schema)), op.orderSpec, op.outPipeName, op.inPipeName)
     val asc = ascendingSortOrder(op.orderSpec.head)
-    render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "key" -> key, "asc" -> asc))
+    render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "key" -> key, "asc" -> asc, "lineage" -> op.lineageSignature))
   }
 
 }
