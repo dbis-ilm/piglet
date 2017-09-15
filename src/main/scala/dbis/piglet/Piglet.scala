@@ -22,6 +22,7 @@ import java.nio.file.{Path, Paths}
 import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.PigletCompiler
 import dbis.piglet.mm.{DataflowProfiler, MaterializationManager, ProfilingException, StatServer}
+import dbis.piglet.op.TimingOp
 import dbis.piglet.plan.rewriting.Rewriter._
 import dbis.piglet.plan.rewriting.Rules
 import dbis.piglet.plan.{DataflowPlan, InvalidPlanException, PlanMerger}
@@ -274,6 +275,7 @@ object Piglet extends PigletLogging {
         println("final plan = {")
         newPlan.printPlan(2)
         println("}")
+        println(s"=> ${newPlan.operators.iterator.filterNot(_.isInstanceOf[TimingOp]).length} operators (${newPlan.operators.length} with Timings)")
       }
 
       // 7. check if the plan is still valid

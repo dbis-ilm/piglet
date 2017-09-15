@@ -1,9 +1,12 @@
 package dbis.piglet.mm
 
 import java.net.{InetSocketAddress, URLDecoder}
+import scala.concurrent.duration._
 
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import com.sun.net.httpserver.{HttpExchange, HttpHandler, HttpServer}
+
+
 import dbis.piglet.tools.Conf
 import dbis.piglet.tools.logging.PigletLogging
 
@@ -38,14 +41,14 @@ object StatServer extends PigletLogging {
   def stop(): Unit = {
     logger.debug("closing stat servers")
     if(server != null)
-      server.stop(10) // 10 = timeout seconds
+      server.stop(10.seconds.toSeconds.toInt) // 10 = timeout seconds
 
     // send the PoisonPill to the writer actor to stop it
     if(writer != null)
       writer ! PoisonPill
 
     // give the writer some time to process pending messages
-    Thread.sleep(3 * 1000)
+    Thread.sleep(3.seconds.toSeconds)
 
     // shutdown the Akka system
     system.terminate()
@@ -122,7 +125,7 @@ class StatsWriterActor(profilerSettings: ProfilerSettings) extends Actor with Pi
       DataflowProfiler.addExecTime(lineage, partitionId, parentsList, currTime)
 
     case msg: SizeMsg =>
-      logger.debug(s"reiceived size msg: $msg")
+//      logger.debug(s"reiceived size msg: $msg")
       DataflowProfiler.addSizes(msg.values, profilerSettings.fraction)
 
 

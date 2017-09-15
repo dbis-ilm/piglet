@@ -2,7 +2,7 @@ package dbis.piglet.op
 
 object PartitionMethod extends Enumeration {
   type PartitionMethod = Value
-  val GRID, BSP = Value
+  val GRID, BSP, Hash = Value
 }
 
 import PartitionMethod.PartitionMethod
@@ -26,6 +26,5 @@ case class Partition(
        |  schema = $schema
        |  field = $field
        |  method = $method
-       |  params = ${params.mkString(",")}
-     """.stripMargin
+       |  params = ${params.mkString(",")}""".stripMargin
 }

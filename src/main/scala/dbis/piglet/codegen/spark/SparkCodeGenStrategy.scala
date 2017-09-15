@@ -125,23 +125,19 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
       Map("profiling" -> url)
     }.getOrElse(Map.empty[String,String])
 
-//    val m = scala.collection.mutable.Map.empty[String,Option[(Long,Long)]]
-//    <lineages:{ l | m("<l>") = accum_<l>.value
-//      }>
-//    PerfMonitor.sizes(sizesUrl,m)
-
-      CodeEmitter.render(
-
-        s"""
-         |<if (profiling)>
-         |  PerfMonitor.sizes(sizesUrl, accum.value)
-         |<endif>
-         |  sc.stop()
-         |<if (profiling)>
-         |    PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
-         |<endif>
-         |  }
-         |}""".stripMargin, map)
+    CodeEmitter.render(
+      s"""
+       |<if (profiling)>
+       |  PerfMonitor.sizes(sizesUrl, accum.value)
+       |<endif>
+       |
+       |  //Thread.sleep(60 * 1000 * 5)
+       |  sc.stop()
+       |<if (profiling)>
+       |    PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
+       |<endif>
+       |  }
+       |}""".stripMargin, map)
 
   }
 }
