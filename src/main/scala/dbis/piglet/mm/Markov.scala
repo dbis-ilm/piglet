@@ -3,6 +3,7 @@ package dbis.piglet.mm
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.tools.logging.PigletLogging
 
+import scala.util.{Failure, Success, Try}
 import scalax.collection.mutable.Graph
 import scalax.collection.edge.Implicits._
 import scalax.collection.edge.WDiEdge
@@ -64,18 +65,18 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     model upsert (parent ~%> child) (newWeight) // update with new weight / count
   }
 
+
+
+//  private def _getparents(op: Lineage): Try[List[Lineage]] = Try {
+//
+//  }
   /**
     * Get the parent operators for the given operator
-    * @param op The lineage / id of the operator to get the parents of.
+    * @param lineage The lineage / id of the operator to get the parents of.
     * @return Returns the list of parents of this operator, or None if there is no parent
     */
-  def parents(op: Lineage): Option[List[Lineage]] = {
-
-    val a = model.get(Op(op)).inNeighbors.map(_.value.lineage).toList
-    if(a.isEmpty)
-    None
-    else
-    Some(a)
+  def parents(lineage: Lineage): Option[List[Lineage]] = {
+    model.find(Op(lineage)).map(o => o.inNeighbors.map{_.value.lineage}.toList).flatMap(l => if(l.isEmpty) None else Some(l))
   }
 
   def size = model.size
@@ -170,19 +171,16 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     * @param lineage The lineage of that operator
     * @param cost The newly measured cost
     */
-  def updateCost(lineage: Lineage, cost: Long) = {
-
-    val a = model.get( Op(lineage)).value
+  def updateCost(lineage: Lineage, cost: Long) = model.find( Op(lineage)).map(_.value).foreach { a =>
     if(a.cost.isDefined) {
       a.cost = Some(T.merge(a.cost.get, cost))
     } else
       a.cost = Some(T(cost))
   }
 
-  def updateSize(size: SizeInfo) = {
-    val a = model.get(Op(size.lineage)).value
-    a.resultRecords = Some(size.records)
-    a.bytesPerRecord = Some(size.bytes)
+  def updateSize(size: SizeInfo) =model.find(Op(size.lineage)).map(_.value).foreach {a =>
+      a.resultRecords = Some(size.records)
+      a.bytesPerRecord = Some(size.bytes)
   }
 
   /**
