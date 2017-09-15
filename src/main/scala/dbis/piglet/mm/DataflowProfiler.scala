@@ -4,11 +4,12 @@ import java.net.URI
 import java.nio.file.{Files, Path, StandardOpenOption}
 
 import dbis.piglet.Piglet.Lineage
+import dbis.piglet.mm.DuplicateStrategy.DuplicateStrategy
 import dbis.piglet.op.CacheMode.CacheMode
 import dbis.piglet.op.{CacheMode, Empty, Load, TimingOp}
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.logging.PigletLogging
-import dbis.piglet.tools.{BreadthFirstTopDownWalker, Conf}
+import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf}
 import dbis.setm.SETM.timing
 
 import scala.collection.JavaConverters._
@@ -125,8 +126,12 @@ object DataflowProfiler extends PigletLogging {
   def collect() = timing("process runtime stats") {
 
     if(alreadyExistingMsgs.nonEmpty) {
-      alreadyExistingMsgs.sortBy(_._1).foreach{ case (p,time, diff) =>
-        logger.warn(s"we already have a time for $p : oldTime: ${currentTimes(p)}  newTime: $time (diff: $diff ms)")
+//      alreadyExistingMsgs.sortBy(_._1).foreach{ case (p,time, diff) =>
+//        logger.warn(s"we already have a time for $p : oldTime: ${currentTimes(p)}  newTime: $time (diff: $diff ms)  - Strategy: ${CliParams.values.profiling.get.duplicates}")
+//      }
+      logger.warn(s"found duplicate times - use strategy ${CliParams.values.profiling.get.duplicates}")
+      alreadyExistingMsgs.groupBy(_._1.lineage).map{ case (lineage, values) => (lineage, values.length, values.map(_._1.partitionId).min, values.map(_._1.partitionId).max)}.foreach { case (lineage, num, min, max) =>
+        logger.warn(s"  $lineage : min = $min, max = $max, num = $num partitions")
       }
     }
 
@@ -218,8 +223,8 @@ object DataflowProfiler extends PigletLogging {
           //              logger.error(sortedTimes.mkString("\n"))
 
 
-          val msg = s"no $p in list of current execution times"
-          logger.warn(msg)
+//          val msg = s"no $p in list of current execution times"
+//          logger.warn(msg)
           //              throw ProfilingException(s"no $p in list of current execution times (as parent for $partition)")
           -1L
         }
@@ -231,9 +236,16 @@ object DataflowProfiler extends PigletLogging {
 
     val p = Partition(lineage, partitionId)
     if(currentTimes.contains(p)) {
-//      logger.warn(s"we already have a time for $p : oldTime: ${currentTimes(p)}  newTime: $time  (diff: ${currentTimes(p) - time}ms")
+      val ps = CliParams.values.profiling.get
+//      logger.warn(s"we already have a time for $p : oldTime: ${currentTimes(p)}  newTime: $time  (diff: ${currentTimes(p) - time}ms - Strategy: ${ps.duplicates}")
       alreadyExistingMsgs += ((p, time, currentTimes(p) - time))
-      return
+
+      ps.duplicates match {
+        case DuplicateStrategy.NEWEST =>
+          currentTimes.remove(p)
+        case DuplicateStrategy.OLDEST =>
+          return
+      }
     }
 
 
@@ -244,7 +256,7 @@ object DataflowProfiler extends PigletLogging {
       val m = parentPartitionInfo(lineage)
 
       if(m.contains(partitionId)) {
-        logger.warn(s"we already have that partition: $lineage  $partitionId . ")
+//        logger.warn(s"we already have that partition: $lineage  $partitionId . ")
       } else {
         m += partitionId -> parentPartitions
       }
@@ -256,14 +268,17 @@ object DataflowProfiler extends PigletLogging {
   }
 
 
-  def addSizes(m: Array[SizeInfo], factor: Int) = m.foreach{
-    case SizeInfo(lineage, records, bytes) =>
-      val bytesPerRecord = bytes / records
-      val totalRecords = records * factor
+  def addSizes(m: Array[SizeInfo], factor: Int) = {
+    m.foreach{
+      case SizeInfo(lineage, records, bytes) =>
+        val bytesPerRecord = bytes / records
+        val totalRecords = records * factor
 
-      logger.debug(s"add size info for $lineage : records=$records * $factor = $totalRecords,  bpr = $bytes / $records = $bytesPerRecord")
+        logger.debug(s"add size info for $lineage : records= $records\t* $factor = $totalRecords,\tbpr = $bytes / $records = $bytesPerRecord")
 
-      profilingGraph.updateSize(SizeInfo(lineage, records = totalRecords, bytes = bytesPerRecord))
+        profilingGraph.updateSize(SizeInfo(lineage, records = totalRecords, bytes = bytesPerRecord))
+    }
+    logger.debug(s"added size info for ${m.length} operators")
   }
 
   def getExectime(op: Lineage): Option[T] = profilingGraph.cost(op)
@@ -308,6 +323,11 @@ object CostStrategy extends Enumeration {
   }
 }
 
+object DuplicateStrategy extends Enumeration {
+  type DuplicateStrategy = Value
+  val NEWEST, OLDEST = Value
+}
+
 import dbis.piglet.mm.CostStrategy.CostStrategy
 import dbis.piglet.mm.ProbStrategy.ProbStrategy
 
@@ -318,6 +338,7 @@ case class ProfilerSettings(
                              probStrategy: ProbStrategy = Conf.mmDefaultProbStrategy,
                              cacheMode: CacheMode = Conf.mmDefaultCacheMode,
                              fraction: Int = Conf.mmDefaultFraction,
+                             duplicates: DuplicateStrategy = DuplicateStrategy.NEWEST,
                              url: URI = ProfilerSettings.profilingUrl
                            )
 
@@ -333,6 +354,7 @@ object ProfilerSettings extends PigletLogging {
         case "prob_strategy" => ps = ps.copy(probStrategy = ProbStrategy.withName(v.toUpperCase))
         case "cache_mode" => ps = ps.copy(cacheMode = CacheMode.withName(v.toUpperCase))
         case "fraction" => ps = ps.copy(fraction = v.toInt)
+        case "duplicates" => ps = ps.copy(duplicates = DuplicateStrategy.withName(v.toUpperCase))
         case _ => logger warn s"unknown profiler settings key $k (value: $v) - ignoring"
       }
     }
