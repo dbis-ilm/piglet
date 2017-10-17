@@ -41,7 +41,7 @@ object GeneralRuleset extends Ruleset {
 
     val namedfields = fields.map(_.asInstanceOf[NamedField])
     val inputs = multipleInputOp.inputs.map(_.producer)
-    var inputWithCorrectFields: Option[PigOperator] = findInputForFields(inputs, namedfields)
+    val inputWithCorrectFields: Option[PigOperator] = findInputForFields(inputs, namedfields)
 
     if (inputWithCorrectFields.isEmpty) {
       // We did not find an input that has all the fields we're looking for - this might be because the fields are
@@ -140,7 +140,7 @@ object GeneralRuleset extends Ruleset {
     // To prevent recursion, empty is ok as well
     case _ : Store | _ : HdfsCmd | _ : Dump | _ : Display | _ : Empty | _ : Generate | _ : SocketWrite => None
     case op: PigOperator =>
-      if (op.outputs.map(_.consumer.isEmpty).fold(true)(_ && _)) {
+      if (op.outputs.map(_.consumer.isEmpty).forall(identity)) {
         val newNode = Empty(Pipe(""))
         newNode.inputs = op.inputs
         Some(newNode)
@@ -161,30 +161,30 @@ object GeneralRuleset extends Ruleset {
   /**
     * Process the list of generator expressions in GENERATE and replace the * by the list of named fields
     *
-    * @param exprs
-    * @param op
+    * @param exprs The generator expressions
+    * @param op The operator
     * @return
     */
   def constructGeneratorList(exprs: List[GeneratorExpr], op: PigOperator): (List[GeneratorExpr], Boolean) = {
     val genExprs: ListBuffer[GeneratorExpr] = ListBuffer()
     var foundStar: Boolean = false
     for (ex <- exprs) {
-      if (ex.expr.isInstanceOf[RefExpr]) {
-        val ref = ex.expr.asInstanceOf[RefExpr]
-        if (ref.r.isInstanceOf[NamedField]) {
-          val field = ref.r.asInstanceOf[NamedField]
-          if (field.name == "*") {
-            if (op.inputSchema.isEmpty) {
-              throw RewriterException("Rewriting * in GENERATE requires a schema")
-            }
-            foundStar = true
-            genExprs ++= op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
+      ex.expr match {
+        case ref: RefExpr =>
+          ref.r match {
+            case field: NamedField =>
+              if (field.name == "*") {
+                if (op.inputSchema.isEmpty) {
+                  throw RewriterException("Rewriting * in GENERATE requires a schema")
+                }
+                foundStar = true
+                genExprs ++= op.inputSchema.get.fields.map(f => GeneratorExpr(RefExpr(NamedField(f.name))))
+              }
+              else genExprs += ex
+            case _ => genExprs += ex
           }
-          else genExprs += ex
-        }
-        else genExprs += ex
+        case _ => genExprs += ex
       }
-      else genExprs += ex
     }
     (genExprs.toList, foundStar)
   }
@@ -195,7 +195,7 @@ object GeneralRuleset extends Ruleset {
         case GeneratorList(exprs) =>
           val (genExprs, foundStar) = constructGeneratorList(exprs, op)
           if (foundStar) {
-            val newGen = GeneratorList(genExprs.toList)
+            val newGen = GeneratorList(genExprs)
             val newOp = Foreach(op.outputs.head, op.inputs.head, newGen, op.windowMode)
             newOp.constructSchema
             Some(newOp)
@@ -207,7 +207,7 @@ object GeneralRuleset extends Ruleset {
       case op@Generate(exprs) =>
         val (genExprs, foundStar) = constructGeneratorList(exprs, op.parentOp)
         if (foundStar) {
-          val newOp = Generate(genExprs.toList)
+          val newOp = Generate(genExprs)
           newOp.copyPipes(op)
           newOp.constructSchema
           Some(newOp)
@@ -227,7 +227,7 @@ object GeneralRuleset extends Ruleset {
   def foreachRecursively(fo: Foreach): Option[Foreach] = {
     fo.subPlan = fo.subPlan map { d: DataflowPlan => Rewriter.rewritePlan(d) }
     if (fo.subPlan.isDefined) {
-      fo.generator = new GeneratorPlan(fo.subPlan.get.operators)
+      fo.generator = GeneratorPlan(fo.subPlan.get.operators)
       Some(fo)
     }
     else
@@ -247,26 +247,26 @@ object GeneralRuleset extends Ruleset {
       if (schema.isDefined &&
         schema.get.indexOfField("group") != -1 &&
         !e.expr.traverseOr(null, Expr.containsAggregateFunc)) {
-        if (e.expr.isInstanceOf[RefExpr]) {
-          val ref = e.expr.asInstanceOf[RefExpr]
-          ref.r match {
+        e.expr match {
+          case ref: RefExpr =>
+            ref.r match {
               // furthermore, we consider only deref tuples, i.e. refs like rel.column
-            case DerefTuple(t, c) => {
-              // now, if the group field's lineage is t.c then we just replace t.c by "group"
-              val f = schema.get.field("group")
-              if (s"$t.$c" == f.lineage.head) {
-                res = GeneratorExpr(RefExpr(NamedField("group")))
-              }
+              case DerefTuple(t, c) =>
+                // now, if the group field's lineage is t.c then we just replace t.c by "group"
+                val f = schema.get.field("group")
+                if (s"$t.$c" == f.lineage.head) {
+                  res = GeneratorExpr(RefExpr(NamedField("group")))
+                }
+              case _ =>
             }
-            case _ => {}
-          }
+          case _ =>
         }
       }
       res
     }
 
     fo.generator match {
-      case GeneratorList(exprs) => {
+      case GeneratorList(exprs) =>
         // check the expression list if there is a DerefTuple _without_ an aggregation
         // and if found then replace it
         val newExprList = exprs.map(e => processExpression(fo.inputSchema, e))
@@ -276,7 +276,6 @@ object GeneralRuleset extends Ruleset {
           Some(fo)
         }
         else None
-      }
       case _ => None
     }
     None
@@ -289,11 +288,11 @@ object GeneralRuleset extends Ruleset {
     * @return the new operator representing the source of the macro definition.
     */
   def replaceMacroOp(t: Any): Option[PigOperator] = t match {
-    case op@MacroOp(out, name, params) => {
-      if (op.macroDefinition.isEmpty)
-        throw new InvalidPlanException(s"macro ${op.macroName} undefined")
+    case op@MacroOp(out, name, params) =>
+      if (op.macroDefinition().isEmpty)
+        throw InvalidPlanException(s"macro ${op.macroName} undefined")
 
-      val macroDef = op.macroDefinition.get
+      val macroDef = op.macroDefinition().get
       val subPlan = macroDef.subPlan.get
 
       /*
@@ -309,7 +308,6 @@ object GeneralRuleset extends Ruleset {
       val newOp = fixReplacementwithMultipleOperators(op, newParent, newChild)
       val schema = newOp.constructSchema
       Some(newOp)
-    }
     case _ =>  None
   }
 
@@ -321,7 +319,7 @@ object GeneralRuleset extends Ruleset {
     merge(mergeFilters)
     merge(mergeWithEmpty)
     merge(mergeLimits)
-    reorder[OrderBy, Filter]
+//    reorder[OrderBy, Filter]
     addBinaryPigOperatorStrategy[Join, Filter](filterBeforeMultipleInputOp)
     addBinaryPigOperatorStrategy[Cross, Filter](filterBeforeMultipleInputOp)
     addStrategy(strategyf(t => splitIntoToFilters(t)))
