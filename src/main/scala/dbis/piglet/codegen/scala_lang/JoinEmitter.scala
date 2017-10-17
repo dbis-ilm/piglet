@@ -11,14 +11,14 @@ import scala.collection.mutable.ArrayBuffer
   * Created by kai on 12.12.16.
   */
 class JoinEmitter extends CodeEmitter[Join] {
-//  .partitionBy(new org.apache.spark.HashPartitioner(32))
+//
   override def template: String =
-    """val <out> = <rel1>_kv.join(<rel2>_kv).map{
+    """val <out>_hp = new org.apache.spark.HashPartitioner(32)
+      |val <out> = <rel1>_kv.partitionBy(<out>_hp).join(<rel2>_kv.partitionBy(<out>_hp)).map{
       |  case (k,(v,w)) =>
       |    val res = <class>(<fields>)
       |    <if (profiling)>
       |    if(scala.util.Random.nextInt(randFactor) == 0) {
-      |      //accum.incr("<lineage>", res.getNumBytes)
       |      accum.incr("<lineage>", PerfMonitor.estimateSize(res))
       |    }
       |    <endif>
@@ -32,7 +32,6 @@ class JoinEmitter extends CodeEmitter[Join] {
       |    val res = <class>(<fields>)
       |    <if (profiling)>
       |    if(scala.util.Random.nextInt(randFactor) == 0) {
-      |      //accum.incr("<lineage>", res.getNumBytes)
       |      accum.incr("<lineage>", PerfMonitor.estimateSize(res))
       |    }
       |    <endif>
