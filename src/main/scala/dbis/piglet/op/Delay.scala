@@ -31,7 +31,7 @@ case class Delay(
                   private val out: Pipe,
                   private val in: Pipe,
                   sampleFactor: Int,
-                  wtime: (FiniteDuration, FiniteDuration)
+                  wtime: FiniteDuration
   ) extends PigOperator(out, in) {
 
   private val r = 0 //System.currentTimeMillis()
