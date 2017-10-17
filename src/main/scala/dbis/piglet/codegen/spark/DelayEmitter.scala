@@ -5,18 +5,18 @@ import dbis.piglet.op.Delay
 
 class DelayEmitter extends CodeEmitter[Delay] {
   override def template: String =
-    """val <out> = <in>.mapPartitions { iter =>
+    """val <out> = <in>.mapPartitions({ iter =>
       |  Thread.sleep(<wtimeMin> + scala.util.Random.nextInt(<wtimeMax> - <wtimeMin>))
       |  iter.filter{ t =>
       |    val decision = scala.util.Random.nextInt(<sampleFactor>) == 0
       |    <if (profiling)>
-      |    if(decision && scala.util.Random.nextInt(<randFactor>) == 0) {
+      |    if(decision && scala.util.Random.nextInt(randFactor) == 0) {
       |      accum.incr("<lineage>", PerfMonitor.estimateSize(t))
       |    }
       |    <endif>
       |    decision
       |  }
-      |}""".stripMargin
+      |},true)""".stripMargin
 
 
   override def code(ctx: CodeGenContext, op: Delay): String = {
@@ -24,7 +24,8 @@ class DelayEmitter extends CodeEmitter[Delay] {
       "in" -> op.inPipeName,
       "wtimeMin" -> op.wtime._1.toMillis.toInt,
       "wtimeMax" -> op.wtime._2.toMillis.toInt,
-      "sampleFactor" -> op.sampleFactor)
+      "sampleFactor" -> op.sampleFactor,
+      "lineage" -> op.lineageSignature)
 
     render(m)
   }
