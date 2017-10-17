@@ -23,23 +23,35 @@ object MaterializationManager extends PigletLogging {
 
   def replaceWithLoad(materialize: PigOperator, path: URI, plan: DataflowPlan): DataflowPlan = {
 
-    val loader = Load(materialize.inputs.head, path, materialize.constructSchema, Some("BinStorage"))
-    val matInput = materialize.inputs.head.producer
 
     var newPlan = plan
 
-    for (inPipe <- matInput.inputs) {
-      newPlan.disconnect(inPipe.producer, matInput)
-    }
+    val p = Pipe(materialize.inPipeName)
+    val loader = Load(p, path, materialize.constructSchema, Some("BinStorage"))
+    newPlan.addOperator(Seq(loader), deferrConstruct = true)
 
-    newPlan = newPlan.replace(matInput, loader)
+
+
+    val consumers = materialize.inputs.head.producer.outputs.head.consumer.filterNot(_.isInstanceOf[Materialize])
+
+    materialize.inputs.head.producer.outputs = List.empty
+
+    newPlan = newPlan.remove(materialize, removePredecessors = true)
+
+    val opAncestors = BreadthFirstBottomUpWalker.collect(plan, Seq(materialize))
+    plan.operators = plan.operators.filterNot(opAncestors.contains)
+
+    consumers.foreach { c =>
+
+      c.inputs.filter(p => p.name == loader.outPipeName).head.producer = loader
+      loader.addConsumer(loader.outPipeName, c)
+    }
 
     logger.info(s"replaced materialize op with loader $loader")
 
     /* TODO: do we need to remove all other nodes that get disconnected now by hand
        * or do they get removed during code generation (because there is no sink?)
        */
-    newPlan = newPlan.remove(materialize)
 
     newPlan
   }
@@ -199,6 +211,9 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
           case None => throw OperatorNotFoundException(lineage)
         }
 
+
+      logger.info(s"we chose to materialize ${theOp.name} ($lineage)")
+
       val path = generatePath(lineage)
 
       if(CliParams.values.compileOnly) {
@@ -209,21 +224,21 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
         saveMapping(lineage, path) // we save a mapping from the lineage of the actual op (not the materialize) to the path
       }
 
-        val storer = Store(theOp.outputs.head, path, Some("BinStorage"))
-        if(ps.cacheMode == CacheMode.NONE) {
-          newPlan.addOperator(Seq(storer), deferrConstruct = false)
-          newPlan = newPlan.insertAfter(theOp, storer)
+      val storer = Store(theOp.outputs.head, path, Some("BinStorage"))
+      if(ps.cacheMode == CacheMode.NONE) {
+        newPlan.addOperator(Seq(storer), deferrConstruct = false)
+        newPlan = newPlan.insertAfter(theOp, storer)
 
-        } else {
-          logger.debug(s"adding cache operator afters $theOp  with cache-mode: ${ps.cacheMode}")
+      } else {
+        logger.debug(s" -> adding cache operator after $theOp  with cache-mode: ${ps.cacheMode}")
 
-          val cache = Cache(Pipe(theOp.outPipeName), Pipe(PipeNameGenerator.generate(), producer= theOp), theOp.lineageSignature, ps.cacheMode)
+        val cache = Cache(Pipe(theOp.outPipeName), Pipe(PipeNameGenerator.generate(), producer= theOp), theOp.lineageSignature, ps.cacheMode)
 
-          newPlan.addOperator(Seq(storer, cache), deferrConstruct = true)
-          newPlan = newPlan.insertAfter(theOp, storer)
-          cache.outputs = theOp.outputs
-          newPlan = ProfilingSupport.insertBetweenAll(theOp.outputs.head, theOp, cache, newPlan)
-        }
+        newPlan.addOperator(Seq(storer, cache), deferrConstruct = true)
+        newPlan = newPlan.insertAfter(theOp, storer)
+        cache.outputs = theOp.outputs
+        newPlan = ProfilingSupport.insertBetweenAll(theOp.outputs.head, theOp, cache, newPlan)
+      }
     }
 
     newPlan
