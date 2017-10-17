@@ -66,14 +66,14 @@ object PerfMonitor {
 
       val a = rdd.dependencies.map{
         case d: NarrowDependency[_] =>
-          d.getParents(partitionId)
+          d.getParents(partitionId).toList
         case s: ShuffleDependency[_,_,_] =>
-          0 until s.partitioner.numPartitions
+          (0 until s.partitioner.numPartitions).toList
 //          rdd.partitions.indices
         case d@ _ =>
           println(s"Unknown dependency type: $d")
-          Seq.empty[Int]
-      }
+          List.empty[Int]
+      }.toList
 
       a.map(inner => inner.mkString(PARENT_DELIM)).mkString(DEP_DELIM)
 
@@ -103,6 +103,13 @@ object PerfMonitor {
 //
 //  }
 
+  /**
+    * Estimate the size in bytes occupied by an object
+    *
+    * @param o The object
+    * @return The number of bytes used by the given object
+    */
+  @inline
   def estimateSize(o: AnyRef): Long = org.apache.spark.util.SizeEstimator.estimate(o)
 
 //  {

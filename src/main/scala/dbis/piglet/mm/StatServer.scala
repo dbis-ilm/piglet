@@ -116,16 +116,16 @@ class StatsWriterActor(profilerSettings: ProfilerSettings) extends Actor with Pi
                           .map { s =>
                             s.split(StatsWriterActor.PARENT_DELIM)
                               .map(_.toInt)
-                              .toSeq
+                              .toList
                           }
-                          .toSeq
+                          .toList
 
       // store info in profiler
 
       DataflowProfiler.addExecTime(lineage, partitionId, parentsList, currTime)
 
     case msg: SizeMsg =>
-//      logger.debug(s"reiceived size msg: $msg")
+      logger.debug(s"reiceived size msg: $msg")
       DataflowProfiler.addSizes(msg.values, profilerSettings.fraction)
 
 

@@ -135,6 +135,9 @@ object DataflowProfiler extends PigletLogging {
       }
     }
 
+    val noParentMsgs = ListBuffer.empty[(Lineage, Int)]
+
+
     currentTimes//.keySet
                 //.map(_.lineage)
                 .filterNot{ case (Partition(lineage,_),_) => lineage == "start" || lineage == "end" || lineage == "progstart" }
@@ -159,7 +162,8 @@ object DataflowProfiler extends PigletLogging {
         parentTimes.max
       } else {
 //        throw ProfilingException(s"no parent time for $lineage on partition $partitionId")
-        logger.debug(s"no parent time for $lineage on partition $partitionId")
+//        logger.debug(s"no parent time for $lineage on partition $partitionId")
+        noParentMsgs += ((lineage, partitionId))
         time + 1
       }
 
@@ -169,7 +173,11 @@ object DataflowProfiler extends PigletLogging {
 
     }
 
-
+    noParentMsgs.groupBy(_._1)
+                .map{ case (lineage, l) => (lineage, l.map(_._2).sorted) }
+                .foreach{ case (lineage, lst) =>
+                  logger.debug(s"no parent time for $lineage on partition ${lst.mkString(",")} (${lst.length})")
+                }
 
 
     // manually add execution time for creating spark context
@@ -232,7 +240,7 @@ object DataflowProfiler extends PigletLogging {
     }.filter(_ >= 0)
 
 
-  def addExecTime(lineage: Lineage, partitionId: Int, parentPartitions: Seq[Seq[Int]], time: Long): Unit = {
+  def addExecTime(lineage: Lineage, partitionId: Int, parentPartitions: List[List[Int]], time: Long): Unit = {
 
     val p = Partition(lineage, partitionId)
     if(currentTimes.contains(p)) {
@@ -240,16 +248,26 @@ object DataflowProfiler extends PigletLogging {
 //      logger.warn(s"we already have a time for $p : oldTime: ${currentTimes(p)}  newTime: $time  (diff: ${currentTimes(p) - time}ms - Strategy: ${ps.duplicates}")
       alreadyExistingMsgs += ((p, time, currentTimes(p) - time))
 
+
+      val oldTime = currentTimes(p)
+
+      /*
+       Update the time in currentTimes only if the newly arrived time matches the strategy
+       */
       ps.duplicates match {
-        case DuplicateStrategy.NEWEST =>
-          currentTimes.remove(p)
-        case DuplicateStrategy.OLDEST =>
-          return
+        case DuplicateStrategy.NEWEST if oldTime < time =>
+          currentTimes.update(p, time)
+
+        case DuplicateStrategy.OLDEST if time < oldTime =>
+          currentTimes.update(p, time)
+
+        case _ => // intentionally left empty
       }
+    } else {
+      currentTimes +=  p -> time
     }
 
 
-    currentTimes +=  p -> time
 
     if(parentPartitionInfo.contains(lineage)) {
 
