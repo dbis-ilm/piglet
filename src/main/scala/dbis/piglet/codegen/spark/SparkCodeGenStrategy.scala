@@ -130,8 +130,6 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
        |<if (profiling)>
        |  PerfMonitor.sizes(sizesUrl, accum.value)
        |<endif>
-       |
-       |  //Thread.sleep(60 * 1000 * 5)
        |  sc.stop()
        |<if (profiling)>
        |    PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)

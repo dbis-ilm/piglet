@@ -230,7 +230,8 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (t._0,t))
       |val c_kv = c.map(t => (t._0,t))
-      |val a = b_kv.join(c_kv).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
+      |val a_hp = new org.apache.spark.HashPartitioner(32)
+      |val a = b_kv.partitionBy(a_hp).join(c_kv.partitionBy(a_hp)).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -254,7 +255,8 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (Array(t._0,t._1).mkString,t))
       |val c_kv = c.map(t => (Array(t._1,t._2).mkString,t))
-      |val a = b_kv.join(c_kv).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
+      |val a_hp = new org.apache.spark.HashPartitioner(32)
+      |val a = b_kv.partitionBy(a_hp).join(c_kv.partitionBy(a_hp)).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 

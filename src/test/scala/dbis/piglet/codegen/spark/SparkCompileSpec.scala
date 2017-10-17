@@ -478,7 +478,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val expectedCode = cleanString("""
       |val bb_kv = bb.map(t => (t._0,t))
       |val cc_kv = cc.map(t => (t._0,t))
-      |val aa = bb_kv.join(cc_kv).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
+      |val aa_hp = new org.apache.spark.HashPartitioner(32)
+      |val aa = bb_kv.partitionBy(aa_hp).join(cc_kv.partitionBy(aa_hp)).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -504,7 +505,8 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val expectedCode = cleanString("""
       |val b_kv = b.map(t => (Array(t._0,t._1).mkString,t))
       |val c_kv = c.map(t => (Array(t._1,t._2).mkString,t))
-      |val a = b_kv.join(c_kv).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
+      |val a_hp = new org.apache.spark.HashPartitioner(32)
+      |val a = b_kv.partitionBy(a_hp).join(c_kv.partitionBy(a_hp)).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, v._2, w._0, w._1, w._2) res }""".stripMargin)
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -619,18 +621,21 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val expectedCode1 = cleanString(
       """val a_kv = a.map(t => (t._0,t))
         |val b_kv = b.map(t => (t._0,t))
-        |val j1 = a_kv.join(b_kv).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, w._0) res }""".stripMargin)
+        |val j1_hp = new org.apache.spark.HashPartitioner(32)
+        |val j1 = a_kv.partitionBy(j1_hp).join(b_kv.partitionBy(j1_hp)).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, w._0) res }""".stripMargin)
     generatedCode1 should matchSnippet(expectedCode1)
 
     val expectedCode2 = cleanString(
       """val c_kv = c.map(t => (t._0,t))
-        |val j2 = a_kv.join(c_kv).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, w._0) res }""".stripMargin)
+        |val j2_hp = new org.apache.spark.HashPartitioner(32)
+        |val j2 = a_kv.partitionBy(j2_hp).join(c_kv.partitionBy(j2_hp)).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, w._0) res }""".stripMargin)
     generatedCode2 should matchSnippet(expectedCode2)
 
     val expectedCode3 = cleanString(
       """val j1_kv = j1.map(t => (t._0,t))
         |val j2_kv = j2.map(t => (t._0,t))
-        |val j = j1_kv.join(j2_kv).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, w._0, w._1) res }""".stripMargin)
+        |val j_hp = new org.apache.spark.HashPartitioner(32)
+        |val j = j1_kv.partitionBy(j_hp).join(j2_kv.partitionBy(j_hp)).map{ case (k,(v,w)) => val res = _t$1_Tuple(v._0, v._1, w._0, w._1) res }""".stripMargin)
     generatedCode3 should matchSnippet(expectedCode3)
 
   }
@@ -916,7 +921,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val op = OrderBy(Pipe("aa"), Pipe("bb"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)))
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-        |val aa = bb.keyBy(t => t.get(0)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
+        |val aa = bb.keyBy(t => t.get(0)).sortByKey(true).map{case (_,v) => v }""".stripMargin)
     assert(generatedCode == expectedCode)
   }
 
@@ -935,7 +940,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     op.schema = Some(schema)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-        |val a = b.keyBy(t => custKey_a_b(t._0,t._2)).sortByKey(true).map{case (k,v) => v}""".stripMargin)
+        |val a = b.keyBy(t => custKey_a_b(t._0,t._2)).sortByKey(true).map{case (_,v) => v }""".stripMargin)
     assert(generatedCode == expectedCode)
 
     val generatedHelperCode = cleanString(codeGenerator.emitHelperClass(ctx, op))
