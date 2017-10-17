@@ -17,10 +17,7 @@
 
 package dbis.piglet.op
 
-import scala.collection.mutable.Map
-import dbis.piglet.expr.Predicate
-import dbis.piglet.expr.Ref
-import dbis.piglet.expr.Expr
+import dbis.piglet.expr.{Expr, Predicate, Ref}
 
 import scala.collection.mutable
 

@@ -13,17 +13,32 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
   override def template = s"""val <out> = <rel1><keyby1><liveindex>.join(
                     |   <rel2><keyby2>,
                     |   dbis.stark.spatial.JoinPredicate.<predicate>
-                    | ).map{ case (v,w) => 
-                    |     <className>(<fields>) 
+                    | ).map{ case (v,w) =>
+                    |     <className>(<fields>)
                     |\\}""".stripMargin
+
+//  partitionBy(new dbis.stark.spatial.partitioner.SpatialGridPartitioner())
+
+
+
+//  override def template = s"""val <rel1>_kvJoin = <rel1><keyby1>
+//                             |val <rel1>_kvJoin_parted = <rel1>_kvJoin.partitionBy(new dbis.stark.spatial.partitioner.SpatialGridPartitioner(<rel1>_kvJoin, 6, pointsOnly=false,-180,180,-90,90,2))
+//                             |val <rel2>_kvJoin = <rel2><keyby2>
+//                             |val <rel2>_kvJoin_parted = <rel2>_kvJoin.partitionBy(new dbis.stark.spatial.partitioner.SpatialGridPartitioner(<rel2>_kvJoin, 6, pointsOnly=true,-180,180,-90,90,2))
+//                             |
+//                             |val <out> = <rel1>_kvJoin_parted<liveindex>.join(
+//                             |   <rel2>_kvJoin_parted,
+//                             |   dbis.stark.spatial.JoinPredicate.<predicate>
+//                             | ).map{ case (v,w) =>
+//                             |     <className>(<fields>)
+//                             |\\}""".stripMargin
   
   def indexTemplate(idxConfig: Option[(IndexMethod, List[String])]) = idxConfig match {
-    case Some((indexMethod, params)) => CodeEmitter.render(".liveIndex(<params>)", Map("params" -> params.mkString(",")))
+    case Some((_, params)) => CodeEmitter.render(".liveIndex(<params>)", Map("params" -> params.mkString(",")))
     case None => ""
   }                    
                     
   def code(ctx: CodeGenContext, op: SpatialJoin): String = {
-    
     if(op.schema.isEmpty)
       throw SchemaException("Schema must be defiend for spatial join operator")
     

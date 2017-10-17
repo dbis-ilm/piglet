@@ -3,12 +3,11 @@ package dbis.piglet.mm
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.tools.logging.PigletLogging
 
-import scala.util.{Failure, Success, Try}
-import scalax.collection.mutable.Graph
 import scalax.collection.edge.Implicits._
 import scalax.collection.edge.WDiEdge
 import scalax.collection.io.json._
 import scalax.collection.io.json.descriptor.predefined.WDi
+import scalax.collection.mutable.Graph
 
 /**
   * Represents a node in the markov graph
