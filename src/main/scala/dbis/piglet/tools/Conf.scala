@@ -113,8 +113,8 @@ object Conf extends PigletLogging {
   def mmDefaultFraction = appconf.getInt("profiler.defaults.fraction")
 
 
-  val BytesPerSecWriting = 47.93590545654297 * 1024 * 1024 // MB/sec --> Bytes/sec
-  val BytesPerSecReading = 83.33333587646484 * 1024 * 1024 // MB/sec --> Bytes/sec
+  val BytesPerSecWriting = 93.18239726276708 * 1024 * 1024 // MB/sec --> Bytes/sec
+  val BytesPerSecReading = 114.56189027118947 * 1024 * 1024 // MB/sec --> Bytes/sec
 
 //  def execTimesFile = "exectimes"
   
