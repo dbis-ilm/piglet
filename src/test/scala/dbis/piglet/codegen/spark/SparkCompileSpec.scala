@@ -87,9 +87,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
         |      val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
         |      sc.register(accum,"accum")
         |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
+        |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
         |      PerfMonitor.sizes(sizesUrl, accum.value)
         |      sc.stop()
-        |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
         |    }
         |}
       """.stripMargin)
@@ -130,9 +130,9 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
                                      |      val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
                                      |      sc.register(accum,"accum")
                                      |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
+                                     |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
                                      |      PerfMonitor.sizes(sizesUrl, accum.value)
                                      |      sc.stop()
-                                     |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
                                      |
                                      |    }
                                      |}

@@ -101,14 +101,15 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
 //    sc.register(accum_<l>,"accum_<l>")
 //      }>
 
-    CodeEmitter.render(s"""  def main(args: Array[String]) {
+    CodeEmitter.render(s"""
+                         |  def main(args: Array[String]) {
                          |<if (profiling)>
-                         |  val url = "<profilingTimes>"
-                         |  val sizesUrl = "<profilingSizes>"
-                         |  PerfMonitor.notify(url,"progstart",null,-1,System.currentTimeMillis)
+                         |    val url = "<profilingTimes>"
+                         |    val sizesUrl = "<profilingSizes>"
+                         |    PerfMonitor.notify(url,"progstart",null,-1,System.currentTimeMillis)
                          |<endif>
-                         |val conf = new SparkConf().setAppName("<name>_App")
-                    		 |val sc = new SparkContext(conf)
+                         |    val conf = new SparkConf().setAppName("<name>_App")
+                    		 |    val sc = new SparkContext(conf)
                          |<if (profiling)>
                          |    val randFactor: Int = <randFactor>
                          |    val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
@@ -128,12 +129,10 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
     CodeEmitter.render(
       s"""
        |<if (profiling)>
-       |  PerfMonitor.sizes(sizesUrl, accum.value)
-       |<endif>
-       |  sc.stop()
-       |<if (profiling)>
        |    PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
+       |    PerfMonitor.sizes(sizesUrl, accum.value)
        |<endif>
+       |    sc.stop()
        |  }
        |}""".stripMargin, map)
 
