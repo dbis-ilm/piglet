@@ -112,9 +112,11 @@ object Conf extends PigletLogging {
   def mmDefaultCacheMode = CacheMode.withName(appconf.getString("profiler.defaults.cache_mode").toUpperCase)
   def mmDefaultFraction = appconf.getInt("profiler.defaults.fraction")
 
+  val MiBPerSecWriting = 93.18239726276708 // * 1024 * 1024 // MB/sec --> Bytes/sec
+  val MiBPerSecReading = 114.56189027118947 // * 1024 * 1024 // MB/sec --> Bytes/sec
 
-  val BytesPerSecWriting = 93.18239726276708 * 1024 * 1024 // MB/sec --> Bytes/sec
-  val BytesPerSecReading = 114.56189027118947 * 1024 * 1024 // MB/sec --> Bytes/sec
+  val BytesPerSecWriting = MiBPerSecWriting * 1024 * 1024 // MB/sec --> Bytes/sec
+  val BytesPerSecReading = MiBPerSecReading * 1024 * 1024 // MB/sec --> Bytes/sec
 
 //  def execTimesFile = "exectimes"
   

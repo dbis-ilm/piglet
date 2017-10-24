@@ -17,6 +17,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.io.Source
+import scala.util.{Failure, Success, Try}
 
 
 object MaterializationManager extends PigletLogging {
@@ -31,8 +32,9 @@ object MaterializationManager extends PigletLogging {
     newPlan.addOperator(Seq(loader), deferrConstruct = true)
 
 
-
-    val consumers = materialize.inputs.head.producer.outputs.head.consumer.filterNot(_.isInstanceOf[Materialize])
+    val consumers = materialize.inputs.head.producer // the producer is the only input of MATERIALIZE
+                      .outputs.head.consumer // all consumers of the producer
+                      .filterNot(_.isInstanceOf[Materialize]) // but without the MATERIALIZE op
 
     materialize.inputs.head.producer.outputs = List.empty
 
@@ -47,7 +49,7 @@ object MaterializationManager extends PigletLogging {
       loader.addConsumer(loader.outPipeName, c)
     }
 
-    logger.info(s"replaced materialize op with loader $loader")
+    logger.debug(s"replaced materialize op with loader $loader")
 
     /* TODO: do we need to remove all other nodes that get disconnected now by hand
        * or do they get removed during code generation (because there is no sink?)
@@ -157,14 +159,15 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
             if(opOutputSize.isDefined) {
 
               val opSizeBytes = opOutputSize.get
+              val opSizeMib = opSizeBytes / 1024 / 1024
 
               logger.debug(s"${op.name} (${op.lineageSignature})\t: " +
                 s"cost=${cost.milliseconds.toSeconds} \t prob=$relProb\t" +
-                s"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = ${opSizeBytes / 1024 / 1024} MiB")
+                s"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = $opSizeMib MiB")
 
 
-              val writingTime = (opSizeBytes / Conf.BytesPerSecWriting).seconds
-              val readingTime = (opSizeBytes / Conf.BytesPerSecReading).seconds
+              val writingTime = (opSizeMib / Conf.MiBPerSecWriting).seconds
+              val readingTime = (opSizeMib / Conf.MiBPerSecReading).seconds
 
               logger.debug(s"\twriting for ${op.name} ($sig) with $opSizeBytes bytes would take ${writingTime.toSeconds} seconds")
               logger.debug(s"\treading for ${op.name} ($sig) with $opSizeBytes bytes would take ${readingTime.toSeconds} seconds")
@@ -177,10 +180,11 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
 
               val benefit = cost.milliseconds - readingTime
               if(decision) {
-                logger.debug(s"\t--> We should materialize ${op.name} with benefit of ${benefit.toSeconds} and prob = $relProb")
                 candidates += MaterializationPoint(sig, benefit, relProb, cost)
-              } else
-              logger.debug(s"\t--> We should NOT materialize ${op.name} with benefit of ${benefit.toSeconds} and prob = $relProb")
+              }
+
+              logger.info(s"\t--> should ${if(!decision) "NOT" else ""} materialize ${op.name}: benefit= ${benefit.toSeconds} and prob= $relProb (est. t w= ${writingTime.toSeconds}, r= ${readingTime.toSeconds})")
+//              logger.info(s"\t--> We should NOT materialize ${op.name} with benefit of ${benefit.toSeconds} and prob = $relProb")
 
             } else {
               logger.debug(s"no size info for ${op.name} ($sig)")
@@ -241,36 +245,32 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
       }
     }
 
+    newPlan.constructPlan(newPlan.operators)
     newPlan
 
   }
 
 
   def loadIntermediateResults(plan: DataflowPlan): DataflowPlan = {
-//    val newPlan = plan
 
-    DepthFirstTopDownWalker.walk(plan) { op =>
+
+    DepthFirstBottomUpWalker.walk(plan) { op =>
 
       val sig = op.lineageSignature
+      val opName = Try { op.name } match {
+        case Success(name) => name
+        case Failure(e) =>
+          logger.warn(s"cannot determine name of operator $sig for checking for intermediate results",e)
+          "<unknown>"
+      }
 
-      logger.debug(s"checking for existing materialized results for ${op.name} ($sig)")
+      logger.debug(s"checking for existing materialized results for $opName ($sig)") //${op.name}
 
       getDataFor(sig) match {
         case Some(uri) =>
           logger.info(s"loading materialized results for ${op.name} $sig")
 
-//          val loader = Load(op.outputs.head, uri, op.schema, Some("BinStorage"))
-          //FIXME: could be a problem when restoring the result of a SPLIT operator. Then we would have to insert multiple LOADs?
-
-//          val newSchema = op.schema.map{ oldSchema =>
-//            val newFields = oldSchema.fields.map{ field => Field(field.name, field.fType) }
-//
-//            Schema(newFields)
-//
-//          }
-
-          val loader = Load(Pipe(op.outPipeName), uri, op.schema, Some("BinStorage"))
-//          loader.outputs.head.producer = loader
+          val loader = Load(Pipe(op.outPipeName), uri, op.constructSchema, Some("BinStorage"))
           logger.debug(s"replacing ${op.name} with $loader")
 
           // add the new Load op to the list of operators in the plan
@@ -284,12 +284,14 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
               we cannot use the DataflowPlan#remove method here. Somehow it messes up the pipes so that
               we don't have correct schema
            */
-//          newPlan = newPlan.remove(op, removePredecessors = true)
           val opAncestors = BreadthFirstBottomUpWalker.collect(plan, Seq(op))
           plan.operators = plan.operators.filterNot(opAncestors.contains) // ++ Seq(loader)
 
           // just to be sure, clear the outputs of op
           op.outputs = List.empty
+
+          // at this point, op and all its transitive predecessors should be removed from plan.operators
+
 
           /* for every consumer that reads from op, make it read from our new Load now
 

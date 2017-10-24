@@ -12,7 +12,7 @@ trait ProfilingSupport extends PigletLogging {
 
     // for all operators - except consumers (STORE, DUMP) and those that were already profiled
     // FIXME: this could cause errors, because if op1 -> op2 and op1 is ignored because of this check, then op2 won't have an input timing
-    for(op <- TopoSort(plan) if op.outputs.nonEmpty && DataflowProfiler.getExectime(op.lineageSignature).isEmpty) {
+    for(op <- TopoSort(plan) if op.outputs.nonEmpty /*&& DataflowProfiler.getExectime(op.lineageSignature).isEmpty*/) {
 
       val outArr = new Array[Pipe](op.outputs.size)
       op.outputs.copyToArray(outArr)

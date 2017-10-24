@@ -103,7 +103,7 @@ object PlanWriter extends PigletLogging {
     * @param graph The graph string to save
     */
   private def writeDotFile(file: Path, graph: String): Unit = {
-    logger.info(s"writing dot file to $file")
+    logger.debug(s"writing dot file to $file")
     if(Files.notExists(file.getParent)) {
       Files.createDirectories(file.getParent)
     }

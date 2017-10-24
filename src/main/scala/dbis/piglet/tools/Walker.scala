@@ -2,7 +2,6 @@ package dbis.piglet.tools
 
 import dbis.piglet.op.{Empty, PigOperator}
 import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.tools.logging.PigletLogging
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -110,6 +109,41 @@ object BreadthFirstTopDownWalker extends Walker[PigOperator] {
 	override def walk(plan: DataflowPlan, startNodes: Seq[PigOperator] = Seq.empty)(visit: (PigOperator => Unit)) = doIt(plan, startNodes, Some(visit))
 
   override def collect(plan: DataflowPlan, startNodes: Seq[PigOperator]): Set[PigOperator] = doIt(plan, startNodes, None).toSet
+}
+
+object DepthFirstBottomUpWalker extends Walker[PigOperator] {
+
+  def doIt(plan: DataflowPlan, startNodes: Seq[PigOperator] = Seq.empty, visitor: Option[(PigOperator => Unit)]): mutable.Set[PigOperator] = {
+    val start = if(startNodes.isEmpty) plan.sinkNodes.toSeq else startNodes
+
+    val todo = mutable.Stack(start: _*)
+    val seen = mutable.Set.empty[PigOperator]
+
+    while(todo.nonEmpty) {
+      val op = todo.pop()
+
+      // if the signature of the current op has been seen before
+      if(!seen.contains(op)) {
+        seen += op  // mark as seen
+
+        if(visitor.isDefined) {
+          val visit = visitor.get
+          visit(op)    // apply the visitor to the current op
+        }
+      }
+
+      val parents = op.inputs.map(_.producer).filterNot { op => op == null || seen.contains(op) }
+      todo.pushAll(parents)
+    }
+
+    seen
+  }
+
+
+  override def walk(plan: DataflowPlan, startNodes: Seq[PigOperator] = Seq.empty)(visit: (PigOperator => Unit)) = doIt(plan, startNodes, Some(visit))
+
+  override def collect(plan: DataflowPlan, startNodes: Seq[PigOperator]): Set[PigOperator] = doIt(plan, startNodes, None).toSet
+
 }
 
 object DepthFirstTopDownWalker extends Walker[PigOperator] {
