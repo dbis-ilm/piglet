@@ -48,6 +48,7 @@ case class Partition(lineage: Lineage, partitionId: Int) extends Ordered[Partiti
     }
 }
 case class SizeInfo(lineage: Lineage, records: Long, bytes: Long)
+case class TimeInfo(lineage: Lineage, partitionId: Int, time: Long, parentPartitions: List[List[Int]])
 
 object DataflowProfiler extends PigletLogging {
 
@@ -107,10 +108,11 @@ object DataflowProfiler extends PigletLogging {
         val lineage = op.lineageSignature
 
         if(op.isInstanceOf[Load])
-          profilingGraph.add("start",lineage)
+          profilingGraph.add(Markov.startLineage,lineage)
 
         op.outputs.flatMap(_.consumer).withFilter{
           case _: Empty => false
+          case _: TimingOp => false
           case _ => true
         }
         .foreach{ c =>
@@ -140,14 +142,14 @@ object DataflowProfiler extends PigletLogging {
 
     currentTimes//.keySet
                 //.map(_.lineage)
-                .filterNot{ case (Partition(lineage,_),_) => lineage == "start" || lineage == "end" || lineage == "progstart" }
+                .filterNot{ case (Partition(lineage,_),_) => lineage == Markov.startLineage || lineage == "end" || lineage == "progstart" }
                 .foreach{ case (partition,time) =>
 
       val lineage = partition.lineage
       val partitionId = partition.partitionId
 
       // parent operators
-      val parentLineages = profilingGraph.parents(lineage).getOrElse(List(Markov.startNode.lineage))
+      val parentLineages = profilingGraph.parents(lineage).getOrElse(List(Markov.startLineage))
 
       // list of parent partitions per parent
       val parentPartitionIds = parentPartitionInfo(lineage)
@@ -239,14 +241,13 @@ object DataflowProfiler extends PigletLogging {
       }
     }.filter(_ >= 0)
 
+//  def addExecTime(lineage: Lineage, partitionId: Int, parentPartitions: List[List[Int]], time: Long): Unit = {
+  def addExecTime(tInfo: TimeInfo): Unit = {
 
-  def addExecTime(lineage: Lineage, partitionId: Int, parentPartitions: List[List[Int]], time: Long): Unit = {
-
-    val p = Partition(lineage, partitionId)
+    val p = Partition(tInfo.lineage, tInfo.partitionId)
     if(currentTimes.contains(p)) {
       val ps = CliParams.values.profiling.get
-//      logger.warn(s"we already have a time for $p : oldTime: ${currentTimes(p)}  newTime: $time  (diff: ${currentTimes(p) - time}ms - Strategy: ${ps.duplicates}")
-      alreadyExistingMsgs += ((p, time, currentTimes(p) - time))
+      alreadyExistingMsgs += ((p, tInfo.time, currentTimes(p) - tInfo.time))
 
 
       val oldTime = currentTimes(p)
@@ -255,32 +256,32 @@ object DataflowProfiler extends PigletLogging {
        Update the time in currentTimes only if the newly arrived time matches the strategy
        */
       ps.duplicates match {
-        case DuplicateStrategy.NEWEST if oldTime < time =>
-          currentTimes.update(p, time)
+        case DuplicateStrategy.NEWEST if oldTime < tInfo.time =>
+          currentTimes.update(p, tInfo.time)
 
-        case DuplicateStrategy.OLDEST if time < oldTime =>
-          currentTimes.update(p, time)
+        case DuplicateStrategy.OLDEST if tInfo.time < oldTime =>
+          currentTimes.update(p, tInfo.time)
 
         case _ => // intentionally left empty
       }
     } else {
-      currentTimes +=  p -> time
+      currentTimes +=  p -> tInfo.time
     }
 
 
 
-    if(parentPartitionInfo.contains(lineage)) {
+    if(parentPartitionInfo.contains(tInfo.lineage)) {
 
-      val m = parentPartitionInfo(lineage)
+      val m = parentPartitionInfo(tInfo.lineage)
 
-      if(m.contains(partitionId)) {
+      if(m.contains(tInfo.partitionId)) {
 //        logger.warn(s"we already have that partition: $lineage  $partitionId . ")
       } else {
-        m += partitionId -> parentPartitions
+        m += tInfo.partitionId -> tInfo.parentPartitions
       }
 
     } else {
-      parentPartitionInfo += lineage -> MutableMap(partitionId -> parentPartitions)
+      parentPartitionInfo += tInfo.lineage -> MutableMap(tInfo.partitionId -> tInfo.parentPartitions)
     }
 
   }

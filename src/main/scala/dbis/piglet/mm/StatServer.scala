@@ -31,7 +31,7 @@ object StatServer extends PigletLogging {
     server = HttpServer.create(new InetSocketAddress(java.net.InetAddress.getLocalHost.getHostAddress, port), allowedQueuedConnections)
     server.createContext("/times", new TimesHandler(writer))
     server.createContext("/sizes", new SizesHandler(writer))
-    logger.info(s"Stats server will listen on $port")
+    logger.debug(s"Stats server will listen on $port")
 
 
     server.start()
@@ -102,28 +102,13 @@ class StatsWriterActor(profilerSettings: ProfilerSettings) extends Actor with Pi
    */
 
   def receive = {
-    case TimeMsg(msg) =>
-//      logger.debug(s"received time msg: $msg")
-      val arr = msg.split(StatsWriterActor.FIELD_DELIM)
-
-      val lineage = arr(0)
-      val partitionId = arr(1).toInt
-      val parents = arr(2)
-      val currTime = arr(3).toLong
-
-      val parentsList = parents.split(StatsWriterActor.DEP_DELIM)
-                          .filter(_.nonEmpty)
-                          .map { s =>
-                            s.split(StatsWriterActor.PARENT_DELIM)
-                              .map(_.toInt)
-                              .toList
-                          }
-                          .toList
+    case msg: TimeMsg =>
+      if(msg.values.lineage == "end")
+        logger.debug("received end msg")
 
       // store info in profiler
-
-      DataflowProfiler.addExecTime(lineage, partitionId, parentsList, currTime)
-
+//      DataflowProfiler.addExecTime(lineage, partitionId, parentsList, currTime)
+      DataflowProfiler.addExecTime(msg.values)
     case msg: SizeMsg =>
       logger.debug(s"reiceived size msg: $msg")
       DataflowProfiler.addSizes(msg.values, profilerSettings.fraction)
@@ -135,7 +120,27 @@ class StatsWriterActor(profilerSettings: ProfilerSettings) extends Actor with Pi
 }
 
 sealed trait StatMsg
-case class TimeMsg(time: String) extends  StatMsg
+case class TimeMsg(private val msg: String) extends  StatMsg {
+  lazy val values = {
+    val arr = msg.split(StatsWriterActor.FIELD_DELIM)
+
+    val lineage = arr(0)
+    val partitionId = arr(1).toInt
+    val parents = arr(2)
+    val currTime = arr(3).toLong
+
+    val parentsList = parents.split(StatsWriterActor.DEP_DELIM)
+      .filter(_.nonEmpty)
+      .map { s =>
+        s.split(StatsWriterActor.PARENT_DELIM)
+          .map(_.toInt)
+          .toList
+      }
+      .toList
+
+    TimeInfo(lineage, partitionId, currTime, parentsList)
+  }
+}
 case class SizeMsg(private val sizes: String) extends StatMsg {
 
   lazy val values = sizes.split(StatsWriterActor.FIELD_DELIM).map{s =>
