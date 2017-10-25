@@ -12,7 +12,6 @@ class FilterEmitter extends CodeEmitter[Filter] {
       |  val res = <pred>
       |  <if (profiling)>
       |  if(res && scala.util.Random.nextInt(randFactor) == 0) {
-      |    //accum.incr("<lineage>", t.getNumBytes)
       |    accum.incr("<lineage>", PerfMonitor.estimateSize(t))
       |  }
       |  <endif>

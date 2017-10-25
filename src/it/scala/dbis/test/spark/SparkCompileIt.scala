@@ -28,7 +28,7 @@ class SparkCompileIt extends FlatSpec with CompileIt{
     ("load.pig", "result1.out", "truth/result1.data", true, "spark"),
     ("load2.pig", "result2.out", "truth/result2.data", true, "spark"),
     ("load3.pig", "result3.out", "truth/result3.data", true, "spark"),
-    ("selfjoin.pig", "joined.out", "truth/joined.data", true, "spark"),
+    ("selfjoin.pig", "joined.out", "truth/joined.data", false, "spark"),
     ("selfjoin_ambiguous_fieldnames.pig", "joined_ambiguous_fieldnames.out", "truth/joined_ambiguous_fieldnames.data",
       // Pigs OrderBy is not a stable sort
       false, "spark"),

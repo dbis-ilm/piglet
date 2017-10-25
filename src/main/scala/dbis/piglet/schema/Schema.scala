@@ -250,15 +250,16 @@ object Schema {
    *         the same structure
    */
   def registerSchema(schema: Schema): Schema = {
-    val code = schema.schemaCode()
+//    val code = schema.schemaCode()
+    val code = schema.fields.map(f => s"${f.name}${f.fType}").mkString("_").hashCode.toString.replace("-","_")
     if (schemaSet.contains(code))
       schemaSet(code)
     else {
       if (schema.isValid) {
         // we do not register invalid schemas - they will be replaced later anyway
 //        schema.className = s"t${nextCounter()}"
-        val cnt = schema.fields.map(f => s"${f.name}${f.fType}").mkString("_").hashCode.toString.replace("-","_")
-        schema.className = s"t$cnt"
+
+        schema.className = s"t$code"
 
         schemaSet += code -> schema
       }

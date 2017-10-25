@@ -18,7 +18,6 @@ class AccumulateEmitter extends CodeEmitter[Accumulate] {
                                |                <helper_class>(v._t, <comp_expr>)""".stripMargin
   def classTemplate: String = """case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
                                 |  override def mkString(_c: String = ",") = <string_rep>
-                                |  override lazy val getNumBytes: Int = 0
                                 |}""".stripMargin
 
   private def callsAverageFunc(op: PigOperator, e: Expr): Boolean =

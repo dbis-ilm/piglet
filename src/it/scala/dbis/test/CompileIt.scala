@@ -77,23 +77,16 @@ trait CompileIt extends Matchers {
     // 3. load the output file(s) and the truth file
     //val result = Source.fromFile(resultDir + "/part-00000").getLines()
 
-    var result = Iterator[String]()
     val resultFile = new java.io.File(resultPath.path)
-
-    if (resultFile.isFile)
-      result ++= Source.fromFile(resultFile).getLines()
+    val files = if (resultFile.isFile)
+      Seq(resultFile)
     else {
-      /*
-       * Read in all result files. There may be multiple files
-       * if the RDD has more than one partition. We iterate over
-       * all files (in order) and read their content       
-       */
-      for (file <- resultFile.listFiles().filter(_.getName.startsWith("part-")).sortBy { f => f.getName }) {
-        result ++= Source.fromFile(file).getLines
-      }
-      
+      resultFile.listFiles().toSeq
+        .filter(_.getName.startsWith("part-"))
+        .sortBy { f => f.getName }
     }
-    result.toSeq
+
+    files.flatMap(file => Source.fromFile(file).getLines)
   }
 
   private def runCompiler(script: String, resourceName: String, resultPath: Path, backend: String): Boolean = {
