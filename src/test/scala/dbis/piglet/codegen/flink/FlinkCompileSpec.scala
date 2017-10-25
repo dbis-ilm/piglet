@@ -27,6 +27,7 @@ import dbis.piglet.plan.rewriting.Rules
 import dbis.piglet.schema._
 import dbis.piglet.tools.CodeMatchers
 import dbis.piglet.tools.TestTools._
+import dbis.piglet.tools.ProductTools._
 import dbis.piglet.udf.UDFTable
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
@@ -297,7 +298,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |_t$1_Tuple(t._0, PigFuncs.count(uniq_sym))} res }""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
-    val _ = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(foreachOp.schema.get)))
+    val _ = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(foreachOp.schema.get)).mkString("\n"))
   }
 
   it should "contain code for a foreach statement with constructors for tuple, bag, and map" in {
@@ -307,7 +308,7 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
         |out = foreach data generate (f1, f2), {f1, f2}, [name, f1];""".stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("out").get
-    val _ = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)))
+    val _ = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)).mkString("\n"))
 
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     //println("schema class = " + schemaClassCode)
@@ -346,9 +347,9 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(
       """val data_helper = data.map(t => List(t._0, t._1))
-        |val res = package.myOp(env, data_helper,1,42.0).map(t => _t1_Tuple(t(0).asInstanceOf[Int], t(1).asInstanceOf[Int]))
+        |val res = package.myOp(env, data_helper,1,42.0).map(t => _t$1_Tuple(t(0).asInstanceOf[Int], t(1).asInstanceOf[Int]))
         |""".stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a UNION operator on two relations" in {
@@ -381,19 +382,24 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
-    val expectedCode = cleanString("""val aa = bb.setParallelism(1).mapPartition( (in, out: Collector[_t2_Tuple]) =>  out.collect(_t2_Tuple("all", in.toIterable)))""")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("""val aa = bb.setParallelism(1).mapPartition( (in, out: Collector[_t$2_Tuple]) =>  out.collect(_t$2_Tuple("all", in.toIterable)))""")
+    generatedCode should matchSnippet(expectedCode)
 
-    val schemaCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)))
-    val expectedSchemaCode =
+    val (classCode, helperCode) = codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get))
+
+    val generatedClassCode = cleanString(classCode)
+    val generatedHelperCode = cleanString(helperCode)
+
+    val expectedClassCode =
       cleanString("""
-         |case class _t2_Tuple (_0: String, _1: Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
+         |case class _t$2_Tuple (_0: String, _1: Iterable[_t$1_Tuple]) extends java.io.Serializable with SchemaClass {
          |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
-         |  override lazy val getNumBytes: Int = 0
-         |}
-         |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
-       """.stripMargin)
-    assert(schemaCode == expectedSchemaCode)
+         |}""".stripMargin)
+
+    val expectedHelperCode = cleanString("implicit def convert_t$2_Tuple(t: (String, Iterable[_t$1_Tuple])): _t$2_Tuple = _t$2_Tuple(t._1, t._2)")
+
+    generatedClassCode should matchSnippet(expectedClassCode)
+    generatedHelperCode should matchSnippet(expectedHelperCode)
   }
 
   it should "contain code for GROUP BY $0" in {
@@ -408,8 +414,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val op = plan.findOperatorForAlias("aa").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-      |val aa = bb.groupBy(t => t._0).reduceGroup{ (in, out: Collector[_t2_Tuple]) => val itr = in.toIterable; out.collect(_t2_Tuple(itr.head._0, itr)) }""".stripMargin)
-    assert(generatedCode == expectedCode)
+      |val aa = bb.groupBy(t => t._0).reduceGroup{ (in, out: Collector[_t$1_Tuple]) => val itr = in.toIterable; out.collect(_t$1_Tuple(itr.head._0, itr)) }""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for GROUP BY with multiple keys" in {
@@ -424,9 +430,9 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val op = plan.findOperatorForAlias("aa").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-      |val aa = bb.groupBy(t => (t._0,t._1)).reduceGroup{ (in, out: Collector[_t3_Tuple]) => val itr = in.toIterable; out.collect(_t3_Tuple(_t2_Tuple(itr.head._0,itr.head._1), itr)) }""".stripMargin)
-    val _ = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)))
-    assert(generatedCode == expectedCode)
+      |val aa = bb.groupBy(t => (t._0,t._1)).reduceGroup{ (in, out: Collector[_t$1_Tuple]) => val itr = in.toIterable; out.collect(_t$1_Tuple(_t$2_Tuple(itr.head._0,itr.head._1), itr)) }""".stripMargin)
+    val _ = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)).mkString("\n"))
+    generatedCode should matchSnippet(expectedCode)
   }
   it should "contain code for simple ORDER BY" in {
     val ctx = CodeGenContext(CodeGenTarget.Flink)
@@ -484,8 +490,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-      |val aa = bb.join(cc).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2) }""".stripMargin)
-    assert(generatedCode == expectedCode)
+      |val aa = bb.join(cc).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t$1_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2) }""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a binary join statement with expression lists" in {
@@ -503,8 +509,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-     |val a = b.join(c).where("_0","_1").equalTo("_1","_2").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2) }""".stripMargin)
-    assert(generatedCode == expectedCode)
+     |val a = b.join(c).where("_0","_1").equalTo("_1","_2").map{ t => val (v1,v2) = t _t$1_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2) }""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for a multiway join statement" in {
@@ -522,8 +528,8 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     op.constructSchema
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-      |val a = b.join(c).where("_0").equalTo("_0").join(d).where("_1._0").equalTo("_0").map{ t => val ((v1,v2),v3) = t _t2_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2) }""".stripMargin)
-    assert(generatedCode == expectedCode)
+      |val a = b.join(c).where("_0").equalTo("_0").join(d).where("_1._0").equalTo("_0").map{ t => val ((v1,v2),v3) = t _t$1_Tuple(v1._0, v1._1, v1._2, v2._0, v2._1, v2._2, v3._0, v3._1, v3._2) }""".stripMargin)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for multiple joins" in {
@@ -544,19 +550,19 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     val finalJoinOp = plan.findOperatorForAlias("j").get
     // TODO: Schema classes!!!!
-    val _ = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(finalJoinOp.schema.get)))
+    val _ = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(finalJoinOp.schema.get)).mkString("\n"))
 
     val expectedCode1 = cleanString(
-      """val j1 = a.join(b).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t2_Tuple(v1._0, v2._0) }""".stripMargin)
-    assert(generatedCode1 == expectedCode1)
+      """val j1 = a.join(b).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t$1_Tuple(v1._0, v2._0) }""".stripMargin)
+    generatedCode1 should matchSnippet(expectedCode1)
 
     val expectedCode2 = cleanString(
-      """val j2 = a.join(c).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t3_Tuple(v1._0, v2._0) }""".stripMargin)
-    assert(generatedCode2 == expectedCode2)
+      """val j2 = a.join(c).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t$1_Tuple(v1._0, v2._0) }""".stripMargin)
+    generatedCode2 should matchSnippet(expectedCode2)
 
     val expectedCode3 = cleanString(
-      """ val j = j1.join(j2).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t4_Tuple(v1._0, v1._1, v2._0, v2._1) }""".stripMargin)
-    assert(generatedCode3 == expectedCode3)
+      """ val j = j1.join(j2).where("_0").equalTo("_0").map{ t => val (v1,v2) = t _t$1_Tuple(v1._0, v1._1, v2._0, v2._1) }""".stripMargin)
+    generatedCode3 should matchSnippet(expectedCode3)
   }
 
   it should "contain code for a simple accumulate statement" in {
@@ -624,9 +630,9 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode = cleanString(
       """
-        |val out = in.map{t => val res = _t2_Tuple(t._0 + 42) res }
+        |val out = in.map{t => val res = _t$1_Tuple(t._0 + 42) res }
         |""".stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for multiple macros" in {
@@ -652,15 +658,16 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
-        |val out = in.map{t => val res = _t4_Tuple(t._0 + 42, t._1) res }
+        |val out = in.map{t => val res = _t$1_Tuple(t._0 + 42, t._1) res }
         |""".stripMargin)
-    assert(generatedCode1 == expectedCode1)
+    generatedCode1 should matchSnippet(expectedCode1)
+
     val generatedCode2 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out2").get))
     val expectedCode2 = cleanString(
       """
-        |val out2 = out.map{t => val res = _t4_Tuple(t._0, t._1 - 5) res }
+        |val out2 = out.map{t => val res = _t$1_Tuple(t._0, t._1 - 5) res }
         |""".stripMargin)
-    assert(generatedCode2 == expectedCode2)
+    generatedCode2 should matchSnippet(expectedCode2)
   }
 
   it should "contain code for invoking a macro multiple times" in {
@@ -681,15 +688,16 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
-        |val out = in.map{t => val res = _t3_Tuple(t._0 + 42) res }
+        |val out = in.map{t => val res = _t$1_Tuple(t._0 + 42) res }
         |""".stripMargin)
-    assert(generatedCode1 == expectedCode1)
+    generatedCode1 should matchSnippet(expectedCode1)
+
     val generatedCode2 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out2").get))
     val expectedCode2 = cleanString(
       """
-        |val out2 = out.map{t => val res = _t3_Tuple(t._0 + 43) res }
+        |val out2 = out.map{t => val res = _t$1_Tuple(t._0 + 43) res }
         |""".stripMargin)
-    assert(generatedCode2 == expectedCode2)
+    generatedCode2 should matchSnippet(expectedCode2)
   }
 
   it should "contain code for schema classes" in {
@@ -706,24 +714,22 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     var code: String = ""
     for (schema <- Schema.schemaList()) {
-      code = code + codeGenerator.emitSchemaHelpers(ctx, List(schema))
+      code = code + codeGenerator.emitSchemaHelpers(ctx, List(schema)).mkString("\n")
     }
 
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
       """
-      |case class _t2_Tuple (_0: Int, _1: String, _2: Double, _3: Int) extends java.io.Serializable with SchemaClass {
+      |case class _t$1_Tuple (_0: Int, _1: String, _2: Double, _3: Int) extends java.io.Serializable with SchemaClass {
       |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2 + _c + _3
-      |override lazy val getNumBytes: Int = 0
       |}
-      |implicit def convert_t2_Tuple(t: (Int, String, Double, Int)): _t2_Tuple = _t2_Tuple(t._1, t._2, t._3, t._4)
-      |case class _t1_Tuple (_0: Int, _1: String, _2: Double) extends java.io.Serializable with SchemaClass {
+      |implicit def convert_t$1_Tuple(t: (Int, String, Double, Int)): _t$1_Tuple = _t$1_Tuple(t._1, t._2, t._3, t._4)
+      |case class _t$2_Tuple (_0: Int, _1: String, _2: Double) extends java.io.Serializable with SchemaClass {
       |override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2
-      |override lazy val getNumBytes: Int = 0
       |}
-      |implicit def convert_t1_Tuple(t: (Int, String, Double)): _t1_Tuple = _t1_Tuple(t._1, t._2, t._3)
+      |implicit def convert_t$2_Tuple(t: (Int, String, Double)): _t$2_Tuple = _t$2_Tuple(t._1, t._2, t._3)
       |""".stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for nested schema classes" in {
@@ -739,24 +745,22 @@ class FlinkCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers wit
 
     var code: String = ""
     for (schema <- Schema.schemaList()) {
-      code = code + codeGenerator.emitSchemaHelpers(ctx, List(schema))
+      code = code + codeGenerator.emitSchemaHelpers(ctx, List(schema)).mkString("\n")
     }
 
     val generatedCode = cleanString(code)
     val expectedCode = cleanString(
       """
-        |case class _t2_Tuple (_0: String, _1: Iterable[_t1_Tuple]) extends java.io.Serializable with SchemaClass {
+        |case class _t$1_Tuple (_0: String, _1: Iterable[_t$2_Tuple]) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
-        |  override lazy val getNumBytes: Int = 0
         |}
-        |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
-        |case class _t1_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
+        |implicit def convert_t$1_Tuple(t: (String, Iterable[_t$2_Tuple])): _t$1_Tuple = _t$1_Tuple(t._1, t._2)
+        |case class _t$2_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + _1
-        |  override lazy val getNumBytes: Int = 0
         |}
-        |implicit def convert_t1_Tuple(t: (String, String)): _t1_Tuple = _t1_Tuple(t._1, t._2)
+        |implicit def convert_t$2_Tuple(t: (String, String)): _t$2_Tuple = _t$2_Tuple(t._1, t._2)
         |""".stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code to handle LOAD with PigStorage but without an explicit schema" in {

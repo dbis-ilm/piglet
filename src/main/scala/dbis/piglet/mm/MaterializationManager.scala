@@ -22,13 +22,15 @@ import scala.util.{Failure, Success, Try}
 
 object MaterializationManager extends PigletLogging {
 
+  private val STORAGE_CLASS = "BinStorage"  //JsonStorage2
+
   def replaceWithLoad(materialize: PigOperator, path: URI, plan: DataflowPlan): DataflowPlan = {
 
 
     var newPlan = plan
 
     val p = Pipe(materialize.inPipeName)
-    val loader = Load(p, path, materialize.constructSchema, Some("BinStorage"))
+    val loader = Load(p, path, materialize.constructSchema, Some(STORAGE_CLASS))
     newPlan.addOperator(Seq(loader), deferrConstruct = true)
 
 
@@ -65,7 +67,7 @@ object MaterializationManager extends PigletLogging {
     val producer = materialize.inputs.head.producer
 
     val p = producer.outputs.filter(_.name == materialize.inputs.head.name).head
-    val storer = Store(p, path, Some("BinStorage"))
+    val storer = Store(p, path, Some(STORAGE_CLASS))
 
     newPlan.addOperator(Seq(storer))
     newPlan = newPlan.remove(materialize)
@@ -228,7 +230,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
         saveMapping(lineage, path) // we save a mapping from the lineage of the actual op (not the materialize) to the path
       }
 
-      val storer = Store(theOp.outputs.head, path, Some("BinStorage"))
+      val storer = Store(theOp.outputs.head, path, Some(MaterializationManager.STORAGE_CLASS))
       if(ps.cacheMode == CacheMode.NONE) {
         newPlan.addOperator(Seq(storer), deferrConstruct = false)
         newPlan = newPlan.insertAfter(theOp, storer)
@@ -270,7 +272,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
         case Some(uri) =>
           logger.info(s"loading materialized results for ${op.name} $sig")
 
-          val loader = Load(Pipe(op.outPipeName), uri, op.constructSchema, Some("BinStorage"))
+          val loader = Load(Pipe(op.outPipeName), uri, op.constructSchema, Some(MaterializationManager.STORAGE_CLASS))
           logger.debug(s"replacing ${op.name} with $loader")
 
           // add the new Load op to the list of operators in the plan

@@ -75,7 +75,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
   def emitEmbeddedCode(ctx: CodeGenContext, additionalCode: String) = additionalCode
 
   def emitNode[O <: PigOperator](ctx: CodeGenContext, node: O): String = {
-    val className = node.getClass.getName
+//    val className = node.getClass.getName
     
     val emitter = emitterForNode(node)
     
@@ -98,36 +98,41 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
     * @param schemas the list of schemas for which we generate classes
     * @return a string representing the code
     */
-  override def emitSchemaHelpers(ctx: CodeGenContext, schemas: List[Schema], profiling: Boolean = false): String = {
+  override def emitSchemaHelpers(ctx: CodeGenContext, schemas: List[Schema], profiling: Boolean = false): (String,String) = {
     var converterCode = ""
 
     val classes = ListBuffer.empty[(String, String)]
 
     for (schema <- schemas) {
+      // (name, fieldNames, fieldTypes, fieldStr, toStr)
       val values = ScalaEmitter.createSchemaInfo(schema)
 
-      classes += ScalaEmitter.emitSchemaClass(values, profiling)
+      val sHash = (values._2, values._3).hashCode()
+
+
+      classes += ScalaEmitter.emitSchemaClass(values, profiling, schemaHash = sHash)
       converterCode += ScalaEmitter.emitSchemaConverters(values)
     }
 
+    val classCode = classes.map(_._2).mkString("\n")
 
-    val sortedClasses = classes.sortWith { case (left, right) =>
-      val leftNum = left._1 match {
-        case ScalaCodeGenStrategy.TupleClassPattern(group) => group.toInt
-        case _ => throw new IllegalArgumentException(s"unexpected class name: $left")
-      }
+//    val sortedClasses = classes.sortWith { case (left, right) =>
+//      val leftNum = left._1 match {
+//        case ScalaCodeGenStrategy.TupleClassPattern(group) => group.toInt
+//        case _ => throw new IllegalArgumentException(s"unexpected class name: $left")
+//      }
+//
+//      val rightNum = right._1 match {
+//        case ScalaCodeGenStrategy.TupleClassPattern(group) => group.toInt
+//        case _ => throw new IllegalArgumentException(s"unexpected class name: $right")
+//      }
+//
+//      leftNum < rightNum
+//    }
+//
+//    val classCode = sortedClasses.map(_._2).mkString("\n")
 
-      val rightNum = right._1 match {
-        case ScalaCodeGenStrategy.TupleClassPattern(group) => group.toInt
-        case _ => throw new IllegalArgumentException(s"unexpected class name: $left")
-      }
-
-      leftNum < rightNum
-    }
-
-    val classCode = sortedClasses.map(_._2).mkString("\n")
-
-    classCode + "\n" + converterCode
+    (classCode , converterCode)
   }
 
   /**
@@ -144,5 +149,5 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
 }
 
 object ScalaCodeGenStrategy {
-  final val TupleClassPattern = "_t([0-9]+)_Tuple".r
+  final val TupleClassPattern = "_t(_?[0-9]+)_Tuple".r
 }

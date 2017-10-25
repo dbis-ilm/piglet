@@ -256,7 +256,10 @@ object Schema {
     else {
       if (schema.isValid) {
         // we do not register invalid schemas - they will be replaced later anyway
-        schema.className = s"t${nextCounter()}"
+//        schema.className = s"t${nextCounter()}"
+        val cnt = schema.fields.map(f => s"${f.name}${f.fType}").mkString("_").hashCode.toString.replace("-","_")
+        schema.className = s"t$cnt"
+
         schemaSet += code -> schema
       }
       schema

@@ -59,7 +59,7 @@ object DataflowProfiler extends PigletLogging {
   val currentTimes = MutableMap.empty[Partition, Long]
 
   // for json (de-)serialization
-  implicit val formats = org.json4s.native.Serialization.formats(org.json4s.NoTypeHints)
+//  implicit val formats = org.json4s.native.Serialization.formats(org.json4s.NoTypeHints)
 
   private val alreadyExistingMsgs = ListBuffer.empty[(Partition,Long,Long)]
 

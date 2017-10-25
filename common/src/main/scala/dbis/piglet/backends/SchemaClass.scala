@@ -19,7 +19,7 @@ package dbis.piglet.backends
 /**
   * The trait for all case classes implementing record types in Piglet.
   */
-trait SchemaClass {
+trait SchemaClass extends Product {
   /**
     * Produces a string representation of the object using the given delimiter.
     *
@@ -34,17 +34,6 @@ trait SchemaClass {
     * @return a string representation
     */
   override def toString = "(" + mkString() + ")"
-
-  /**
-    * Returns the number of bytes that the fields in an instance
-    * of this class allocate.
-    *
-    * For fixed length data types (Int, Long, ...) the number is directly inserted.
-    * For other types, the number is computed recursively or, for strings, determined
-    * by getBytes.length
-    * @return The number of bytes used the fields in this instance
-    */
-  val getNumBytes: Int
 
   /**
     * Returns the timestamp of the tuple - either application or system time.
@@ -64,7 +53,7 @@ trait SchemaClass {
 case class Record(fields: Array[String]) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = fields.mkString(delim)
 
-  override lazy val getNumBytes: Int = fields.map(_.getBytes.length).sum
+//  override lazy val getNumBytes: Int = fields.map(_.getBytes.length).sum
 
   /**
     * Returns the value for field at position idx

@@ -58,7 +58,7 @@ trait CodeGenStrategy {
    * @param profiling Flag to enable profiling code
    * @return a string representing the code
    */
-  def emitSchemaHelpers(ctx: CodeGenContext, schemas: List[Schema], profiling: Boolean): String
+  def emitSchemaHelpers(ctx: CodeGenContext, schemas: List[Schema], profiling: Boolean): (String,String)
 
   /**
    * Generate code for the given Pig operator.
@@ -153,7 +153,11 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
     val additionalImports = codeGen.collectAdditionalImports(plan)
 
     // generate import statements
-    var code = codeGen.emitImport(ctx, additionalImports)
+    var code = codeGen.emitImport(ctx, additionalImports) + "\n"
+
+    val (classCode, converterCode) = codeGen.emitSchemaHelpers(ctx, Schema.schemaList(), profiling.isDefined)
+
+    code += classCode + "\n"
 
     if (!forREPL)
       code = code + codeGen.emitHeader1(ctx, scriptName)
@@ -161,7 +165,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
     if(plan.code.nonEmpty)
       code = code + codeGen.emitEmbeddedCode(ctx, plan.code)
 
-    code += codeGen.emitSchemaHelpers(ctx, Schema.schemaList(), profiling.isDefined)
+    code += converterCode + "\n"
 
     // generate helper classes (if needed, e.g. for custom key classes)
     for (op <- plan.operators) {

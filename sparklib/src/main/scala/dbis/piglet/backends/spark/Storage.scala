@@ -147,6 +147,40 @@ object BinStorage {
   def apply[T: ClassTag](fraction: Int = -1): BinStorage[T] = new BinStorage[T](fraction)
 }
 
+import org.json4s._
+import org.json4s.native.Serialization
+
+
+class JsonStorage2[T <: SchemaClass : Manifest](fraction: Int = -1)  extends Serializable {
+
+  def load(sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = {
+    val spark = SparkSession.builder().config(sc.getConf).getOrCreate()
+    import spark.implicits._
+    val a = spark.read.json(path).as[T]
+    a.rdd.map{ t =>
+      if (lineageAndAccum.isDefined) {
+        val (lineage, accum) = lineageAndAccum.get
+
+        if (scala.util.Random.nextInt(fraction) == 0) {
+          accum.incr(lineage, PerfMonitor.estimateSize(t))
+        }
+      }
+      t
+    }
+  }
+
+
+  def write(path: String, rdd: RDD[T]) = {
+    val spark = SparkSession.builder().config(rdd.sparkContext.getConf).getOrCreate()
+    import spark.sqlContext.implicits._
+    rdd.toDF().write.json(path)
+  }
+}
+
+object JsonStorage2 {
+  def apply[T <: SchemaClass: Manifest](fraction: Int = -1): JsonStorage2[T] = new JsonStorage2(fraction)
+}
+
 //-----------------------------------------------------------------------------------------------------
 
 class JsonStorage(fraction: Int = -1) extends java.io.Serializable {

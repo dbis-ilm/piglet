@@ -283,6 +283,12 @@ object ScalaEmitter extends PigletLogging {
         paramMap += (
           "class" -> className
         )
+      case Some(s) if loaderFunc.nonEmpty && loaderFunc.get == "JsonStorage2" =>
+        paramMap += (
+          "class" -> ScalaEmitter.schemaClassName(s.className),
+          "extractor" -> "(data: Any) => data"
+
+        )
       case Some(s) =>
         paramMap += ("extractor" ->
           s"""(data: Array[String]) => ${ScalaEmitter.schemaClassName(s.className)}(${schemaExtractor(s)})""",
@@ -378,27 +384,28 @@ object ScalaEmitter extends PigletLogging {
     * @param values Input values
     * @return
     */
-  def emitSchemaClass(values: (String, String, String, String, String, String), profiling: Boolean): (String, String) = {
-    val (name, fieldNames, fieldTypes, fieldStr, toStr, byteLength) = values
+  def emitSchemaClass(values: (String, String, String, String, String), profiling: Boolean, schemaHash: Long): (String, String) = {
+    val (name, fieldNames, fieldTypes, fieldStr, toStr) = values
 
     val params = Map("name" -> name,
       "fieldNames" -> fieldNames,
       "fieldTypes" -> fieldTypes,
       "fields"   -> fieldStr,
       "string_rep" -> toStr,
-      "byteslength" -> byteLength)
+      "schemaHash" -> schemaHash)
 
-    val code = CodeEmitter.render(""" case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
-                                    |    override def mkString(_c: String = ",") = <string_rep>
-                                    |    override lazy val getNumBytes: Int = <if (profiling)>{ <byteslength> } <else> 0 <endif>
-                                    |  }
+    //@SerialVersionUID(<schemaHash>L)
+    val code = CodeEmitter.render("""
+                                    |case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
+                                    |  override def mkString(_c: String = ",") = <string_rep>
+                                    |}
                                     |""".stripMargin, params)
 
     (name, code)
   }
 
-  def emitSchemaConverters(values: (String, String, String, String, String, String)): String = {
-    val (name, fieldNames, fieldTypes, _, _,_) = values
+  def emitSchemaConverters(values: (String, String, String, String, String)): String = {
+    val (name, fieldNames, fieldTypes, _, _) = values
 
     CodeEmitter.render("""<if (fieldNames)>
                          |  implicit def convert<name>(t: (<fieldTypes>)): <name> = <name>(<fieldNames>)
@@ -408,37 +415,6 @@ object ScalaEmitter extends PigletLogging {
     ))
   }
 
-
-  private def generateNumByteCode(i: Int, t: PigType, name: String): String = {
-
-    val b = t match {
-      case s: SimpleType =>
-        if(s.numBytes > 0) // for primitive types, we can directly decide the number of bytes
-          s.numBytes.toString
-        else { // otherwise we need to do some further processing
-          t.tc match {
-              // the code generator will use Scala String type for the following three
-            case TypeCode.CharArrayType | TypeCode.ByteArrayType | TypeCode.AnyType =>
-//              s"$name.getBytes.length"
-//              "0"
-              s"$name.length"
-            case _ =>
-              // anything else is not supported yet - but we should not get here
-              logger.warn(s"unsupported field type: $t for num byte generation")
-              (-3).toString
-          }
-        }
-
-//      case bag: BagType =>
-//        s"$name.size * ()"
-
-      case _ =>
-//        s"PerfMonitor.serializedSize($name)"
-        "0"
-    }
-
-    b
-  }
 
   def createSchemaInfo(schema: Schema) = {
 
@@ -481,11 +457,11 @@ object ScalaEmitter extends PigletLogging {
     }.mkString(" + _c + ")
 
 
-    val bytesLength = fieldList.zipWithIndex.map{ case (f,i) => generateNumByteCode(i, f.fType, s"_$i")}.mkString(" + ")
+//    val bytesLength = fieldList.zipWithIndex.map{ case (f,i) => generateNumByteCode(i, f.fType, s"_$i")}.mkString(" + ")
 
     val name = schemaClassName(schema.className)
 
-    (name, fieldNames, fieldTypes, fieldStr, toStr, bytesLength)
+    (name, fieldNames, fieldTypes, fieldStr, toStr)
   }
 
   /**

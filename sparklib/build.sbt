@@ -13,7 +13,7 @@ libraryDependencies ++= Seq(
     //scalikejdbc,
     //scalikejdbc_config,
     jdbc,
-    scalajhttp
+    json4s
 )
 
 test in assembly := {}

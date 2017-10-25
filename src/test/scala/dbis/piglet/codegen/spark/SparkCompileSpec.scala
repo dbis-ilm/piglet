@@ -33,6 +33,7 @@ import dbis.piglet.plan.rewriting.Rewriter.rewritePlan
 import dbis.piglet.plan.rewriting.{Rewriter, Rules}
 import dbis.piglet.schema._
 import dbis.piglet.tools.CodeMatchers
+import dbis.piglet.tools.ProductTools._
 import dbis.piglet.tools.TestTools.strToUri
 import dbis.piglet.codegen.CodeGenerator
 import dbis.piglet.tools.TopoSort
@@ -380,17 +381,16 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("aa").get
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
-    val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map{t => val res = _t2_Tuple("all", t) res }""")
-    assert(generatedCode == expectedCode)
+    val expectedCode = cleanString("""val aa = bb.coalesce(1).glom.map{t => val res = _t$1_Tuple("all", t) res }""")
+    generatedCode should matchSnippet(expectedCode)
 
-    val schemaCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)))
+    val schemaCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)).mkString("\n"))
     val expectedSchemaCode =
       cleanString("""
          |case class _t$1_Tuple (_0: String, _1: Iterable[_t$2_Tuple]) extends java.io.Serializable with SchemaClass {
          |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
-         |  override lazy val getNumBytes: Int = 0
          |}
-         |implicit def convert_t2_Tuple(t: (String, Iterable[_t1_Tuple])): _t2_Tuple = _t2_Tuple(t._1, t._2)
+         |implicit def convert_t$1_Tuple(t: (String, Iterable[_t$2_Tuple])): _t$1_Tuple = _t$1_Tuple(t._1, t._2)
        """.stripMargin)
     schemaCode should matchSnippet(expectedSchemaCode)
   }
@@ -616,7 +616,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
 
     val finalJoinOp = plan.findOperatorForAlias("j").get
     // TODO: Schema classes!!!!
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(finalJoinOp.schema.get)))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(finalJoinOp.schema.get)).mkString("\n"))
 
     val expectedCode1 = cleanString(
       """val a_kv = a.map(t => (t._0,t))
@@ -775,7 +775,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
         |_t$1_Tuple(t._0, PigFuncs.count(uniq_sym))} res }""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(foreachOp.schema.get)))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(foreachOp.schema.get)).mkString("\n"))
   }
 
   it should "contain code for a FOREACH statement with constructors for tuple, bag, and map" in {
@@ -787,7 +787,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
         |out = foreach data generate (f1, f2), {f1, f2}, [name, f1];""".stripMargin)
     val plan = new DataflowPlan(ops)
     val op = plan.findOperatorForAlias("out").get
-    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)))
+    val schemaClassCode = cleanString(codeGenerator.emitSchemaHelpers(ctx, List(op.schema.get)).mkString("\n"))
 
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     //println("schema class = " + schemaClassCode)
@@ -1147,15 +1147,16 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val generatedCode1 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out").get))
     val expectedCode1 = cleanString(
       """
-        |val out = in.map{t => val res = _t3_Tuple(t._0 + 42) res }
+        |val out = in.map{t => val res = _t$3_Tuple(t._0 + 42) res }
         |""".stripMargin)
-    assert(generatedCode1 == expectedCode1)
+    generatedCode1 should matchSnippet(expectedCode1)
+
     val generatedCode2 = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("out2").get))
     val expectedCode2 = cleanString(
       """
-        |val out2 = out.map{t => val res = _t3_Tuple(t._0 + 43) res }
+        |val out2 = out.map{t => val res = _t$1_Tuple(t._0 + 43) res }
         |""".stripMargin)
-    assert(generatedCode2 == expectedCode2)
+    generatedCode2 should matchSnippet(expectedCode2)
   }
 
   it should "contain code for schema classes" in {
@@ -1169,11 +1170,15 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = rewritePlan(plan)
+    val _ = rewritePlan(plan)
 
     var code: String = ""
+
+
     for (schema <- Schema.schemaList()) {
-      code = code + codeGenerator.emitSchemaHelpers(ctx, List(schema))
+      val (classCode, helperCode) = codeGenerator.emitSchemaHelpers(ctx, List(schema))
+
+      code = code + cleanString(classCode) + "\n" + cleanString(helperCode) + "\n"
     }
 
     val generatedCode = cleanString(code)
@@ -1181,14 +1186,12 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     """
       |case class _t$2_Tuple (_0: Int, _1: String, _2: Double, _3: Int) extends java.io.Serializable with SchemaClass {
       |  override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2 + _c + _3
-      |  override lazy val getNumBytes: Int = 0
       |}
-      |implicit def convert_t2_Tuple(t: (Int, String, Double, Int)): _t2_Tuple = _t2_Tuple(t._1, t._2, t._3, t._4)
+      |implicit def convert_t$2_Tuple(t: (Int, String, Double, Int)): _t$2_Tuple = _t$2_Tuple(t._1, t._2, t._3, t._4)
       |case class _t$1_Tuple (_0: Int, _1: String, _2: Double) extends java.io.Serializable with SchemaClass {
       |  override def mkString(_c: String = ",") = _0 + _c + _1 + _c + _2
-      |  override lazy val getNumBytes: Int = 0
       |}
-      |implicit def convert_t1_Tuple(t: (Int, String, Double)): _t1_Tuple = _t1_Tuple(t._1, t._2, t._3)
+      |implicit def convert_t$1_Tuple(t: (Int, String, Double)): _t$1_Tuple = _t$1_Tuple(t._1, t._2, t._3)
       |""".stripMargin
     )
     generatedCode should matchSnippet(expectedCode)
@@ -1204,11 +1207,11 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
       """.stripMargin
     )
     val plan = new DataflowPlan(ops)
-    val rewrittenPlan = rewritePlan(plan)
+    val _ = rewritePlan(plan)
 
     var code: String = ""
     for (schema <- Schema.schemaList()) {
-      code = code + codeGenerator.emitSchemaHelpers(ctx, List(schema))
+      code = code + codeGenerator.emitSchemaHelpers(ctx, List(schema)).mkString("\n")
     }
 
     val generatedCode = cleanString(code)
@@ -1216,12 +1219,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
       """
         |case class _t$2_Tuple (_0: String, _1: Iterable[_t$1_Tuple]) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + "{" + _1.mkString(",") + "}"
-        |  override lazy val getNumBytes: Int = 0
         |}
         |implicit def convert_t$2_Tuple(t: (String, Iterable[_t$1_Tuple])): _t$2_Tuple = _t$2_Tuple(t._1, t._2)
         |case class _t$1_Tuple (_0: String, _1: String) extends java.io.Serializable with SchemaClass {
         |  override def mkString(_c: String = ",") = _0 + _c + _1
-        |  override lazy val getNumBytes: Int = 0
         |}
         |implicit def convert_t$1_Tuple(t: (String, String)): _t$1_Tuple = _t$1_Tuple(t._1, t._2)
         |""".stripMargin
@@ -1326,10 +1327,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(ctx, op))
     val expectedHelperClass = cleanString(
       """object bNFA {
-        |  def filterA (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._0 == 1
-        |  def filterB (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._1 == 2
+        |  def filterA (t: _t$1_Tuple, rvalues: NFAStructure[_t$1_Tuple]) : Boolean = t._0 == 1
+        |  def filterB (t: _t$1_Tuple, rvalues: NFAStructure[_t$1_Tuple]) : Boolean = t._1 == 2
         |  def createNFA = {
-        |    val bOurNFA: NFAController[_t1_Tuple] = new NFAController()
+        |    val bOurNFA: NFAController[_t$1_Tuple] = new NFAController()
         |    val StartState = bOurNFA.createAndGetNormalState("Start")
         |    val AState = bOurNFA.createAndGetNormalState("A")
         |    val BState = bOurNFA.createAndGetFinalState("B")
@@ -1365,10 +1366,10 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val generatedHelperClass = cleanString(codeGenerator.emitHelperClass(ctx, op))
     val expectedHelperClass = cleanString(
       """object bNFA {
-        |  def filterA (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._0 == 1
-        |  def filterB (t: _t1_Tuple, rvalues: NFAStructure[_t1_Tuple]) : Boolean = t._1 == 2 && t._2 == rvalues.events(0)._2)
+        |  def filterA (t: _t$1_Tuple, rvalues: NFAStructure[_t$1_Tuple]) : Boolean = t._0 == 1
+        |  def filterB (t: _t$1_Tuple, rvalues: NFAStructure[_t$1_Tuple]) : Boolean = t._1 == 2 && t._2 == rvalues.events(0)._2)
         |  def createNFA = {
-        |    val bOurNFA: NFAController[_t1_Tuple] = new NFAController()
+        |    val bOurNFA: NFAController[_t$1_Tuple] = new NFAController()
         |    val StartState = bOurNFA.createAndGetNormalState("Start")
         |    val AState = bOurNFA.createAndGetNormalState("A")
         |    val BState = bOurNFA.createAndGetFinalState("B")

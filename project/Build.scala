@@ -107,7 +107,7 @@ object PigBuild extends Build {
  * Dependencies
  */
 object Dependencies {
-  
+
   val sparkVersion = "2.1.1"
   val flinkVersion = "1.1.3"
 
@@ -119,15 +119,15 @@ object Dependencies {
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
   val jline = "jline" % "jline" % "2.14.3"
-  
+
   val sparkCore = "org.apache.spark" %% "spark-core" % sparkVersion
   val sparkSql = "org.apache.spark" %% "spark-sql" % sparkVersion
   val sparkREPL = "org.apache.spark" %% "spark-repl" % sparkVersion
   val sparkStreaming = "org.apache.spark" %% "spark-streaming" % sparkVersion
-  
+
   val flinkScala = "org.apache.flink" %% "flink-scala" % flinkVersion
   val flinkStreaming = "org.apache.flink" %% "flink-streaming-scala" % flinkVersion
-  
+
   val hadoop = "org.apache.hadoop" % "hadoop-client" % "2.7.3"
   val pig = "org.apache.pig" % "pig" % "0.15.0"
 
@@ -145,7 +145,8 @@ object Dependencies {
 
 
   val scalajhttp = "org.scalaj" %% "scalaj-http" % "2.3.0"
-  val json4s = "org.json4s" %% "json4s-native" % "3.5.2"
+  val json4s = "org.json4s" %% "json4s-native" % "3.5.3"
+
 //  val akkahttp = "com.typesafe.akka" %% "akka-http" % "10.0.7"
 //  val akkaslf = "com.typesafe.akka" % "akka-slf4j_2.11" % "2.4.17"
 

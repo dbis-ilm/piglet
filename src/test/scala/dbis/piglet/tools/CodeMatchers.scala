@@ -42,13 +42,13 @@ trait CodeMatchers {
 object SnippetMatcher {
   def matches(snippet: String, template: String): Boolean = {
     val replacements = mutable.Map[String, String]()
-    val pattern = "\\$[0-9]".r
+    val pattern = "\\$_?[0-9]".r
     val positions = pattern.findAllMatchIn(template)
       .map(p => p.start)
       .zipWithIndex
       .map{ case (p, offset) => p - offset}.toList
     val keys = pattern.findAllMatchIn(template).map(p => p.toString).toList
-    val pattern2 = "[0-9]+".r
+    val pattern2 = "_?[0-9]+".r
     var offs = 0
     for (i <- keys.indices) {
       // now we look for the number that we use to replace the $i string

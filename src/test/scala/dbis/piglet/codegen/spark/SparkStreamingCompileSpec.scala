@@ -90,10 +90,10 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("in").get))
     val expectedCode = cleanString(
       """
-      |val in = PigStream[_t1_Tuple]().receiveStream(ssc, "localhost", 5555,
-      |(data: Array[String]) => _t1_Tuple(data(0).toString, data(1).toInt), ",")
+      |val in = PigStream[_t$1_Tuple]().receiveStream(ssc, "localhost", 5555,
+      |(data: Array[String]) => _t$1_Tuple(data(0).toString, data(1).toInt), ",")
     """.stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for loading a stream" in {
@@ -109,10 +109,10 @@ class SparkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, rewrittenPlan.findOperatorForAlias("in").get))
     val expectedCode = cleanString(
       """
-        |val in = PigStream[_t1_Tuple]().loadStream(ssc, "file.csv",
-        |(data: Array[String]) => _t1_Tuple(data(0).toInt, data(1).toInt), ",")
+        |val in = PigStream[_t$1_Tuple]().loadStream(ssc, "file.csv",
+        |(data: Array[String]) => _t$1_Tuple(data(0).toInt, data(1).toInt), ",")
       """.stripMargin)
-    assert(generatedCode == expectedCode)
+    generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for simple ORDER BY" in {

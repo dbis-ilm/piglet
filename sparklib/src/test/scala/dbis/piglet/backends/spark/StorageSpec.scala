@@ -28,12 +28,10 @@ import org.scalatest._
 
 case class DataRecord(col1: Int, col2: String) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = s"$col1$delim$col2"
-  override lazy val getNumBytes: Int = col2.getBytes.length + 4
 }
 
 case class DoubleRecord(col1: Double, col2: Double) extends java.io.Serializable with SchemaClass {
   override def mkString(delim: String) = s"$col1$delim$col2"
-  override lazy val getNumBytes: Int = 8 + 4
 }
 
 class StorageSpec extends FlatSpec with Matchers with BeforeAndAfter {
