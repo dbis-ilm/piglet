@@ -7,8 +7,8 @@ BF2 = FILTER B BY b3 == 1;
 X = JOIN A BY a1, BF1 BY b1;
 X2 = JOIN A BY a1, BF2 BY b1;
 
-x0 = FOREACH X GENERATE A::a1, BF1::b1;
-x1 = FOREACH X2 GENERATE A::a1, BF2::b1;
+x0 = FOREACH X GENERATE a1, b1;
+x1 = FOREACH X2 GENERATE a1, b1;
 u = UNION x0, x1;
 
 STORE u INTO '$outfile';
