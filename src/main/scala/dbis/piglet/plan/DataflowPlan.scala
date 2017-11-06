@@ -520,7 +520,7 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
     * @return true if any expression was found satisfying the predicate of the traverser
     */
   def checkExpressions(f: (Schema, Expr) => Boolean): Boolean = {
-    val res = operators.map {
+    operators.exists {
       case op@Foreach(_, _, gen, _) => gen match {
         case GeneratorList(exprs) => exprs.exists(g => f(op.schema.orNull, g.expr))
         case GeneratorPlan(p) => false
@@ -528,6 +528,6 @@ class DataflowPlan(private var _operators: List[PigOperator], val ctx: Option[Li
       case op@Filter(_, _, pred, _) => pred.traverseOr(op.schema.orNull, f)
       case _ => false
     }
-    res.contains(true)
+//    res.contains(true)
   }
 }

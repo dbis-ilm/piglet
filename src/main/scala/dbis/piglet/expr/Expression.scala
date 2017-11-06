@@ -195,8 +195,12 @@ object Expr {
     case _ => false
   }
   
-  def containsGeometryType(schema: Schema, ex: Expr): Boolean = ex match {
-    case ConstructGeometryExpr(_,_) => true
-    case _ => false
+  def containsGeometryType(schema: Schema, ex: Expr): Boolean = {
+    val hasConstruct = ex match {
+      case ConstructGeometryExpr(_,_) => true
+      case _ => false
+    }
+
+    hasConstruct
   }
 }

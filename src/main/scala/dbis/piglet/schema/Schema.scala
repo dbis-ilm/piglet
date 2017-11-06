@@ -273,4 +273,6 @@ object Schema {
     * @return the list of schemas
     */
   def schemaList(): List[Schema] = schemaSet.values.toList.sortWith(_.schemaCode() < _.schemaCode())
+
+  def hasSpatialTypes = Schema.schemaList().exists(s => s.fields.exists(f => f.fType.tc == TypeCode.GeometryType))
 }

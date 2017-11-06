@@ -8,6 +8,7 @@ import dbis.piglet.expr.Expr
 import dbis.piglet.mm.ProfilerSettings
 import dbis.piglet.op._
 import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.schema.Schema
 import dbis.piglet.tools.Conf
 
 class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
@@ -17,7 +18,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
   override def collectAdditionalImports(plan: DataflowPlan) = {
     val additionalImports = super.collectAdditionalImports(plan)
 
-    if (plan.checkExpressions(Expr.containsGeometryType)) {
+    if (plan.checkExpressions(Expr.containsGeometryType) || Schema.hasSpatialTypes) {
       additionalImports ++= Seq(
         "import com.vividsolutions.jts.io.WKTReader",
         "import dbis.stark.{STObject, Instant, Interval}",

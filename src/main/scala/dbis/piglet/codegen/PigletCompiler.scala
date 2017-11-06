@@ -7,6 +7,7 @@ import dbis.piglet.expr.Expr
 import dbis.piglet.op.PigOperator
 import dbis.piglet.parser.PigParser
 import dbis.piglet.plan.DataflowPlan
+import dbis.piglet.schema.Schema
 import dbis.piglet.tools._
 import dbis.piglet.tools.logging.PigletLogging
 import dbis.setm.SETM.timing
@@ -144,7 +145,7 @@ object PigletCompiler extends PigletLogging {
           CliParams.values.backendPath.resolve(Conf.commonJar).toString) // common lib
       
       // if the plan contains geometry expressions, we need to add the spatial library           
-      if(plan.checkExpressions(Expr.containsGeometryType))
+      if(plan.checkExpressions(Expr.containsGeometryType) || Schema.hasSpatialTypes)
         libraryJars += CliParams.values.backendPath.resolve(Conf.spatialJar).toString
           
       // extract all additional jar files to output
