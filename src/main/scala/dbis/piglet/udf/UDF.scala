@@ -26,30 +26,34 @@ case class UDF(name: String, scalaName: String, paramTypes: List[PigType], resul
 
 object UDFTable {
   lazy val funcTable = ListBuffer[UDF](
-    UDF("COUNT", "PigFuncs.count", List(Types.AnyType), Types.LongType, true),
-    UDF("AVG", "PigFuncs.average", List(Types.IntType), Types.DoubleType, true),
-    UDF("AVG", "PigFuncs.average", List(Types.LongType), Types.DoubleType, true),
-    UDF("AVG", "PigFuncs.average", List(Types.FloatType), Types.DoubleType, true),
-    UDF("AVG", "PigFuncs.average", List(Types.DoubleType), Types.DoubleType, true),
-    UDF("SUM", "PigFuncs.sum", List(Types.IntType), Types.IntType, true),
-    UDF("SUM", "PigFuncs.sum", List(Types.LongType), Types.LongType, true),
-    UDF("SUM", "PigFuncs.sum", List(Types.FloatType), Types.FloatType, true),
-    UDF("SUM", "PigFuncs.sum", List(Types.DoubleType), Types.DoubleType, true),
-    UDF("MIN", "PigFuncs.min", List(Types.IntType), Types.IntType, true),
-    UDF("MIN", "PigFuncs.min", List(Types.LongType), Types.LongType, true),
-    UDF("MIN", "PigFuncs.min", List(Types.FloatType), Types.FloatType, true),
-    UDF("MIN", "PigFuncs.min", List(Types.DoubleType), Types.DoubleType, true),
-    UDF("MAX", "PigFuncs.max", List(Types.IntType), Types.IntType, true),
-    UDF("MAX", "PigFuncs.max", List(Types.LongType), Types.LongType, true),
-    UDF("MAX", "PigFuncs.max", List(Types.FloatType), Types.FloatType, true),
-    UDF("MAX", "PigFuncs.max", List(Types.DoubleType), Types.DoubleType, true),
-    UDF("TOKENIZE", "PigFuncs.tokenize", List(Types.CharArrayType), BagType(TupleType(Array(Field("", Types.ByteArrayType)))), false),
-    UDF("TOMAP", "PigFuncs.toMap", List(Types.AnyType), MapType(Types.ByteArrayType), false),
-    UDF("STARTSWITH","PigFuncs.startswith", List(Types.CharArrayType, Types.CharArrayType), Types.BooleanType, false),
-    UDF("STRLEN", "PigFuncs.strlen", List(Types.CharArrayType), Types.IntType,false),
-    UDF("TODOUBLE", "PigFuncs.toDouble", List(Types.CharArrayType), Types.DoubleType, false),
-    UDF("SQRT", "math.sqrt", List(Types.DoubleType), Types.DoubleType, false),
-    UDF("POW", "math.pow", List(Types.DoubleType, Types.DoubleType), Types.DoubleType, false)
+    UDF("COUNT", "PigFuncs.count", List(Types.AnyType), Types.LongType, isAggregate = true),
+    UDF("AVG", "PigFuncs.average", List(Types.IntType), Types.DoubleType, isAggregate = true),
+    UDF("AVG", "PigFuncs.average", List(Types.LongType), Types.DoubleType, isAggregate = true),
+    UDF("AVG", "PigFuncs.average", List(Types.FloatType), Types.DoubleType, isAggregate = true),
+    UDF("AVG", "PigFuncs.average", List(Types.DoubleType), Types.DoubleType, isAggregate = true),
+    UDF("SUM", "PigFuncs.sum", List(Types.IntType), Types.IntType, isAggregate = true),
+    UDF("SUM", "PigFuncs.sum", List(Types.LongType), Types.LongType, isAggregate = true),
+    UDF("SUM", "PigFuncs.sum", List(Types.FloatType), Types.FloatType, isAggregate = true),
+    UDF("SUM", "PigFuncs.sum", List(Types.DoubleType), Types.DoubleType, isAggregate = true),
+    UDF("MIN", "PigFuncs.min", List(Types.IntType), Types.IntType, isAggregate = true),
+    UDF("MIN", "PigFuncs.min", List(Types.LongType), Types.LongType, isAggregate = true),
+    UDF("MIN", "PigFuncs.min", List(Types.FloatType), Types.FloatType, isAggregate = true),
+    UDF("MIN", "PigFuncs.min", List(Types.DoubleType), Types.DoubleType, isAggregate = true),
+    UDF("MAX", "PigFuncs.max", List(Types.IntType), Types.IntType, isAggregate = true),
+    UDF("MAX", "PigFuncs.max", List(Types.LongType), Types.LongType, isAggregate = true),
+    UDF("MAX", "PigFuncs.max", List(Types.FloatType), Types.FloatType, isAggregate = true),
+    UDF("MAX", "PigFuncs.max", List(Types.DoubleType), Types.DoubleType, isAggregate = true),
+    UDF("TOKENIZE", "PigFuncs.tokenize", List(Types.CharArrayType), BagType(TupleType(Array(Field("", Types.ByteArrayType)))), isAggregate = false),
+    UDF("TOMAP", "PigFuncs.toMap", List(Types.AnyType), MapType(Types.ByteArrayType), isAggregate = false),
+    UDF("STARTSWITH","PigFuncs.startswith", List(Types.CharArrayType, Types.CharArrayType), Types.BooleanType, isAggregate = false),
+    UDF("STRLEN", "PigFuncs.strlen", List(Types.CharArrayType), Types.IntType,isAggregate = false),
+    UDF("LOWER", "PigFuncs.lowercase", List(Types.CharArrayType), Types.CharArrayType, isAggregate = false),
+    UDF("UPPER", "PigFuncs.uppercase", List(Types.CharArrayType), Types.CharArrayType, isAggregate = false),
+    UDF("CONCAT", "PigFuncs.concat", List(Types.CharArrayType, Types.CharArrayType), Types.CharArrayType, isAggregate = false),
+    UDF("TODOUBLE", "PigFuncs.toDouble", List(Types.CharArrayType), Types.DoubleType, isAggregate = false),
+    UDF("SQRT", "math.sqrt", List(Types.DoubleType), Types.DoubleType, isAggregate = false),
+    UDF("POW", "math.pow", List(Types.DoubleType, Types.DoubleType), Types.DoubleType, isAggregate = false),
+    UDF("S_DISTANCE", "dbis.stark.Distance.seuclid", List(Types.AnyType, Types.AnyType), Types.DoubleType, isAggregate = false)
   )
 
   def addUDF(func: UDF): Unit = {
@@ -75,7 +79,7 @@ object UDFTable {
    */
   def typeListMatch(funcTypes: List[PigType], paramTypes: List[PigType]): Boolean = {
     val matches = funcTypes.zip(paramTypes).map{case (t1, t2) => typeMatch(t1, t2)}
-    matches.size == funcTypes.size && ! matches.exists(_ == false)
+    matches.size == funcTypes.size && ! matches.contains(false)
   }
 
   /**
@@ -87,7 +91,7 @@ object UDFTable {
    */
   def typeListCompatibility(funcTypes: List[PigType], paramTypes: List[PigType]): Boolean = {
     val matches = funcTypes.zip(paramTypes).map{case (t1, t2) => Types.typeCompatibility(t1, t2)}
-    matches.size == funcTypes.size && ! matches.exists(_ == false)
+    matches.size == funcTypes.size && ! matches.contains(false)
   }
 
   /**
@@ -138,6 +142,6 @@ object UDFTable {
     */
   def findFirstUDF(name: String): Option[UDF] = {
     val res = funcTable.filter{ udf: UDF => udf.name == name }
-    if (res.isEmpty) None else Some(res.head)
+    res.headOption
   }
 }
