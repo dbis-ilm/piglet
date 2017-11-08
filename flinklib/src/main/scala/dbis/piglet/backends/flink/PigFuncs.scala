@@ -53,11 +53,12 @@ object PigFuncs {
   def tokenize(s: String, delim: String = """[, "]""") = s.split(delim)
 
   def startswith(haystack: String, prefix: String) = haystack.startsWith(prefix)
-
+  def endswith(haystack: String, suffix: String) = haystack.endsWith(suffix)
   def strlen(s: String) = s.length()
   def uppercase(s: String) = s.toUpperCase
   def lowercase(s: String) = s.toLowerCase
   def concat(s1: String, s2: String) = s1 + s2
+  def contains(s1: String, s2: String) = s1.contains(s2)
 
   /**
    * Incremental versions of the aggregate functions - used for implementing ACCUMULATE.
