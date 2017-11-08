@@ -138,6 +138,10 @@ object Piglet extends PigletLogging {
         logger.debug("Stackstrace: ", e)
         success = false
     } finally {
+
+      if(CliParams.values.profiling.isDefined)
+        StatServer.stop()
+
       if(CliParams.values.notifyURL.isDefined) {
         
         val stringURI = CliParams.values.notifyURL.get.toString
