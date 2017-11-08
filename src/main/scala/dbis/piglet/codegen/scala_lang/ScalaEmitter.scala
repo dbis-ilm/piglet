@@ -72,9 +72,10 @@ object ScalaEmitter extends PigletLogging {
         }
       }
       else {
+
         val pos = ctx.schema.get.indexOfField(nf)
         if (pos == -1) {
-          throw new CodeGenException(s"invalid field name $nf (field position not found)")
+          throw new CodeGenException(s"invalid field name $nf (field position not found in ${ctx.schema.get})")
         }
         s"${ctx.asString("tuplePrefix")}._$pos" // s"$tuplePrefix.$f"
       }

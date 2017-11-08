@@ -25,6 +25,7 @@ import org.kiama.rewriting.Rewritable
 
 import scala.collection.immutable.Seq
 import scala.collection.mutable
+import scala.util.Try
 
 /**
  * PigOperator is the base trait for all Pig operators. An operator contains
@@ -311,7 +312,7 @@ abstract class PigOperator(
     */
   def printOperator(tab: Int): Unit = toString.split("\n").withFilter(_.trim.nonEmpty).foreach(line => println(s"${" "*tab}$line"))
 
-  lazy val name = toString.split(PigOperator.namePattern).head
+  lazy val name = Try { toString.split(PigOperator.namePattern).head }.getOrElse("unknown")
 }
 
 object PigOperator {

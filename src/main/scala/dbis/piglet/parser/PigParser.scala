@@ -913,10 +913,10 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     case kw ~ refs =>
 
       val (r1,r2) = refs match {
-      case None => (PositionalField(0),PositionalField(0))
-      case Some(r) => r
-    }
-    SpatialJoinPredicate(r1, r2, SpatialPredicateType.withName(kw.toUpperCase()))
+        case None => (PositionalField(0),PositionalField(0))
+        case Some(r) => r
+      }
+      SpatialJoinPredicate(r1, r2, SpatialPredicateType.withName(kw.toUpperCase()))
   }
 
   def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ "," ~ bag ~ onKeyword ~ spatialJoinPredicate ~ (withIndexClause?)  ^^ {

@@ -197,8 +197,7 @@ class CodeGenerator(codeGen: CodeGenStrategy) {
         
       } catch {
       case e: CodeGenException => 
-        op.printOperator(2)
-        throw new CodeGenException(s"error producing code for $op", e)
+        throw new CodeGenException(s"error producing code for $op : ${e.getMessage}", e)
       }
     }
 
