@@ -25,6 +25,8 @@ import dbis.piglet.plan.rewriting.internals.Column.Column
 import dbis.piglet.plan.rewriting.internals.{Column, RDF}
 import dbis.piglet.schema.{Field, Schema, Types}
 import org.kiama.rewriting.Rewriter._
+
+import scala.collection.mutable
 import scala.collection.mutable.Map
 import scala.language.postfixOps
 
@@ -354,7 +356,7 @@ object RDFRuleset extends Ruleset {
 
   /** Applies rewriting rule F6 of the paper "[[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].
     *
-    * @param term
+    * @param op
     * @return
     */
   def F6(op: BGPFilter): Option[(Foreach, Filter)] = {
@@ -611,15 +613,15 @@ object RDFRuleset extends Ruleset {
     val in = op.inputs.head
     val patterns = op.patterns
 
-    def isNamed(r: Ref): Option[NamedField] = r match {
-      case n@NamedField(_, _) => Some(n)
-      case _ => None
-    }
-
-    val namedFields = patterns map { p =>
-      (isNamed(p.subj), isNamed(p.pred), isNamed(p.obj))
-    } toSet
-
+//    def isNamed(r: Ref): Option[NamedField] = r match {
+//      case n@NamedField(_, _) => Some(n)
+//      case _ => None
+//    }
+//
+//    val namedFields = patterns map { p =>
+//      (isNamed(p.subj), isNamed(p.pred), isNamed(p.obj))
+//    }
+//
 //    if (namedFields.size != 1) {
 //      // There are either no NamedFields or they appear in more than one position in different patterns, so it's
 //      // not a star join
@@ -633,7 +635,7 @@ object RDFRuleset extends Ruleset {
     // This maps NamedField to a list of pipe names columns. Each column of that specific Pipe (produces by one of
     // the filters) contains the value of the NamedField in the join.
     // Its keys are also all the NamedFields that appear in `patterns`.
-    val namedFieldToPipeName: Map[NamedField, List[(String, Column.Column)]] = Map.empty
+    val namedFieldToPipeName: mutable.Map[NamedField, List[(String, Column.Column)]] = mutable.Map.empty
 
     val filters = patterns map { p =>
       val pipename = generate()
@@ -746,7 +748,7 @@ object RDFRuleset extends Ruleset {
       // This maps NamedField to a list of pipe names and columns. Each column of that specific Pipe (produces by one of
       // the filters) contains the value of the NamedField in the join.
       // Its keys are also all the NamedFields that appear in `patterns`.
-      val namedFieldToPipeName: Map[NamedField, List[(String, Column.Column)]] = Map.empty
+      val namedFieldToPipeName: mutable.Map[NamedField, List[(String, Column.Column)]] = mutable.Map.empty
 
       // First build new BGPFilter objects for all the patterns.
 
@@ -829,7 +831,7 @@ object RDFRuleset extends Ruleset {
       // This maps NamedField to a list of pipe names and columns. Each column of that specific Pipe (produces by one of
       // the filters) contains the value of the NamedField in the join.
       // Its keys are also all the NamedFields that appear in `patterns`.
-      val namedFieldToPipeName: Map[NamedField, List[(String, Column.Column)]] = Map.empty
+      val namedFieldToPipeName: mutable.Map[NamedField, List[(String, Column.Column)]] = mutable.Map.empty
 
       // First build new BGPFilter objects for all the patterns.
       val newBGPFilters = patterns map { p =>

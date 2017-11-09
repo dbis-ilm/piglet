@@ -112,7 +112,7 @@ object Rewriter extends PigletLogging
   /** Resets [[ourStrategy]] to [[fail]].
     *
     */
-  private def resetStrategy = ourStrategy = fail
+  private def resetStrategy() = ourStrategy = fail
 
   /** Add a [[org.kiama.rewriting.Strategy]] to this Rewriter.
     *
@@ -220,5 +220,5 @@ object Rewriter extends PigletLogging
     newPlan
   }
 
-  registerAllRules
+  registerAllRules()
 }
