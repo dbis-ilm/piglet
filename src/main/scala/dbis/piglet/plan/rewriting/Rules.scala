@@ -16,7 +16,9 @@
  */
 package dbis.piglet.plan.rewriting
 
-import dbis.piglet.plan.rewriting.rulesets.{SparkRuleset, GeneralRuleset, RDFRuleset}
+import dbis.piglet.plan.rewriting.rulesets.{GeneralRuleset, RDFRuleset, SparkRuleset}
+import dbis.piglet.tools.CliParams
+import dbis.piglet.tools.logging.PigletLogging
 
 
 
@@ -24,8 +26,13 @@ import dbis.piglet.plan.rewriting.rulesets.{SparkRuleset, GeneralRuleset, RDFRul
   *
   */
 //noinspection ScalaDocMissingParameterDescription
-object Rules {
-  val rulesets = List(GeneralRuleset, RDFRuleset)
+object Rules extends PigletLogging {
+  val rulesets = (
+    if(CliParams.values.optimization) List(GeneralRuleset) else {
+    logger.debug("disabling general optimization rules!")
+    List.empty
+  }) ++ List(RDFRuleset)
+
   def registerAllRules() = {
     // IMPORTANT: If you change one of the rule registration calls in here, please also change the call in the
     // corresponding test methods!
@@ -33,7 +40,8 @@ object Rules {
   }
 
   def registerBackendRules(backend: String) = backend match {
-    case "spark" => SparkRuleset.registerRules()
+    case "spark" if CliParams.values.optimization => SparkRuleset.registerRules()
+    case "spark" => logger.debug("will no optimize with Spark specific rules!")
     case _ =>
   }
 }

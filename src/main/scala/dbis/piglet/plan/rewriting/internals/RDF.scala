@@ -16,11 +16,10 @@
  */
 package dbis.piglet.plan.rewriting.internals
 
-import java.lang.IllegalArgumentException
-
-import dbis.piglet.op._
-import scala.collection.mutable.Map
 import dbis.piglet.expr._
+import dbis.piglet.op._
+
+import scala.collection.mutable
 
 /** An enumeration of the three columns in RDF data - subject, predicate and object.
   *
@@ -29,7 +28,7 @@ object Column extends Enumeration {
   type Column = Value
   val Subject, Predicate, Object = Value
 
-  /** Maps [[Column]]s to [[dbis.piglet.op.NamedField]]s.
+  /** Maps [[Column]]s to [[dbis.piglet.expr.NamedField]]s.
     *
     * @param c
     * @return
@@ -49,8 +48,8 @@ object RDF {
     * @return
     */
   def allUnbound(pattern: TriplePattern): Boolean =
-    (!pattern.subj.isInstanceOf[Value] && !pattern.pred.isInstanceOf[Value] && !pattern.obj
-      .isInstanceOf[Value])
+    !pattern.subj.isInstanceOf[Value] && !pattern.pred.isInstanceOf[Value] && !pattern.obj
+      .isInstanceOf[Value]
 
   /** Given a [[TriplePattern]] return the [[Column]] that's bound by a variable in it.
     *
@@ -92,7 +91,7 @@ object RDF {
       isBound(pattern.obj, Column.Object)
   }
 
-  /** Extracts all variables as [[dbis.piglet.op.NamedField]] objects used in `patterns`.
+  /** Extracts all variables as [[dbis.piglet.expr.NamedField]] objects used in `patterns`.
     *
     * The order of the fields returned is '''arbitrary'''.
     *
@@ -115,32 +114,38 @@ object RDF {
 
   /** Build a map of ([[Column]], [[NamedField]]) to the number of their occurences in ``patterns``.
     */
-  private def buildStarJoinMap(patterns: Seq[TriplePattern]): Map[(Column.Value, NamedField), Int] = {
+  private def buildStarJoinMap(patterns: Seq[TriplePattern]): mutable.Map[(Column.Value, NamedField), Int] = {
     // We count how often each (Column, NamedField) tuple appears in each pattern. If, at the end, a single tuple
     // appears as often as patterns is long, the same variable appears in the same position in each pattern,
     // therefore patterns form a star join.
-    val variableInPosition  = Map[(Column.Value, NamedField), Int]().withDefaultValue(0)
+    val variableInPosition  = mutable.Map[(Column.Value, NamedField), Int]().withDefaultValue(0)
     patterns foreach {pattern: TriplePattern =>
-      if (pattern.subj.isInstanceOf[NamedField]) {
-        val key = (Column.Subject, pattern.subj.asInstanceOf[NamedField])
-        variableInPosition(key) = variableInPosition(key) + 1
+      pattern.subj match {
+        case field2: NamedField =>
+          val key = (Column.Subject, field2)
+          variableInPosition(key) = variableInPosition(key) + 1
+        case _ =>
       }
 
-      if (pattern.pred.isInstanceOf[NamedField]) {
-        val key = (Column.Predicate, pattern.pred.asInstanceOf[NamedField])
-        variableInPosition(key) = variableInPosition(key) + 1
+      pattern.pred match {
+        case field1: NamedField =>
+          val key = (Column.Predicate, field1)
+          variableInPosition(key) = variableInPosition(key) + 1
+        case _ =>
       }
 
-      if (pattern.obj.isInstanceOf[NamedField]) {
-        val key = (Column.Object, pattern.obj.asInstanceOf[NamedField])
-        variableInPosition(key) = variableInPosition(key) + 1
+      pattern.obj match {
+        case field: NamedField =>
+          val key = (Column.Object, field)
+          variableInPosition(key) = variableInPosition(key) + 1
+        case _ =>
       }
     }
 
     variableInPosition
   }
 
-  /** Returns the [[Column.Column]] and [[dbis.piglet.op.NamedField]] of the star join column in ``patterns`` or None if it's not a star join.
+  /** Returns the [[Column.Column]] and [[dbis.piglet.expr.NamedField]] of the star join column in ``patterns`` or None if it's not a star join.
     *
     * If two variables appear in the same position in all ``patterns``, None will be returned
     * @param patterns
@@ -166,7 +171,7 @@ object RDF {
 
   /** Returns true if ``patterns`` form a star join
     *
-    * ``patterns`` form a star join if the same [[dbis.piglet.op.NamedField]] is used in the same position in each
+    * ``patterns`` form a star join if the same [[dbis.piglet.expr.NamedField]] is used in the same position in each
     * pattern.
     */
   def isStarJoin(patterns: Seq[TriplePattern]): Boolean =
@@ -175,31 +180,34 @@ object RDF {
       old || count == patterns.length
     }
 
-  /** Builds a map of [[dbis.piglet.op.NamedField]] objects to the columns they appear in in `patterns`.
+  /** Builds a map of [[dbis.piglet.expr.NamedField]] objects to the columns they appear in in `patterns`.
     *
     */
-  private def buildPathJoinMap(patterns: Seq[TriplePattern]): Map[NamedField, Set[Column.Value]] = {
-    val pathJoinMap = Map[NamedField, Set[Column.Value]]().withDefaultValue(Set.empty)
+  private def buildPathJoinMap(patterns: Seq[TriplePattern]): mutable.Map[NamedField, Set[Column.Value]] = {
+    val pathJoinMap = mutable.Map[NamedField, Set[Column.Value]]().withDefaultValue(Set.empty)
     patterns foreach { pattern =>
-      if (pattern.subj.isInstanceOf[NamedField]) {
-        val key = pattern.subj.asInstanceOf[NamedField]
-        pathJoinMap(key) = pathJoinMap(key) + Column.Subject
+      pattern.subj match {
+        case key: NamedField =>
+          pathJoinMap(key) = pathJoinMap(key) + Column.Subject
+        case _ =>
       }
 
-      if (pattern.pred.isInstanceOf[NamedField]) {
-        val key = pattern.pred.asInstanceOf[NamedField]
-        pathJoinMap(key) = pathJoinMap(key) + Column.Predicate
+      pattern.pred match {
+        case key: NamedField =>
+          pathJoinMap(key) = pathJoinMap(key) + Column.Predicate
+        case _ =>
       }
 
-      if (pattern.obj.isInstanceOf[NamedField]) {
-        val key = pattern.obj.asInstanceOf[NamedField]
-        pathJoinMap(key) = pathJoinMap(key) + Column.Object
+      pattern.obj match {
+        case key: NamedField =>
+          pathJoinMap(key) = pathJoinMap(key) + Column.Object
+        case _ =>
       }
     }
     pathJoinMap
   }
 
-  /** Returns the [[dbis.piglet.op.NamedField]] that's used in the path join in ``patterns``.
+  /** Returns the [[dbis.piglet.expr.NamedField]] that's used in the path join in ``patterns``.
     */
   def pathJoinNamedField(patterns: Seq[TriplePattern]): Option[(NamedField)] = {
     buildPathJoinMap(patterns).find(_._2.size == patterns.length).map(_._1)
@@ -230,7 +238,7 @@ object RDF {
     }.mkString(" . ") + " }"
   }
 
-  /** Builds a new [[dbis.piglet.op.Eq]] constraint that filters by the value of `column` in `p`.
+  /** Builds a new [[dbis.piglet.expr.Eq]] constraint that filters by the value of `column` in `p`.
     *
     * @param column
     * @param p
@@ -246,7 +254,7 @@ object RDF {
     return Eq(RefExpr(filter_by), RefExpr(filter_value))
   }
 
-  /** Builds a [[dbis.piglet.op.Predicate]] that checks for all the bound columns in `p`.
+  /** Builds a [[dbis.piglet.expr.Predicate]] that checks for all the bound columns in `p`.
    *
    * @param p
    * @return None, if no columns are bound.
@@ -263,8 +271,10 @@ object RDF {
 
   def namedFieldColumnPairFromPattern(p: TriplePattern): Seq[(NamedField, Column.Column)] = {
     def makeTuple(r: Ref, c: Column): Option[(NamedField, Column.Column)] = {
-      if (r.isInstanceOf[NamedField]) {
-        return Some((r.asInstanceOf[NamedField], c))
+      r match {
+        case field: NamedField =>
+          return Some((field, c))
+        case _ =>
       }
       None
     }

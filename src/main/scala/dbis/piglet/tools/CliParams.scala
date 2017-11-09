@@ -53,7 +53,8 @@ case class CliParams(
                       interactive: Boolean = false,
                       quiet: Boolean = false,
                       notifyURL: Option[URI] = None,
-                      muteConsumer: Boolean = false
+                      muteConsumer: Boolean = false,
+                      optimization: Boolean = true
 ) {
   
   require(!showPlan || (showPlan && !quiet), "show-plan and quiet cannot be active at the same time" )
@@ -95,8 +96,9 @@ object CliParams {
     opt[Map[String, String]]("backend-args") valueName "key1=value1,key2=value2..." action { (x, c) => c.copy(backendArgs = x) } text "parameter(s) to substitute"
     opt[Unit]('c', "compile") action { (_, c) => c.copy(compileOnly = true) } text "compile only (don't execute the script)"
     opt[File]('o', "outdir") optional() action { (x, c) => c.copy(outDir = x.toPath) } text "output directory for generated code"
-    opt[Unit]('k',"keep") optional() action { (x,c) => c.copy(keepFiles = true) } text "keep generated files"
+    opt[Unit]('k',"keep") optional() action { (_,c) => c.copy(keepFiles = true) } text "keep generated files"
     opt[String]('g', "log-level") optional() action { (x, c) => c.copy(logLevel = LogLevel.withName(x.toUpperCase())) } text "Set the log level: DEBUG, INFO, WARN, ERROR"
+    opt[Unit]('z', "no-optimization") optional() action { (_,c) => c.copy(optimization = false)} text "disable optimization rules"
     opt[Unit]('s', "show-plan") optional() action { (_, c) => c.copy(showPlan = true) } text s"show the execution plan"
     opt[Map[String,String]]("profiling") optional() valueName "prob=<prob_thresh>,cost=<cost_thresh>,cost_strategy=<strategy>,prob_strategy=<strategy>,cache_mode=<mode>" action {
       (x, c) => c.copy(profiling = Some(ProfilerSettings(x)))

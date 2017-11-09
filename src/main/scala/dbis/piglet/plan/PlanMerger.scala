@@ -9,7 +9,7 @@ object PlanMerger extends PigletLogging {
 
   
 	def mergePlans(schedule: Seq[DataflowPlan]): DataflowPlan = timing("merge plans") {
-	  require(schedule.size > 0, "schedule must not be empty")
+	  require(schedule.nonEmpty, "schedule must not be empty")
 	  
 	  if(schedule.size == 1)
 	    return schedule.head
@@ -61,22 +61,21 @@ object PlanMerger extends PigletLogging {
 			     * since we use BFS, we should always find all inputs as they were processed before
 			     * the actual join/cross op
 			     */ 
-			    case Join(_,_,_,_) | Cross(_,_,_) => {
-			      
-			      op.inputs.foreach { pipe =>
-			        val prod = mergedPlan.findOperator { o => o.lineageSignature == pipe.producer.lineageSignature }.headOption
-			        if(prod.isDefined)
-			          pipe.name = prod.get.outPipeName
-			        else
-			          logger.warn(s"No producer found for $op -- this shouldn't happen?!")
-			      }
-			      
-			      // add op to the list but do not create plan now 
-			      logger.debug(s"try to add $op with deferr=$deferrPlanConstruction")
-			      mergedPlan.addOperator(List(op), deferrPlanConstruction)
-			      needPlanConstruction = true
-			    } 
-			    case _ =>
+			    case Join(_,_,_,_) | Cross(_,_,_) =>
+
+						op.inputs.foreach { pipe =>
+              val prod = mergedPlan.findOperator { o => o.lineageSignature == pipe.producer.lineageSignature }.headOption
+              if(prod.isDefined)
+                pipe.name = prod.get.outPipeName
+              else
+                logger.warn(s"No producer found for $op -- this shouldn't happen?!")
+            }
+
+						// add op to the list but do not create plan now
+						logger.debug(s"try to add $op with deferr=$deferrPlanConstruction")
+						mergedPlan.addOperator(List(op), deferrPlanConstruction)
+						needPlanConstruction = true
+					case _ =>
 			      
 			      op.inputs // since join and cross are handled separately, inputs is  1
     			    .flatMap { pipe => mergedPlan.findOperator { o => o.lineageSignature == pipe.producer.lineageSignature } } // get the producer 
