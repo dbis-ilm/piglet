@@ -5,6 +5,8 @@ import dbis.piglet.expr._
 import dbis.piglet.op.{Accumulate, PigOperator}
 import dbis.piglet.schema.Types
 
+import scala.collection.mutable
+
 /**
   * Created by kai on 12.12.16.
   */
@@ -12,10 +14,12 @@ class AccumulateEmitter extends CodeEmitter[Accumulate] {
   override def template: String = """val <out>_fold = <in>.map(t => <helper_class>(t, <init_expr>))
                                     |                                        .aggregate(<helper_class>())(aggr_<out>_seq, aggr_<out>_comp)
                                     |        val <out> = sc.parallelize(Array(<class>(<aggr_expr>)))""".stripMargin
+
   def aggrTemplate: String = """def aggr_<out>_seq(acc: <helper_class>, v: <helper_class>): <helper_class> =
                                |                <helper_class>(v._t, <seq_expr>)
                                |        def aggr_<out>_comp(acc: <helper_class>, v: <helper_class>): <helper_class> =
                                |                <helper_class>(v._t, <comp_expr>)""".stripMargin
+
   def classTemplate: String = """case class <name> (<fields>) extends java.io.Serializable with SchemaClass {
                                 |  override def mkString(_c: String = ",") = <string_rep>
                                 |}""".stripMargin
@@ -27,7 +31,13 @@ class AccumulateEmitter extends CodeEmitter[Accumulate] {
     e.traverseOr(op.inputSchema.getOrElse(null), Expr.containsCountFunc)
 
   override def helper(ctx: CodeGenContext, op: Accumulate): String = {
-      
+
+    if(AccumulateEmitter.helperClasses.contains(op.schema.get.className)) {
+      return ""
+    } else {
+      AccumulateEmitter.helperClasses += op.schema.get.className
+    }
+
     // TODO: for ACCUMULATE we need a special tuple class
     val inSchemaClassName = op.inputSchema match {
       case Some(s) => ScalaEmitter.schemaClassName(s.className)
@@ -138,5 +148,8 @@ class AccumulateEmitter extends CodeEmitter[Accumulate] {
 }
 
 object AccumulateEmitter {
+
+  val helperClasses = mutable.Set.empty[String]
+
   lazy val instance = new AccumulateEmitter
 }
