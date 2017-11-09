@@ -17,47 +17,8 @@
 
 package dbis.piglet.backends.spark
 
-import scala.Numeric.Implicits._
-import scala.collection.mutable.ListBuffer
+import dbis.piglet.CommonPigFuncs
 
-object PigFuncs {
-  def average[T: Numeric](bag: Iterable[T]) : Double = sum(bag).toDouble / count(bag).toDouble
+object PigFuncs extends CommonPigFuncs {
 
-  def count(bag: Iterable[Any]): Int = bag.size
-
-  def sum[T: Numeric](bag: Iterable[T]): T = bag.sum
-
-  def min[T: Ordering](bag: Iterable[T]): T = bag.min
-
-  def max[T: Ordering](bag: Iterable[T]): T = bag.max
-
-  /*
-   * String functions
-   */
-  def tokenize(s: String, delim: String = """[, "]""") = s.split(delim)
-  
-  def startswith(haystack: String, prefix: String) = haystack.startsWith(prefix)
-  def endswith(haystack: String, suffix: String) = haystack.endsWith(suffix)
-
-  def strlen(s: String) = s.length()
-
-  def uppercase(s: String) = s.toUpperCase
-  def lowercase(s: String) = s.toLowerCase
-  def concat(s1: String, s2: String) = s1 + s2
-  def contains(s1: String, s2: String) = s1.contains(s2)
-  /*
-   * Incremental versions of the aggregate functions - used for implementing ACCUMULATE.
-   */
-  def incrSUM(acc: Int, v: Int) = acc + v
-  def incrSUM(acc: Double, v: Double) = acc + v
-  def incrSUM(acc: Long, v: Long) = acc + v
-  def incrCOUNT(acc: Int, v: Int) = acc + 1
-  def incrCOUNT(acc: Long, v: Long) = acc + 1
-  def incrCOUNT(acc: Double, v: Double) = acc + 1
-  def incrMIN(acc: Int, v: Int) = math.min(acc, v)
-  def incrMIN(acc: Long, v: Long) = math.min(acc, v)
-  def incrMIN(acc: Double, v: Double) = math.min(acc, v)
-  def incrMAX(acc: Int, v: Int) = math.max(acc, v)
-  def incrMAX(acc: Long, v: Long) = math.max(acc, v)
-  def incrMAX(acc: Double, v: Double) = math.max(acc, v)
 }
