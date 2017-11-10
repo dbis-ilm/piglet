@@ -153,6 +153,10 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
         }
         else if (line.nonEmpty) {
           lineBuffer += line
+
+          if(insideEmbeddedCode)
+            lineBuffer += System.getProperty("line.separator")
+
           if (line.startsWith("<%") || line.startsWith("<!")) {
             insideEmbeddedCode = true
             prompt = "    | "
