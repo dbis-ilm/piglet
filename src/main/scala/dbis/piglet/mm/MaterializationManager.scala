@@ -313,7 +313,19 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
               loader.addConsumer(outPipe.name, consumer)
 
               // and remove the old pipe and add Load as producer
-              consumer.inputs = loader.outputs ++ consumer.inputs.filterNot(_.name == outPipe.name)
+              consumer.inputs = {
+                // we need to replace the old pipe with the new pipe from the Loader
+                // so first find the position of the old one
+                val idx = consumer.inputs.indexWhere(_.name == outPipe.name)
+
+                val (left,right) = consumer.inputs.splitAt(idx)
+                // and then insert the new loader instead of the old op
+                left ++ loader.outputs ++ right.drop(1) // drop 1 to remove the old pipe
+
+                // CAUTION: THE FOLLOWING IS NOT CORRECT! the will reorder the pipes and then,
+                // for a Join, we won't find the field in the schema!!
+//                loader.outputs ++ consumer.inputs.filterNot(_.name == outPipe.name)
+              }
             }
           }
 
