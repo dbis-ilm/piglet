@@ -43,7 +43,18 @@ object UDFTable {
     UDF("MAX", "PigFuncs.max", List(Types.LongType), Types.LongType, isAggregate = true),
     UDF("MAX", "PigFuncs.max", List(Types.FloatType), Types.FloatType, isAggregate = true),
     UDF("MAX", "PigFuncs.max", List(Types.DoubleType), Types.DoubleType, isAggregate = true),
+    UDF("ISEMPTY", "PigFuncs.isempty", List(Types.AnyType), Types.BooleanType, isAggregate = true),
+    UDF("NONEMPTY", "PigFuncs.nonempty", List(Types.AnyType), Types.BooleanType, isAggregate = true),
+
+    UDF("NONEMPTY", "PigFuncs.strNonEmpty", List(Types.CharArrayType), Types.BooleanType, isAggregate = false),
+    UDF("ISEMPTY", "PigFuncs.strIsEmpty", List(Types.CharArrayType), Types.BooleanType, isAggregate = false),
+    UDF("TRIM", "PigFuncs.trim", List(Types.CharArrayType), Types.CharArrayType, isAggregate = false),
+
+    UDF("SUBSTRING", "PigFuncs.substring", List(Types.CharArrayType), Types.CharArrayType, isAggregate = false),
+
     UDF("TOKENIZE", "PigFuncs.tokenize", List(Types.CharArrayType), BagType(TupleType(Array(Field("", Types.ByteArrayType)))), isAggregate = false),
+    UDF("STRSPLIT", "PigFuncs.split", List(Types.CharArrayType), TupleType(Array(Field("", Types.CharArrayType))), isAggregate = false),
+    UDF("STRSPLIT", "PigFuncs.split", List(Types.CharArrayType, Types.CharArrayType), TupleType(Array(Field("", Types.CharArrayType))), isAggregate = false),
     UDF("TOMAP", "PigFuncs.toMap", List(Types.AnyType), MapType(Types.ByteArrayType), isAggregate = false),
     UDF("STARTSWITH","PigFuncs.startswith", List(Types.CharArrayType, Types.CharArrayType), Types.BooleanType, isAggregate = false),
     UDF("ENDSWITH","PigFuncs.endswith", List(Types.CharArrayType, Types.CharArrayType), Types.BooleanType, isAggregate = false),
@@ -51,8 +62,9 @@ object UDFTable {
     UDF("LOWER", "PigFuncs.lowercase", List(Types.CharArrayType), Types.CharArrayType, isAggregate = false),
     UDF("UPPER", "PigFuncs.uppercase", List(Types.CharArrayType), Types.CharArrayType, isAggregate = false),
     UDF("CONCAT", "PigFuncs.concat", List(Types.CharArrayType, Types.CharArrayType), Types.CharArrayType, isAggregate = false),
-    UDF("CONTAINS", "PigFuncs.contains", List(Types.CharArrayType, Types.CharArrayType), Types.BooleanType, isAggregate = false),
+    UDF("STRCONTAINS", "PigFuncs.contains", List(Types.CharArrayType, Types.CharArrayType), Types.BooleanType, isAggregate = false),
     UDF("TODOUBLE", "PigFuncs.toDouble", List(Types.CharArrayType), Types.DoubleType, isAggregate = false),
+    UDF("TOINT", "PigFuncs.toInt", List(Types.CharArrayType), Types.IntType, isAggregate = false),
     UDF("SQRT", "math.sqrt", List(Types.DoubleType), Types.DoubleType, isAggregate = false),
     UDF("POW", "math.pow", List(Types.DoubleType, Types.DoubleType), Types.DoubleType, isAggregate = false),
     UDF("S_DISTANCE", "dbis.stark.Distance.seuclid", List(Types.AnyType, Types.AnyType), Types.DoubleType, isAggregate = false)
