@@ -17,7 +17,7 @@ class CrossEmitter extends CodeEmitter[Cross] {
   // code template to create all cartesian products one after he other
   val t = "<rel1>.cartesian(<rel2>).map{ case (v,w)  => (<fields>) \\}"
     
-  private def makeFieldString(p: Pipe, prefix: String, offset: Int = 0) = p.inputSchema.get.fields.indices.map(i => s"${prefix}._${i+offset}").mkString(",") 
+  private def makeFieldString(p: Pipe, prefix: String, offset: Int = 0) = p.inputSchema.get.fields.indices.map(i => s"$prefix._${i+offset}").mkString(",")
     
   override def code(ctx: CodeGenContext, op: Cross): String = {
     val rels = op.inputs
@@ -25,7 +25,7 @@ class CrossEmitter extends CodeEmitter[Cross] {
     /* first we construct the resulting fields of the first product
      * the offste parameter is left to 0 because the field name numbering in the schema classes starts at 0
      */
-    var fieldList = s"${makeFieldString(rels(0), "v")},${makeFieldString(rels(1), "w")}"
+    var fieldList = s"${makeFieldString(rels.head, "v")},${makeFieldString(rels(1), "w")}"
     
     // create the code for the first cross product
     var code = CodeEmitter.render(t, Map(
@@ -35,10 +35,10 @@ class CrossEmitter extends CodeEmitter[Cross] {
     
         
     // if we have mor than two input relation, we need to add the subsequent cross operations one after the other    
-    for(i <- (2 until op.inputs.size)) {
+    for(i <- 2 until op.inputs.size) {
     
       // count how many fields have been created by the previous CROSS's
-      val numFields = (0 until i).map(j => rels(j).inputSchema.get.fields.size).sum
+      val numFields = (0 until i).map(j => rels(j).inputSchema.get.fields.length).sum
       
       // the resulting fields consist for all fields of the previous results + the fields of the current input relation
       fieldList = (1 to numFields).map(j => s"v._$j").mkString(",") + "," + makeFieldString(rels(i), "w", 0)

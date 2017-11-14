@@ -272,11 +272,13 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   lazy val returnsKeyword = "returns".ignoreCase
   lazy val accumulateKeyword = "accumulate".ignoreCase
   lazy val timestampKeyword = "timestamp".ignoreCase
+  lazy val zipKeyword = "zip".ignoreCase
 
   def boolean: Parser[Boolean] = (
       trueKeyword ^^ { _=> true }
       | falseKeyword ^^ { _ => false }
     )
+
 
   /*
    * tuple schema: tuple(<list of fields>) or (<list of fields>)
@@ -535,6 +537,21 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     case out ~ _ ~ _ ~ rlist => Cross(Pipe(out), rlist.map(r => Pipe(r)))
   }
 
+
+  def zipExpr = withKeyword ~ bag ^^ { case _ ~ b => b}
+  def zipExprList = rep(zipExpr) ^^ { l => l}
+
+  def zipWithIndexStmt = bag ~ "=" ~ zipKeyword ~ bag ~ withKeyword ~ indexKeyword ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ _ => Zip(Pipe(out), List(Pipe(in)), withIndex = true)
+  }
+
+  def zipWithBagsStmt = bag ~ "=" ~ zipKeyword ~ bag ~ zipExprList ^^ {
+    case out ~ _ ~ _ ~ in ~ bags => Zip(Pipe(out), List(Pipe(in)) ++ bags.map(b => Pipe(b)), withIndex = false)
+  }
+
+  def zipStmt = zipWithIndexStmt | zipWithBagsStmt
+
+
   /*
    * <A> = UNION <B>, <C>, <D>, ...
    */
@@ -701,8 +718,13 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     materializeStmt | cacheStmt | delayStmt | rscriptStmt |
     /* standard Pig Latin statements */
     loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
-    distinctStmt |  joinStmt | crossStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    distinctStmt |  joinStmt | crossStmt | zipStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | fsStmt | defineStmt | setterStmt | macroRefStmt | displayStmt
+
+
+
+
+
   /* ---------------------------------------------------------------------------------------------------------------- */
   /*
    * Pig extensions for processing RDF data and supporting SPARQL BGPs.
