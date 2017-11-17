@@ -14,7 +14,13 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
                     |   <rel2><keyby2>,
                     |   dbis.stark.spatial.JoinPredicate.<predicate>
                     | ).map{ case (v,w) =>
-                    |     <className>(<fields>)
+                    |     val t = <className>(<fields>)
+                    |     <if (profiling)>
+                    |     if(scala.util.Random.nextInt(randFactor) == 0) {
+                    |       accum.incr("<lineage>", PerfMonitor.estimateSize(t))
+                    |     }
+                    |     t
+                    |  <endif>
                     |\\}""".stripMargin
 
 //  partitionBy(new dbis.stark.spatial.partitioner.SpatialGridPartitioner())
