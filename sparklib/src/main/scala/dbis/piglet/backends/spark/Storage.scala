@@ -17,12 +17,17 @@
 
 package dbis.piglet.backends.spark
 
+import java.io._
+
 import dbis.piglet.backends._
+import dbis.piglet.tools.HDFSService
+import org.apache.hadoop.io.{BytesWritable, NullWritable}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
+import org.apache.spark.util.Utils
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -53,8 +58,7 @@ class PigStorage[T <: SchemaClass :ClassTag](fraction: Int = 1) extends java.io.
       rawArr.map{ arr =>
         val t = extract(arr)
         if(scala.util.Random.nextInt(fraction) == 0) {
-//          accum.incr(lineage, t.getNumBytes)
-            accum.incr(lineage, PerfMonitor.estimateSize(t))
+          PerfMonitor.sampleSize(t, lineage, accum)
         }
         t
       }
@@ -147,6 +151,45 @@ object BinStorage {
   def apply[T: ClassTag](fraction: Int = -1): BinStorage[T] = new BinStorage[T](fraction)
 }
 
+class BinStorage2[T: ClassTag](fraction: Int = -1) extends java.io.Serializable {
+//  val hdfs = HDFSService.fileSystem
+
+
+  def load(sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] =
+    sc.objectFile[T](path)
+
+
+  def write(path: String, rdd: RDD[T]) = {
+
+    rdd.mapPartitions(iter => iter.grouped(10).map(_.toArray))
+      .map(x => (NullWritable.get(), new BytesWritable(BinStorage2.serialize(x))))
+      .saveAsSequenceFile(path)
+  }
+
+
+
+}
+
+object BinStorage2 {
+  def apply[T:ClassTag](fraction: Int = -1): BinStorage[T] = new BinStorage[T](fraction)
+
+  def serialize[T](o: T): Array[Byte] = {
+    val bos = new ByteArrayOutputStream()
+    val oos = new ObjectOutputStream(bos)
+    oos.writeUnshared(o)
+    oos.close()
+    bos.toByteArray
+  }
+
+  /** Deserialize an object using Java serialization */
+  def deserialize[T](bytes: Array[Byte]): T = {
+    val bis = new ByteArrayInputStream(bytes)
+    val ois = new ObjectInputStream(bis)
+    ois.readUnshared.asInstanceOf[T]
+  }
+}
+
+
 import org.json4s._
 import org.json4s.native.Serialization
 
@@ -162,7 +205,8 @@ class JsonStorage2[T <: SchemaClass : Manifest](fraction: Int = -1)  extends Ser
         val (lineage, accum) = lineageAndAccum.get
 
         if (scala.util.Random.nextInt(fraction) == 0) {
-          accum.incr(lineage, PerfMonitor.estimateSize(t))
+//          accum.incr(lineage, PerfMonitor.estimateSize(t))
+          PerfMonitor.sampleSize(t, lineage, accum)
         }
       }
       t

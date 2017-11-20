@@ -9,7 +9,14 @@ import dbis.piglet.expr.Ref
 
 class SpatialFilterEmitter extends CodeEmitter[SpatialFilter] {
   
-  override def template = "val <out> = <in><keyby><liveindex>.<predicate>(<other>).map{ case (_,v) => v \\}"
+  override def template =
+    """val <out> = <in><keyby><liveindex>.<predicate>(<other>).map{ case (_,v) =>
+      |  <if (profiling)>
+      |  if(scala.util.Random.nextInt(randFactor) == 0) {
+      |    PerfMonitor.sampleSize(v,"<lineage>", accum)
+      |  }
+      |  v
+      |}""".stripMargin
   
   def indexTemplate(idxConfig: Option[(IndexMethod, List[String])]) = idxConfig match {
     case Some((method, params)) => CodeEmitter.render(".liveIndex(<params>)", Map("params" -> params.mkString(",")))
@@ -21,7 +28,8 @@ class SpatialFilterEmitter extends CodeEmitter[SpatialFilter] {
           "predicate" -> op.pred.predicateType.toString.toLowerCase(),
           "other" -> ScalaEmitter.emitExpr(ctx, op.pred.expr),
           "liveindex" -> indexTemplate(op.idx),
-          "keyby" -> SpatialEmitterHelper.keyByCode(op.inputSchema, op.pred.field, ctx)
+          "keyby" -> SpatialEmitterHelper.keyByCode(op.inputSchema, op.pred.field, ctx),
+          "lineage" -> op.lineageSignature
 //          {
 //            if(SpatialEmitterHelper.geomIsFirstPos(op.pred.field, op)) 
 //              "" 

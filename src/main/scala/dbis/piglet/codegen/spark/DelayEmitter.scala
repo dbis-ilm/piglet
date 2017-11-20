@@ -11,7 +11,7 @@ class DelayEmitter extends CodeEmitter[Delay] {
       |    val decision = scala.util.Random.nextInt(<sampleFactor>) == 0
       |    <if (profiling)>
       |    if(decision && scala.util.Random.nextInt(randFactor) == 0) {
-      |      accum.incr("<lineage>", PerfMonitor.estimateSize(t))
+      |      PerfMonitor.sampleSize(t,"<lineage>", accum)
       |    }
       |    <endif>
       |    decision

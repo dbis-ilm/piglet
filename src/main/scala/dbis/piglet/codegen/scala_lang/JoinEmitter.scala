@@ -19,7 +19,7 @@ class JoinEmitter extends CodeEmitter[Join] {
       |    val res = <class>(<fields>)
       |    <if (profiling)>
       |    if(scala.util.Random.nextInt(randFactor) == 0) {
-      |      accum.incr("<lineage>", PerfMonitor.estimateSize(res))
+      |      PerfMonitor.sampleSize(res,"<lineage>", accum)
       |    }
       |    <endif>
       |    res
@@ -32,7 +32,7 @@ class JoinEmitter extends CodeEmitter[Join] {
       |    val res = <class>(<fields>)
       |    <if (profiling)>
       |    if(scala.util.Random.nextInt(randFactor) == 0) {
-      |      accum.incr("<lineage>", PerfMonitor.estimateSize(res))
+      |      PerfMonitor.sampleSize(res,"<lineage>", accum)
       |    }
       |    <endif>
       |    res

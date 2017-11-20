@@ -13,7 +13,7 @@ class PartitionerEmitter extends CodeEmitter[Partition]  {
          |  <in>_helper.partitionBy(<partitioner>).map{case (_,v)=>
          |    <if (profiling)>
          |    if(scala.util.Random.nextInt(randFactor) == 0) {
-         |      accum.incr("<lineage>", v)
+         |      PerfMonitor.sampleSize(v,"<lineage>", accum)
          |    }
          |    <endif>
          |

@@ -8,11 +8,20 @@ import dbis.piglet.op.Limit
   */
 class LimitEmitter extends CodeEmitter[Limit] {
   // val <out> = sc.parallelize(<in>.take(<num>))
-  override def template: String = """val <out> = <in>.zipWithIndex.filter{case (_,idx) => idx \< <num>}.map(_._1)""".stripMargin
+  override def template: String =
+    """val <out> = <in>.zipWithIndex.filter{case (_,idx) => idx \< <num>}.map{t =>
+      |  val res = t._1
+      |  <if (profiling)>
+      |  if(scala.util.Random.nextInt(randFactor) == 0) {
+      |    PerfMonitor.sampleSize(res,"<lineage>", accum)
+      |  }
+      |  <endif>
+      |  res
+      |}""".stripMargin
 
 
   override def code(ctx: CodeGenContext, op: Limit): String = 
-        render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "num" -> op.num))
+        render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "num" -> op.num,"lineage" -> op.lineageSignature))
 
 }
 

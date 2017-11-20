@@ -17,7 +17,7 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
                     |     val t = <className>(<fields>)
                     |     <if (profiling)>
                     |     if(scala.util.Random.nextInt(randFactor) == 0) {
-                    |       accum.incr("<lineage>", PerfMonitor.estimateSize(t))
+                    |       PerfMonitor.sampleSize(t,"<lineage>", accum)
                     |     }
                     |     t
                     |  <endif>

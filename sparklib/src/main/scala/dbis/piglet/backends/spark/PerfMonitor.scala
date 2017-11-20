@@ -2,12 +2,15 @@ package dbis.piglet.backends.spark
 
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
+import com.sun.xml.internal.ws.wsdl.writer.document.xsd.Schema
+import dbis.piglet.backends.SchemaClass
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.AccumulatorV2
 import org.apache.spark.{NarrowDependency, ShuffleDependency}
 
 import scala.collection.mutable
-import scala.collection.mutable.{Map => MutableMap}
+import scala.collection.mutable.{ListBuffer, Map => MutableMap}
+import scala.util.Try
 
 class UpdateMap[K,V](m: MutableMap[K,V]) {
 
@@ -40,6 +43,49 @@ object PerfMonitor {
   def sizes(url: String, m: scala.collection.mutable.Map[String, SizeStat]) = {
     val dataString = m.map{case(lineage, SizeStat(records, bytes)) => s"$lineage:$records:$bytes"}.mkString(FIELD_DELIM)
     request(url, dataString)
+  }
+
+  def sizes2(url: String, m: scala.collection.mutable.Map[String, ListBuffer[SchemaClass]]) = {
+    val dataString = m.map { case (lineage, objects) =>
+      val numBytes = {
+        var bos: java.io.ByteArrayOutputStream = null
+        var out: java.io.ObjectOutputStream = null
+
+        try {
+          bos = new java.io.ByteArrayOutputStream()
+          out = new java.io.ObjectOutputStream(bos)
+          out.writeObject(objects)
+          out.flush()
+          bos.toByteArray.length
+        } catch {
+          case e: Throwable =>
+            System.err.println(e.getMessage)
+            0
+        } finally {
+          if(bos != null)
+            bos.close()
+
+          if(out != null)
+            out.close()
+        }
+      }
+
+      s"$lineage:${objects.size}:$numBytes"
+
+    }.mkString(FIELD_DELIM)
+
+    request(url,dataString)
+  }
+
+  def sizes3(url: String, m: scala.collection.mutable.Map[String, ListBuffer[SchemaClass]]) = {
+    val dataString = m.map { case (lineage, objects) =>
+      val numBytes = org.apache.spark.util.SizeEstimator.estimate(objects)
+
+      s"$lineage:${objects.size}:$numBytes"
+
+    }.mkString(FIELD_DELIM)
+
+    request(url,dataString)
   }
 
   def notify(url: String, lineage: String, rdd: RDD[_], partitionId: Int, time: Long) = {
@@ -112,27 +158,17 @@ object PerfMonitor {
   @inline
   def estimateSize(o: AnyRef): Long = org.apache.spark.util.SizeEstimator.estimate(o)
 
-//  {
-//    var bos: java.io.ByteArrayOutputStream = null
-//    var out: java.io.ObjectOutputStream = null
-//    try {
-//      bos = new java.io.ByteArrayOutputStream()
-//      out = new java.io.ObjectOutputStream(bos)
-//      out.writeObject(o)
-//      out.flush()
-//      bos.toByteArray.length
-//    } catch {
-//      case e: Throwable =>
-//        System.err.println(e.getMessage)
-//        0
-//    }finally {
-//      if(bos != null)
-//        bos.close()
-//
-//      if(out != null)
-//        out.close()
-//    }
-//  }
+  @inline
+  def sampleSize2(t: SchemaClass, lineage: String, accum: SizeAccumulator3): Unit = {
+    accum.incr(lineage, t)
+  }
+
+  @inline
+  def sampleSize(o: AnyRef, lineage: String, accum: SizeAccumulator2): Unit = {
+    val theSize = estimateSize(o)
+    accum.incr(lineage, theSize)
+  }
+
 }
 
 case class SizeStat(var records: Long, var bytes: Long) extends Cloneable {
@@ -144,6 +180,59 @@ case class SizeStat(var records: Long, var bytes: Long) extends Cloneable {
   }
 }
 
+case class SizeStat2(var elems: ListBuffer[SchemaClass]) extends Cloneable {
+  override def clone(): SizeStat2 = SizeStat2(elems.clone())
+
+  def add(stat: SizeStat2): Unit = {
+    elems ++= stat.elems
+  }
+}
+
+class SizeAccumulator3(maxSampleSizePerOp: Int = 1000 ) extends AccumulatorV2[mutable.Map[String, ListBuffer[SchemaClass]],mutable.Map[String, ListBuffer[SchemaClass]]] {
+
+  type Lineage = String
+
+  private val theValue = mutable.Map.empty[Lineage, ListBuffer[SchemaClass]]
+
+  override def isZero: Boolean = theValue.isEmpty
+
+  override def copy(): AccumulatorV2[MutableMap[Lineage, ListBuffer[SchemaClass]], MutableMap[Lineage, ListBuffer[SchemaClass]]] = {
+    val newAccum = new SizeAccumulator3()
+
+    theValue.foreach{ case (k,v) =>
+      newAccum.value += k -> v
+    }
+
+    newAccum
+  }
+
+  override def reset(): Unit = theValue.clear()
+
+  override def add(value: MutableMap[Lineage, ListBuffer[SchemaClass]]): Unit = {
+    value.foreach{ case (k,v) =>
+      if(theValue.contains(k) && theValue(k).size < maxSampleSizePerOp) {
+        val numTake = math.max(maxSampleSizePerOp - theValue(k).size, 0)
+        theValue(k) ++= v.take(numTake)
+      } else {
+        theValue += k -> v
+      }
+    }
+  }
+
+  def incr(lineage: Lineage, o: SchemaClass) = {
+    if(theValue.contains(lineage) && theValue(lineage).size < maxSampleSizePerOp) {
+      theValue(lineage) += o
+    } else {
+      theValue += lineage -> ListBuffer(o)
+    }
+  }
+
+  override def merge(other: AccumulatorV2[MutableMap[Lineage, ListBuffer[SchemaClass]], MutableMap[Lineage, ListBuffer[SchemaClass]]]): Unit = {
+    add(other.value)
+  }
+
+  override def value: MutableMap[Lineage, ListBuffer[SchemaClass]] = theValue
+}
 
 class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mutable.Map[String, SizeStat]] {
 

@@ -278,7 +278,7 @@ object ScalaEmitter extends PigletLogging {
         paramMap += ("extractor" ->
           s"""(data: org.apache.spark.sql.Row) => ${ScalaEmitter.schemaClassName(s.className)}(${jdbcSchemaExtractor(s)})""",
           "class" -> ScalaEmitter.schemaClassName(s.className))
-      case Some(s) if loaderFunc.nonEmpty && loaderFunc.get == "BinStorage" =>
+      case Some(s) if loaderFunc.nonEmpty && loaderFunc.get.startsWith("BinStorage") =>
 
         val className = ScalaEmitter.schemaClassName(s.className)
         paramMap += (
@@ -443,7 +443,7 @@ object ScalaEmitter extends PigletLogging {
     val fields = fieldList.zipWithIndex.map{ case (f, i) =>
       (s"_$i", s"${typeName(f.fType, f.name)}")}
 
-    val fieldStr = fields.map(t => t._1 + ": " + t._2).mkString(", ")
+    val fieldStr = fields.map(t => "var "+t._1 + ": " + t._2).mkString(", ")
 
     // construct the mkString method
     //   we have to handle the different types here:

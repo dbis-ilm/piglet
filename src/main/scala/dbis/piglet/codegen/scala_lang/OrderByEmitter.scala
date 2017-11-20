@@ -12,7 +12,7 @@ class OrderByEmitter extends CodeEmitter[OrderBy] {
     """val <out> = <in>.keyBy(t => <key>).sortByKey(<asc>).map{case (_,v) =>
       |  <if (profiling)>
       |  if(scala.util.Random.nextInt(randFactor) == 0) {
-      |    accum.incr("<lineage>", PerfMonitor.estimateSize(v))
+      |    PerfMonitor.sampleSize(v,"<lineage>", accum)
       |  }
       |  <endif>
       |  v

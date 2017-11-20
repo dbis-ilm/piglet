@@ -9,11 +9,11 @@ import dbis.piglet.op.Dump
 class DumpEmitter extends CodeEmitter[Dump] {
   override def template: String = """<if(mute)><in>.foreach{t=><if (profiling)>
                                     |if(scala.util.Random.nextInt(randFactor) == 0) {
-                                    |  accum.incr("<lineage>", PerfMonitor.estimateSize(t))
+                                    |  PerfMonitor.sampleSize(t,"<lineage>", accum)
                                     |}<endif>}<else>
                                     |<in><if (profiling)>.map{t =>
                                     |  if(scala.util.Random.nextInt(randFactor) == 0) {
-                                    |    accum.incr("<lineage>", PerfMonitor.estimateSize(t))
+                                    |    PerfMonitor.sampleSize(t,"<lineage>", accum)
                                     |  }
                                     |  t
                                     |}<endif>.collect.foreach(t => println(t.mkString()))<endif>""".stripMargin
