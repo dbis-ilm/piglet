@@ -1,9 +1,7 @@
 package dbis.piglet.backends.spark
 
-import java.io.{ByteArrayOutputStream, ObjectOutputStream}
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
-import com.sun.xml.internal.ws.wsdl.writer.document.xsd.Schema
 import dbis.piglet.backends.SchemaClass
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.AccumulatorV2
@@ -11,7 +9,6 @@ import org.apache.spark.{NarrowDependency, ShuffleDependency}
 
 import scala.collection.mutable
 import scala.collection.mutable.{ListBuffer, Map => MutableMap}
-import scala.util.Try
 
 class UpdateMap[K,V](m: MutableMap[K,V]) {
 
@@ -125,9 +122,21 @@ object PerfMonitor {
 //  def estimateSize(o: AnyRef): Long = org.apache.spark.util.SizeEstimator.estimate(o)
 
   @inline
-  def sampleSize(t: SchemaClass, lineage: String, accum: SizeAccumulator): Unit = {
-    accum.incr(lineage, t)
+  def sampleSize(t: SchemaClass, lineage: String, accum: SizeAccumulator, num: Int = 1): Unit = {
+    accum.incr(lineage, t, num)
   }
+
+  @inline
+  def sampleSize(t: Iterable[SchemaClass], lineage: String, accum: SizeAccumulator): Unit = {
+    sampleSize(t.toSeq, lineage, accum)
+  }
+
+  @inline
+  def sampleSize(t: Seq[SchemaClass], lineage: String, accum: SizeAccumulator): Unit = {
+    accum.incr(lineage, t.take(100), num = t.size)
+  }
+
+
 
 //  @inline
 //  def sampleSize2(o: AnyRef, lineage: String, accum: SizeAccumulator2): Unit = {
@@ -146,19 +155,66 @@ object PerfMonitor {
 //  }
 //}
 
-case class SizeStat2(private var _elems: ListBuffer[SchemaClass], private var _cnt: Long, private var _numBytes: Option[Double] = None) extends Cloneable {
-  override def clone(): SizeStat2 = SizeStat2(_elems.clone(), _cnt, _numBytes)
+case class SizeStat2(private var elems: ListBuffer[AnyRef], private var _cnt: Long, private var _numBytes: Option[Double] = None,
+                     private var additionalBytes: Long = 0, private var numAdditional: Int = 0) extends Cloneable {
+  override def clone(): SizeStat2 = SizeStat2(elems.clone(), cnt, _numBytes, additionalBytes, numAdditional)
 
-  def getElems = _elems
+//  def getElems = elems
   def cnt = _cnt
   def numBytes(): Double = _numBytes.getOrElse {
-    val nbytes = computeNumBytes
+    val nbytes = (SizeStat2.computeNumBytes(elems) + additionalBytes) / (elems.size + numAdditional).toDouble
     _numBytes = Some(nbytes)
-    _elems.clear()
+    elems.clear()
     nbytes
   }
 
-  private def computeNumBytes: Double = {
+
+  def addAdditionalBytes(bytes: Long, num: Int = 1): Unit = {
+    additionalBytes += bytes
+    numAdditional += num
+  }
+
+  def add(o: AnyRef): Unit = {
+
+    if(_numBytes.isEmpty && elems.size < SizeStat2.MaxSampleSizePerOp) {
+      elems += o
+    }
+
+    if(elems.size >= SizeStat2.MaxSampleSizePerOp) {
+      val bytes = SizeStat2.computeNumBytes(elems) / elems.size.toDouble
+      _numBytes = Some(bytes)
+      elems.clear()
+    }
+
+    _cnt += 1
+  }
+
+
+  def merge(other: SizeStat2): Unit = {
+
+    val iter = other.elems.iterator
+
+    while(elems.size < SizeStat2.MaxSampleSizePerOp && iter.hasNext) {
+      val elem = iter.next()
+      elems += elem
+    }
+
+    if(elems.size >= SizeStat2.MaxSampleSizePerOp) {
+      val bytes = SizeStat2.computeNumBytes(elems) / elems.size.toDouble
+      _numBytes = Some(bytes)
+      elems.clear()
+    }
+
+    _cnt += other._cnt
+  }
+}
+
+object SizeStat2 {
+  val MaxSampleSizePerOp: Int = 1000
+
+  def computeNumBytes(objects: AnyRef): Long = {
+
+//    val objects = stat.elems
 
     var bos: java.io.ByteArrayOutputStream = null
     var out: java.io.ObjectOutputStream = null
@@ -166,7 +222,7 @@ case class SizeStat2(private var _elems: ListBuffer[SchemaClass], private var _c
     val bytes = try {
       bos = new java.io.ByteArrayOutputStream()
       out = new java.io.ObjectOutputStream(bos)
-      out.writeObject(_elems)
+      out.writeObject(objects)
       out.flush()
       bos.toByteArray.length
     } catch {
@@ -182,49 +238,13 @@ case class SizeStat2(private var _elems: ListBuffer[SchemaClass], private var _c
     }
 
     // too imprecise
-//    org.apache.spark.util.SizeEstimator.estimate(_elems) / _elems.size.toDouble
+    //    org.apache.spark.util.SizeEstimator.estimate(elems) / elems.size.toDouble
 
-    bytes / _elems.size.toDouble
+//    (bytes + stat.additionalBytes) / (objects.size + stat.numAdditional).toDouble
+    bytes
   }
 
-
-  def add(o: SchemaClass): Unit = {
-
-    if(_numBytes.isEmpty && _elems.size < SizeStat2.MaxSampleSizePerOp) {
-      _elems += o
-    }
-
-    if(_elems.size >= SizeStat2.MaxSampleSizePerOp) {
-      val bytes = computeNumBytes
-      _numBytes = Some(bytes)
-      _elems.clear()
-    }
-
-    _cnt += 1
-  }
-
-
-  def merge(other: SizeStat2): Unit = {
-
-    val iter = other.getElems.iterator
-
-    while(_elems.size < SizeStat2.MaxSampleSizePerOp && iter.hasNext) {
-      val elem = iter.next()
-      _elems += elem
-    }
-
-    if(_elems.size >= SizeStat2.MaxSampleSizePerOp) {
-      val bytes = computeNumBytes
-      _numBytes = Some(bytes)
-      _elems.clear()
-    }
-
-    _cnt += other._cnt
-  }
-}
-
-object SizeStat2 {
-  val MaxSampleSizePerOp: Int = 1000
+  def fromAdditionalBytes(bytes: Long): SizeStat2 = SizeStat2(ListBuffer.empty, 0, None, bytes, 1)
 }
 
 class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mutable.Map[String, SizeStat2]] {
@@ -259,13 +279,36 @@ class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mut
     }
   }
 
-  def incr(lineage: Lineage, o: SchemaClass) = {
+  def incr(lineage: Lineage, o: SchemaClass, num: Int = 1) = {
     if(theValue.contains(lineage)) {
       theValue(lineage).add(o)
     } else {
       theValue += lineage -> SizeStat2(ListBuffer(o),1)
     }
+
+    if(num > 1)
+      theValue(lineage).addAdditionalBytes(SizeStat2.computeNumBytes(o) * (num - 1) )
   }
+
+  def incr(lineage: Lineage, o: Seq[SchemaClass], num: Int) = {
+//    val taken = o.take(100)
+//    if(theValue.contains(lineage)) {
+//      theValue(lineage).add(taken)
+//    } else {
+//      theValue += lineage -> SizeStat2(ListBuffer(taken),1)
+//    }
+
+    val bytes = if(o.isEmpty) { 0 } else {
+      ((SizeStat2.computeNumBytes(o.head) / o.size.toDouble) * num).toLong
+    }
+    if(theValue.contains(lineage)) {
+      theValue(lineage).addAdditionalBytes(bytes, 1)
+    } else {
+      theValue += lineage -> SizeStat2.fromAdditionalBytes(bytes)
+    }
+  }
+
+
 
   override def merge(other: AccumulatorV2[MutableMap[Lineage, SizeStat2], MutableMap[Lineage, SizeStat2]]): Unit = {
     add(other.value)
@@ -274,48 +317,48 @@ class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mut
   override def value: MutableMap[Lineage, SizeStat2] = theValue
 }
 
-class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mutable.Map[String, SizeStat]] {
-
-  type Lineage = String
-
-  private val theValue = mutable.Map.empty[Lineage, SizeStat]
-
-  override def isZero: Boolean = theValue.isEmpty
-
-  override def copy(): AccumulatorV2[MutableMap[Lineage, SizeStat], MutableMap[Lineage, SizeStat]] = {
-    val newAccum = new SizeAccumulator2()
-
-
-    theValue.foreach{ case (k,v) =>
-      newAccum.value += k -> v
-    }
-
-    newAccum
-  }
-
-  override def reset(): Unit = theValue.clear()
-
-  override def add(value: MutableMap[Lineage, SizeStat]): Unit = {
-    value.foreach{ case (k,v) =>
-      if(theValue.contains(k)) {
-        theValue(k).add(v)
-      } else {
-        theValue += k -> v
-      }
-    }
-  }
-
-  def incr(lineage: Lineage, bytes: Long) = {
-    if(theValue.contains(lineage)) {
-      theValue(lineage).add(SizeStat(1,bytes))
-    } else {
-      theValue += lineage -> SizeStat(1,bytes)
-    }
-  }
-
-  override def merge(other: AccumulatorV2[MutableMap[Lineage, SizeStat], MutableMap[Lineage, SizeStat]]): Unit = {
-    add(other.value)
-  }
-
-  override def value: MutableMap[Lineage, SizeStat] = theValue
-}
+//class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mutable.Map[String, SizeStat]] {
+//
+//  type Lineage = String
+//
+//  private val theValue = mutable.Map.empty[Lineage, SizeStat]
+//
+//  override def isZero: Boolean = theValue.isEmpty
+//
+//  override def copy(): AccumulatorV2[MutableMap[Lineage, SizeStat], MutableMap[Lineage, SizeStat]] = {
+//    val newAccum = new SizeAccumulator2()
+//
+//
+//    theValue.foreach{ case (k,v) =>
+//      newAccum.value += k -> v
+//    }
+//
+//    newAccum
+//  }
+//
+//  override def reset(): Unit = theValue.clear()
+//
+//  override def add(value: MutableMap[Lineage, SizeStat]): Unit = {
+//    value.foreach{ case (k,v) =>
+//      if(theValue.contains(k)) {
+//        theValue(k).add(v)
+//      } else {
+//        theValue += k -> v
+//      }
+//    }
+//  }
+//
+//  def incr(lineage: Lineage, bytes: Long) = {
+//    if(theValue.contains(lineage)) {
+//      theValue(lineage).add(SizeStat(1,bytes))
+//    } else {
+//      theValue += lineage -> SizeStat(1,bytes)
+//    }
+//  }
+//
+//  override def merge(other: AccumulatorV2[MutableMap[Lineage, SizeStat], MutableMap[Lineage, SizeStat]]): Unit = {
+//    add(other.value)
+//  }
+//
+//  override def value: MutableMap[Lineage, SizeStat] = theValue
+//}
