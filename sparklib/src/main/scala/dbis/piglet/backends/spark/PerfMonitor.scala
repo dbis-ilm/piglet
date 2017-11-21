@@ -180,23 +180,24 @@ case class SizeStat(var records: Long, var bytes: Long) extends Cloneable {
   }
 }
 
-case class SizeStat2(var elems: ListBuffer[SchemaClass]) extends Cloneable {
-  override def clone(): SizeStat2 = SizeStat2(elems.clone())
+case class SizeStat2(var elems: ListBuffer[SchemaClass], var cnt: Long) extends Cloneable {
+  override def clone(): SizeStat2 = SizeStat2(elems.clone(), cnt)
 
   def add(stat: SizeStat2): Unit = {
     elems ++= stat.elems
+    cnt += stat.cnt
   }
 }
 
-class SizeAccumulator3(maxSampleSizePerOp: Int = 1000 ) extends AccumulatorV2[mutable.Map[String, ListBuffer[SchemaClass]],mutable.Map[String, ListBuffer[SchemaClass]]] {
+class SizeAccumulator3(maxSampleSizePerOp: Int = 1000 ) extends AccumulatorV2[mutable.Map[String, SizeStat2],mutable.Map[String, SizeStat2]] {
 
   type Lineage = String
 
-  private val theValue = mutable.Map.empty[Lineage, ListBuffer[SchemaClass]]
+  private val theValue = mutable.Map.empty[Lineage, SizeStat2]
 
   override def isZero: Boolean = theValue.isEmpty
 
-  override def copy(): AccumulatorV2[MutableMap[Lineage, ListBuffer[SchemaClass]], MutableMap[Lineage, ListBuffer[SchemaClass]]] = {
+  override def copy(): AccumulatorV2[MutableMap[Lineage, SizeStat2], MutableMap[Lineage, SizeStat2]] = {
     val newAccum = new SizeAccumulator3()
 
     theValue.foreach{ case (k,v) =>
@@ -208,11 +209,15 @@ class SizeAccumulator3(maxSampleSizePerOp: Int = 1000 ) extends AccumulatorV2[mu
 
   override def reset(): Unit = theValue.clear()
 
-  override def add(value: MutableMap[Lineage, ListBuffer[SchemaClass]]): Unit = {
+  override def add(value: MutableMap[Lineage, SizeStat2]): Unit = {
     value.foreach{ case (k,v) =>
-      if(theValue.contains(k) && theValue(k).size < maxSampleSizePerOp) {
-        val numTake = math.max(maxSampleSizePerOp - theValue(k).size, 0)
-        theValue(k) ++= v.take(numTake)
+      if(theValue.contains(k)) {
+        theValue(k).cnt += v.cnt
+
+        if(theValue(k).elems.size < maxSampleSizePerOp) {
+          val numTake: Int = math.max(maxSampleSizePerOp - theValue(k).elems.size, 0)
+          theValue(k).elems ++= v.elems.take(numTake)
+        }
       } else {
         theValue += k -> v
       }
@@ -220,18 +225,21 @@ class SizeAccumulator3(maxSampleSizePerOp: Int = 1000 ) extends AccumulatorV2[mu
   }
 
   def incr(lineage: Lineage, o: SchemaClass) = {
-    if(theValue.contains(lineage) && theValue(lineage).size < maxSampleSizePerOp) {
-      theValue(lineage) += o
+    if(theValue.contains(lineage)) {
+      theValue(lineage).cnt += 1
+      if(theValue(lineage).elems.size < maxSampleSizePerOp) {
+        theValue(lineage).elems += o
+      }
     } else {
-      theValue += lineage -> ListBuffer(o)
+      theValue += lineage -> SizeStat2(ListBuffer(o),1)
     }
   }
 
-  override def merge(other: AccumulatorV2[MutableMap[Lineage, ListBuffer[SchemaClass]], MutableMap[Lineage, ListBuffer[SchemaClass]]]): Unit = {
+  override def merge(other: AccumulatorV2[MutableMap[Lineage, SizeStat2], MutableMap[Lineage, SizeStat2]]): Unit = {
     add(other.value)
   }
 
-  override def value: MutableMap[Lineage, ListBuffer[SchemaClass]] = theValue
+  override def value: MutableMap[Lineage, SizeStat2] = theValue
 }
 
 class SizeAccumulator2() extends AccumulatorV2[mutable.Map[String, SizeStat],mutable.Map[String, SizeStat]] {
