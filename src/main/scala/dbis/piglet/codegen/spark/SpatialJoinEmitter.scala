@@ -19,8 +19,8 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
                     |     if(scala.util.Random.nextInt(randFactor) == 0) {
                     |       PerfMonitor.sampleSize(t,"<lineage>", accum)
                     |     }
+                    |     <endif>
                     |     t
-                    |  <endif>
                     |\\}""".stripMargin
 
 //  partitionBy(new dbis.stark.spatial.partitioner.SpatialGridPartitioner())

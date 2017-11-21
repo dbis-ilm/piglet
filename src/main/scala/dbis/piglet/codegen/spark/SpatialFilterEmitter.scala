@@ -15,6 +15,7 @@ class SpatialFilterEmitter extends CodeEmitter[SpatialFilter] {
       |  if(scala.util.Random.nextInt(randFactor) == 0) {
       |    PerfMonitor.sampleSize(v,"<lineage>", accum)
       |  }
+      |  <endif>
       |  v
       |}""".stripMargin
   
