@@ -47,7 +47,7 @@ case class Partition(lineage: Lineage, partitionId: Int) extends Ordered[Partiti
         0
     }
 }
-case class SizeInfo(lineage: Lineage, records: Long, bytes: Long)
+case class SizeInfo(lineage: Lineage, records: Long, bytes: Double)
 case class TimeInfo(lineage: Lineage, partitionId: Int, time: Long, parentPartitions: List[List[Int]])
 
 object DataflowProfiler extends PigletLogging {
@@ -290,10 +290,10 @@ object DataflowProfiler extends PigletLogging {
   def addSizes(m: Array[SizeInfo], factor: Int) = {
     m.foreach{
       case SizeInfo(lineage, records, bytes) =>
-        val bytesPerRecord = bytes / records
+        val bytesPerRecord = bytes // / records
         val totalRecords = records * factor
 
-        logger.debug(s"add size info for $lineage : records= $records\t* $factor = $totalRecords,\tbpr = $bytes / $records = $bytesPerRecord")
+        logger.debug(s"add size info for $lineage : records= $records\t* $factor = $totalRecords,\tbpr = $bytesPerRecord")
 
         profilingGraph.updateSize(SizeInfo(lineage, records = totalRecords, bytes = bytesPerRecord))
     }

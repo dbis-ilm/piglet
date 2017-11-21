@@ -14,7 +14,7 @@ import scalax.collection.mutable.Graph
   * @param lineage The lineage for the operator
   * @param cost The operator cost (execution time)
   */
-case class Op(lineage: Lineage, var cost: Option[T] = None, var resultRecords: Option[Long] = None, var bytesPerRecord: Option[Long] = None) {
+case class Op(lineage: Lineage, var cost: Option[T] = None, var resultRecords: Option[Long] = None, var bytesPerRecord: Option[Double] = None) {
   override def equals(obj: scala.Any): Boolean = obj match {
     case Op(l,_,_,_) => l equals lineage
     case _ => false
@@ -94,7 +94,7 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
   def cost(lineage: Lineage): Option[T] = model.find(Op(lineage)).flatMap(_.value.cost)
 
   def resultRecords(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.value.resultRecords)
-  def bytesPerRecord(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.value.bytesPerRecord)
+  def bytesPerRecord(lineage: Lineage): Option[Double] = model.find(Op(lineage)).flatMap(_.value.bytesPerRecord)
 
 //  def outputRecords(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.outNeighbors.headOption.flatMap(_.value.resultRecords))
 //  def outputBytesPerRecord(lineage: Lineage): Option[Long] = model.find(Op(lineage)).flatMap(_.outNeighbors.headOption.flatMap(_.value.bytesPerRecord))

@@ -147,7 +147,7 @@ case class SizeMsg(private val sizes: String) extends StatMsg {
     val a = s.split(StatsWriterActor.SIZE_DELIM)
     val lineage = a(0)
     val numRecords = a(1).toLong
-    val numBytes = a(2).toLong
+    val numBytes = a(2).toDouble
     SizeInfo(lineage, records = numRecords, bytes = numBytes)
   }
 }

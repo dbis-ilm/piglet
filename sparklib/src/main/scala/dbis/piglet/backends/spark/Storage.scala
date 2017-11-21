@@ -38,7 +38,7 @@ import scala.tools.nsc.io._
 class PigStorage[T <: SchemaClass :ClassTag](fraction: Int = 1) extends java.io.Serializable {
   
   def load(sc: SparkContext, path: String, extract: (Array[String]) => T, delim: String = "\t", 
-      skipFirstRow: Boolean = false, skipEmpty: Boolean = false, comments: String = "", lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = {
+      skipFirstRow: Boolean = false, skipEmpty: Boolean = false, comments: String = "", lineageAndAccum: Option[(String, SizeAccumulator)] = None): RDD[T] = {
         
     val raw = sc.textFile(path)
     val nonEmpty = if(skipEmpty) raw.filter { line => line.nonEmpty } else raw
@@ -78,7 +78,7 @@ object PigStorage extends java.io.Serializable {
 //-----------------------------------------------------------------------------------------------------
 
 class TextLoader[T <: SchemaClass :ClassTag](franction: Int = -1) extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, extract: (Array[String]) => T, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = {
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T, lineageAndAccum: Option[(String, SizeAccumulator)] = None): RDD[T] = {
     sc.textFile(path).map(line => extract(Array(line)))  //.map(line => Record(Array(line)))
   }
 
@@ -127,7 +127,7 @@ class RDFFileStorage[T: ClassTag](fraction: Int = -1) extends java.io.Serializab
     fields.toArray.slice(0, 3)
   }
 
-  def load(sc: SparkContext, path: String, extract: (Array[String]) => T, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] =
+  def load(sc: SparkContext, path: String, extract: (Array[String]) => T, lineageAndAccum: Option[(String, SizeAccumulator)] = None): RDD[T] =
     sc.textFile(path).map(line => extract(rdfize(line)))
 }
 
@@ -141,8 +141,8 @@ object RDFFileStorage {
 
 class BinStorage[T: ClassTag](fraction: Int = -1) extends java.io.Serializable {
 
-  def load(sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = sc.objectFile[T](path)
-//  def load(sc: SparkContext, path: String, lineageAndAccum: Option[(String, SizeAccumulator2)]): RDD[T] =
+  def load(sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator)] = None): RDD[T] = sc.objectFile[T](path)
+//  def load(sc: SparkContext, path: String, lineageAndAccum: Option[(String, SizeAccumulator)]): RDD[T] =
 
   def write(path: String, rdd: RDD[T]) = rdd.saveAsObjectFile(path)
 }
@@ -155,7 +155,7 @@ class BinStorage2[T: ClassTag](fraction: Int = -1) extends java.io.Serializable 
 //  val hdfs = HDFSService.fileSystem
 
 
-  def load(sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] =
+  def load(sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator)] = None): RDD[T] =
     sc.objectFile[T](path)
 
 
@@ -196,7 +196,7 @@ import org.json4s.native.Serialization
 
 class JsonStorage2[T <: SchemaClass : Manifest](fraction: Int = -1)  extends Serializable {
 
-  def load(sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = {
+  def load(sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator)] = None): RDD[T] = {
     val spark = SparkSession.builder().config(sc.getConf).getOrCreate()
     import spark.implicits._
     val a = spark.read.json(path).as[T]
@@ -228,7 +228,7 @@ object JsonStorage2 {
 //-----------------------------------------------------------------------------------------------------
 
 class JsonStorage(fraction: Int = -1) extends java.io.Serializable {
-  def load(sc: SparkContext, path: String, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[List[Any]] = {
+  def load(sc: SparkContext, path: String, lineageAndAccum: Option[(String, SizeAccumulator)] = None): RDD[List[Any]] = {
     val sqlContext = new org.apache.spark.sql.SQLContext(sc)
     // TODO: convert a DataFrame to a RDD with generic components
     sqlContext.read.json(path).rdd.map(_.toSeq.map(v => v.toString).toList)
@@ -242,7 +242,7 @@ object JsonStorage {
 //-----------------------------------------------------------------------------------------------------
 
 class JdbcStorage[T <: SchemaClass: ClassTag](fraction: Int = -1) extends java.io.Serializable {
-  def load(sc: SparkContext, table: String, extract: Row => T, driver: String, url: String, lineageAndAccum: Option[(String, SizeAccumulator2)] = None): RDD[T] = {
+  def load(sc: SparkContext, table: String, extract: Row => T, driver: String, url: String, lineageAndAccum: Option[(String, SizeAccumulator)] = None): RDD[T] = {
     // sc.addJar("/Users/kai/Projects/h2/bin/h2-1.4.189.jar")
     var params = scala.collection.immutable.Map[String, String]()
     params += ("driver" -> driver)

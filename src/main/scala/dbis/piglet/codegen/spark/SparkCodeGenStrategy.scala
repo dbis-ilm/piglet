@@ -113,7 +113,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
                     		 |    val sc = new SparkContext(conf)
                          |<if (profiling)>
                          |    val randFactor: Int = <randFactor>
-                         |    val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
+                         |    val accum = new dbis.piglet.backends.spark.SizeAccumulator()
                          |    sc.register(accum,"accum")
                          |    PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
                          |<endif>
