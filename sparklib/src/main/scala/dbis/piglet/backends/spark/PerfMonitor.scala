@@ -247,7 +247,7 @@ object SizeStat2 {
     bytes
   }
 
-  def fromAdditionalBytes(bytes: Long): SizeStat2 = SizeStat2(ListBuffer.empty, 0, None, bytes, 1)
+  def fromAdditionalBytes(bytes: Long): SizeStat2 = SizeStat2(ListBuffer.empty, 1, None, bytes, 1)
 }
 
 class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mutable.Map[String, SizeStat2]] {
