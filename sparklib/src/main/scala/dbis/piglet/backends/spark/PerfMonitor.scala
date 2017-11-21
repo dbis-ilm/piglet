@@ -181,7 +181,7 @@ case class SizeStat2(private var elems: ListBuffer[AnyRef], private var _cnt: Lo
     }
 
     if(elems.size >= SizeStat2.MaxSampleSizePerOp) {
-      val bytes = SizeStat2.computeNumBytes(elems) / elems.size.toDouble
+      val bytes = (SizeStat2.computeNumBytes(elems) + additionalBytes) / (elems.size + numAdditional).toDouble
       _numBytes = Some(bytes)
       elems.clear()
     }
@@ -194,13 +194,16 @@ case class SizeStat2(private var elems: ListBuffer[AnyRef], private var _cnt: Lo
 
     val iter = other.elems.iterator
 
+    additionalBytes += other.additionalBytes
+    numAdditional += other.numAdditional
+
     while(elems.size < SizeStat2.MaxSampleSizePerOp && iter.hasNext) {
       val elem = iter.next()
       elems += elem
     }
 
     if(elems.size >= SizeStat2.MaxSampleSizePerOp) {
-      val bytes = SizeStat2.computeNumBytes(elems) / elems.size.toDouble
+      val bytes = (SizeStat2.computeNumBytes(elems) + additionalBytes) / (elems.size + numAdditional).toDouble
       _numBytes = Some(bytes)
       elems.clear()
     }
