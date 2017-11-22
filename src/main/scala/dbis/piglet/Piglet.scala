@@ -272,7 +272,8 @@ object Piglet extends PigletLogging {
 
       // for creating the Dot image
       PlanWriter.init(newPlan)
-      val imgPath = path.resolveSibling(scriptName)
+//      val imgPath = path.resolveSibling(scriptName)
+      val imgPath = CliParams.values.outDir.resolve(scriptName)
       PlanWriter.createImage(imgPath, scriptName)
 
       if (CliParams.values.showPlan) {
@@ -364,7 +365,7 @@ object Piglet extends PigletLogging {
           }
 
           //          PlanWriter.writeDotFile(jarFile.getParent.resolve(s"$scriptName.dot"))
-          PlanWriter.createImage(jarFile.getParent, scriptName)
+//          PlanWriter.createImage(jarFile.getParent, scriptName)
         case None => logger.error(s"creating jar file failed for $path")
       }
     }
