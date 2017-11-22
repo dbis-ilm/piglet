@@ -320,10 +320,12 @@ object Piglet extends PigletLogging {
 
             timing("job execution") {
               val start = System.currentTimeMillis()
-              runner.execute(CliParams.values.master, scriptName, jarFile, CliParams.values.backendArgs, CliParams.values.profiling.isDefined)
 
-              logger.info(s"program execution finished in ${System.currentTimeMillis() - start} ms")
-
+              try {
+                runner.execute(CliParams.values.master, scriptName, jarFile, CliParams.values.backendArgs, CliParams.values.profiling.isDefined)
+              } finally {
+                logger.info(s"program execution finished in ${System.currentTimeMillis() - start} ms")
+              }
             }
 
 
