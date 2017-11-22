@@ -15,7 +15,7 @@ class GroupingEmitter extends CodeEmitter[Grouping] {
                                     |           val t = <class>(<keyExtr>,v)
                                     |           <if (profiling)>
                                     |           if(scala.util.Random.nextInt(randFactor) == 0) {
-                                    |             PerfMonitor.sampleSize(v,"<lineage>", accum)
+                                    |             PerfMonitor.sampleSize(v.head,"<lineage>", accum, v.size)
                                     |           }
                                     |           <endif>
                                     |           t
@@ -25,7 +25,7 @@ class GroupingEmitter extends CodeEmitter[Grouping] {
                                     |         val res = <class>("all", t)
                                     |         <if (profiling)>
                                     |         if(scala.util.Random.nextInt(randFactor) == 0) {
-                                    |           PerfMonitor.sampleSize(t,"<lineage>", accum)
+                                    |           PerfMonitor.sampleSize(t.head,"<lineage>", accum, t.size)
                                     |         }
                                     |         <endif>
                                     |         res
