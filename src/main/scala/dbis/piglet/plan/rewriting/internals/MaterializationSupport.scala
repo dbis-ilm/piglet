@@ -61,7 +61,7 @@ trait MaterializationSupport extends PigletLogging {
        * with the loader.
        */
       if(data.isDefined) {
-        logger.debug(s"found materialized data for materialize operator $materialize")
+        logger.info(s"found materialized data for materialize operator $materialize")
 
         val path: URI = data.get
 
@@ -72,7 +72,7 @@ trait MaterializationSupport extends PigletLogging {
          * --> store them by adding a STORE operator to the MATERIALIZE operator's input op
          * then, remove the materialize op
          */
-        logger.debug(s"did not find materialized data for materialize operator $materialize")
+        logger.info(s"did not find materialized data for materialize operator $materialize")
 
         val sig = materialize.lineageSignature
 

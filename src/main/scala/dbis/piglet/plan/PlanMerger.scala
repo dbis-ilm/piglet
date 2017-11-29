@@ -15,13 +15,13 @@ object PlanMerger extends PigletLogging {
 	    return schedule.head
 	  
 	  val indexedSchedule = schedule.zipWithIndex
-	  
-	  indexedSchedule.foreach { case (plan,idx) =>  
+
+	  indexedSchedule.foreach { case (plan,idx) =>
 	    plan.operators.foreach { _.outputs.foreach { pipe => pipe.name += s"_$idx" } }    
 	  }
-	  
-	  // start with the first plan as basis
-		var mergedPlan = schedule.head
+
+		// start with the first plan as basis
+		val mergedPlan = schedule.head
 
 		
 		// just to avoid magic "numbers" in later code
@@ -38,16 +38,16 @@ object PlanMerger extends PigletLogging {
 		 */
 		def visitor(op: PigOperator): Unit = {
 		  logger.debug("")
-	    logger.debug(s"processing op: $op")
+	    logger.debug(s"processing op: ${op.name} (${op.outPipeNames.mkString(",")})")
 	  
 	    // try to find the current op in merged plan
 	    val mergedOps = mergedPlan.findOperator { o => o.lineageSignature == op.lineageSignature} 
 	    
-	    logger.debug(s"For $op --> Ops in merged plan: $mergedOps")
+	    logger.debug(s"For ${op.name} --> Ops in merged plan: ${mergedOps.map(o => s"${o.name}(${o.outPipeNames.mkString(",")})")}")
 	    
 	    // not found --> add it
 			if(mergedOps.isEmpty) {
-			  logger.debug(s"$op not already part of merged plan")
+			  logger.debug(s"${op.name} not already part of merged plan")
 			  
 			  // some ops need special treatment
 			  op match {
@@ -72,7 +72,7 @@ object PlanMerger extends PigletLogging {
             }
 
 						// add op to the list but do not create plan now
-						logger.debug(s"try to add $op with deferr=$deferrPlanConstruction")
+						logger.debug(s"try to add ${op.name} with deferr=$deferrPlanConstruction")
 						mergedPlan.addOperator(List(op), deferrPlanConstruction)
 						needPlanConstruction = true
 					case _ =>
@@ -85,11 +85,11 @@ object PlanMerger extends PigletLogging {
     			      
 //      					mergedPlan = mergedPlan.insertAfter(producer, op)
     			      mergedPlan.addOperator(List(op), deferrPlanConstruction)
-      					logger.debug(s"inserted $op after $producer")
+      					logger.debug(s"inserted ${op.name}(${op.outPipeNames.mkString(",")}) after ${producer.name}(${producer.outPipeNames.mkString(",")})")
     				}
 			  }
 			} else {
-			  logger.debug(s"$op already present in plan")
+			  logger.debug(s"${op.name}(${op.outPipeNames.mkString(",")}) already present in plan")
 			}
 		}
 
