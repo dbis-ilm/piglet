@@ -24,6 +24,9 @@ class UpdateMap[K,V](m: MutableMap[K,V]) {
 
 object PerfMonitor {
 
+  val SEQ_SAMPLE_MAX_SIZE = 8 * 100 * 1024 // 8 kB
+
+
   def request(url: String, data: String): Boolean = {
     val theUrl = new URL(s"$url?data=${URLEncoder.encode(data, "UTF-8")}")
     val c = theUrl.openConnection().asInstanceOf[HttpURLConnection]
@@ -133,7 +136,20 @@ object PerfMonitor {
 
   @inline
   def sampleSize(t: Seq[SchemaClass], lineage: String, accum: SizeAccumulator): Unit = {
-    accum.incr(lineage, t.take(100), num = t.size)
+
+    var takenSize = 0L
+    val taken = t.takeWhile{ s =>
+      val tSize = org.apache.spark.util.SizeEstimator.estimate(s)
+      if(takenSize + tSize < SEQ_SAMPLE_MAX_SIZE) {
+        takenSize += tSize
+        true
+      } else {
+        false
+      }
+
+    }
+
+    accum.incr(lineage, taken, num = t.size)
   }
 
 
@@ -213,7 +229,7 @@ case class SizeStat2(private var elems: ListBuffer[AnyRef], private var _cnt: Lo
 }
 
 object SizeStat2 {
-  val MaxSampleSizePerOp: Int = 1000
+  val MaxSampleSizePerOp: Int = 100
 
   def computeNumBytes(objects: AnyRef): Long = {
 
@@ -294,15 +310,8 @@ class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mut
   }
 
   def incr(lineage: Lineage, o: Seq[SchemaClass], num: Int) = {
-//    val taken = o.take(100)
-//    if(theValue.contains(lineage)) {
-//      theValue(lineage).add(taken)
-//    } else {
-//      theValue += lineage -> SizeStat2(ListBuffer(taken),1)
-//    }
-
     val bytes = if(o.isEmpty) { 0 } else {
-      ((SizeStat2.computeNumBytes(o.head) / o.size.toDouble) * num).toLong
+      ((SizeStat2.computeNumBytes(o) / o.size.toDouble) * num).toLong
     }
     if(theValue.contains(lineage)) {
       theValue(lineage).addAdditionalBytes(bytes, 1)
