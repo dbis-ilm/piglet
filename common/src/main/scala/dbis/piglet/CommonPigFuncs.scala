@@ -27,6 +27,12 @@ trait CommonPigFuncs {
     sum / num
   }
 
+  def median[T: Numeric](bag: Iterable[T]): T = {
+    val sorted = bag.toSeq.sorted
+    val m = sorted.length / 2
+    sorted(m)
+  }
+
   def count(bag: Iterable[Any]): Int = bag.size
 
   def sum[T: Numeric](bag: Iterable[T]): T = bag.sum
