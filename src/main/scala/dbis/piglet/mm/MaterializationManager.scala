@@ -17,7 +17,6 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.io.Source
-import scala.util.{Failure, Success, Try}
 
 
 object MaterializationManager extends PigletLogging {
@@ -27,29 +26,33 @@ object MaterializationManager extends PigletLogging {
   def replaceWithLoad(materialize: PigOperator, path: URI, plan: DataflowPlan): DataflowPlan = {
 
 
-    var newPlan = plan
-
-    val p = Pipe(materialize.inPipeName)
-    val loader = Load(p, path, materialize.constructSchema, Some(STORAGE_CLASS))
-    newPlan.addOperator(Seq(loader), deferrConstruct = true)
-
+    val newPlan = plan
 
     val consumers = materialize.inputs.head.producer // the producer is the only input of MATERIALIZE
                       .outputs.head.consumer // all consumers of the producer
                       .filterNot(_.isInstanceOf[Materialize]) // but without the MATERIALIZE op
 
-    materialize.inputs.head.producer.outputs = List.empty
 
-    newPlan = newPlan.remove(materialize, removePredecessors = true)
+    val p = Pipe(materialize.inPipeName)
+    val loader = Load(p, path.toString, materialize.constructSchema, Some(STORAGE_CLASS))
 
-    val opAncestors = BreadthFirstBottomUpWalker.collect(plan, Seq(materialize))
-    plan.operators = plan.operators.filterNot(opAncestors.contains)
+    //    newPlan = newPlan.remove(materialize, removePredecessors = true)
+
+    val opAncestors = BreadthFirstBottomUpWalker.collect(newPlan, Seq(materialize))
+    newPlan.operators = newPlan.operators.filterNot{ o => o == materialize || opAncestors.contains(o)}
+
+    newPlan.addOperator(Seq(loader), deferrConstruct = true)
 
     consumers.foreach { c =>
-
       c.inputs.filter(p => p.name == loader.outPipeName).head.producer = loader
       loader.addConsumer(loader.outPipeName, c)
     }
+
+    materialize.inputs.head.producer.outputs = List.empty
+//    logger.info(s"pipe: $p")
+    loader.outputs = List(p)
+
+    logger.info(s"plan ops: \n${newPlan.operators.map(_.name).mkString("\n")}")
 
     logger.debug(s"replaced materialize op with loader $loader")
 
@@ -57,6 +60,7 @@ object MaterializationManager extends PigletLogging {
        * or do they get removed during code generation (because there is no sink?)
        */
 
+    newPlan.constructPlan(newPlan.operators)
     newPlan
   }
 
@@ -67,7 +71,7 @@ object MaterializationManager extends PigletLogging {
     val producer = materialize.inputs.head.producer
 
     val p = producer.outputs.filter(_.name == materialize.inputs.head.name).head
-    val storer = Store(p, path, Some(STORAGE_CLASS))
+    val storer = Store(p, path.toString, Some(STORAGE_CLASS))
 
     newPlan.addOperator(Seq(storer))
     newPlan = newPlan.remove(materialize)
@@ -230,7 +234,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
         saveMapping(lineage, path) // we save a mapping from the lineage of the actual op (not the materialize) to the path
       }
 
-      val storer = Store(theOp.outputs.head, path, Some(MaterializationManager.STORAGE_CLASS))
+      val storer = Store(theOp.outputs.head, path.toString, Some(MaterializationManager.STORAGE_CLASS))
       if(ps.cacheMode == CacheMode.NONE) {
         newPlan.addOperator(Seq(storer), deferrConstruct = false)
         newPlan = newPlan.insertAfter(theOp, storer)
@@ -253,18 +257,15 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
   }
 
 
-  def loadIntermediateResults(plan: DataflowPlan): DataflowPlan = {
+  def loadIntermediateResults(plan: DataflowPlan): (DataflowPlan, Boolean) = {
 
+
+    var loaded = false
 
     DepthFirstBottomUpWalker.walk(plan) { op =>
 
       val sig = op.lineageSignature
-      val opName = Try { op.name } match {
-        case Success(name) => name
-        case Failure(e) =>
-          logger.warn(s"cannot determine name of operator $sig for checking for intermediate results",e)
-          "<unknown>"
-      }
+      val opName = op.name
 
       logger.debug(s"checking for existing materialized results for $opName ($sig)") //${op.name}
 
@@ -272,7 +273,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
         case Some(uri) =>
           logger.info(s"loading materialized results for ${op.name} $sig")
 
-          val loader = Load(Pipe(op.outPipeName), uri, op.constructSchema, Some(MaterializationManager.STORAGE_CLASS))
+          val loader = Load(Pipe(op.outPipeName), uri.toString, op.constructSchema, Some(MaterializationManager.STORAGE_CLASS))
           logger.debug(s"replacing ${op.name} with $loader")
 
           // add the new Load op to the list of operators in the plan
@@ -329,13 +330,15 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
             }
           }
 
+          loaded = true
+
         case None => // nothing to do
       }
 
     }
 
     plan.constructPlan(plan.operators)
-    plan
+    (plan,loaded)
   }
 
   /**

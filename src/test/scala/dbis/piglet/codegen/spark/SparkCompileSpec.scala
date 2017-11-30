@@ -85,7 +85,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
         |      val conf = new SparkConf().setAppName("test_App")
         |      val sc = new SparkContext(conf)
         |      val randFactor: Int = 10
-        |      val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
+        |      val accum = new dbis.piglet.backends.spark.SizeAccumulator()
         |      sc.register(accum,"accum")
         |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
         |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
@@ -128,7 +128,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
                                      |      val conf = new SparkConf().setAppName("test_App")
                                      |      val sc = new SparkContext(conf)
                                      |      val randFactor: Int = 10
-                                     |      val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
+                                     |      val accum = new dbis.piglet.backends.spark.SizeAccumulator()
                                      |      sc.register(accum,"accum")
                                      |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
                                      |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
@@ -453,7 +453,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val op = Limit(Pipe("aa"), Pipe("bb"), 10)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
 //    sc.parallelize(bb.take(10))
-    val expectedCode = cleanString("val aa = bb.zipWithIndex.filter{case (_,idx) => idx < 10}.map(_._1)")
+    val expectedCode = cleanString("val aa = bb.zipWithIndex.filter{case (_,idx) => idx < 10}.map{t => val res = t._1 res }")
     assert(generatedCode == expectedCode)
   }
 

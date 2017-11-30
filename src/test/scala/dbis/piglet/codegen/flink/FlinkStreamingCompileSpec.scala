@@ -16,21 +16,16 @@
  */
 package dbis.piglet.codegen.flink
 
-import dbis.piglet.Piglet._
-import dbis.piglet.op._
+import dbis.piglet.backends.BackendManager
+import dbis.piglet.codegen.{CodeGenContext, CodeGenTarget}
 import dbis.piglet.expr._
+import dbis.piglet.op._
+import dbis.piglet.parser.PigParser.parseScript
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema._
-import org.scalatest.FlatSpec
-import java.net.URI
-import dbis.piglet.tools.Conf
-import dbis.piglet.backends.BackendManager
-import dbis.piglet.tools.logging.PigletLogging
 import dbis.piglet.tools.CodeMatchers
-import org.scalatest.{ Matchers, BeforeAndAfterAll, FlatSpec }
-import dbis.piglet.parser.PigParser.parseScript
-import dbis.piglet.codegen.CodeGenContext
-import dbis.piglet.codegen.CodeGenTarget
+import dbis.piglet.tools.logging.PigletLogging
+import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers}
 
 class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Matchers with CodeMatchers with PigletLogging {
 
@@ -93,7 +88,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   /******************/
   it should "contain code for LOAD" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
 
     val op = Load(Pipe("a"), file)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
@@ -103,7 +98,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
 
   it should "contain code for LOAD with PigStream" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     val op = Load(Pipe("a"), file, None, Some("PigStream"), List("""','"""))
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString(s"""val a = PigStream[Record]().loadStream(env, "$file", (data: Array[String]) => Record(data), ',')""")
@@ -112,10 +107,10 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
 
   it should "contain code for LOAD with RDFStream" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/file.n3")
+    val file = new java.io.File(".").getCanonicalPath + "/file.n3"
     val op = Load(Pipe("a"), file, None, Some("RDFStream"))
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
-    val expectedCode = cleanString(s"""val a = RDFStream[Record]().loadStream(env, "${file}", (data: Array[String]) => Record(data))""")
+    val expectedCode = cleanString(s"""val a = RDFStream[Record]().loadStream(env, "$file", (data: Array[String]) => Record(data))""")
     generatedCode should matchSnippet(expectedCode)
   }
 
@@ -198,17 +193,17 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   /*******************/
   it should "contain code for STORE" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     val op = Store(Pipe("A"), file)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
-    val expectedCode = cleanString(s"""PigStream[Record]().writeStream("${file}", A)""")
+    val expectedCode = cleanString(s"""PigStream[Record]().writeStream("$file", A)""")
     generatedCode should matchSnippet(expectedCode)
   }
 
   it should "contain code for STORE with a known schema" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
     Schema.init()
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     val op = Store(Pipe("A"), file)
     op.schema = Some(Schema(Array(
       Field("f1", Types.IntType),
@@ -221,7 +216,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   it should "contain code for STORE with delimiter" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
     Schema.init()
-    val file = new URI(new java.io.File(".").getCanonicalPath + "/input/file.csv")
+    val file = new java.io.File(".").getCanonicalPath + "/input/file.csv"
     val op = Store(Pipe("A"), file, Some("PigStream"), List(""""#""""))
     op.schema = Some(Schema(Array(
       Field("f1", Types.IntType),
@@ -241,7 +236,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   it should "contain code for DISTINCT" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.DoubleType)))), "t1")
-    val op = Distinct(Pipe("c"), Pipe("b"), true)
+    val op = Distinct(Pipe("c"), Pipe("b"), windowMode = true)
     op.schema = Some(schema)
 
     // Helping surrounding operators
@@ -284,7 +279,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   it should "contain code for simple ORDER BY" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.DoubleType)))), "t1")
-    val op = OrderBy(Pipe("c"), Pipe("b"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)), true)
+    val op = OrderBy(Pipe("c"), Pipe("b"), List(OrderBySpec(PositionalField(0), OrderByDirection.AscendingOrder)), windowMode = true)
     op.schema = Some(schema)
 
     // Helping surrounding operators
@@ -326,7 +321,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
       Field("f2", Types.DoubleType),
       Field("f3", Types.IntType)))), "t1")
     val op = OrderBy(Pipe("c"), Pipe("b"), List(OrderBySpec(NamedField("f1"), OrderByDirection.AscendingOrder),
-      OrderBySpec(NamedField("f3"), OrderByDirection.AscendingOrder)), true)
+      OrderBySpec(NamedField("f3"), OrderByDirection.AscendingOrder)), windowMode = true)
     op.schema = Some(schema)
 
     // Helping surrounding operators
@@ -408,7 +403,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   it should "contain code for a CROSS operator on two relations" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
     // a = Cross b, c;
-    val file = new java.net.URI("input/file.csv")
+    val file = "input/file.csv"
     val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c")), (10, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.DoubleType)))), "t1")
     op.schema = Some(schema)
@@ -428,7 +423,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
     // a = Cross b, c, d;
     val op = Cross(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), (10, "SECONDS"))
-    val file = new java.net.URI("input/file.csv")
+    val file = "input/file.csv"
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.DoubleType)))), "t1")
     op.schema = Some(schema)
     val input1 = Pipe("b", Load(Pipe("b"), file, Some(schema), Some("PigStream"), List("\",\"")))
@@ -451,7 +446,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   /******************/
   it should "contain code for a binary JOIN statement with simple expression" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
-    val file = new java.net.URI("input/file.csv")
+    val file = "input/file.csv"
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
       Field("f2", Types.DoubleType),
@@ -471,7 +466,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
 
   it should "contain code for a binary JOIN statement with expression lists" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
-    val file = new java.net.URI("input/file.csv")
+    val file = "input/file.csv"
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c")), List(List(PositionalField(0), PositionalField(1)),
       List(PositionalField(1), PositionalField(2))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
@@ -493,7 +488,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
 
   it should "contain code for a multiway JOIN statement" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
-    val file = new java.net.URI("input/file.csv")
+    val file = "input/file.csv"
     val op = Join(Pipe("a"), List(Pipe("b"), Pipe("c"), Pipe("d")), List(List(PositionalField(0)),
       List(PositionalField(0)), List(PositionalField(0))), (5, "SECONDS"))
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType),
@@ -558,7 +553,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   it should "contain code for FILTER in window mode" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType)))), "t1")
-    val op = Filter(Pipe("c"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))), true)
+    val op = Filter(Pipe("c"), Pipe("b"), Lt(RefExpr(PositionalField(1)), RefExpr(Value("42"))), windowMode = true)
     op.schema = Some(schema)
 
     // Helping surrounding operators
@@ -663,7 +658,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
       GeneratorExpr(RefExpr(PositionalField(0))),
       GeneratorExpr(Func("COUNT", List(RefExpr(PositionalField(1)))), Some(Field("CNT", Types.LongType))))))
     op.schema = Some(schema)
-    val file = new java.net.URI("input/file.csv")
+    val file = "input/file.csv"
     val input = Pipe("b", Load(Pipe("b"), file, Some(schema), Some("PigStream"), List("\",\"")))
     op.inputs = List(input)
 
@@ -744,7 +739,7 @@ class FlinkStreamingCompileSpec extends FlatSpec with BeforeAndAfterAll with Mat
   it should "contain code for GROUP BY $0 in window mode" in {
     val ctx = CodeGenContext(CodeGenTarget.FlinkStreaming)
     val schema = new Schema(BagType(TupleType(Array(Field("f1", Types.CharArrayType), Field("f2", Types.DoubleType)))), "t1")
-    val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List(PositionalField(0))), true)
+    val op = Grouping(Pipe("a"), Pipe("b"), GroupingExpression(List(PositionalField(0))), windowMode = true)
     op.schema = Some(schema)
 
     // Helping surrounding operators

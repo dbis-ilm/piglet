@@ -238,8 +238,8 @@ object Piglet extends PigletLogging {
 
       // 4. check if we already have materialized results
       // and insert LOAD operators
-      newPlan = mm.loadIntermediateResults(newPlan)
-
+      val (newPlan2,loaded) = mm.loadIntermediateResults(newPlan)
+      newPlan = newPlan2
 
       // 5. analyze plan if something can be materialized or
       // if materialized results are present
@@ -247,7 +247,8 @@ object Piglet extends PigletLogging {
         val model = DataflowProfiler.analyze(newPlan)
 
         // according to statistics, insert MATERIALIZE (STORE) operators
-        newPlan = mm.insertMaterializationPoints(newPlan, model)
+//        if(!loaded)
+          newPlan = mm.insertMaterializationPoints(newPlan, model)
       }
 //      newPlan = processMaterializations(newPlan, mm)
 

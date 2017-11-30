@@ -28,7 +28,7 @@ import java.net.URI
  */
 case class Store(
     private val in: Pipe,
-    file: URI,
+    file: String,
     func: Option[String] = None, //BackendManager.backend.defaultConnector,
     params: List[String] = null) extends PigOperator(List(), List(in)) {
 

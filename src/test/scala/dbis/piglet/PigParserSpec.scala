@@ -17,42 +17,37 @@
 
 package dbis.piglet
 
-import java.net.URI
-
-import dbis.piglet.plan.DataflowPlan
-import dbis.piglet.tools.TestTools._
-
 import dbis.piglet.expr._
 import dbis.piglet.op._
 import dbis.piglet.op.cmd._
 import dbis.piglet.parser.PigParser.parseScript
-import dbis.piglet.parser.PigParser
 import dbis.piglet.schema._
-import org.scalatest.{Matchers, OptionValues, FlatSpec}
+import dbis.piglet.tools.HdfsCommand
+import dbis.piglet.tools.TestTools._
+import org.scalatest.{FlatSpec, Matchers, OptionValues}
 
 import scala.util.Random
-import dbis.piglet.tools.HdfsCommand
 
 class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   /* -------------------- LOAD -------------------- */
   "The parser"  should "parse a simple load statement" in  {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     assert(parseScript("""a = load 'file.csv';""") == List(Load(Pipe("a"), uri)))
   }
 
   it should "parse also a case insensitive load statement" in  {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     assert(parseScript("""a = LOAD 'file.csv';""") == List(Load(Pipe("a"), uri)))
   }
 
   it should "parse also a load statement with a path" in  {
-    val uri = new URI("dir1/dir2/file.csv")
+    val uri = "dir1/dir2/file.csv"
     assert(parseScript("""a = LOAD 'dir1/dir2/file.csv';""") == List(Load(Pipe("a"), uri)))
   }
 
   it should "parse also a load statement with the using clause" in  {
-    val uri1 = new URI("file.data")
-    val uri2 = new URI("file.n3")
+    val uri1 = "file.data"
+    val uri2 = "file.n3"
     assert(parseScript("""a = LOAD 'file.data' using PigStorage(',');""") ==
       List(Load(Pipe("a"), uri1, None, Some("PigStorage"), List("""",""""))))
     assert(parseScript("""a = LOAD 'file.n3' using RDFFileStorage();""") ==
@@ -60,7 +55,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a load statement with typed schema specification" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     val schema = Array(Field("a", Types.IntType),
                                                 Field("b", Types.CharArrayType),
                                                 Field("c", Types.DoubleType))
@@ -69,7 +64,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a load statement with complex typed schema specification" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     val schema = Array(Field("a", Types.IntType),
       Field("t", TupleType(Array(Field("f1", Types.IntType), Field("f2", Types.IntType)))),
       Field("b", BagType(TupleType(Array(Field("f3", Types.DoubleType), Field("f4", Types.DoubleType))))))
@@ -78,7 +73,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse another load statement with complex typed schema specification" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
       Field("m1", MapType(Types.CharArrayType)),
       Field("m2", MapType(TupleType(Array(Field("f1", Types.IntType), Field("f2", Types.IntType))))),
@@ -88,7 +83,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a load statement with typed schema specification and using clause" in {
-    val uri = new URI("file.data")
+    val uri = "file.data"
     val schema = BagType(TupleType(Array(Field("a", Types.IntType),
       Field("b", Types.CharArrayType),
       Field("c", Types.DoubleType))))
@@ -97,7 +92,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a load statement with untyped schema specification" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     val schema = BagType(TupleType(Array(Field("a", Types.ByteArrayType),
       Field("b", Types.ByteArrayType),
       Field("c", Types.ByteArrayType))))
@@ -136,7 +131,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   /* -------------------- STORE -------------------- */
   it should "parse the store statement" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     assert(parseScript("""store b into 'file.csv';""") == List(Store(Pipe("b"), uri)))
   }
 
@@ -224,7 +219,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
     assert(parseScript("a = FILTER b BY aFunc(x, y) == true AND cFunc(x, y) >= x;") ==
       List(Filter(Pipe("a"),Pipe("b"),And(
             Eq(Func("aFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(Value(true))),
-            Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),false)))
+            Geq(Func("cFunc",List(RefExpr(NamedField("x")), RefExpr(NamedField("y")))),RefExpr(NamedField("x")))),windowMode = false)))
   }
 
   /* -------------------- FOREACH -------------------- */
@@ -368,12 +363,12 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
    it should "parse a list of statements" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     assert(parseScript("a = load 'file.csv';\ndump b;") == List(Load(Pipe("a"), uri), Dump(Pipe("b"))))
   }
 
   it should "parse a list of statements while ignoring comments" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     assert(parseScript("-- A comment\na = load 'file.csv';-- Another comment\ndump b;") ==
       List(Load(Pipe("a"), uri), Dump(Pipe("b"))))
   }
@@ -604,7 +599,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse RDFLoad operators for plain triples" in {
-    val uri = new URI("rdftest.rdf")
+    val uri = "rdftest.rdf"
     val ungrouped = parseScript( """a = RDFLoad('rdftest.rdf');""")
     assert(ungrouped == List(RDFLoad(Pipe("a"), uri, None)))
 
@@ -624,7 +619,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse RDFLoad operators for triple groups" in {
-    val uri = new URI("rdftest.rdf")
+    val uri = "rdftest.rdf"
     val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on subject;""")
     val grouped_on_pred = parseScript( """a = RDFLoad('rdftest.rdf') grouped on predicate;""")
     val grouped_on_obj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on object;""")
@@ -639,7 +634,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   it should "reject RDFLoad operators with unknown grouping column names" in {
     val colname = Random.nextString(10)
     intercept[IllegalArgumentException] {
-      val grouped_on_subj = parseScript( """a = RDFLoad('rdftest.rdf') grouped on $colname;""")
+      val _ = parseScript( s"""a = RDFLoad('rdftest.rdf') grouped on $colname;""")
     }
   }
 
@@ -763,7 +758,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         |%>
         |A = LOAD 'file.csv';
       """.stripMargin)
-      assert (ops(1) == Load(Pipe("A"), new URI("file.csv")))
+      assert (ops(1) == Load(Pipe("A"), "file.csv"))
   }
 
   it should "parse a script with embedded code and rules" in {
@@ -778,13 +773,13 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         |%>
         |A = LOAD 'file.csv';
       """.stripMargin)
-    assert(ops(0).isInstanceOf[EmbedCmd])
-    val op = ops(0).asInstanceOf[EmbedCmd]
+    assert(ops.head.isInstanceOf[EmbedCmd])
+    val op = ops.head.asInstanceOf[EmbedCmd]
     assert(op.code.stripLineEnd ==
        """def someFunc(s: String): String = {
           |   s
           | }""".stripMargin)
-    assert(op.ruleCode.headOption.value ==
+    assert(op.ruleCode.value ==
       """
         |def rule(term: Any): Option[PigOperator] = None
         |def rule2(term: Any): Option[PigOperator] = None
@@ -828,9 +823,10 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
         |};
       """.stripMargin
     )
-    assert(ops == List(DefineMacroCmd(Pipe("out_alias"), "my_macro", Some(List()),
-      List(Load(Pipe("$out_alias"), new URI("file"), None, Some("PigStorage"), List("""":"""")))
-    )))
+    assert(ops == List(
+      DefineMacroCmd(Pipe("out_alias"), "my_macro", Some(List()),
+      List(Load(Pipe("$out_alias"), "file", None, Some("PigStorage"), List("""":""""))
+    ))))
   }
 
   it should "parse a statement invoking a macro" in {
@@ -839,7 +835,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
 
   it should "parse a load statement with schema and timestamp specification" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     val schema = Schema(Array(Field("a", Types.IntType),
       Field("b", Types.CharArrayType),
       Field("c", Types.DoubleType)))
@@ -849,7 +845,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a load statement with schema and positional timestamp specification" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     val schema = Schema(Array(Field("a", Types.IntType),
       Field("b", Types.CharArrayType),
       Field("c", Types.LongType)))
@@ -867,7 +863,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   }
 
   it should "parse a LOAD statement with matrix types" in {
-    val uri = new URI("file.csv")
+    val uri = "file.csv"
     val schema = Schema(Array(Field("m1", MatrixType(Types.IntType, 4, 4, MatrixRep.DenseMatrix))))
     assert(parseScript("""a = load 'file.csv' as (m1: dimatrix(4,4));""") ==
       List(Load(Pipe("a"), uri, Some(schema))))
@@ -893,12 +889,12 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
 
   it should "parse a CROSS op with two relations" in {
     val s = parseScript("crossed = CROSS a,b")
-    s should contain only (Cross(Pipe("crossed"), List(Pipe("a"),Pipe("b"))))
+    s should contain only Cross(Pipe("crossed"), List(Pipe("a"), Pipe("b")))
   }
 
   it should "parse a CROSS op with many relations" in {
     val s = parseScript("crossed = CROSS a,b,c,d,e,f,g")
-    s should contain only (Cross(Pipe("crossed"), List(Pipe("a"),Pipe("b"),Pipe("c"),Pipe("d"),Pipe("e"),Pipe("f"),Pipe("g"))))
+    s should contain only Cross(Pipe("crossed"), List(Pipe("a"), Pipe("b"), Pipe("c"), Pipe("d"), Pipe("e"), Pipe("f"), Pipe("g")))
   }
   
   it should "parse a script with PARTITION" in {
@@ -917,7 +913,7 @@ class PigParserSpec extends FlatSpec with OptionValues with Matchers {
   
   it should "reject a script with unknown index method" in 
     assertThrows[Exception] {
-      val s = parseScript("""a = load 'abc.txt' using PigStorage(';') as (id: int, lat: double, lon: double);
+      val _ = parseScript("""a = load 'abc.txt' using PigStorage(';') as (id: int, lat: double, lon: double);
       |b = FOREACH a GENERATE id, geometry("POINT("+lat+" "+lon+")") as loc;
       |c = index b on loc using bla(order=2);""".stripMargin)
     }

@@ -59,7 +59,7 @@ object RDFRuleset extends Ruleset {
     val uri = op.uri
 
     if (uri.getScheme == "http" || uri.getScheme == "https") {
-      Some(Load(op.outputs.head, uri, op.schema, Some("pig.SPARQLLoader"), List(""""SELECT * WHERE { ?s ?p ?o }"""")))
+      Some(Load(op.outputs.head, uri.toString, op.schema, Some("pig.SPARQLLoader"), List(""""SELECT * WHERE { ?s ?p ?o }"""")))
     } else {
       None
     }
@@ -80,7 +80,7 @@ object RDFRuleset extends Ruleset {
           val uri = op.uri
           if (sop == op && (uri.getScheme == "http" || uri.getScheme == "https")) {
 
-            Some(Load(op.outputs.head, op.uri, op.schema, Some("pig.SPARQLLoader"),
+            Some(Load(op.outputs.head, op.uri.toString, op.schema, Some("pig.SPARQLLoader"),
               List(s""""CONSTRUCT * WHERE ${RDF.triplePatternsToString(bf.get.patterns)}"""")))
           } else {
             None
@@ -109,7 +109,7 @@ object RDFRuleset extends Ruleset {
       return None
     }
  
-    Some(Load(op.outputs.head, op.uri, op.schema, Some("RDFFileStorage")))
+    Some(Load(op.outputs.head, op.uri.toString, op.schema, Some("RDFFileStorage")))
   }
 
   /** Applies rewriting rule F1 of the paper [[http://www.btw-2015.de/res/proceedings/Hauptband/Wiss/Hagedorn-SPARQling_Pig_-_Processin.pdf SPARQling Pig - Processing Linked Data with Pig Latin]].

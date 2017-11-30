@@ -36,7 +36,7 @@ import scala.util.{Failure, Success, Try}
   */
 case class Load(
     private val out: Pipe, 
-    var file: URI,
+    var file: String,
     private var loadSchema: Option[Schema] = None,
     loaderFunc: Option[String] = None,
     loaderParams: List[String] = null) extends PigOperator(List(out), List(), loadSchema) {
@@ -75,7 +75,8 @@ case class Load(
         case Value(v) =>
           val s = v.toString
           if (s(0) == '"')
-            file = new URI(s.substring(1, s.length-1))
+            file = s.substring(1, s.length-1)
+//            file = new URI(s.substring(1, s.length-1))
         case _ =>
       }
     }
