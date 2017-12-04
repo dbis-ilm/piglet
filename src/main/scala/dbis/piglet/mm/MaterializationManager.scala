@@ -118,10 +118,10 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
   /**
     * Checks the complete plan for potential materialization points
     * @param plan The plan
-    * @param model The markov model that represents previously collected statistics
+    * @param globalOpGraph The markov model that represents previously collected statistics
     * @return Returns a new plan with inserted materialization points
     */
-  def insertMaterializationPoints(plan: DataflowPlan, model: Markov): DataflowPlan = {
+  def insertMaterializationPoints(plan: DataflowPlan, globalOpGraph: GlobalOperatorGraph): DataflowPlan = {
 
     if(CliParams.values.profiling.isEmpty) {
       logger.info("profiling is disabled - won't try to find possible materialization points")
@@ -149,15 +149,15 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
         val sig = op.lineageSignature
 
         // try to get total costs up to this operator from the model
-        model.totalCost(sig, ProbStrategy.func(ps.probStrategy))(CostStrategy.func(ps.costStrategy)) match {
+        globalOpGraph.totalCost(sig, ProbStrategy.func(ps.probStrategy))(CostStrategy.func(ps.costStrategy)) match {
 
           case Some((cost,prob)) =>
             val relProb = prob // / model.totalRuns
             val probDecision = relProb > ps.probThreshold
 
 
-            val outRecords = model.resultRecords(sig)
-            val outputBPR = model.bytesPerRecord(sig)
+            val outRecords = globalOpGraph.resultRecords(sig)
+            val outputBPR = globalOpGraph.bytesPerRecord(sig)
 
             // total number of bytes
             val opOutputSize = outRecords.flatMap(r => outputBPR.map(_ * r))

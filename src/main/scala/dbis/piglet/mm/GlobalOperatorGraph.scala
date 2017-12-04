@@ -33,9 +33,9 @@ object Op {
   * A data structure to maintain profiling information on operator occurrences
   * @param model The graph representing operators with their costs and the number of transitions on the edges
   */
-case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLogging {
+case class GlobalOperatorGraph(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLogging {
 
-  import Markov._
+  import GlobalOperatorGraph._
 
 
   /* Increase the total amount of runs
@@ -117,7 +117,7 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     *         or None, if there is no such op
     */
   def totalCost(lineage: Lineage,
-                probStrategy: Traversable[Double] => Double = Markov.ProbMin)(
+                probStrategy: Traversable[Double] => Double = GlobalOperatorGraph.ProbMin)(
                 costStrategy: Traversable[(Long, Double)] => (Long, Double)): Option[(Long, Double)] = {
 
     // this assignment is needed by the type checker/compiler to bring the graph in scope
@@ -186,13 +186,13 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     * String representation of this model as JSON
     * @return JSON representation of this model
     */
-  def toJson: String = model.toJson(Markov.descriptor)
+  def toJson: String = model.toJson(GlobalOperatorGraph.descriptor)
 
   override def toString: Lineage = model.toString()
 
 }
 
-object Markov {
+object GlobalOperatorGraph {
 
   val startLineage: Lineage = "start"
   val startNode: Op = Op(startLineage)
@@ -216,16 +216,16 @@ object Markov {
     * @param json The JSON representation of the graph
     * @return Returns the Markov model parsed from JSON
     */
-  def fromJson(json: String): Markov = {
+  def fromJson(json: String): GlobalOperatorGraph = {
     val g = Graph.fromJson[Op, WDiEdge](json, descriptor)
-    Markov(g)
+    GlobalOperatorGraph(g)
   }
 
   /**
     * Create an empty model
     * @return An empty Markov model
     */
-  def empty = new Markov(Graph[Op, WDiEdge]())
+  def empty = new GlobalOperatorGraph(Graph[Op, WDiEdge]())
 
 
   def ProbMin(l: Traversable[Double]): Double = l.min

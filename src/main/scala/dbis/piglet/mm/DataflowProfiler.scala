@@ -53,7 +53,7 @@ case class TimeInfo(lineage: Lineage, partitionId: Int, time: Long, parentPartit
 object DataflowProfiler extends PigletLogging {
 
 
-  protected[mm] var profilingGraph: Markov = _
+  protected[mm] var profilingGraph: GlobalOperatorGraph = _
 
   val parentPartitionInfo = MutableMap.empty[Lineage, MutableMap[Int, Seq[Seq[Int]]]]
   val currentTimes = MutableMap.empty[Partition, Long]
@@ -70,9 +70,9 @@ object DataflowProfiler extends PigletLogging {
     val profilingFile = base.resolve(Conf.profilingFile)
     if(Files.exists(profilingFile)) {
       val json = Source.fromFile(profilingFile.toFile).getLines().mkString("\n")
-      profilingGraph = Markov.fromJson(json)
+      profilingGraph = GlobalOperatorGraph.fromJson(json)
     } else
-      profilingGraph = Markov.empty
+      profilingGraph = GlobalOperatorGraph.empty
 
     logger.debug(s"loaded markov model with size: ${profilingGraph.size}")
     logger.debug(s"total runs in markov is: ${profilingGraph.totalRuns}")
@@ -90,7 +90,7 @@ object DataflowProfiler extends PigletLogging {
     * @return Returns the updated model (Markov chain) that contains operator statistics from
     *         previous runs as well as the updated counts
     */
-  def analyze(plan: DataflowPlan): Markov = timing("analyze plan") {
+  def analyze(plan: DataflowPlan): GlobalOperatorGraph = timing("analyze plan") {
 
     // reset old values for parents and execution time
     reset()
@@ -108,7 +108,7 @@ object DataflowProfiler extends PigletLogging {
         val lineage = op.lineageSignature
 
         if(op.isInstanceOf[Load])
-          profilingGraph.add(Markov.startLineage,lineage)
+          profilingGraph.add(GlobalOperatorGraph.startLineage,lineage)
 
         op.outputs.flatMap(_.consumer).withFilter{
           case _: Empty => false
@@ -142,14 +142,14 @@ object DataflowProfiler extends PigletLogging {
 
     currentTimes//.keySet
                 //.map(_.lineage)
-                .filterNot{ case (Partition(lineage,_),_) => lineage == Markov.startLineage || lineage == "end" || lineage == "progstart" }
+                .filterNot{ case (Partition(lineage,_),_) => lineage == GlobalOperatorGraph.startLineage || lineage == "end" || lineage == "progstart" }
                 .foreach{ case (partition,time) =>
 
       val lineage = partition.lineage
       val partitionId = partition.partitionId
 
       // parent operators
-      val parentLineages = profilingGraph.parents(lineage).getOrElse(List(Markov.startLineage))
+      val parentLineages = profilingGraph.parents(lineage).getOrElse(List(GlobalOperatorGraph.startLineage))
 
       // list of parent partitions per parent
       val parentPartitionIds = parentPartitionInfo(lineage)
@@ -202,7 +202,7 @@ object DataflowProfiler extends PigletLogging {
       parentPartitionsOfCurrentPartition.map { pId =>
 
 
-        val p = if (parentLineage == Markov.startNode.lineage)
+        val p = if (parentLineage == GlobalOperatorGraph.startNode.lineage)
             Partition(parentLineage, -1) // for "start" we only have one value with partition id -1
           else {
             val theParentId = if (pId > parentMaxPartitionId) {
@@ -325,10 +325,10 @@ object ProbStrategy extends Enumeration  {
   val MIN, MAX, AVG, PRODUCT = Value
 
   def func(s: ProbStrategy): (Traversable[Double]) => Double = s match {
-    case MIN => Markov.ProbMin
-    case MAX => Markov.ProbMax
-    case AVG => Markov.ProbAvg
-    case PRODUCT => Markov.ProbProduct
+    case MIN => GlobalOperatorGraph.ProbMin
+    case MAX => GlobalOperatorGraph.ProbMax
+    case AVG => GlobalOperatorGraph.ProbAvg
+    case PRODUCT => GlobalOperatorGraph.ProbProduct
   }
 }
 
@@ -337,8 +337,8 @@ object CostStrategy extends Enumeration {
   val MIN, MAX = Value
 
   def func(s: CostStrategy): (Traversable[(Long, Double)]) => (Long, Double) = s match {
-    case MIN => Markov.CostMin
-    case MAX => Markov.CostMax
+    case MIN => GlobalOperatorGraph.CostMin
+    case MAX => GlobalOperatorGraph.CostMax
   }
 }
 
