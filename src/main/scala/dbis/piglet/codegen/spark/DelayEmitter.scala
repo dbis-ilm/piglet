@@ -10,9 +10,7 @@ class DelayEmitter extends CodeEmitter[Delay] {
       |  iter.filter{ t =>
       |    val decision = scala.util.Random.nextInt(<sampleFactor>) == 0
       |    <if (profiling)>
-      |    if(decision && scala.util.Random.nextInt(randFactor) == 0) {
-      |      PerfMonitor.sampleSize(t,"<lineage>", accum)
-      |    }
+      |      PerfMonitor.sampleSize(t,"<lineage>", accum, randFactor)
       |    <endif>
       |    decision
       |  }

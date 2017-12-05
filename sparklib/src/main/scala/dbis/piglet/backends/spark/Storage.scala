@@ -57,9 +57,7 @@ class PigStorage[T <: SchemaClass :ClassTag](fraction: Int = 1) extends java.io.
       val (lineage, accum) = lineageAndAccum.get
       rawArr.map{ arr =>
         val t = extract(arr)
-        if(scala.util.Random.nextInt(fraction) == 0) {
-          PerfMonitor.sampleSize(t, lineage, accum)
-        }
+          PerfMonitor.sampleSize(t, lineage, accum, fraction)
         t
       }
     } else
@@ -204,10 +202,7 @@ class JsonStorage2[T <: SchemaClass : Manifest](fraction: Int = -1)  extends Ser
       if (lineageAndAccum.isDefined) {
         val (lineage, accum) = lineageAndAccum.get
 
-        if (scala.util.Random.nextInt(fraction) == 0) {
-//          accum.incr(lineage, PerfMonitor.estimateSize(t))
-          PerfMonitor.sampleSize(t, lineage, accum)
-        }
+          PerfMonitor.sampleSize(t, lineage, accum, fraction)
       }
       t
     }

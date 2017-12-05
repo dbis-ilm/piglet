@@ -12,9 +12,7 @@ class PartitionerEmitter extends CodeEmitter[Partition]  {
          |  val <in>_helper = <in><keyby> 
          |  <in>_helper.partitionBy(<partitioner>).map{case (_,v)=>
          |    <if (profiling)>
-         |    if(scala.util.Random.nextInt(randFactor) == 0) {
-         |      PerfMonitor.sampleSize(v,"<lineage>", accum)
-         |    }
+         |      PerfMonitor.sampleSize(v,"<lineage>", accum, randFactor)
          |    <endif>
          |
          |    v

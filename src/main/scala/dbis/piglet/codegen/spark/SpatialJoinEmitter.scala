@@ -16,9 +16,7 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
                     | ).map{ case (v,w) =>
                     |     val t = <className>(<fields>)
                     |     <if (profiling)>
-                    |     if(scala.util.Random.nextInt(randFactor) == 0) {
-                    |       PerfMonitor.sampleSize(t,"<lineage>", accum)
-                    |     }
+                    |       PerfMonitor.sampleSize(t,"<lineage>", accum, randFactor)
                     |     <endif>
                     |     t
                     |\\}""".stripMargin
@@ -65,7 +63,8 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
       "keyby2" -> SpatialEmitterHelper.keyByCode(op.inputs.last.inputSchema, op.predicate.right, ctx),
 //      "keyby1" -> s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs.head.inputSchema)), op.predicate.left)})",
 //      "keyby2" -> s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputs.last.inputSchema)), op.predicate.right)})",
-      "liveindex" -> indexTemplate(op.index)
+      "liveindex" -> indexTemplate(op.index),
+      "lineage" -> op.lineageSignature
     )
 
     render(params)

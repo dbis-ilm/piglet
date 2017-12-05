@@ -11,9 +11,7 @@ class OrderByEmitter extends CodeEmitter[OrderBy] {
   override def template: String =
     """val <out> = <in>.keyBy(t => <key>).sortByKey(<asc>).map{case (_,v) =>
       |  <if (profiling)>
-      |  if(scala.util.Random.nextInt(randFactor) == 0) {
-      |    PerfMonitor.sampleSize(v,"<lineage>", accum)
-      |  }
+      |    PerfMonitor.sampleSize(v,"<lineage>", accum, randFactor)
       |  <endif>
       |  v
       |}""".stripMargin

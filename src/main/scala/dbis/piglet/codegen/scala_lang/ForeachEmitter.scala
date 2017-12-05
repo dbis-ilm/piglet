@@ -16,9 +16,7 @@ class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
     """val <out> = <in>.map{t =>
       |  val res = <class>(<expr>)
       |  <if (profiling)>
-      |  if(scala.util.Random.nextInt(randFactor) == 0) {
-      |   PerfMonitor.sampleSize(res,"<lineage>", accum)
-      |  }
+      |   PerfMonitor.sampleSize(res,"<lineage>", accum, randFactor)
       |  <endif>
       |  res
       |}""".stripMargin
@@ -28,9 +26,7 @@ class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
     """val <out> = <in>.map{t =>
       |  val res = <expr>
       |  <if (profiling)>
-      |  if(scala.util.Random.nextInt(randFactor) == 0) {
-      |   PerfMonitor.sampleSize(res,"<lineage>", accum)
-      |  }
+      |   PerfMonitor.sampleSize(res,"<lineage>", accum, randFactor)
       |  <endif>
       |  res
       |}""".stripMargin
@@ -39,9 +35,7 @@ class ForeachEmitter extends CodeEmitter[Foreach] with PigletLogging {
     """val <out> = <in>.flatMap{t =>
       |  val res = <expr>
       |  <if (profiling)>
-      |  if(scala.util.Random.nextInt(randFactor) == 0) {
-      |    PerfMonitor.sampleSize(res,"<lineage>", accum)
-      |  }
+      |    PerfMonitor.sampleSize(res,"<lineage>", accum, randFactor)
       |  <endif>
       |  res
       |}""".stripMargin

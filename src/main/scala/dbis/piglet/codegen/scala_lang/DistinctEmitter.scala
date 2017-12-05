@@ -8,10 +8,7 @@ import dbis.piglet.op.{Distinct, PigOperator}
   */
 class DistinctEmitter extends CodeEmitter[Distinct] {
   override def template: String = """val <out> = <in>.distinct<if (profiling)>.map{t =>
-                                    |  if(scala.util.Random.nextInt(randFactor) == 0) {
-                                    |    //accum.incr("<lineage>", PerfMonitor.estimateSize(t))
-                                    |    PerfMonitor.sampleSize(t,"<lineage>", accum)
-                                    |  }
+                                    |    PerfMonitor.sampleSize(t,"<lineage>", accum, randFactor)
                                     |  t
                                     |}<endif>""".stripMargin
 

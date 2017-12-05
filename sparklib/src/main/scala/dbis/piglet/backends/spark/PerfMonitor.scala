@@ -125,33 +125,36 @@ object PerfMonitor {
 //  def estimateSize(o: AnyRef): Long = org.apache.spark.util.SizeEstimator.estimate(o)
 
   @inline
-  def sampleSize(t: SchemaClass, lineage: String, accum: SizeAccumulator, num: Int = 1): Unit = {
-    accum.incr(lineage, t, num)
+  def sampleSize(t: SchemaClass, lineage: String, accum: SizeAccumulator, randFactor: Int, num: Int = 1): Unit = {
+
+    if(accum.containsNot(lineage) || scala.util.Random.nextInt(randFactor) == 0)
+      accum.incr(lineage, t, num)
   }
 
   @inline
-  def sampleSize(t: Iterable[SchemaClass], lineage: String, accum: SizeAccumulator): Unit = {
-    sampleSize(t.toSeq, lineage, accum)
+  def sampleSize(t: Iterable[SchemaClass], lineage: String, accum: SizeAccumulator, randFactor: Int): Unit = {
+    sampleSize(t.toSeq, lineage, accum, randFactor)
   }
 
   @inline
-  def sampleSize(t: Seq[SchemaClass], lineage: String, accum: SizeAccumulator): Unit = {
+  def sampleSize(t: Seq[SchemaClass], lineage: String, accum: SizeAccumulator, randFactor: Int): Unit = {
 
-    var takenSize = 0L
-    val taken = t.takeWhile{ s =>
-      val tSize = org.apache.spark.util.SizeEstimator.estimate(s)
-      if(takenSize + tSize < SEQ_SAMPLE_MAX_SIZE) {
-        takenSize += tSize
-        true
-      } else {
-        false
+    if(accum.containsNot(lineage) || scala.util.Random.nextInt(randFactor) == 0) {
+      var takenSize = 0L
+      val taken = t.takeWhile { s =>
+        val tSize = org.apache.spark.util.SizeEstimator.estimate(s)
+        if (takenSize + tSize < SEQ_SAMPLE_MAX_SIZE) {
+          takenSize += tSize
+          true
+        } else {
+          false
+        }
+
       }
 
+      accum.incr(lineage, taken, num = t.size)
     }
-
-    accum.incr(lineage, taken, num = t.size)
   }
-
 
 
 //  @inline
@@ -320,7 +323,9 @@ class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mut
     }
   }
 
+  def contains(lineage: Lineage): Boolean = theValue.contains(lineage)
 
+  def containsNot(lineage: Lineage): Boolean = ! theValue.contains(lineage)
 
   override def merge(other: AccumulatorV2[MutableMap[Lineage, SizeStat2], MutableMap[Lineage, SizeStat2]]): Unit = {
     add(other.value)

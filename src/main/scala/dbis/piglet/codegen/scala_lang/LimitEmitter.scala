@@ -12,9 +12,7 @@ class LimitEmitter extends CodeEmitter[Limit] {
     """val <out> = <in>.zipWithIndex.filter{case (_,idx) => idx \< <num>}.map{t =>
       |  val res = t._1
       |  <if (profiling)>
-      |  if(scala.util.Random.nextInt(randFactor) == 0) {
-      |    PerfMonitor.sampleSize(res,"<lineage>", accum)
-      |  }
+      |    PerfMonitor.sampleSize(res,"<lineage>", accum, randFactor)
       |  <endif>
       |  res
       |}""".stripMargin
