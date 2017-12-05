@@ -119,7 +119,7 @@ object CliParams {
 
   def values = _values
 
-  def parse(args: Array[String]): Unit = {
+  def parse(args: Seq[String]): Unit = {
     _values = optparser.parse(args, CliParams()).getOrElse{
       throw new IllegalStateException("Error parsing parameter options")
     }

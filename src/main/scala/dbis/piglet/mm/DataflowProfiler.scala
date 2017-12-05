@@ -13,6 +13,7 @@ import dbis.piglet.tools.{BreadthFirstTopDownWalker, CliParams, Conf}
 import dbis.setm.SETM.timing
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.collection.mutable.{ListBuffer, Map => MutableMap}
 import scala.concurrent.duration._
 import scala.io.Source
@@ -342,19 +343,61 @@ object CostStrategy extends Enumeration {
   }
 }
 
+object GlobalStrategy extends Enumeration {
+  type GlobalStrategy = Value
+  val MAXBENEFIT, MARKOV, LAST = Value
+
+  def getStrategy(v: GlobalStrategy): ChooseMatPointStrategy = v match {
+    case LAST =>
+      MaterializeLast
+    case MAXBENEFIT =>
+      MaxBenefitStrategy
+    case MARKOV =>
+      MarkovStrategy
+  }
+}
+
 object DuplicateStrategy extends Enumeration {
   type DuplicateStrategy = Value
   val NEWEST, OLDEST = Value
 }
 
+
+trait ChooseMatPointStrategy {
+  def apply(candidates: mutable.Set[MaterializationPoint], plan: DataflowPlan, opGraph: GlobalOperatorGraph): Iterable[MaterializationPoint]
+}
+
+object MaterializeLast extends ChooseMatPointStrategy {
+  override def apply(candidates: mutable.Set[MaterializationPoint], plan: DataflowPlan, opGraph: GlobalOperatorGraph): Iterable[MaterializationPoint] = {
+    val opsBeforeSink = plan.sinkNodes.flatMap(_.inputs.map(_.producer.lineageSignature))
+
+    val matPoints = for(candidate <- candidates if opsBeforeSink.contains(candidate.lineage)) yield candidate
+    matPoints
+  }
+}
+
+object MaxBenefitStrategy extends ChooseMatPointStrategy {
+  override def apply(candidates: mutable.Set[MaterializationPoint], plan: DataflowPlan, opGraph: GlobalOperatorGraph) = {
+    candidates.toSeq.sortBy(_.benefit)(Ordering[Duration].reverse).headOption.toList
+  }
+}
+
+object MarkovStrategy extends ChooseMatPointStrategy {
+  override def apply(candidates: mutable.Set[MaterializationPoint], plan: DataflowPlan, opGraph: GlobalOperatorGraph) = {
+    candidates.map{ mp => (mp, mp.prob * mp.benefit.toSeconds)}.toSeq.sortBy(_._2)(Ordering[Double].reverse).headOption.map(_._1).toList
+  }
+}
+
 import dbis.piglet.mm.CostStrategy.CostStrategy
 import dbis.piglet.mm.ProbStrategy.ProbStrategy
+import dbis.piglet.mm.GlobalStrategy.GlobalStrategy
 
 case class ProfilerSettings(
                              minBenefit: Duration = Conf.mmDefaultMinBenefit,
                              probThreshold: Double = Conf.mmDefaultProbThreshold,
                              costStrategy: CostStrategy = Conf.mmDefaultCostStrategy,
                              probStrategy: ProbStrategy = Conf.mmDefaultProbStrategy,
+                             strategy: GlobalStrategy = Conf.mmDefaultStrategy,
                              cacheMode: CacheMode = Conf.mmDefaultCacheMode,
                              fraction: Int = Conf.mmDefaultFraction,
                              duplicates: DuplicateStrategy = DuplicateStrategy.NEWEST,
@@ -371,6 +414,7 @@ object ProfilerSettings extends PigletLogging {
         case "benefit" => ps = ps.copy(minBenefit = v.toDouble.seconds)
         case "cost_strategy" => ps = ps.copy(costStrategy = CostStrategy.withName(v.toUpperCase))
         case "prob_strategy" => ps = ps.copy(probStrategy = ProbStrategy.withName(v.toUpperCase))
+        case "strategy" => ps = ps.copy(strategy = GlobalStrategy.withName(v.toUpperCase))
         case "cache_mode" => ps = ps.copy(cacheMode = CacheMode.withName(v.toUpperCase))
         case "fraction" => ps = ps.copy(fraction = v.toInt)
         case "duplicates" => ps = ps.copy(duplicates = DuplicateStrategy.withName(v.toUpperCase))

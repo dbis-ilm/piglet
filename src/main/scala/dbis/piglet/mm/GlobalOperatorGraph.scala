@@ -87,9 +87,17 @@ case class GlobalOperatorGraph(protected[mm] var model: Graph[Op, WDiEdge]) exte
     * @return Returns the weight of this edge or 0 if there is none
     */
   def rawWeight(parent: Op, child: Op): Long =
-  model.find( (parent ~%> child)(0) ) // the weight is not regarded for search
-    .map(_.weight)
-    .getOrElse(0L)
+    model.find( (parent ~%> child)(0) ) // the weight is not regarded for search
+      .map(_.weight)
+      .getOrElse(0L)
+
+  def outProbs(lineage: Lineage): Option[Double] =
+    model.find(Op(lineage)).map{o =>
+
+      val weigths = o.outgoing.map(e => e.weight)
+      weigths.sum / weigths.size.toDouble
+
+    }
 
   def cost(lineage: Lineage): Option[T] = model.find(Op(lineage)).flatMap(_.value.cost)
 

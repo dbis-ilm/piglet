@@ -135,6 +135,89 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
     logger.debug(s"using prob threshold: ${ps.probThreshold}")
     logger.debug(s"using min benefit: ${ps.minBenefit}")
 
+    var candidates = getCandidates(plan, globalOpGraph, ps)
+
+    /* if unset, ps.minBenefit is actually Duration.Undefined
+     * this, however, cannot be compared to Duration.Undefined, since this comparison is always false
+     * But since Undefined is always greater than Inf, we use this fact for comparison
+     */
+
+    if(ps.minBenefit < Duration.Inf) {
+      logger.debug(s"remove candidates with min benefit ${ps.minBenefit}")
+      candidates = candidates.filter(p => p.benefit >= ps.minBenefit)
+    }
+
+    if(!java.lang.Double.isNaN(ps.probThreshold)) {
+      logger.debug(s"remove candidates with min prob ${ps.probThreshold}")
+      candidates = candidates.filter(p => p.prob >= ps.probThreshold)
+    }
+
+    logger.debug(s"still have ${candidates.size} materialization points - choose one with ${ps.strategy}")
+
+
+    // just informative output for debugging/comparsion of different strategies
+    // prints chosen points for each available strategy - independent from selected strategy
+    GlobalStrategy.values.foreach{ s =>
+      logger.debug(s"chosen points for $s \n${GlobalStrategy.getStrategy(s)(candidates,plan,globalOpGraph).mkString("\n")} ")
+    }
+
+    val chosenPoint = GlobalStrategy.getStrategy(ps.strategy)(candidates, plan, globalOpGraph)
+
+    // for each candidate point ...
+    // ... so that we will materialize the one with the greatest benefit
+    var newPlan = plan
+    chosenPoint.foreach{ case MaterializationPoint(lineage, _,_,_) =>
+      // ... determine the operator ...
+      newPlan = materialize(lineage, newPlan)
+    }
+
+    newPlan.constructPlan(newPlan.operators)
+    newPlan
+
+  }
+
+
+  private def materialize(lineage: Lineage, plan: DataflowPlan): DataflowPlan = {
+    var newPlan = plan
+    val theOp = newPlan.get(lineage) match {
+      case Some(op) => op
+      case None => throw OperatorNotFoundException(lineage)
+    }
+
+    logger.info(s"we chose to materialize ${theOp.name} ($lineage)")
+
+    val ps = CliParams.values.profiling.get
+
+    val path = generatePath(lineage)
+
+    if(CliParams.values.compileOnly) {
+      // if in compile only, we will not execute the script and thus not actually write the intermediate
+      // results. Hence, we only create the path that would be used, but to not save the mapping
+    } else {
+      // ... that will be replaced with a Store op.
+      saveMapping(lineage, path) // we save a mapping from the lineage of the actual op (not the materialize) to the path
+    }
+
+    val storer = Store(theOp.outputs.head, path.toString, Some(MaterializationManager.STORAGE_CLASS))
+    if(ps.cacheMode == CacheMode.NONE) {
+      newPlan.addOperator(Seq(storer), deferrConstruct = false)
+      newPlan = newPlan.insertAfter(theOp, storer)
+
+    } else {
+      logger.debug(s" -> adding cache operator after ${theOp.name} (${theOp.outPipeNames.mkString(",")}) with cache-mode: ${ps.cacheMode}")
+
+      val cache = Cache(Pipe(theOp.outPipeName), Pipe(PipeNameGenerator.generate(), producer= theOp), theOp.lineageSignature, ps.cacheMode)
+
+      newPlan.addOperator(Seq(storer, cache), deferrConstruct = true)
+      newPlan = newPlan.insertAfter(theOp, storer)
+      cache.outputs = theOp.outputs
+      newPlan = ProfilingSupport.insertBetweenAll(theOp.outputs.head, theOp, cache, newPlan)
+    }
+
+    newPlan
+  }
+
+  private def getCandidates(plan: DataflowPlan, globalOpGraph: GlobalOperatorGraph, ps: ProfilerSettings) = {
     // we add all potential points into a list first
     val candidates = mutable.Set.empty[MaterializationPoint]
 
@@ -143,117 +226,54 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
       case _: TimingOp => // ignore timing ops
 
       case op if
-        !candidates.contains(MaterializationPoint.dummy(op.lineageSignature)) && // only if not already analyzed
-          op.outputs.nonEmpty => // not sink operator
+      !candidates.contains(MaterializationPoint.dummy(op.lineageSignature)) && // only if not already analyzed
+        op.outputs.nonEmpty && op.inputs.nonEmpty => // not sink and not source operator
 
         val sig = op.lineageSignature
 
         // try to get total costs up to this operator from the model
         globalOpGraph.totalCost(sig, ProbStrategy.func(ps.probStrategy))(CostStrategy.func(ps.costStrategy)) match {
 
-          case Some((cost,prob)) =>
-            val relProb = prob // / model.totalRuns
-            val probDecision = relProb > ps.probThreshold
-
+          case Some((cost, prob)) =>
+            val relProb = prob / globalOpGraph.totalRuns
 
             val outRecords = globalOpGraph.resultRecords(sig)
             val outputBPR = globalOpGraph.bytesPerRecord(sig)
-
             // total number of bytes
             val opOutputSize = outRecords.flatMap(r => outputBPR.map(_ * r))
 
-            if(opOutputSize.isDefined) {
 
+            if(opOutputSize.isDefined) {
               val opSizeBytes = opOutputSize.get
+
               val opSizeMib = opSizeBytes / 1024 / 1024
 
-              logger.debug(s"${op.name} (${op.lineageSignature})\t: " +
-                s"cost=${cost.milliseconds.toSeconds} \t prob=$relProb\t" +
-                s"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = $opSizeMib MiB")
-
+              logger.debug(s"${op.name} (${op.outPipeNames.mkString(",")}|${op.lineageSignature})\t: " +
+                            s"cost=${cost.milliseconds.toSeconds} \t prob=$relProb\t" +
+                            s"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = $opSizeMib MiB")
 
               val writingTime = (opSizeMib / Conf.MiBPerSecWriting).seconds
               val readingTime = (opSizeMib / Conf.MiBPerSecReading).seconds
 
-              logger.debug(s"\twriting for ${op.name} ($sig) with $opSizeBytes bytes would take ${writingTime.toSeconds} seconds")
-              logger.debug(s"\treading for ${op.name} ($sig) with $opSizeBytes bytes would take ${readingTime.toSeconds} seconds")
-
-
-              val costDecision = readingTime < cost.milliseconds - ps.minBenefit
-
-              // if the costs and probability satisfy our criteria add as potential mat point
-              val decision = costDecision && probDecision
+              logger.debug(s"\twriting $opSizeBytes bytes would take ${writingTime.toSeconds} seconds")
+              logger.debug(s"\treading $opSizeBytes bytes would take ${readingTime.toSeconds} seconds")
 
               val benefit = cost.milliseconds - readingTime
-              if(decision) {
-                candidates += MaterializationPoint(sig, benefit, relProb, cost)
-              }
 
-              logger.info(s"\t--> should ${if(!decision) "NOT" else ""} materialize ${op.name}: benefit= ${benefit.toSeconds} and prob= $relProb (est. t w= ${writingTime.toSeconds}, r= ${readingTime.toSeconds})")
-//              logger.info(s"\t--> We should NOT materialize ${op.name} with benefit of ${benefit.toSeconds} and prob = $relProb")
-
+//            logger.info(s"\t--> should ${if(!decision) "NOT" else ""} materialize ${op.name}: benefit= ${benefit.toSeconds} and prob= $relProb (est. t w= ${writingTime.toSeconds}, r= ${readingTime.toSeconds})")
+              val m = MaterializationPoint(sig, cost = cost, prob = relProb, benefit = benefit)
+              candidates += m
             } else {
-              logger.debug(s"no size info for ${op.name} ($sig)")
+              logger.debug(s"no size info for ${op.name} (${op.outPipeNames.mkString(",")}|$sig)")
             }
 
-
-          case None =>
-            logger.debug(s"no profiling info for ${op.name} ($sig)")
+            case None =>
+              logger.debug(s"no profiling info for ${op.name} ($sig)")
         }
 
       case _ =>
     }
-
-
-    // here we might have a long list of possible MaterializationPoint s - we should only select the most important ones
-
-
-    var newPlan = plan
-
-    // for each candidate point ...
-    candidates.toSeq.sortBy(_.benefit)(Ordering[Duration].reverse) // descending ordering ...
-      .headOption                                            // ... so that we will materialize the one with the greatest benefit
-      .foreach{ case MaterializationPoint(lineage, _,_,_) =>
-
-        // ... determine the operator ...
-        val theOp = newPlan.get(lineage) match {
-          case Some(op) => op
-          case None => throw OperatorNotFoundException(lineage)
-        }
-
-
-      logger.info(s"we chose to materialize ${theOp.name} ($lineage)")
-
-      val path = generatePath(lineage)
-
-      if(CliParams.values.compileOnly) {
-          // if in compile only, we will not execute the script and thus not actually write the intermediate
-          // results. Hence, we only create the path that would be used, but to not save the mapping
-      } else {
-        // ... that will be replaced with a Store op.
-        saveMapping(lineage, path) // we save a mapping from the lineage of the actual op (not the materialize) to the path
-      }
-
-      val storer = Store(theOp.outputs.head, path.toString, Some(MaterializationManager.STORAGE_CLASS))
-      if(ps.cacheMode == CacheMode.NONE) {
-        newPlan.addOperator(Seq(storer), deferrConstruct = false)
-        newPlan = newPlan.insertAfter(theOp, storer)
-
-      } else {
-        logger.debug(s" -> adding cache operator after $theOp  with cache-mode: ${ps.cacheMode}")
-
-        val cache = Cache(Pipe(theOp.outPipeName), Pipe(PipeNameGenerator.generate(), producer= theOp), theOp.lineageSignature, ps.cacheMode)
-
-        newPlan.addOperator(Seq(storer, cache), deferrConstruct = true)
-        newPlan = newPlan.insertAfter(theOp, storer)
-        cache.outputs = theOp.outputs
-        newPlan = ProfilingSupport.insertBetweenAll(theOp.outputs.head, theOp, cache, newPlan)
-      }
-    }
-
-    newPlan.constructPlan(newPlan.operators)
-    newPlan
-
+    candidates
   }
 
 
