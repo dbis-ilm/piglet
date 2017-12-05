@@ -166,9 +166,9 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
     // for each candidate point ...
     // ... so that we will materialize the one with the greatest benefit
     var newPlan = plan
-    chosenPoint.foreach{ case MaterializationPoint(lineage, _,_,_) =>
+    chosenPoint.foreach{ m =>
       // ... determine the operator ...
-      newPlan = materialize(lineage, newPlan)
+      newPlan = materialize(m, newPlan)
     }
 
     newPlan.constructPlan(newPlan.operators)
@@ -177,8 +177,11 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
   }
 
 
-  private def materialize(lineage: Lineage, plan: DataflowPlan): DataflowPlan = {
+  private def materialize(m: MaterializationPoint, plan: DataflowPlan): DataflowPlan = {
     var newPlan = plan
+
+    val lineage = m.lineage
+
     val theOp = newPlan.get(lineage) match {
       case Some(op) => op
       case None => throw OperatorNotFoundException(lineage)
@@ -249,18 +252,18 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
               val opSizeMib = opSizeBytes / 1024 / 1024
 
               logger.debug(s"${op.name} (${op.outPipeNames.mkString(",")}|${op.lineageSignature})\t: " +
-                            s"cost=${cost.milliseconds.toSeconds} \t prob=$relProb\t" +
-                            s"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = $opSizeMib MiB")
+                            f"cost=${cost.milliseconds.toSeconds} \t prob=$relProb%2.2f\t" +
+                            f"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = $opSizeMib%2.3f MiB")
 
               val writingTime = (opSizeMib / Conf.MiBPerSecWriting).seconds
               val readingTime = (opSizeMib / Conf.MiBPerSecReading).seconds
 
-              logger.debug(s"\twriting $opSizeBytes bytes would take ${writingTime.toSeconds} seconds")
-              logger.debug(s"\treading $opSizeBytes bytes would take ${readingTime.toSeconds} seconds")
-
+              logger.debug(f"\twriting $opSizeBytes bytes ($opSizeMib%2.2f MiB) would take ${writingTime.toSeconds} seconds")
+              logger.debug(f"\treading $opSizeBytes bytes ($opSizeMib%2.2f MiB) would take ${readingTime.toSeconds} seconds")
               val benefit = cost.milliseconds - readingTime
 
-//            logger.info(s"\t--> should ${if(!decision) "NOT" else ""} materialize ${op.name}: benefit= ${benefit.toSeconds} and prob= $relProb (est. t w= ${writingTime.toSeconds}, r= ${readingTime.toSeconds})")
+              logger.info(s"\t--> benefit: ${benefit.toSeconds}")
+
               val m = MaterializationPoint(sig, cost = cost, prob = relProb, benefit = benefit)
               candidates += m
             } else {
