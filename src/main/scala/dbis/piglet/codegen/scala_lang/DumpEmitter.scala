@@ -8,7 +8,7 @@ import dbis.piglet.op.Dump
   */
 class DumpEmitter extends CodeEmitter[Dump] {
   override def template: String = """<if(mute)><in>.foreach{t=><if (profiling)>
-                                    |  PerfMonitor.sampleSize(t,"<lineage>", accum)
+                                    |  PerfMonitor.sampleSize(t,"<lineage>", accum, randFactor)
                                     |<endif>}<else>
                                     |<in><if (profiling)>.map{t =>
                                     |    PerfMonitor.sampleSize(t,"<lineage>", accum, randFactor)
