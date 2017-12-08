@@ -85,7 +85,7 @@ object PerfMonitor {
         case d@ _ =>
           println(s"Unknown dependency type: $d")
           List.empty[Int]
-      }.toList
+      }
 
       a.map(inner => inner.mkString(PARENT_DELIM)).mkString(DEP_DELIM)
 
@@ -143,7 +143,7 @@ object PerfMonitor {
       var takenSize = 0L
       val taken = t.takeWhile { s =>
         val tSize = org.apache.spark.util.SizeEstimator.estimate(s)
-        if (takenSize + tSize < SEQ_SAMPLE_MAX_SIZE) {
+        if (takenSize < SEQ_SAMPLE_MAX_SIZE) {
           takenSize += tSize
           true
         } else {

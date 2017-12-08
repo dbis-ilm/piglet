@@ -1,6 +1,7 @@
 package dbis.piglet.mm
 import java.net.URI
 import java.nio.file.{Files, StandardOpenOption}
+import java.util.NoSuchElementException
 
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.op._
@@ -17,6 +18,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.io.Source
+import scala.util.{Failure, Success}
 
 
 object MaterializationManager extends PigletLogging {
@@ -135,6 +137,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
     logger.debug(s"using prob threshold: ${ps.probThreshold}")
     logger.debug(s"using min benefit: ${ps.minBenefit}")
 
+    // get all candidate materialization points
     var candidates = getCandidates(plan, globalOpGraph, ps)
 
     /* if unset, ps.minBenefit is actually Duration.Undefined
@@ -220,6 +223,13 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
     newPlan
   }
 
+  /**
+    * From the given plan, extract all candidate materialization points
+    * @param plan
+    * @param globalOpGraph
+    * @param ps
+    * @return
+    */
   private def getCandidates(plan: DataflowPlan, globalOpGraph: GlobalOperatorGraph, ps: ProfilerSettings) = {
     // we add all potential points into a list first
     val candidates = mutable.Set.empty[MaterializationPoint]
@@ -237,7 +247,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
         // try to get total costs up to this operator from the model
         globalOpGraph.totalCost(sig, ProbStrategy.func(ps.probStrategy))(CostStrategy.func(ps.costStrategy)) match {
 
-          case Some((cost, prob)) =>
+          case Success(Some((cost, prob))) =>
             val relProb = prob / globalOpGraph.totalRuns
 
             val outRecords = globalOpGraph.resultRecords(sig)
@@ -253,7 +263,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
 
               logger.debug(s"${op.name} (${op.outPipeNames.mkString(",")}|${op.lineageSignature})\t: " +
                             f"cost=${cost.milliseconds.toSeconds} \t prob=$relProb%2.2f\t" +
-                            f"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.getOrElse("n/a")} bytes/r = $opSizeMib%2.3f MiB")
+                            f"records =${outRecords.getOrElse("n/a")} r | ${outputBPR.map(o => f"$o%2.3f").getOrElse("n/a")} bytes/r = $opSizeMib%2.3f MiB")
 
               val writingTime = (opSizeMib / Conf.MiBPerSecWriting).seconds
               val readingTime = (opSizeMib / Conf.MiBPerSecReading).seconds
@@ -270,8 +280,15 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
               logger.debug(s"no size info for ${op.name} (${op.outPipeNames.mkString(",")}|$sig)")
             }
 
-            case None =>
-              logger.debug(s"no profiling info for ${op.name} ($sig)")
+          case Success(None) =>
+            logger.debug(s"no profiling info for ${op.name} ($sig)")
+
+          case Failure(e) => e match {
+            case _:NoSuchElementException =>
+              logger.debug(s"no such node in GOG: $sig ")
+            case _ =>
+              throw e
+          }
         }
 
       case _ =>

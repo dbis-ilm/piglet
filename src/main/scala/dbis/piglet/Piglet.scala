@@ -219,7 +219,7 @@ object Piglet extends PigletLogging {
       //TODO:this is ugly in this place here... maybe we should create a "clear-wrapper"
       dbis.piglet.codegen.scala_lang.JoinEmitter.joinKeyVars.clear()
 
-      
+
       var newPlan = plan
 
       val mm = new MaterializationManager(Conf.materializationBaseDir)
@@ -231,6 +231,7 @@ object Piglet extends PigletLogging {
       // 2. rewrite WINDOW operators for Flink streaming
       if (CliParams.values.backend == "flinks")
         newPlan = processWindows(newPlan)
+
 
       // 3. apply general optimization rules
       Rules.registerBackendRules(CliParams.values.backend)
@@ -247,11 +248,9 @@ object Piglet extends PigletLogging {
         val model = DataflowProfiler.analyze(newPlan)
 
         // according to statistics, insert MATERIALIZE (STORE) operators
-//        if(!loaded)
-          newPlan = mm.insertMaterializationPoints(newPlan, model)
+        //        if(!loaded)
+        newPlan = mm.insertMaterializationPoints(newPlan, model)
       }
-//      newPlan = processMaterializations(newPlan, mm)
-
 
       // 6. after all optimizations have been performed, insert
       // profiling operators (if desired)
@@ -259,6 +258,7 @@ object Piglet extends PigletLogging {
         // after rewriting the plan, add the timing operations
         newPlan = insertTimings(newPlan)
       }
+
 
       // for testing of scripts and Piglet features, consumers
       // such as Dump and Store may be muted

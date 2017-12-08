@@ -76,7 +76,8 @@ trait MaterializationSupport extends PigletLogging {
 
         val sig = materialize.lineageSignature
 
-        val file = mm.generatePath(sig)
+//        val file = mm.generatePath(sig)
+        val file = mm.generatePath(materialize.inPipeName)
 
       if(!CliParams.values.compileOnly)
           mm.saveMapping(sig, file)

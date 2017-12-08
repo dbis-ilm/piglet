@@ -371,7 +371,10 @@ object MaterializeLast extends ChooseMatPointStrategy {
   override def apply(candidates: mutable.Set[MaterializationPoint], plan: DataflowPlan, opGraph: GlobalOperatorGraph): Iterable[MaterializationPoint] = {
     val opsBeforeSink = plan.sinkNodes.flatMap(_.inputs.map(_.producer.lineageSignature))
 
-    val matPoints = for(candidate <- candidates if opsBeforeSink.contains(candidate.lineage)) yield candidate
+
+    val matPoints = candidates.filter(c => opsBeforeSink.contains(c.lineage))
+
+//    val matPoints = for(candidate <- candidates if opsBeforeSink.contains(candidate.lineage)) yield candidate
     matPoints
   }
 }

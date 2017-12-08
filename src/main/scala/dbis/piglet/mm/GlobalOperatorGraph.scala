@@ -3,6 +3,7 @@ package dbis.piglet.mm
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.tools.logging.PigletLogging
 
+import scala.util.Try
 import scalax.collection.edge.Implicits._
 import scalax.collection.edge.WDiEdge
 import scalax.collection.io.json._
@@ -126,7 +127,7 @@ case class GlobalOperatorGraph(protected[mm] var model: Graph[Op, WDiEdge]) exte
     */
   def totalCost(lineage: Lineage,
                 probStrategy: Traversable[Double] => Double = GlobalOperatorGraph.ProbMin)(
-                costStrategy: Traversable[(Long, Double)] => (Long, Double)): Option[(Long, Double)] = {
+                costStrategy: Traversable[(Long, Double)] => (Long, Double)): Try[Option[(Long, Double)]] = Try {
 
     // this assignment is needed by the type checker/compiler to bring the graph in scope
     val g = model
