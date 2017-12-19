@@ -18,6 +18,7 @@ package dbis.piglet.op
 
 import java.net.URI
 
+import dbis.piglet.Piglet.Lineage
 import dbis.piglet.expr.{Ref, Value}
 import dbis.piglet.schema.Schema
 import dbis.piglet.tools.{CliParams, HDFSService}
@@ -39,7 +40,8 @@ case class Load(
     var file: String,
     private var loadSchema: Option[Schema] = None,
     loaderFunc: Option[String] = None,
-    loaderParams: List[String] = null) extends PigOperator(List(out), List(), loadSchema) {
+    loaderParams: List[String] = null,
+    linStr: Option[Lineage] = None) extends PigOperator(List(out), List(), loadSchema) {
 
 
   private lazy val lastModified: Option[Try[Long]] = CliParams.values.profiling.map(_ => Try(HDFSService.lastModified(file.toString)))
@@ -51,14 +53,13 @@ case class Load(
    *
    * @return a string representation of the sub-plan.
    */
-  override def lineageString: String = {
+  override def lineageString: String = linStr getOrElse {
     s"""LOAD%$file%${lastModified match {
       case None => -1
       case Some(Failure(_)) => -2
       case Some(Success(v)) => v
     }}%""" + super.lineageString
   }
-
 
   override def toString: String =
     s"""LOAD

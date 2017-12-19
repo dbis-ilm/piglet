@@ -21,6 +21,8 @@ case class MaterializationPoint(lineage: Lineage, prob: Double, cost: Long, bene
     case MaterializationPoint(l,_,_,_) => l equals lineage
     case _ => false
   }
+
+  override def toString = s"MaterializationPoint($lineage, prob=$prob, cost=$cost ms, benefit=${benefit.toMillis} ms)"
 }
 
 

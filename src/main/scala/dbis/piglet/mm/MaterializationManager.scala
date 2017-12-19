@@ -138,11 +138,11 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
     logger.debug(s"using min benefit: ${ps.minBenefit}")
 
     // get all candidate materialization points
-    var candidates = getCandidates(plan, globalOpGraph, ps)
+    var candidates = getCandidates(plan, globalOpGraph).filter(_.benefit > 0.seconds)
 
     /* if unset, ps.minBenefit is actually Duration.Undefined
      * this, however, cannot be compared to Duration.Undefined, since this comparison is always false
-     * But since Undefined is always greater than Inf, we use this fact for comparison
+     * But since Undefined is always greater than Inf, we use this fact to check if the threshold was set
      */
 
     if(ps.minBenefit < Duration.Inf) {
@@ -190,7 +190,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
       case None => throw OperatorNotFoundException(lineage)
     }
 
-    logger.info(s"we chose to materialize ${theOp.name} ($lineage)")
+    logger.info(s"we chose to materialize ${theOp.name} (${theOp.outPipeNames.mkString(",")}|$lineage) --> benfit = ${m.benefit.toSeconds} s")
 
     val ps = CliParams.values.profiling.get
 
@@ -225,14 +225,15 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
 
   /**
     * From the given plan, extract all candidate materialization points
-    * @param plan
-    * @param globalOpGraph
-    * @param ps
+    * @param plan The plan for which candidate materialization points are to be generated
+    * @param globalOpGraph The operator graph with execution statistics
     * @return
     */
-  private def getCandidates(plan: DataflowPlan, globalOpGraph: GlobalOperatorGraph, ps: ProfilerSettings) = {
+  private def getCandidates(plan: DataflowPlan, globalOpGraph: GlobalOperatorGraph) = {
     // we add all potential points into a list first
     val candidates = mutable.Set.empty[MaterializationPoint]
+
+    val ps = CliParams.values.profiling.get
 
     // traverse the plan and see if the current operator should be materialized
     DepthFirstTopDownWalker.walk(plan) {
@@ -272,7 +273,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
               logger.debug(f"\treading $opSizeBytes bytes ($opSizeMib%2.2f MiB) would take ${readingTime.toSeconds} seconds")
               val benefit = cost.milliseconds - readingTime
 
-              logger.info(s"\t--> benefit: ${benefit.toSeconds}")
+              logger.debug(s"\t--> benefit: ${benefit.toSeconds}")
 
               val m = MaterializationPoint(sig, cost = cost, prob = relProb, benefit = benefit)
               candidates += m
@@ -311,10 +312,11 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
 
       getDataFor(sig) match {
         case Some(uri) =>
-          logger.info(s"loading materialized results for ${op.name} $sig")
+          logger.info(s"loading materialized results for ${op.name} ${op.outPipeNames.mkString(",")} $sig")
 
-          val loader = Load(Pipe(op.outPipeName), uri.toString, op.constructSchema, Some(MaterializationManager.STORAGE_CLASS))
+          val loader = Load(Pipe(op.outPipeName), uri.toString, op.constructSchema, Some(MaterializationManager.STORAGE_CLASS), linStr = Some(op.lineageString))
           logger.debug(s"replacing ${op.name} with $loader")
+          logger.info(s"new loader gets lineage: ${loader.lineageSignature}")
 
           // add the new Load op to the list of operators in the plan
           plan.addOperator(Seq(loader), deferrConstruct = true)
