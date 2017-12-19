@@ -13,9 +13,10 @@ class CrossEmitter extends CodeEmitter[Cross] {
   override def template: String = """
     |val <out> = <code>.map{case l =>
     |  val res = convert<class>(l)
-    |  <if(profiling>
+    |  <if(profiling)>
     |    PerfMonitor.sampleSize(t,"<lineage>", accum, randFactor)
     |  <endif>
+    |  res
     |\}
     """.stripMargin
 
