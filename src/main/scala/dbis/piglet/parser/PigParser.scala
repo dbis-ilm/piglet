@@ -989,8 +989,23 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
   lazy val delayKeyword = "delay".ignoreCase
 
-  def delayStmt = bag ~ "=" ~ delayKeyword ~ bag ~ byKeyword ~ "(" ~ num ~ "," ~ num ~ ")" ^^ {
-    case out ~ _ ~ _ ~ in ~ _ ~ _ ~ wTime ~ _ ~ sample ~ _ => Delay(Pipe(out), Pipe(in), sample, wTime.milliseconds)
+  def delayStmt = bag ~ "=" ~ delayKeyword ~ bag ~ byKeyword ~ "(" ~ (pigStringLiteral|num) ~ "," ~ num ~ ")" ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ _ ~ wTime ~ _ ~ sample ~ _ =>
+
+
+
+
+      val waitDur= wTime match {
+        case s: String =>
+          val wTimeVal = s"PT${unquote(s)}"
+          Duration.fromNanos(java.time.Duration.parse(wTimeVal).toNanos)
+        case i: Int =>
+          i.milliseconds
+      }
+
+
+
+      Delay(Pipe(out), Pipe(in), sample, waitDur)
   }
 
 

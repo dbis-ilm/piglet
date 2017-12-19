@@ -78,10 +78,10 @@ class GlobalOperatorGraphSpec extends FlatSpec with Matchers {
 
     val c = m.totalCost("4",GlobalOperatorGraph.ProbMin)(GlobalOperatorGraph.CostMax)
 
-    c shouldBe defined
+    c shouldBe 'Success
 
-    val cost = c.get._1
-    val probs = c.get._2
+    val cost = c.get.get._1
+    val probs = c.get.get._2
 
     withClue("wrong cost") { cost shouldBe 12L }
     withClue("wrong prob") { probs shouldBe 1.0 }
@@ -101,10 +101,10 @@ class GlobalOperatorGraphSpec extends FlatSpec with Matchers {
 
     val c = m.totalCost("7",GlobalOperatorGraph.ProbMin)(GlobalOperatorGraph.CostMax)
 
-    c shouldBe defined
+    c shouldBe 'Success
 
-    val cost = c.get._1
-    val probs = c.get._2
+    val cost = c.get.get._1
+    val probs = c.get.get._2
 
     withClue("wrong cost") { cost shouldBe 15L }
     withClue("wrong prob") { probs shouldBe 1/3.0 }
