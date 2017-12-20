@@ -1,6 +1,5 @@
 package dbis.piglet.plan.rewriting.internals
 
-import dbis.piglet.mm.DataflowProfiler
 import dbis.piglet.op.{PigOperator, Pipe, TimingOp}
 import dbis.piglet.plan.{DataflowPlan, PipeNameGenerator}
 import dbis.piglet.tools.TopoSort

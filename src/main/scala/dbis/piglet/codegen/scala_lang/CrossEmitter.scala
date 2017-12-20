@@ -11,7 +11,13 @@ class CrossEmitter extends CodeEmitter[Cross] {
 
   // the template for final code
   override def template: String = """
-    |val <out> = <code>.map{case l => convert<class>(l) \}
+    |val <out> = <code>.map{case l =>
+    |  val res = convert<class>(l)
+    |  <if(profiling)>
+    |    PerfMonitor.sampleSize(t,"<lineage>", accum, randFactor)
+    |  <endif>
+    |  res
+    |\}
     """.stripMargin
 
   // code template to create all cartesian products one after he other
@@ -61,7 +67,8 @@ class CrossEmitter extends CodeEmitter[Cross] {
     render(Map(
       "out" -> op.outPipeName,
       "class" -> className,
-      "code" -> code))
+      "code" -> code,
+      "lineage" -> op.lineageSignature))
   }
 
 }

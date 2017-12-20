@@ -5,16 +5,16 @@ import org.scalatest.{Matchers, FlatSpec}
 /**
   * Created by hage on 02.06.17.
   */
-class MarkovSpec extends FlatSpec with Matchers {
+class GlobalOperatorGraphSpec extends FlatSpec with Matchers {
 
   "A Markov model" should "have size 0 when empty" in {
-    val m = Markov.empty
+    val m = GlobalOperatorGraph.empty
 
     m.size shouldBe 0
   }
 
   it should "return the None cost if nothing was set" in {
-    val m = Markov.empty
+    val m = GlobalOperatorGraph.empty
 
     m.add("start", Op("1"))
 
@@ -23,7 +23,7 @@ class MarkovSpec extends FlatSpec with Matchers {
   }
 
   it should "return the correct cost of a node" in {
-    val m = Markov.empty
+    val m = GlobalOperatorGraph.empty
 
     m.add("start", Op("1",T(3)))
 
@@ -35,9 +35,9 @@ class MarkovSpec extends FlatSpec with Matchers {
 
   it should "find the correct parent infos" in {
 
-    val m = Markov.empty
+    val m = GlobalOperatorGraph.empty
 
-    m.add(Markov.startNode, "1")
+    m.add(GlobalOperatorGraph.startNode, "1")
     m.add("1", "2")
     m.add("2", "3")
     m.add("3", "4")
@@ -54,9 +54,9 @@ class MarkovSpec extends FlatSpec with Matchers {
   }
 
   it should "have edge weights 1 for linear graph" in {
-    val m = Markov.empty
+    val m = GlobalOperatorGraph.empty
 
-    m.add(Markov.startNode, "1")
+    m.add(GlobalOperatorGraph.startNode, "1")
     m.add("1", "2")
     m.add("2", "3")
     m.add("3", "4")
@@ -69,28 +69,28 @@ class MarkovSpec extends FlatSpec with Matchers {
   }
 
   it should "have correct total cost for linear graph" in {
-    val m = Markov.empty
+    val m = GlobalOperatorGraph.empty
 
-    m.add(Markov.startNode, Op("1",T(3)))
+    m.add(GlobalOperatorGraph.startNode, Op("1",T(3)))
     m.add("1", Op("2",T(2)))
     m.add("2", Op("3",T(4)))
     m.add("3", Op("4",T(3)))
 
-    val c = m.totalCost("4",Markov.ProbMin)(Markov.CostMax)
+    val c = m.totalCost("4",GlobalOperatorGraph.ProbMin)(GlobalOperatorGraph.CostMax)
 
-    c shouldBe defined
+    c shouldBe 'Success
 
-    val cost = c.get._1
-    val probs = c.get._2
+    val cost = c.get.get._1
+    val probs = c.get.get._2
 
     withClue("wrong cost") { cost shouldBe 12L }
     withClue("wrong prob") { probs shouldBe 1.0 }
   }
 
   it should "have correct total cost for graph with a split" in {
-    val m = Markov.empty
+    val m = GlobalOperatorGraph.empty
 
-    m.add(Markov.startNode, Op("1",T(3)))
+    m.add(GlobalOperatorGraph.startNode, Op("1",T(3)))
     m.add("1", Op("2",T(2)))
     m.add("2", Op("3",T(4)))
     m.add("2", Op("8",T(2)))
@@ -99,12 +99,12 @@ class MarkovSpec extends FlatSpec with Matchers {
     m.add("4", Op("6",T(2)))
     m.add("4", Op("7",T(3)))
 
-    val c = m.totalCost("7",Markov.ProbMin)(Markov.CostMax)
+    val c = m.totalCost("7",GlobalOperatorGraph.ProbMin)(GlobalOperatorGraph.CostMax)
 
-    c shouldBe defined
+    c shouldBe 'Success
 
-    val cost = c.get._1
-    val probs = c.get._2
+    val cost = c.get.get._1
+    val probs = c.get.get._2
 
     withClue("wrong cost") { cost shouldBe 15L }
     withClue("wrong prob") { probs shouldBe 1/3.0 }

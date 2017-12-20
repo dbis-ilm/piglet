@@ -53,7 +53,7 @@ object PlanMerger extends PigletLogging {
 			  op match {
 			    
 			    // for load we don't need to adjust inputs
-			    case Load(_,_,_,_,_) => 
+			    case _:Load /*(_,_,_,_,_,_)*/ =>
 			      mergedPlan.addOperator(List(op), deferrPlanConstruction)
 			      needPlanConstruction = true
 			      
@@ -61,7 +61,7 @@ object PlanMerger extends PigletLogging {
 			     * since we use BFS, we should always find all inputs as they were processed before
 			     * the actual join/cross op
 			     */ 
-			    case Join(_,_,_,_) | Cross(_,_,_) =>
+			    case _:Join/*(_,_,_,_)*/ | _:Cross/*(_,_,_)*/ =>
 
 						op.inputs.foreach { pipe =>
               val prod = mergedPlan.findOperator { o => o.lineageSignature == pipe.producer.lineageSignature }.headOption

@@ -365,7 +365,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
   def loadStmt: Parser[PigOperator] = bag ~ "=" ~ loadKeyword ~ fileName ~ (usingClause?) ~ (loadSchemaClause?) ~ (timestampClause?) ^^ {
     case b ~ _ ~ _ ~ f ~ u ~ s ~ ts =>
-      val uri = new URI(f)
+      val uri = f //new URI(f)
       if (s.isDefined && ts.isDefined) ts.get match {
         case NamedField(n, _) => s.get.timestampField = s.get.indexOfField(n)
         case PositionalField(p) => s.get.timestampField = p
@@ -431,7 +431,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
    */
   def storeStmt: Parser[PigOperator] = storeKeyword ~ bag ~ intoKeyword ~ fileName ~ (usingClause?) ^^ {
     case _ ~ b ~  _ ~ f ~ u =>
-      val uri = new URI(f)
+      val uri = f //new URI(f)
       u match {
         case Some(p) => Store(Pipe(b), uri, Some(p._1), if (p._2.isEmpty) null else p._2.map(s => s""""${unquote(s)}""""))
         case None => Store(Pipe(b), uri)
@@ -989,8 +989,23 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
   lazy val delayKeyword = "delay".ignoreCase
 
-  def delayStmt = bag ~ "=" ~ delayKeyword ~ bag ~ byKeyword ~ "(" ~ num ~ "," ~ num ~ ")" ^^ {
-    case out ~ _ ~ _ ~ in ~ _ ~ _ ~ wTime ~ _ ~ sample ~ _ => Delay(Pipe(out), Pipe(in), sample, wTime.milliseconds)
+  def delayStmt = bag ~ "=" ~ delayKeyword ~ bag ~ byKeyword ~ "(" ~ (pigStringLiteral|num) ~ "," ~ num ~ ")" ^^ {
+    case out ~ _ ~ _ ~ in ~ _ ~ _ ~ wTime ~ _ ~ sample ~ _ =>
+
+
+
+
+      val waitDur= wTime match {
+        case s: String =>
+          val wTimeVal = s"PT${unquote(s)}"
+          Duration.fromNanos(java.time.Duration.parse(wTimeVal).toNanos)
+        case i: Int =>
+          i.milliseconds
+      }
+
+
+
+      Delay(Pipe(out), Pipe(in), sample, waitDur)
   }
 
 

@@ -18,7 +18,7 @@ package dbis.piglet.plan.rewriting.internals
 
 import java.net.URI
 
-import dbis.piglet.mm.MaterializationManager
+import dbis.piglet.mm.{CacheManager, MaterializationManager}
 import dbis.piglet.op.Materialize
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.tools.{BreadthFirstBottomUpWalker, CliParams}
@@ -52,7 +52,7 @@ trait MaterializationSupport extends PigletLogging {
      */
     for (materialize <- materializes if newPlan.containsOperator(materialize)) {
 
-      val data = mm.getDataFor(materialize.lineageSignature)
+      val data = CacheManager.getDataFor(materialize.lineageSignature)
 
       /*
        * The materialization manager has data for the current materialization
@@ -76,10 +76,11 @@ trait MaterializationSupport extends PigletLogging {
 
         val sig = materialize.lineageSignature
 
-        val file = mm.generatePath(sig)
+//        val file = mm.generatePath(sig)
+        val file = mm.generatePath(materialize.inPipeName)
 
-      if(!CliParams.values.compileOnly)
-          mm.saveMapping(sig, file)
+        if(!CliParams.values.compileOnly)
+          CacheManager.insert(sig, file)
 
         newPlan = MaterializationManager.replaceWithStore(materialize, file, newPlan)
       }

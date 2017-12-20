@@ -11,9 +11,8 @@ class FilterEmitter extends CodeEmitter[Filter] {
     """val <out> = <in>.filter{t =>
       |  val res = <pred>
       |  <if (profiling)>
-      |  if(res && scala.util.Random.nextInt(randFactor) == 0) {
-      |    PerfMonitor.sampleSize(t, "<lineage>", accum)
-      |    //accum.incr("<lineage>", PerfMonitor.estimateSize(t))
+      |  if(res) {
+      |    PerfMonitor.sampleSize(t, "<lineage>", accum, randFactor)
       |  }
       |  <endif>
       |  res

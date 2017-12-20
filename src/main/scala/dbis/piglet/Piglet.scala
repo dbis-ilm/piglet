@@ -197,7 +197,7 @@ object Piglet extends PigletLogging {
      * if we have got more than one plan and we should not execute them
      * sequentially, then try to merge them into one plan
      */
-    if(schedule.size > 1 && !CliParams.values.sequential) {
+    if(schedule.lengthCompare(1) > 0 && !CliParams.values.sequential) {
       logger.debug("Start merging plans")
 
       // merge plans into one plan
@@ -219,7 +219,7 @@ object Piglet extends PigletLogging {
       //TODO:this is ugly in this place here... maybe we should create a "clear-wrapper"
       dbis.piglet.codegen.scala_lang.JoinEmitter.joinKeyVars.clear()
 
-      
+
       var newPlan = plan
 
       val mm = new MaterializationManager(Conf.materializationBaseDir)
@@ -232,14 +232,15 @@ object Piglet extends PigletLogging {
       if (CliParams.values.backend == "flinks")
         newPlan = processWindows(newPlan)
 
+
       // 3. apply general optimization rules
       Rules.registerBackendRules(CliParams.values.backend)
       newPlan = rewritePlan(newPlan)
 
       // 4. check if we already have materialized results
       // and insert LOAD operators
-      newPlan = mm.loadIntermediateResults(newPlan)
-
+      val (newPlan2,loaded) = mm.loadIntermediateResults(newPlan)
+      newPlan = newPlan2
 
       // 5. analyze plan if something can be materialized or
       // if materialized results are present
@@ -247,10 +248,9 @@ object Piglet extends PigletLogging {
         val model = DataflowProfiler.analyze(newPlan)
 
         // according to statistics, insert MATERIALIZE (STORE) operators
+        //        if(!loaded)
         newPlan = mm.insertMaterializationPoints(newPlan, model)
       }
-//      newPlan = processMaterializations(newPlan, mm)
-
 
       // 6. after all optimizations have been performed, insert
       // profiling operators (if desired)
@@ -258,6 +258,7 @@ object Piglet extends PigletLogging {
         // after rewriting the plan, add the timing operations
         newPlan = insertTimings(newPlan)
       }
+
 
       // for testing of scripts and Piglet features, consumers
       // such as Dump and Store may be muted

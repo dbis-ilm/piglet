@@ -24,6 +24,9 @@ class UpdateMap[K,V](m: MutableMap[K,V]) {
 
 object PerfMonitor {
 
+  val SEQ_SAMPLE_MAX_SIZE = 8 * 100 * 1024 // 8 kB
+
+
   def request(url: String, data: String): Boolean = {
     val theUrl = new URL(s"$url?data=${URLEncoder.encode(data, "UTF-8")}")
     val c = theUrl.openConnection().asInstanceOf[HttpURLConnection]
@@ -82,7 +85,7 @@ object PerfMonitor {
         case d@ _ =>
           println(s"Unknown dependency type: $d")
           List.empty[Int]
-      }.toList
+      }
 
       a.map(inner => inner.mkString(PARENT_DELIM)).mkString(DEP_DELIM)
 
@@ -122,20 +125,36 @@ object PerfMonitor {
 //  def estimateSize(o: AnyRef): Long = org.apache.spark.util.SizeEstimator.estimate(o)
 
   @inline
-  def sampleSize(t: SchemaClass, lineage: String, accum: SizeAccumulator, num: Int = 1): Unit = {
-    accum.incr(lineage, t, num)
+  def sampleSize(t: SchemaClass, lineage: String, accum: SizeAccumulator, randFactor: Int, num: Int = 1): Unit = {
+
+    if(accum.containsNot(lineage) || scala.util.Random.nextInt(randFactor) == 0)
+      accum.incr(lineage, t, num)
   }
 
   @inline
-  def sampleSize(t: Iterable[SchemaClass], lineage: String, accum: SizeAccumulator): Unit = {
-    sampleSize(t.toSeq, lineage, accum)
+  def sampleSize(t: Iterable[SchemaClass], lineage: String, accum: SizeAccumulator, randFactor: Int): Unit = {
+    sampleSize(t.toSeq, lineage, accum, randFactor)
   }
 
   @inline
-  def sampleSize(t: Seq[SchemaClass], lineage: String, accum: SizeAccumulator): Unit = {
-    accum.incr(lineage, t.take(100), num = t.size)
-  }
+  def sampleSize(t: Seq[SchemaClass], lineage: String, accum: SizeAccumulator, randFactor: Int): Unit = {
 
+    if(accum.containsNot(lineage) || scala.util.Random.nextInt(randFactor) == 0) {
+      var takenSize = 0L
+      val taken = t.takeWhile { s =>
+        val tSize = org.apache.spark.util.SizeEstimator.estimate(s)
+        if (takenSize < SEQ_SAMPLE_MAX_SIZE) {
+          takenSize += tSize
+          true
+        } else {
+          false
+        }
+
+      }
+
+      accum.incr(lineage, taken, num = t.size)
+    }
+  }
 
 
 //  @inline
@@ -213,7 +232,7 @@ case class SizeStat2(private var elems: ListBuffer[AnyRef], private var _cnt: Lo
 }
 
 object SizeStat2 {
-  val MaxSampleSizePerOp: Int = 1000
+  val MaxSampleSizePerOp: Int = 100
 
   def computeNumBytes(objects: AnyRef): Long = {
 
@@ -294,15 +313,8 @@ class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mut
   }
 
   def incr(lineage: Lineage, o: Seq[SchemaClass], num: Int) = {
-//    val taken = o.take(100)
-//    if(theValue.contains(lineage)) {
-//      theValue(lineage).add(taken)
-//    } else {
-//      theValue += lineage -> SizeStat2(ListBuffer(taken),1)
-//    }
-
     val bytes = if(o.isEmpty) { 0 } else {
-      ((SizeStat2.computeNumBytes(o.head) / o.size.toDouble) * num).toLong
+      ((SizeStat2.computeNumBytes(o) / o.size.toDouble) * num).toLong
     }
     if(theValue.contains(lineage)) {
       theValue(lineage).addAdditionalBytes(bytes, 1)
@@ -311,7 +323,9 @@ class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mut
     }
   }
 
+  def contains(lineage: Lineage): Boolean = theValue.contains(lineage)
 
+  def containsNot(lineage: Lineage): Boolean = ! theValue.contains(lineage)
 
   override def merge(other: AccumulatorV2[MutableMap[Lineage, SizeStat2], MutableMap[Lineage, SizeStat2]]): Unit = {
     add(other.value)

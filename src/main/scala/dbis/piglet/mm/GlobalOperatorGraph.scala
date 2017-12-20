@@ -3,6 +3,7 @@ package dbis.piglet.mm
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.tools.logging.PigletLogging
 
+import scala.util.Try
 import scalax.collection.edge.Implicits._
 import scalax.collection.edge.WDiEdge
 import scalax.collection.io.json._
@@ -14,9 +15,11 @@ import scalax.collection.mutable.Graph
   * @param lineage The lineage for the operator
   * @param cost The operator cost (execution time)
   */
-case class Op(lineage: Lineage, var cost: Option[T] = None, var resultRecords: Option[Long] = None, var bytesPerRecord: Option[Double] = None) {
+case class Op(lineage: Lineage, var cost: Option[T] = None, var resultRecords: Option[Long] = None,
+              var bytesPerRecord: Option[Double] = None) {
+
   override def equals(obj: scala.Any): Boolean = obj match {
-    case Op(l,_,_,_) => l equals lineage
+    case o: Op => o.lineage equals lineage
     case _ => false
   }
 
@@ -33,9 +36,9 @@ object Op {
   * A data structure to maintain profiling information on operator occurrences
   * @param model The graph representing operators with their costs and the number of transitions on the edges
   */
-case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLogging {
+case class GlobalOperatorGraph(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLogging {
 
-  import Markov._
+  import GlobalOperatorGraph._
 
 
   /* Increase the total amount of runs
@@ -64,8 +67,6 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     model upsert (parent ~%> child) (newWeight) // update with new weight / count
   }
 
-
-
 //  private def _getparents(op: Lineage): Try[List[Lineage]] = Try {
 //
 //  }
@@ -87,9 +88,17 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     * @return Returns the weight of this edge or 0 if there is none
     */
   def rawWeight(parent: Op, child: Op): Long =
-  model.find( (parent ~%> child)(0) ) // the weight is not regarded for search
-    .map(_.weight)
-    .getOrElse(0L)
+    model.find( (parent ~%> child)(0) ) // the weight is not regarded for search
+      .map(_.weight)
+      .getOrElse(0L)
+
+  def outProbs(lineage: Lineage): Option[Double] =
+    model.find(Op(lineage)).map{o =>
+
+      val weigths = o.outgoing.map(e => e.weight)
+      weigths.sum / weigths.size.toDouble
+
+    }
 
   def cost(lineage: Lineage): Option[T] = model.find(Op(lineage)).flatMap(_.value.cost)
 
@@ -117,8 +126,8 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     *         or None, if there is no such op
     */
   def totalCost(lineage: Lineage,
-                probStrategy: Traversable[Double] => Double = Markov.ProbMin)(
-                costStrategy: Traversable[(Long, Double)] => (Long, Double)): Option[(Long, Double)] = {
+                probStrategy: Traversable[Double] => Double = GlobalOperatorGraph.ProbMin)(
+                costStrategy: Traversable[(Long, Double)] => (Long, Double)): Try[Option[(Long, Double)]] = Try {
 
     // this assignment is needed by the type checker/compiler to bring the graph in scope
     val g = model
@@ -186,13 +195,13 @@ case class Markov(protected[mm] var model: Graph[Op, WDiEdge]) extends PigletLog
     * String representation of this model as JSON
     * @return JSON representation of this model
     */
-  def toJson: String = model.toJson(Markov.descriptor)
+  def toJson: String = model.toJson(GlobalOperatorGraph.descriptor)
 
   override def toString: Lineage = model.toString()
 
 }
 
-object Markov {
+object GlobalOperatorGraph {
 
   val startLineage: Lineage = "start"
   val startNode: Op = Op(startLineage)
@@ -201,7 +210,8 @@ object Markov {
   // used to serialize the nodes to JSON
   private val nodeDescriptor = new NodeDescriptor[Op](typeId = "operators"){
     def id(node: Any) = node match {
-      case Op(l,_,_,_) => l
+      case o:Op => o.lineage
+      case _ => ???
     }
   }
 
@@ -216,16 +226,16 @@ object Markov {
     * @param json The JSON representation of the graph
     * @return Returns the Markov model parsed from JSON
     */
-  def fromJson(json: String): Markov = {
+  def fromJson(json: String): GlobalOperatorGraph = {
     val g = Graph.fromJson[Op, WDiEdge](json, descriptor)
-    Markov(g)
+    GlobalOperatorGraph(g)
   }
 
   /**
     * Create an empty model
     * @return An empty Markov model
     */
-  def empty = new Markov(Graph[Op, WDiEdge]())
+  def empty = new GlobalOperatorGraph(Graph[Op, WDiEdge]())
 
 
   def ProbMin(l: Traversable[Double]): Double = l.min

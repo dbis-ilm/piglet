@@ -1,14 +1,15 @@
 package dbis.piglet.mm
 
-import java.net.{InetSocketAddress, URLDecoder}
-import scala.concurrent.duration._
+import java.net.{HttpURLConnection, InetSocketAddress, URLDecoder}
 
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import com.sun.net.httpserver.{HttpExchange, HttpHandler, HttpServer}
-
-
 import dbis.piglet.tools.Conf
 import dbis.piglet.tools.logging.PigletLogging
+
+import scala.util.{Failure, Success}
 
 /**
   * The StatServer starts a HTTP Server on a specified port
@@ -23,19 +24,29 @@ object StatServer extends PigletLogging {
   var server: HttpServer = _
   var writer: ActorRef = _
 
+  private val actorName = "statswriter"
+
   def start(profilerSettings: ProfilerSettings): Unit = {
 //    writer = system.actorOf(Props[StatsWriterActor], name = "statswriter")
 
-    writer = system.actorOf(Props(new StatsWriterActor(profilerSettings)), name = "statswriter")
+    system.actorSelection(system / actorName).resolveOne(3.seconds).onComplete {
+      case Success(ref) =>
+        writer = ref
+      case Failure(_) =>
+        writer = system.actorOf(Props(new StatsWriterActor(profilerSettings)), name = actorName)
+    }
 
-    server = HttpServer.create(new InetSocketAddress(java.net.InetAddress.getLocalHost.getHostAddress, port), allowedQueuedConnections)
-    server.createContext("/times", new TimesHandler(writer))
-    server.createContext("/sizes", new SizesHandler(writer))
-    logger.debug(s"Stats server will listen on $port")
 
+    if(server == null) {
+      server = HttpServer.create(new InetSocketAddress(java.net.InetAddress.getLocalHost.getHostAddress, port), allowedQueuedConnections)
+      server.createContext("/times", new TimesHandler(writer))
+      server.createContext("/sizes", new SizesHandler(writer))
+      logger.debug(s"Stats server will listen on $port")
 
-    server.start()
-    logger.debug("started stat server")
+      server.start()
+      logger.debug("started stat server")
+    }
+
   }
 
   def stop(): Unit = {
@@ -110,7 +121,7 @@ class StatsWriterActor(profilerSettings: ProfilerSettings) extends Actor with Pi
 //      DataflowProfiler.addExecTime(lineage, partitionId, parentsList, currTime)
       DataflowProfiler.addExecTime(msg.values)
     case msg: SizeMsg =>
-      logger.debug(s"reiceived size msg: $msg")
+//      logger.debug(s"reiceived size msg: $msg")
       DataflowProfiler.addSizes(msg.values, profilerSettings.fraction)
 
 

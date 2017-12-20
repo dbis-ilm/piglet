@@ -12,9 +12,7 @@ class SpatialFilterEmitter extends CodeEmitter[SpatialFilter] {
   override def template =
     """val <out> = <in><keyby><liveindex>.<predicate>(<other>).map{ case (_,v) =>
       |  <if (profiling)>
-      |  if(scala.util.Random.nextInt(randFactor) == 0) {
-      |    PerfMonitor.sampleSize(v,"<lineage>", accum)
-      |  }
+      |    PerfMonitor.sampleSize(v,"<lineage>", accum, randFactor)
       |  <endif>
       |  v
       |}""".stripMargin

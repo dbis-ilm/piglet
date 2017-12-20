@@ -85,7 +85,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
         |      val conf = new SparkConf().setAppName("test_App")
         |      val sc = new SparkContext(conf)
         |      val randFactor: Int = 10
-        |      val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
+        |      val accum = new dbis.piglet.backends.spark.SizeAccumulator()
         |      sc.register(accum,"accum")
         |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
         |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
@@ -128,7 +128,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
                                      |      val conf = new SparkConf().setAppName("test_App")
                                      |      val sc = new SparkContext(conf)
                                      |      val randFactor: Int = 10
-                                     |      val accum = new dbis.piglet.backends.spark.SizeAccumulator2()
+                                     |      val accum = new dbis.piglet.backends.spark.SizeAccumulator()
                                      |      sc.register(accum,"accum")
                                      |      PerfMonitor.notify(url,"start",null,-1,System.currentTimeMillis)
                                      |      PerfMonitor.notify(url,"end",null,-1,System.currentTimeMillis)
@@ -453,7 +453,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     val op = Limit(Pipe("aa"), Pipe("bb"), 10)
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
 //    sc.parallelize(bb.take(10))
-    val expectedCode = cleanString("val aa = bb.zipWithIndex.filter{case (_,idx) => idx < 10}.map(_._1)")
+    val expectedCode = cleanString("val aa = bb.zipWithIndex.filter{case (_,idx) => idx < 10}.map{t => val res = t._1 res }")
     assert(generatedCode == expectedCode)
   }
 
@@ -837,7 +837,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     op.constructSchema
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-        |val aa = bb.cartesian(cc).map{ case (v,w) => (v._0,v._1,v._2,w._0,w._1,w._2) }.map{case l => convert_t$1_Tuple(l) }""".stripMargin)
+        |val aa = bb.cartesian(cc).map{ case (v,w) => (v._0,v._1,v._2,w._0,w._1,w._2) }.map{case l => val res = convert_t$1_Tuple(l) res }""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
   }
@@ -854,7 +854,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
     op.constructSchema
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
     val expectedCode = cleanString("""
-        |val a = b.cartesian(c).map{ case (v,w) => (v._0,w._0) }.cartesian(d).map{ case (v,w) => (v._1,v._2,w._0) }.map{case l => convert_t$1_Tuple(l) }""".stripMargin)
+        |val a = b.cartesian(c).map{ case (v,w) => (v._0,w._0) }.cartesian(d).map{ case (v,w) => (v._1,v._2,w._0) }.map{case l => val res = convert_t$1_Tuple(l) res }""".stripMargin)
 
     generatedCode should matchSnippet(expectedCode)
   }
