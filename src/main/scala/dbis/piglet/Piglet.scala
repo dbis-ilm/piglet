@@ -197,7 +197,7 @@ object Piglet extends PigletLogging {
      * if we have got more than one plan and we should not execute them
      * sequentially, then try to merge them into one plan
      */
-    if(schedule.size > 1 && !CliParams.values.sequential) {
+    if(schedule.lengthCompare(1) > 0 && !CliParams.values.sequential) {
       logger.debug("Start merging plans")
 
       // merge plans into one plan

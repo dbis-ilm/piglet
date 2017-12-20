@@ -15,9 +15,11 @@ import scalax.collection.mutable.Graph
   * @param lineage The lineage for the operator
   * @param cost The operator cost (execution time)
   */
-case class Op(lineage: Lineage, var cost: Option[T] = None, var resultRecords: Option[Long] = None, var bytesPerRecord: Option[Double] = None) {
+case class Op(lineage: Lineage, var cost: Option[T] = None, var resultRecords: Option[Long] = None,
+              var bytesPerRecord: Option[Double] = None) {
+
   override def equals(obj: scala.Any): Boolean = obj match {
-    case Op(l,_,_,_) => l equals lineage
+    case o: Op => o.lineage equals lineage
     case _ => false
   }
 
@@ -64,8 +66,6 @@ case class GlobalOperatorGraph(protected[mm] var model: Graph[Op, WDiEdge]) exte
 
     model upsert (parent ~%> child) (newWeight) // update with new weight / count
   }
-
-
 
 //  private def _getparents(op: Lineage): Try[List[Lineage]] = Try {
 //
@@ -210,7 +210,8 @@ object GlobalOperatorGraph {
   // used to serialize the nodes to JSON
   private val nodeDescriptor = new NodeDescriptor[Op](typeId = "operators"){
     def id(node: Any) = node match {
-      case Op(l,_,_,_) => l
+      case o:Op => o.lineage
+      case _ => ???
     }
   }
 

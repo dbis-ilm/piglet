@@ -14,11 +14,11 @@ import scala.concurrent.duration.Duration
   * @param prob The probability for re-using this operator
   * @param cost The duration that this operator takes
  */
-case class MaterializationPoint(lineage: Lineage, prob: Double, cost: Long, benefit: Duration = Duration.Undefined) {
+case class MaterializationPoint(lineage: Lineage, prob: Double, cost: Long, bytes: Long, benefit: Duration = Duration.Undefined) {
   override def hashCode(): Int = lineage.hashCode
 
   override def equals(obj: scala.Any): Boolean = obj match {
-    case MaterializationPoint(l,_,_,_) => l equals lineage
+    case m:MaterializationPoint => m.lineage equals lineage
     case _ => false
   }
 
@@ -27,5 +27,5 @@ case class MaterializationPoint(lineage: Lineage, prob: Double, cost: Long, bene
 
 
 object MaterializationPoint {
-  def dummy(lineage: Lineage): MaterializationPoint = MaterializationPoint(lineage, -1,-1, Duration.Undefined)
+  def dummy(lineage: Lineage): MaterializationPoint = MaterializationPoint(lineage, -1,-1, -1, Duration.Undefined)
 }

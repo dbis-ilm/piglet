@@ -5,6 +5,7 @@ import java.nio.file.{Files, Path, StandardOpenOption}
 
 import dbis.piglet.Piglet.Lineage
 import dbis.piglet.mm.DuplicateStrategy.DuplicateStrategy
+import dbis.piglet.mm.EvictionStrategy.EvictionStrategy
 import dbis.piglet.op.CacheMode.CacheMode
 import dbis.piglet.op.{CacheMode, Empty, Load, TimingOp}
 import dbis.piglet.plan.DataflowPlan
@@ -391,6 +392,8 @@ object MarkovStrategy extends ChooseMatPointStrategy {
   }
 }
 
+
+
 import dbis.piglet.mm.CostStrategy.CostStrategy
 import dbis.piglet.mm.ProbStrategy.ProbStrategy
 import dbis.piglet.mm.GlobalStrategy.GlobalStrategy
@@ -401,18 +404,22 @@ case class ProfilerSettings(
                              costStrategy: CostStrategy = Conf.mmDefaultCostStrategy,
                              probStrategy: ProbStrategy = Conf.mmDefaultProbStrategy,
                              strategy: GlobalStrategy = Conf.mmDefaultStrategy,
+                             eviction: EvictionStrategy = Conf.mmDefaultEvictionStrategy,
+                             cacheSize: Long = Conf.mmDefaultCacheSize,
                              cacheMode: CacheMode = Conf.mmDefaultCacheMode,
                              fraction: Int = Conf.mmDefaultFraction,
                              duplicates: DuplicateStrategy = DuplicateStrategy.NEWEST,
                              url: URI = ProfilerSettings.profilingUrl
-                           )
+                           ) {
+
+}
 
 object ProfilerSettings extends PigletLogging {
   def apply(m: Map[String, String]): ProfilerSettings = {
     var ps = ProfilerSettings()
 
     m.foreach { case (k,v) =>
-      k match {
+      k.toLowerCase match {
         case "prob" => ps = ps.copy(probThreshold = v.toDouble)
         case "benefit" => ps = ps.copy(minBenefit = v.toDouble.seconds)
         case "cost_strategy" => ps = ps.copy(costStrategy = CostStrategy.withName(v.toUpperCase))
@@ -421,6 +428,8 @@ object ProfilerSettings extends PigletLogging {
         case "cache_mode" => ps = ps.copy(cacheMode = CacheMode.withName(v.toUpperCase))
         case "fraction" => ps = ps.copy(fraction = v.toInt)
         case "duplicates" => ps = ps.copy(duplicates = DuplicateStrategy.withName(v.toUpperCase))
+        case "eviction" => ps = ps.copy(eviction = EvictionStrategy.withName(v.toUpperCase))
+        case "cachesize" => ps = ps.copy(cacheSize = v.toLong)
         case _ => logger warn s"unknown profiler settings key $k (value: $v) - ignoring"
       }
     }

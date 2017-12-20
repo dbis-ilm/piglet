@@ -5,11 +5,9 @@ import java.net.URI
 import java.nio.file.{Files, Path, Paths, StandardCopyOption}
 
 import com.typesafe.config.{Config, ConfigFactory}
-import dbis.piglet.mm.{CostStrategy, GlobalStrategy, ProbStrategy}
+import dbis.piglet.mm.{CostStrategy, EvictionStrategy, GlobalStrategy, ProbStrategy}
 import dbis.piglet.op.CacheMode
 import dbis.piglet.tools.logging.PigletLogging
-
-import scala.concurrent.duration.Duration._
 
 import scala.concurrent.duration._
 
@@ -18,13 +16,15 @@ import scala.concurrent.duration._
  */
 object Conf extends PigletLogging {
 
-
   val EXECTIMES_FRAGMENT = "times"
   val SIZES_FRAGMENT = "sizes"
   val MATERIALIZATION_FRAGMENT = "materializations"
 
 
 	val programHome = Paths.get(System.getProperty("user.home"), ".piglet")
+
+  val cacheSizePattern = "([0-9]+)\\s*(?i)(k|m|g|kb|mb|gb)".r
+
 
 	// create directory if not exists
 	if(!Files.exists(programHome))
@@ -100,9 +100,9 @@ object Conf extends PigletLogging {
   def hdfsHdfsSiteFile = Paths.get(appconf.getString("hdfs.hdfssite"))
 
   def commonJar = Paths.get(appconf.getString("common.jar"))
-  
+
   def spatialJar = Paths.get(appconf.getString("features.spatial.jar"))
-  
+
   def statServerPort = appconf.getInt("statserver.port")
   def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url"))) else None
 
@@ -112,6 +112,34 @@ object Conf extends PigletLogging {
   def mmDefaultProbStrategy = ProbStrategy.withName(appconf.getString("profiler.defaults.prob_strategy").toUpperCase)
   def mmDefaultStrategy = GlobalStrategy.withName(appconf.getString("profiler.defaults.global_strategy").toUpperCase)
 
+  def mmDefaultEvictionStrategy = EvictionStrategy.withName(appconf.getString("profiler.defaults.cache.eviction").toUpperCase)
+  def mmDefaultCacheSize = {
+
+    val s = appconf.getString("profiler.defaults.cache.size")
+
+    val cacheSizeBytes = s match {
+      case cacheSizePattern(num, unit) =>
+        val n = num.toLong
+
+        val power = unit.toLowerCase match {
+          case null =>
+            0
+          case "k" | "kb" =>
+            1
+          case "m" | "mb" =>
+            2
+          case "g" | "gb" =>
+            3
+        }
+
+        (n * math.pow(1024,power)).toLong
+      case _ =>
+        Long.MaxValue
+    }
+
+    cacheSizeBytes
+
+  }
 
   def mmDefaultProbThreshold = appconf.getDouble("profiler.defaults.prob_threshold")
 

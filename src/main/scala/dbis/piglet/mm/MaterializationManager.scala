@@ -1,6 +1,5 @@
 package dbis.piglet.mm
 import java.net.URI
-import java.nio.file.{Files, StandardOpenOption}
 import java.util.NoSuchElementException
 
 import dbis.piglet.Piglet.Lineage
@@ -9,15 +8,10 @@ import dbis.piglet.plan.rewriting.internals.ProfilingSupport
 import dbis.piglet.plan.{DataflowPlan, OperatorNotFoundException, PipeNameGenerator}
 import dbis.piglet.tools._
 import dbis.piglet.tools.logging.PigletLogging
-import org.json4s._
-import org.json4s.native.JsonMethods._
-import org.json4s.native.Serialization
-import org.json4s.native.Serialization.write
 
-import scala.collection.JavaConverters._
+
 import scala.collection.mutable
 import scala.concurrent.duration._
-import scala.io.Source
 import scala.util.{Failure, Success}
 
 
@@ -91,31 +85,10 @@ object MaterializationManager extends PigletLogging {
   */
 class MaterializationManager(private val matBaseDir: URI) extends PigletLogging {
 
-  implicit val formats = Serialization.formats(NoTypeHints)
-
   logger.debug(s"materialization base directory: $matBaseDir")
   //  logger.debug(s"using materialization storage service at $url")
 
   require(matBaseDir != null, "Base directory for materialization must not be null")
-
-
-  /**
-    * Already existing materializations
-    *
-    * They're read from file and stored as a mapping from lineage --> file name
-    */
-  var materializations: Map[Lineage, URI] = if (Files.exists(Conf.materializationMapFile)) {
-    val json = Source.fromFile(Conf.materializationMapFile.toFile).getLines().mkString("\n")
-
-    if(json.isEmpty)
-      Map.empty[Lineage, URI]
-    else
-      parse(json).extract[Map[Lineage, String]].map{case(k,v) => (k,new URI(v))}
-
-  } else {
-    Map.empty[Lineage, URI]
-  }
-
 
   /**
     * Checks the complete plan for potential materialization points
@@ -164,23 +137,41 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
       logger.debug(s"chosen points for $s \n${GlobalStrategy.getStrategy(s)(candidates,plan,globalOpGraph).mkString("\n")} ")
     }
 
+    // getStrategy returns a [[ChooseMatPointStrategy]] which has an apply method that is immediately called
     val chosenPoint = GlobalStrategy.getStrategy(ps.strategy)(candidates, plan, globalOpGraph)
+
+//    val evictionStrategy = EvictionStrategy.getStrategy(ps.eviction)
+//
+//    if(evictionStrategy.inserted(chosenPoint,  globalOpGraph))
+
 
     // for each candidate point ...
     // ... so that we will materialize the one with the greatest benefit
     var newPlan = plan
     chosenPoint.foreach{ m =>
-      // ... determine the operator ...
-      newPlan = materialize(m, newPlan)
+
+      if(CliParams.values.compileOnly) {
+        // if in compile only, we will not execute the script and thus not actually write the intermediate
+        // results. Hence, we only create the path that would be used, but to not save the mapping
+      } else {
+        // ... that will be replaced with a Store op.
+        val path = generatePath(m.lineage)
+
+        val inserted = CacheManager.insert(m, path)
+
+        if(inserted) {
+          // ... determine the operator ...
+          newPlan = materialize(m, path, newPlan)
+        }
+      }
     }
 
     newPlan.constructPlan(newPlan.operators)
     newPlan
-
   }
 
 
-  private def materialize(m: MaterializationPoint, plan: DataflowPlan): DataflowPlan = {
+  private def materialize(m: MaterializationPoint, path: URI, plan: DataflowPlan): DataflowPlan = {
     var newPlan = plan
 
     val lineage = m.lineage
@@ -193,16 +184,6 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
     logger.info(s"we chose to materialize ${theOp.name} (${theOp.outPipeNames.mkString(",")}|$lineage) --> benfit = ${m.benefit.toSeconds} s")
 
     val ps = CliParams.values.profiling.get
-
-    val path = generatePath(lineage)
-
-    if(CliParams.values.compileOnly) {
-      // if in compile only, we will not execute the script and thus not actually write the intermediate
-      // results. Hence, we only create the path that would be used, but to not save the mapping
-    } else {
-      // ... that will be replaced with a Store op.
-      saveMapping(lineage, path) // we save a mapping from the lineage of the actual op (not the materialize) to the path
-    }
 
     val storer = Store(theOp.outputs.head, path.toString, Some(MaterializationManager.STORAGE_CLASS))
     if(ps.cacheMode == CacheMode.NONE) {
@@ -275,7 +256,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
 
               logger.debug(s"\t--> benefit: ${benefit.toSeconds}")
 
-              val m = MaterializationPoint(sig, cost = cost, prob = relProb, benefit = benefit)
+              val m = MaterializationPoint(sig, cost = cost, prob = relProb, bytes = opSizeBytes.toLong, benefit = benefit)
               candidates += m
             } else {
               logger.debug(s"no size info for ${op.name} (${op.outPipeNames.mkString(",")}|$sig)")
@@ -310,7 +291,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
 
       logger.debug(s"checking for existing materialized results for $opName ($sig)") //${op.name}
 
-      getDataFor(sig) match {
+      CacheManager.getDataFor(sig) match {
         case Some(uri) =>
           logger.info(s"loading materialized results for ${op.name} ${op.outPipeNames.mkString(",")} $sig")
 
@@ -323,6 +304,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
 
           // the consumers of op
           val opConsumers = op.outputs
+
 
 
           /* remove Op and all its predecessors from plan
@@ -383,13 +365,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
     (plan,loaded)
   }
 
-  /**
-   * Checks if we have materialized results for the given hash value
-   * 
-   * @param lineage The hash value to get data for
-   * @return Returns the path to the materialized result, iff present. Otherwise <code>null</code>
-   */
-  def getDataFor(lineage: Lineage): Option[URI] = materializations.get(lineage)
+
     
   /**
    * Generate a path for the given lineage/hash value
@@ -400,24 +376,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
   def generatePath(lineage: Lineage): URI = matBaseDir.resolve(lineage)
   
 
-  /**
-   * Persist the given mapping of a hashcode to a specific file name.
-   * 
-   * @param lineage The hash code of the sub plan to persist
-   * @param matFile The path to the file in which the results were materialized
-   */
-  def saveMapping(lineage: Lineage, matFile: URI) = {
 
-    require(!CliParams.values.compileOnly, "writing materialization mapping info in compile-only mode will break things!")
-
-    materializations += lineage -> matFile
-
-    val json = write(materializations.map{case(k,v) => (k,v.toString)})
-
-    Files.write(Conf.materializationMapFile,
-      List(json).asJava,
-      StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
-        
-  }
     
 }
+
