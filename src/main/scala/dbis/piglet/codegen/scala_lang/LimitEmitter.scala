@@ -8,19 +8,21 @@ import dbis.piglet.op.Limit
   */
 class LimitEmitter extends CodeEmitter[Limit] {
   // val <out> = sc.parallelize(<in>.take(<num>))
-  override def template: String =
-    """val <out> = <in>.zipWithIndex.filter{case (_,idx) => idx \< <num>}.map{t =>
-      |  val res = t._1
-      |  <if (profiling)>
-      |    PerfMonitor.sampleSize(res,"<lineage>", accum, randFactor)
-      |  <endif>
-      |  res
-      |}""".stripMargin
+  override def template: String = smallLimitTemplate
 
-  val smallLimitTemplate = s"""val <out> = sc.parallelize(<in>.take(<num>))<if (profiling)>.map{e =>
-    |  PerfMonitor.sampleSize(e,"<lineage>", accum, randFactor)
-    |  e
-    |}<endif>""".stripMargin
+  lazy val smallLimitTemplate = s"""val <out> = sc.parallelize(<in>.take(<num>))<if (profiling)>.map{e =>
+                                     |  PerfMonitor.sampleSize(e,"<lineage>", accum, randFactor)
+                                     |  e
+                                     |}<endif>""".stripMargin
+
+
+  lazy val largeLimitTemplage = """val <out> = <in>.zipWithIndex.filter{case (_,idx) => idx \< <num>}.map{t =>
+    |  val res = t._1
+    |  <if (profiling)>
+    |    PerfMonitor.sampleSize(res,"<lineage>", accum, randFactor)
+    |  <endif>
+    |  res
+    |}""".stripMargin
 
   override def code(ctx: CodeGenContext, op: Limit): String = {
 
@@ -30,16 +32,12 @@ class LimitEmitter extends CodeEmitter[Limit] {
       "num" -> op.num,
       "lineage" -> op.lineageSignature)
 
-    if(op.num <= 1000)
-      CodeEmitter.render(smallLimitTemplate,params)
+    if(op.num > 1000)
+      CodeEmitter.render(largeLimitTemplage,params)
     else
       render(params)
 
   }
-
-
-
-
 
 }
 
