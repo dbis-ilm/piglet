@@ -1,46 +1,25 @@
 package dbis.piglet.mm
 
 import java.net.URI
+import java.nio.file.{Files, StandardOpenOption}
 
-import dbis.piglet.tools.CliParams
+import dbis.piglet.tools.{CliParams, Conf}
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FlatSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class LRUSpec extends FlatSpec with Matchers with BeforeAndAfter with BeforeAndAfterAll {
 
-  override def beforeAll: Unit = {
-    val ps = new ProfilerSettings(minBenefit = 10.seconds,
-      admissionCheck = false,
-      cacheSize = 30,
-      eviction = EvictionStrategy.LRU)
-
-    CliParams._values = new CliParams(profiling = Some(ps))
-  }
-
-
-  "LRU" should "remove something" in {
-
-    val newEntry = CacheEntry("new", "new", 1000L, 10, lastLoaded = Some(11))
-
-    val list = Seq(
-      CacheEntry("1", "1", _benefit=1000L, bytes=10, lastLoaded = Some(10)),
-      CacheEntry("2", "2", _benefit=1000L, bytes=10, lastLoaded = Some(9)),
-      CacheEntry("3", "3", _benefit=1000L, bytes=10, lastLoaded = Some(8))
-    )
-
-    val wouldRemove = LRUEviction.wouldRemove(newEntry, list)
-
-    wouldRemove should contain only CacheEntry("1", "1", 1000L, 10, lastLoaded = Some(10))
-
-  }
-
-}
 
 
 class CacheManagerSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   before {
+//    import scala.collection.JavaConverters._
+//    Files.write(Conf.materializationMapFile, List("").asJava,
+//      StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING )
+
+
+    Files.deleteIfExists(Conf.materializationMapFile)
 
     CacheManager.materializations = Map(
       "1" -> CacheEntry("1",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L)),
@@ -58,7 +37,6 @@ class CacheManagerSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   "LRU strategy" should "remove one entry with admission check" in {
 
-
     val ps = new ProfilerSettings(minBenefit = 10.seconds,
       admissionCheck = true,
       cacheSize = 5500,
@@ -66,7 +44,7 @@ class CacheManagerSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
     CliParams._values = new CliParams(profiling = Some(ps))
 
-    val mp = MaterializationPoint("new",1,1,1100, 1000.milliseconds)
+    val mp = MaterializationPoint("new", prob = 1, cost = 1, bytes = 1100, benefit = 1000.milliseconds)
 
     val u = new URI("file:///new")
 
@@ -78,16 +56,61 @@ class CacheManagerSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
     CacheManager.materializations.size shouldBe 6
 
-    CacheManager.materializations.values should not contain CacheEntry("10",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
-    CacheManager.materializations.values should not contain CacheEntry("9",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
-    CacheManager.materializations.values should not contain CacheEntry("8",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
-    CacheManager.materializations.values should not contain CacheEntry("7",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
     CacheManager.materializations.values should not contain CacheEntry("1",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
+    CacheManager.materializations.values should not contain CacheEntry("2",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
+    CacheManager.materializations.values should not contain CacheEntry("3",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
+    CacheManager.materializations.values should not contain CacheEntry("4",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
+    CacheManager.materializations.values should not contain CacheEntry("5",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
+
     CacheManager.materializations.values should contain (CacheEntry("new", u.toString, 110, 1100))
 
   }
 
   it should "remove one entry with NO benefit and NO admission check" in {
+    val ps = new ProfilerSettings(minBenefit = 10.seconds,
+      admissionCheck = false,
+      cacheSize = 5500,
+      eviction = EvictionStrategy.LRU)
+
+    CliParams._values = new CliParams(profiling = Some(ps))
+
+    val mp = MaterializationPoint("new",cost = 1, prob = 1, bytes = 100, benefit = 1.milliseconds)
+
+    val u = new URI("file:///new")
+
+    val inserted = CacheManager.insert(mp, u)
+
+    inserted shouldBe true
+
+    CacheManager.materializations.size shouldBe 10
+
+    CacheManager.materializations.values should not contain CacheEntry("1",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
+    CacheManager.materializations.values should contain (CacheEntry("new", u.toString, 110, 1100))
+  }
+
+  it should "not add an entry because of admission check" in {
+    val ps = new ProfilerSettings(minBenefit = 10.seconds,
+      admissionCheck = true,
+      cacheSize = 5500,
+      eviction = EvictionStrategy.LRU)
+
+    CliParams._values = new CliParams(profiling = Some(ps))
+
+    val mp = MaterializationPoint("new",cost = 1, prob = 1, bytes = 100, benefit = 1.milliseconds)
+
+    val u = new URI("file:///new")
+
+    val inserted = CacheManager.insert(mp, u)
+
+    inserted shouldBe false
+
+    CacheManager.materializations.size shouldBe 10
+
+    CacheManager.materializations.values should contain (CacheEntry("1",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L)))
+    CacheManager.materializations.values should not contain CacheEntry("new", u.toString, 110, 1100)
+  }
+
+  it should "remove one entry with LRU and NO admission check" in {
     val ps = new ProfilerSettings(minBenefit = 10.seconds,
       admissionCheck = false,
       cacheSize = 5500,
@@ -103,30 +126,7 @@ class CacheManagerSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
     inserted shouldBe true
 
-    CacheManager.materializations.size shouldBe 10
-
-    CacheManager.materializations.values should not contain CacheEntry("1",_benefit = 10, bytes = 100, uri = "1", lastLoaded = Some(1L))
     CacheManager.materializations.values should contain (CacheEntry("new", u.toString, 110, 1100))
+
   }
-  //
-  //  it should "remove one entry with LRU and NO admission check" in {
-  //    println(CacheManager.materializations.size)
-  //    val ps = new ProfilerSettings(minBenefit = 10.seconds,
-  //      admissionCheck = false,
-  //      cacheSize = 5500,
-  //      eviction = EvictionStrategy.LRU)
-  //
-  //    CliParams._values = new CliParams(profiling = Some(ps))
-  //
-  //    val mp = MaterializationPoint("new",1,1,1100, 1.milliseconds)
-  //
-  //    val u = new URI("file:///new")
-  //
-  //    val inserted = CacheManager.insert(mp, u)
-  //
-  //    inserted shouldBe true
-  //
-  //    CacheManager.materializations.values should contain (CacheEntry("new", u.toString, 110, 1100))
-  //
-  //  }
 }

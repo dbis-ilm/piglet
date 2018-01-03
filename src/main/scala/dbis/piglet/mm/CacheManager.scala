@@ -12,90 +12,7 @@ import org.json4s.native.Serialization
 import org.json4s.native.Serialization.write
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration._
 import scala.io.Source
-
-
-
-object EvictionStrategy extends Enumeration {
-  type EvictionStrategy = Value
-
-  val NONE, LRU, KNAPSACK = Value
-
-  def getStrategy(v: EvictionStrategy): IEvictionStrategy = v match {
-    case NONE => NoEviction
-    case LRU => LRUEviction
-    case KNAPSACK => KnapSackEviction
-  }
-}
-
-trait IEvictionStrategy {
-  val CACHE_SIZE = CliParams.values.profiling.get.cacheSize
-  def wouldRemove(newEntry: CacheEntry, oldEntries: Seq[CacheEntry]): Seq[CacheEntry]
-}
-
-object NoEviction extends IEvictionStrategy {
-  override def wouldRemove(newEntry: CacheEntry, oldEntries: Seq[CacheEntry]): Seq[CacheEntry] = Seq.empty
-}
-
-object LRUEviction extends IEvictionStrategy {
-
-  def wouldRemove(newEntry: CacheEntry, oldEntries: Seq[CacheEntry]): Seq[CacheEntry] = {
-    var totalSize: Long = newEntry.bytes
-
-    val toProcess = oldEntries.filter(e => !e.fixed && e.lastLoaded.isDefined).sortBy(_.lastLoaded.get)(Ordering[Long].reverse)
-
-//    println("to process")
-//    toProcess.foreach(println)
-
-    def fitsInCache(e: CacheEntry): Boolean = {
-      totalSize + e.bytes < CACHE_SIZE
-    }
-
-
-    val res = toProcess.takeWhile{e =>
-      val fitsInCache = totalSize + e.bytes < CACHE_SIZE
-      if(fitsInCache)
-        totalSize += e.bytes
-
-      fitsInCache
-    }.size
-
-    // take the remaining elements
-    val res2 = toProcess.slice(res, toProcess.size)
-//    println("res")
-//    res2.foreach(println)
-
-    res2
-
-    // fixed results will be kept in cache - regardless of its size
-//    entries.filter(_.fixed) ++ res
-  }
-}
-
-object KnapSackEviction extends IEvictionStrategy {
-
-  override def wouldRemove(newEntry: CacheEntry, oldEntries: Seq[CacheEntry]): Seq[CacheEntry] = {
-    var totalSize: Long = 0L
-
-    val toProcess = (oldEntries :+ newEntry).filter(e => !e.fixed ).sortBy(_.benefit)(Ordering[Duration].reverse)
-
-    val res = toProcess.takeWhile{e =>
-      val fitsInCache = totalSize + e.bytes < CACHE_SIZE
-      if(fitsInCache)
-        totalSize += e.bytes
-
-      fitsInCache
-    }.size
-
-
-    toProcess.slice(res, toProcess.size)
-
-//    entries.filter(_.fixed) ++ res
-
-
-  }
-}
 
 object CacheManager extends PigletLogging {
 
@@ -106,7 +23,7 @@ object CacheManager extends PigletLogging {
     *
     * They're read from file and stored as a mapping from lineage --> file name
     */
-  var materializations: Map[Lineage, CacheEntry] = if (Files.exists(Conf.materializationMapFile)) {
+  protected[mm] var materializations: Map[Lineage, CacheEntry] = if (Files.exists(Conf.materializationMapFile)) {
     val json = Source.fromFile(Conf.materializationMapFile.toFile).getLines().mkString("\n")
 
     if(json.isEmpty)
@@ -126,7 +43,7 @@ object CacheManager extends PigletLogging {
     */
   def getDataFor(lineage: Lineage): Option[URI] = {
     val e = materializations(lineage)
-    e.markLoaded
+    e.markLoaded()
     Some(new URI(e.uri))
   }
 
@@ -149,6 +66,12 @@ object CacheManager extends PigletLogging {
     logger.info(s"using cache eviction strategy: $evictionStrategy")
     logger.info(s"max cache size is ${evictionStrategy.CACHE_SIZE}")
 
+
+    if(entry.bytes > evictionStrategy.CACHE_SIZE) {
+      logger.debug(s"${entry.lineage} does not fit into cache (exceeds by ${evictionStrategy.CACHE_SIZE - entry.bytes} bytes)")
+      return false
+    }
+
     val wouldRemove = evictionStrategy.wouldRemove(entry, materializations.values.toSeq)
 
     val wouldRemoveBenefit = wouldRemove.map(_.benefit.toMillis).sum
@@ -158,22 +81,22 @@ object CacheManager extends PigletLogging {
       logger.debug(s"removing ${wouldRemove.size} cached entries (${wouldRemoveBenefit / 1000} sec) to add $entry")
       replace(wouldRemove, entry)
 
+      // when data has been replaced, we need to persist these changed immediately
       val json = write(materializations)
 
       Files.write(Conf.materializationMapFile,
         List(json).asJava,
         StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
 
-      val inserted = materializations.contains(entry.lineage)
-      if(inserted)
-        entry.markWritten
+      val ins = materializations.contains(entry.lineage)
+      if(ins)
+        entry.markWritten()
 
-      inserted
+      ins
     } else {
       logger.debug(s"will not add $entry (admission check: ${ps.admissionCheck}, new entry has higher benefit: ${wouldRemoveBenefit < entry.benefit.toMillis}")
       false
     }
-
 
     inserted
 
@@ -198,36 +121,3 @@ object CacheManager extends PigletLogging {
   }
 }
 
-case class CacheEntry(lineage: Lineage, uri: String, _benefit: Long, bytes: Long, var lastLoaded: Option[Long] = None, var written: Option[Long] = None,
-                      var useCount: Int = 0, var fixed: Boolean = false) {
-
-
-  def benefit: Duration = _benefit.milliseconds
-
-  def markWritten = written = Some(System.currentTimeMillis())
-
-  def markLoaded = {
-    lastLoaded = Some(System.currentTimeMillis())
-    useCount += 1
-  }
-
-  override def toString =
-    s"""CacheEntry
-       |  lineage: $lineage
-       |  file: $uri
-       |  benefit: ${benefit.toSeconds}
-       |  bytes: $bytes
-       |  lastLoaded: ${lastLoaded.getOrElse("-")}
-       |  written: ${written.getOrElse("-")}
-       |  use count: $useCount
-       |  fixed: $fixed
-     """.stripMargin
-
-  override def equals(obj: scala.Any): Boolean = obj match {
-    case o: CacheEntry =>
-      o.lineage equals lineage
-    case _ => false
-  }
-
-  override def hashCode(): Int = lineage.hashCode
-}
