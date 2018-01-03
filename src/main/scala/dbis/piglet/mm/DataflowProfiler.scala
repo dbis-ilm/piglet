@@ -405,6 +405,7 @@ case class ProfilerSettings(
                              probStrategy: ProbStrategy = Conf.mmDefaultProbStrategy,
                              strategy: GlobalStrategy = Conf.mmDefaultStrategy,
                              eviction: EvictionStrategy = Conf.mmDefaultEvictionStrategy,
+                             admissionCheck: Boolean = Conf.mmDefaulAdmissionCheck,
                              cacheSize: Long = Conf.mmDefaultCacheSize,
                              cacheMode: CacheMode = Conf.mmDefaultCacheMode,
                              fraction: Int = Conf.mmDefaultFraction,
@@ -429,6 +430,7 @@ object ProfilerSettings extends PigletLogging {
         case "fraction" => ps = ps.copy(fraction = v.toInt)
         case "duplicates" => ps = ps.copy(duplicates = DuplicateStrategy.withName(v.toUpperCase))
         case "eviction" => ps = ps.copy(eviction = EvictionStrategy.withName(v.toUpperCase))
+        case "admission" => ps = ps.copy(admissionCheck = v.toBoolean)
         case "cachesize" => ps = ps.copy(cacheSize = v.toLong)
         case _ => logger warn s"unknown profiler settings key $k (value: $v) - ignoring"
       }

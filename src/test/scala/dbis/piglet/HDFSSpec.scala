@@ -13,7 +13,7 @@ object HdfsTest extends Tag("hdfs")
  */
 class HDFSSpec extends FlatSpec with Matchers {
   
-  "The HDFS service" should "create a HDFS directoy" taggedAs(HdfsTest) in {
+  "The HDFS service" should "create a HDFS directoy" taggedAs HdfsTest in {
     if (HDFSService.isInitialized) {
       HDFSService.createDirectory("/data/blubs")
       // heck whether the directory exists
@@ -23,7 +23,7 @@ class HDFSSpec extends FlatSpec with Matchers {
       assume(false, "HDFS not enabled, no test performed")
   }
 
-  it should "copy a file to HDFS" taggedAs(HdfsTest) in {
+  it should "copy a file to HDFS" taggedAs HdfsTest in {
     if (HDFSService.isInitialized) {
       HDFSService.copyToRemote("LICENSE", "/data/blubs/LICENSE") should be(true)
       // check whether the file exists
@@ -41,7 +41,7 @@ class HDFSSpec extends FlatSpec with Matchers {
       assume(false, "HDFS not enabled, no test performed")
   }
 
-  it should "remove a directory from HDFS" taggedAs(HdfsTest) in {
+  it should "remove a directory from HDFS" taggedAs HdfsTest in {
     if (HDFSService.isInitialized) {
       HDFSService.removeDirectory("/data/blubs", true) should be(true)
       // check that the file doesn't exist anymore
@@ -51,7 +51,7 @@ class HDFSSpec extends FlatSpec with Matchers {
       assume(false, "HDFS not enabled, no test performed")
   }
 
-  it should "process HDFS commands" taggedAs(HdfsTest) in {
+  it should "process HDFS commands" taggedAs HdfsTest in {
     if (HDFSService.isInitialized) {
       HDFSService.process(HdfsCommand.MKDIR, List("/data/blubs"))
       HDFSService.exists("/data/blubs") should be(true)
