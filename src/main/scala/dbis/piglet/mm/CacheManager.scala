@@ -41,10 +41,9 @@ object CacheManager extends PigletLogging {
     * @param lineage The hash value to get data for
     * @return Returns the path to the materialized result, iff present. Otherwise <code>null</code>
     */
-  def getDataFor(lineage: Lineage): Option[URI] = {
-    val e = materializations(lineage)
+  def getDataFor(lineage: Lineage): Option[URI] = materializations.get(lineage).map{ e =>
     e.markLoaded()
-    Some(new URI(e.uri))
+    new URI(e.uri)
   }
 
   /**
