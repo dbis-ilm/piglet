@@ -107,7 +107,7 @@ object Conf extends PigletLogging {
   def statServerURL = if(appconf.hasPath("statserver.url")) Some(URI.create(appconf.getString("statserver.url"))) else None
 
 
-  def profilingFile = "profilerstats.json"
+  def profilingFile = appconf.getString("profiler.configfile")
   def mmDefaultCostStrategy = CostStrategy.withName(appconf.getString("profiler.defaults.cost_strategy").toUpperCase)
   def mmDefaultProbStrategy = ProbStrategy.withName(appconf.getString("profiler.defaults.prob_strategy").toUpperCase)
   def mmDefaultStrategy = GlobalStrategy.withName(appconf.getString("profiler.defaults.global_strategy").toUpperCase)
@@ -140,6 +140,8 @@ object Conf extends PigletLogging {
     cacheSizeBytes
 
   }
+
+  def mmDefaulAdmissionCheck: Boolean = appconf.getBoolean("profiler.defaults.cache.admissioncheck")
 
   def mmDefaultProbThreshold = appconf.getDouble("profiler.defaults.prob_threshold")
 

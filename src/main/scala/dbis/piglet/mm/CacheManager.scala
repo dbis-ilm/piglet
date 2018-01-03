@@ -12,7 +12,7 @@ import org.json4s.native.Serialization
 import org.json4s.native.Serialization.write
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.io.Source
 
 
@@ -31,43 +31,68 @@ object EvictionStrategy extends Enumeration {
 
 trait IEvictionStrategy {
   val CACHE_SIZE = CliParams.values.profiling.get.cacheSize
-  def apply(entries: Seq[CacheEntry]): Seq[CacheEntry]
+  def wouldRemove(newEntry: CacheEntry, oldEntries: Seq[CacheEntry]): Seq[CacheEntry]
 }
 
 object NoEviction extends IEvictionStrategy {
-  override def apply(entries: Seq[CacheEntry]): Seq[CacheEntry] = entries
+  override def wouldRemove(newEntry: CacheEntry, oldEntries: Seq[CacheEntry]): Seq[CacheEntry] = Seq.empty
 }
 
 object LRUEviction extends IEvictionStrategy {
-  def apply(entries: Seq[CacheEntry]): Seq[CacheEntry] = {
-    var totalSize: Long = 0L
-    val res = entries.filter(e => !e.fixed && e.lastLoaded.isDefined).sortBy(_.lastLoaded.get)(Ordering[Long].reverse).takeWhile{e =>
+
+  def wouldRemove(newEntry: CacheEntry, oldEntries: Seq[CacheEntry]): Seq[CacheEntry] = {
+    var totalSize: Long = newEntry.bytes
+
+    val toProcess = oldEntries.filter(e => !e.fixed && e.lastLoaded.isDefined).sortBy(_.lastLoaded.get)(Ordering[Long].reverse)
+
+//    println("to process")
+//    toProcess.foreach(println)
+
+    def fitsInCache(e: CacheEntry): Boolean = {
+      totalSize + e.bytes < CACHE_SIZE
+    }
+
+
+    val res = toProcess.takeWhile{e =>
       val fitsInCache = totalSize + e.bytes < CACHE_SIZE
       if(fitsInCache)
         totalSize += e.bytes
 
       fitsInCache
-    }
+    }.size
+
+    // take the remaining elements
+    val res2 = toProcess.slice(res, toProcess.size)
+//    println("res")
+//    res2.foreach(println)
+
+    res2
 
     // fixed results will be kept in cache - regardless of its size
-    entries.filter(_.fixed) ++ res
+//    entries.filter(_.fixed) ++ res
   }
 }
 
 object KnapSackEviction extends IEvictionStrategy {
 
-  override def apply(entries: Seq[CacheEntry]): Seq[CacheEntry] = {
+  override def wouldRemove(newEntry: CacheEntry, oldEntries: Seq[CacheEntry]): Seq[CacheEntry] = {
     var totalSize: Long = 0L
 
-    val res = entries.filter(e => !e.fixed ).sortBy(_.benefit)(Ordering[Duration].reverse).takeWhile{e =>
+    val toProcess = (oldEntries :+ newEntry).filter(e => !e.fixed ).sortBy(_.benefit)(Ordering[Duration].reverse)
+
+    val res = toProcess.takeWhile{e =>
       val fitsInCache = totalSize + e.bytes < CACHE_SIZE
       if(fitsInCache)
         totalSize += e.bytes
 
       fitsInCache
-    }
+    }.size
 
-    entries.filter(_.fixed) ++ res
+
+    toProcess.slice(res, toProcess.size)
+
+//    entries.filter(_.fixed) ++ res
+
 
   }
 }
@@ -100,8 +125,9 @@ object CacheManager extends PigletLogging {
     * @return Returns the path to the materialized result, iff present. Otherwise <code>null</code>
     */
   def getDataFor(lineage: Lineage): Option[URI] = {
-    markLoaded(lineage)
-    materializations.get(lineage).map(s => new URI(s.uri))
+    val e = materializations(lineage)
+    e.markLoaded
+    Some(new URI(e.uri))
   }
 
   /**
@@ -118,38 +144,43 @@ object CacheManager extends PigletLogging {
     val ps = CliParams.values.profiling.get
     val evictionStrategy = EvictionStrategy.getStrategy(ps.eviction)
 
-    val entry = CacheEntry(m.lineage, matFile.toString, benefit = m.benefit, bytes = m.bytes, lastLoaded = Some(System.currentTimeMillis()))
+    val entry = CacheEntry(m.lineage, matFile.toString, _benefit = m.benefit.toMillis, bytes = m.bytes, lastLoaded = Some(System.currentTimeMillis()))
 
     logger.info(s"using cache eviction strategy: $evictionStrategy")
     logger.info(s"max cache size is ${evictionStrategy.CACHE_SIZE}")
 
-    val before = materializations.values.toSeq :+ entry
-    logger.debug(s"cache before: \n ${before.mkString("\n")}")
-    val remainingCacheContent = evictionStrategy(before)
+    val wouldRemove = evictionStrategy.wouldRemove(entry, materializations.values.toSeq)
 
-    logger.debug(s"cache after: \n ${remainingCacheContent.mkString("\n")}")
+    val wouldRemoveBenefit = wouldRemove.map(_.benefit.toMillis).sum
+    logger.debug(s"${ps.eviction} would remove total benefit: ${wouldRemoveBenefit / 1000} sec: \n ${wouldRemove.mkString("\n")}")
 
-//    materializations += m.lineage -> matFile
+    val inserted = if(!ps.admissionCheck || wouldRemoveBenefit < entry.benefit.toMillis) {
+      logger.debug(s"removing ${wouldRemove.size} cached entries (${wouldRemoveBenefit / 1000} sec) to add $entry")
+      replace(wouldRemove, entry)
 
-    materializations = remainingCacheContent.map{ e => e.lineage -> e}.toMap
+      val json = write(materializations)
 
-    val json = write(materializations)
+      Files.write(Conf.materializationMapFile,
+        List(json).asJava,
+        StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
 
-    Files.write(Conf.materializationMapFile,
-      List(json).asJava,
-      StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+      val inserted = materializations.contains(entry.lineage)
+      if(inserted)
+        entry.markWritten
 
+      inserted
+    } else {
+      logger.debug(s"will not add $entry (admission check: ${ps.admissionCheck}, new entry has higher benefit: ${wouldRemoveBenefit < entry.benefit.toMillis}")
+      false
+    }
 
-    val inserted = remainingCacheContent.exists(_.lineage == m.lineage)
-    if(inserted)
-      markWritten(m.lineage)
 
     inserted
 
   }
 
   def insert(sig: Lineage, file: URI): Boolean = {
-    val entry = CacheEntry(sig, file.toString, benefit = Duration.Undefined, bytes = -1, written = Some(System.currentTimeMillis()), fixed = true)
+    val entry = CacheEntry(sig, file.toString, _benefit = Long.MinValue + 1, bytes = -1, written = Some(System.currentTimeMillis()), fixed = true)
 
     materializations += sig -> entry
 
@@ -162,22 +193,23 @@ object CacheManager extends PigletLogging {
     true
   }
 
-
-
-  private def markWritten(lineage: Lineage): Unit = materializations.find(_._1 == lineage)
-                                                .foreach(_._2.written = Some(System.currentTimeMillis()))
-
-
-  private def markLoaded(lineage: Lineage): Unit = materializations.find(_._1 == lineage).foreach{e =>
-      e._2.lastLoaded = Some(System.currentTimeMillis())
-      e._2.useCount += 1
-    }
-
+  private def replace(old: Seq[CacheEntry], entry: CacheEntry): Unit = {
+    materializations = materializations.filterNot{ case (_,e) => old.contains(e)} + (entry.lineage -> entry)
+  }
 }
 
-case class CacheEntry(lineage: Lineage, uri: String, benefit: Duration, bytes: Long, var lastLoaded: Option[Long] = None, var written: Option[Long] = None,
+case class CacheEntry(lineage: Lineage, uri: String, _benefit: Long, bytes: Long, var lastLoaded: Option[Long] = None, var written: Option[Long] = None,
                       var useCount: Int = 0, var fixed: Boolean = false) {
 
+
+  def benefit: Duration = _benefit.milliseconds
+
+  def markWritten = written = Some(System.currentTimeMillis())
+
+  def markLoaded = {
+    lastLoaded = Some(System.currentTimeMillis())
+    useCount += 1
+  }
 
   override def toString =
     s"""CacheEntry
@@ -190,4 +222,12 @@ case class CacheEntry(lineage: Lineage, uri: String, benefit: Duration, bytes: L
        |  use count: $useCount
        |  fixed: $fixed
      """.stripMargin
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case o: CacheEntry =>
+      o.lineage equals lineage
+    case _ => false
+  }
+
+  override def hashCode(): Int = lineage.hashCode
 }

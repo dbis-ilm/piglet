@@ -115,7 +115,7 @@ object CliParams {
     arg[File]("<file>...") unbounded() optional() action { (x, c) => c.copy(inputFiles = c.inputFiles :+ x.toPath) } text "Pig script files to execute"
   }
 
-  private var _values: CliParams = CliParams()
+  private[piglet] var _values: CliParams = CliParams()
 
   def values = _values
 
