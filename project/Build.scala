@@ -142,6 +142,7 @@ object Dependencies {
 
   //val breeze = "org.scalanlp" %% "breeze" % "0.11.2"
   val log4j = "log4j" % "log4j" % "1.2.17"
+  val slf4j = "org.slf4j" % "slf4j-api" % "1.7.25"
 
 
   val scalajhttp = "org.scalaj" %% "scalaj-http" % "2.3.0"
@@ -151,7 +152,7 @@ object Dependencies {
 //  val akkaslf = "com.typesafe.akka" % "akka-slf4j_2.11" % "2.4.17"
 
   val akka = "com.typesafe.akka" % "akka-actor_2.11" % "2.5.2"
-  val akkaLogging = "com.typesafe.akka" % "akka-slf4j_2.11" % "2.5.2"
+  val akkaLogging = "com.typesafe.akka" % "akka-slf4j_2.11" % "2.3.7" //"2.5.2"
 
   val graphcore = "org.scala-graph" %% "graph-core" % "1.11.5"
   val graphjson = "org.scala-graph" % "graph-json_2.11" % "1.11.0"
