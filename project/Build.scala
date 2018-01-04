@@ -118,7 +118,7 @@ object Dependencies {
   val scalaTest = "org.scalatest" %% "scalatest" % "3.0.3"
   val scalaParserCombinators = "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
   val scalaIoFile = "com.github.scala-incubator.io" %% "scala-io-file" % "0.4.3-1"
-  val jline = "jline" % "jline" % "2.14.3"
+  val jline = "jline" % "jline" % "2.14.5"
 
   val sparkCore = "org.apache.spark" %% "spark-core" % sparkVersion
   val sparkSql = "org.apache.spark" %% "spark-sql" % sparkVersion
