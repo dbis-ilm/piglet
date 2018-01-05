@@ -19,6 +19,7 @@ package dbis.piglet.codegen.scala_lang
 import dbis.piglet.codegen.{CodeEmitter, CodeGenContext, CodeGenStrategy, CodeGenTarget}
 import dbis.piglet.expr.Expr
 import dbis.piglet.op._
+import dbis.piglet.op.cmd.CoGroup
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.schema._
 import dbis.piglet.tools.logging.PigletLogging
@@ -48,6 +49,7 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
       case _: Sample => SampleEmitter.instance
       case _: Union => UnionEmitter.instance
       case _: Grouping => GroupingEmitter.instance
+      case _: CoGroup => CoGroupEmitter.instance
       case _: OrderBy => OrderByEmitter.instance
       case _: Top => TopEmitter.instance
       case _: Accumulate => AccumulateEmitter.instance

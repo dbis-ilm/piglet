@@ -49,7 +49,7 @@ case class GroupingExpression(keyList: List[Ref]) {
       // GROUP ALL
       Types.CharArrayType
     }
-    else if (keyList.size == 1) {
+    else if (keyList.lengthCompare(1) == 0) {
       typeForRef(keyList.head)
     }
     else {

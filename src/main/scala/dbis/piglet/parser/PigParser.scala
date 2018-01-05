@@ -227,6 +227,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   lazy val filterKeyword = "filter".ignoreCase
   lazy val byKeyword = "by".ignoreCase
   lazy val groupKeyword = "group".ignoreCase
+  lazy val cogroupKeyword = "cogroup".ignoreCase
   lazy val allKeyword = "all".ignoreCase
   lazy val joinKeyword = "join".ignoreCase
   lazy val crossKeyword = "cross".ignoreCase
@@ -494,12 +495,26 @@ class PigParser extends JavaTokenParsers with PigletLogging {
    */
   def describeStmt: Parser[PigOperator] = describeKeyword ~ bag ^^ { case _ ~ b => Describe(Pipe(b)) }
 
+
+  def cogroupList = bag ~ groupingClause ^^ {
+    case in ~ expr => (in, expr)
+  }
+
+  def cogroupStmt = bag ~ "=" ~ cogroupKeyword ~ repsep(cogroupList , ",") ^^ {
+    case out ~ _ ~ _ ~ exprs =>
+      val inputs = exprs.map(t => Pipe(t._1))
+      val refs = exprs.map(t => t._2)
+
+      CoGroup(Pipe(out), inputs, refs)
+  }
+
   /*
    * <A> = GROUP <B> ALL
    * <A> = GROUP <B> BY <Ref>
    * <A> = GROUP <B> B> ( <ListOfRefs> )
    */
   def refList: Parser[List[Ref]] = ref ^^ { r => List(r) } | "(" ~ repsep(ref, ",") ~ ")" ^^ { case _ ~ rlist ~ _ => rlist }
+
   def groupingClause: Parser[GroupingExpression] = allKeyword ^^ {
     _ => GroupingExpression(List())} |
     (byKeyword ~ refList ^^ {
@@ -717,7 +732,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     /* misc Pig Latin extensions */
     materializeStmt | cacheStmt | delayStmt | rscriptStmt |
     /* standard Pig Latin statements */
-    loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | accumulateStmt |
+    loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | cogroupStmt | accumulateStmt |
     distinctStmt |  joinStmt | crossStmt | zipStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | fsStmt | defineStmt | setterStmt | macroRefStmt | displayStmt
 

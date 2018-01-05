@@ -40,7 +40,7 @@ class GroupingEmitter extends CodeEmitter[Grouping] {
         if (op.groupExpr.keyList.isEmpty)
           render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "class" -> className, "lineage" -> op.lineageSignature))
         else {
-          val keyExtr = if (op.groupExpr.keyList.size > 1) {
+          val keyExtr = if (op.groupExpr.keyList.length > 1) {
             // the grouping key consists of multiple fields, i.e. we have
             // to construct a tuple where the type is the TupleType of the group field
             val field = op.schema.get.field("group")
@@ -53,7 +53,11 @@ class GroupingEmitter extends CodeEmitter[Grouping] {
           }
           else "k" // the simple case: the key is a single field
 
-          render(Map("out" -> op.outPipeName, "in" -> op.inPipeName, "class" -> className, "lineage" -> op.lineageSignature,
+          render(Map(
+            "out" -> op.outPipeName,
+            "in" -> op.inPipeName,
+            "class" -> className,
+            "lineage" -> op.lineageSignature,
             "expr" -> ScalaEmitter.emitGroupExpr(CodeGenContext(ctx, Map("schema" -> op.inputSchema)), op.groupExpr),
             "keyExtr" -> keyExtr))
         }
