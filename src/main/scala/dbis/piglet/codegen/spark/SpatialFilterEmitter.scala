@@ -1,11 +1,9 @@
 package dbis.piglet.codegen.spark
 
-import dbis.piglet.codegen.CodeEmitter
-import dbis.piglet.op.SpatialFilter
-import dbis.piglet.codegen.CodeGenContext
+import dbis.piglet.codegen.{CodeEmitter, CodeGenContext}
 import dbis.piglet.codegen.scala_lang.ScalaEmitter
 import dbis.piglet.op.IndexMethod.IndexMethod
-import dbis.piglet.expr.Ref
+import dbis.piglet.op.SpatialFilter
 
 class SpatialFilterEmitter extends CodeEmitter[SpatialFilter] {
   
@@ -22,20 +20,29 @@ class SpatialFilterEmitter extends CodeEmitter[SpatialFilter] {
     case None => ""
   }
   
-  override def code(ctx: CodeGenContext, op: SpatialFilter): String = render(Map("out" -> op.outPipeName,
-          "in" -> op.inPipeName,
-          "predicate" -> op.pred.predicateType.toString.toLowerCase(),
-          "other" -> ScalaEmitter.emitExpr(ctx, op.pred.expr),
-          "liveindex" -> indexTemplate(op.idx),
-          "keyby" -> SpatialEmitterHelper.keyByCode(op.inputSchema, op.pred.field, ctx),
-          "lineage" -> op.lineageSignature
-//          {
-//            if(SpatialEmitterHelper.geomIsFirstPos(op.pred.field, op)) 
-//              "" 
-//            else 
-//              s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputSchema)), op.pred.field)})"
-//          }
-        ))
+  override def code(ctx: CodeGenContext, op: SpatialFilter): String = {
+
+//    println(op.inputSchema.map(_.element.valueType))
+    render(Map("out" -> op.outPipeName,
+      "in" -> op.inPipeName,
+      "predicate" -> op.pred.predicateType.toString.toLowerCase(),
+      "other" -> ScalaEmitter.emitExpr(ctx, op.pred.expr),
+      "liveindex" -> indexTemplate(op.idx),
+      "keyby" -> {
+        if(op.schema.nonEmpty && op.schema.get.isIndexed)
+          ""
+        else
+          SpatialEmitterHelper.keyByCode(op.inputSchema, op.pred.field, ctx)
+      },
+      "lineage" -> op.lineageSignature
+      //          {
+      //            if(SpatialEmitterHelper.geomIsFirstPos(op.pred.field, op))
+      //              ""
+      //            else
+      //              s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->op.inputSchema)), op.pred.field)})"
+      //          }
+    ))
+  }
   
 }
 

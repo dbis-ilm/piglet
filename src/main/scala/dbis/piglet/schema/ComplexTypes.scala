@@ -62,7 +62,7 @@ abstract class ComplexType extends java.io.Serializable with PigType {
  *
  * @param fields the list of fields representing the tuple components.
  */
-case class TupleType(var fields: Array[Field],var className: String = "") extends ComplexType {
+case class TupleType(var fields: Array[Field], var className: String = "") extends TType {
   override def tc = TypeCode.TupleType
   override def name = "tuple"
 
@@ -78,11 +78,11 @@ case class TupleType(var fields: Array[Field],var className: String = "") extend
    *
    * @return the string repesentation
    */
-  override def toString = s"$name(" + fields.mkString(",") + ")"
+  override def toString = s"$name(" + plainDescriptionString + ")"
 
-  override def descriptionString = "(" + fields.mkString(", ") + ")"
+  override def descriptionString = "(" + plainDescriptionString + ")"
 
-  def plainDescriptionString = fields.mkString(", ")
+  override def plainDescriptionString = fields.mkString(", ")
 
   override def typeOfComponent(name: String): PigType = fields.find(f => f.name == name).head.fType
   override def typeOfComponent(pos: Int): PigType = fields(pos).fType
@@ -103,6 +103,11 @@ object TupleType {
 
 }
 
+abstract class TType extends ComplexType {
+  def fields: Array[Field]
+
+  def className: String
+}
 
 /**
  * A type for representing Pig bags consisting of a value type (a tuple type) and an
@@ -110,9 +115,11 @@ object TupleType {
  *
  * @param valueType the tuple type representing the element of the bag
  */
-case class BagType(var valueType: TupleType) extends ComplexType {
+case class BagType(var valueType: TType) extends ComplexType {
+
   override def tc = TypeCode.BagType
   override def name = "bag"
+
 
   /**
    * Returns a string representation of the type object.
@@ -127,6 +134,26 @@ case class BagType(var valueType: TupleType) extends ComplexType {
   override def typeOfComponent(name: String): PigType = valueType.typeOfComponent(name)
   override def typeOfComponent(pos: Int): PigType = valueType.typeOfComponent(pos)
 }
+
+//case class IndexedBagType(private var _valueType: IndexType) extends BagType {
+//  override def tc = TypeCode.IndexedBagType
+//  override def name = "indexedbag"
+//
+//  override def valueType = _valueType
+//
+//  /**
+//    * Returns a string representation of the type object.
+//    *
+//    * @return the string repesentation
+//    */
+//  override def toString = s"$name{${_valueType}}"
+//
+//  override def encode: String = s"{${_valueType.encode}}"
+//
+//  override def descriptionString = "{" + _valueType.descriptionString + "}"
+//  override def typeOfComponent(name: String): PigType = _valueType.typeOfComponent(name)
+//  override def typeOfComponent(pos: Int): PigType = _valueType.typeOfComponent(pos)
+//}
 
 /**
  * A type of representing Pig maps consisting of a value type (arbitrary Pig type) and
@@ -166,3 +193,31 @@ case class MatrixType(valueType: PigType, rows: Int, cols: Int, rep: MatrixRep =
   override def descriptionString = name
 }
 
+case class IndexType(var valueType: TupleType, className: String) extends TType {
+  override def tc = TypeCode.IndexType
+  override def name = "index"
+
+  /**
+    * Returns the type of the component with the given field name.
+    *
+    * @param name the field name
+    * @return the name of this field
+    */
+  override def typeOfComponent(name: String) = { require(name == "idx"); valueType}
+
+  /**
+    * Returns the type of the component of the field at the given position.
+    *
+    * @param pos the position of the field
+    * @return the name of this field
+    */
+  override def typeOfComponent(pos: Int) = { require(pos == 0); valueType}
+
+  override def descriptionString = "Index{" + valueType.plainDescriptionString + "}"
+
+  override def toString = s"$name{$valueType}"
+
+  override def encode = s"Index{${valueType.encode}}"
+
+  override def fields = Array(Field("idx", Types.AnyType))
+}

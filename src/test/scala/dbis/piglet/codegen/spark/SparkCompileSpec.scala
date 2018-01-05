@@ -304,7 +304,7 @@ class SparkCompileSpec extends FlatSpec with BeforeAndAfter with BeforeAndAfterA
 
     val op = Dump(Pipe("a"))
     val generatedCode = cleanString(codeGenerator.emitNode(ctx, op))
-    val expectedCode = cleanString("""a.collect.foreach(t => println(t.mkString()))""")
+    val expectedCode = cleanString("""a.collect.foreach(t => println(t.toString()))""")
     assert(generatedCode == expectedCode)
   }
 

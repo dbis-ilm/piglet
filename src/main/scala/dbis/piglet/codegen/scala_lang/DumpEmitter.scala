@@ -13,7 +13,7 @@ class DumpEmitter extends CodeEmitter[Dump] {
                                     |<in><if (profiling)>.map{t =>
                                     |    PerfMonitor.sampleSize(t,"<lineage>", accum, randFactor)
                                     |  t
-                                    |}<endif>.collect.foreach(t => println(t.mkString()))<endif>""".stripMargin
+                                    |}<endif>.collect.foreach(t => println(t.toString()))<endif>""".stripMargin
 
 
   override def code(ctx: CodeGenContext, op: Dump): String = {

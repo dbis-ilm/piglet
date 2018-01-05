@@ -728,7 +728,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     /* CEP statement */
     matcherStmt |
     /* spatial statements */
-    spatialFilterStmt | spatialJoinStmt | /*indexStmt |*/ partitionStmt |
+    spatialFilterStmt | spatialJoinStmt | indexStmt | partitionStmt |
     /* misc Pig Latin extensions */
     materializeStmt | cacheStmt | delayStmt | rscriptStmt |
     /* standard Pig Latin statements */
@@ -978,7 +978,10 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
 
   def indexStmt: Parser[PigOperator] = bag ~ "=" ~ indexKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ indexMethod  ^^ {
-    case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ methodWithParams => IndexOp(Pipe(out), Pipe(in), field, methodWithParams._1, methodWithParams._2)
+    case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ methodWithParams =>
+      val op = IndexOp(Pipe(out), Pipe(in), field, methodWithParams._1, methodWithParams._2)
+      println(op)
+      op
   }
   
   lazy val partitionKeyword = "partition".ignoreCase

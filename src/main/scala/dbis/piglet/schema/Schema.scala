@@ -75,9 +75,23 @@ case class Schema(var element: BagType, var className: String = "", var timestam
   @throws[AmbiguousFieldnameException]("if the NamedField doesn't contain enough information to find the index " +
     "unambiguously")
   def indexOfField(nf: NamedField): Int = {
-    if (! element.valueType.isInstanceOf[TupleType])
-      throw SchemaException("schema type isn't a bag of tuples")
-    val tupleType = element.valueType
+
+    element.valueType match {
+      case iType: IndexType =>
+        getIndexForField(nf, iType.valueType)
+
+      case tupleType: TupleType =>
+        getIndexForField(nf, tupleType)
+    }
+
+
+//    if (! element.valueType.isInstanceOf[TType])
+//      throw SchemaException("schema type isn't a bag of tuples")
+//    val tupleType = element.valueType
+
+  }
+
+  private def getIndexForField(nf: NamedField, tupleType: TupleType): Int =
     tupleType.fields.count(_.name == nf.name) match {
       case 0 => -1
       case 1 =>
@@ -101,12 +115,11 @@ case class Schema(var element: BagType, var className: String = "", var timestam
           tupleType.fields.indexOf(possibleField.head)
         } else {
           throw AmbiguousFieldnameException(
-            s"""
- there is more than one field called ${nf.name} in $this
- and ${nf.lineage} was not enough to disambiguate it""".stripMargin)
+            s"""there is more than one field called ${nf.name} in $this
+               | and ${nf.lineage} was not enough to disambiguate it""".stripMargin)
         }
     }
-  }
+
 
   /**
    * Returns the field at the given position.
@@ -116,10 +129,16 @@ case class Schema(var element: BagType, var className: String = "", var timestam
    */
   @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
   def field(pos: Int): Field = {
-    if (! element.valueType.isInstanceOf[TupleType])
+    if (! element.valueType.isInstanceOf[TType])
       throw SchemaException("schema type isn't a bag of tuples")
-    val tupleType = element.valueType
-    tupleType.fields(pos)
+
+    element.valueType match {
+      case IndexType(tuple, _) => tuple.fields(pos)
+      case TupleType(fields, _) => fields(pos)
+    }
+
+//    val tupleType = element.valueType
+//    tupleType.fields(pos)
   }
 
   /**
@@ -160,11 +179,13 @@ case class Schema(var element: BagType, var className: String = "", var timestam
    */
   @throws[SchemaException]("if the element type of the schema isn't a bag of tuples")
   def fields: Array[Field] = {
-    if (! element.valueType.isInstanceOf[TupleType])
+    if (! element.valueType.isInstanceOf[TType])
       throw SchemaException("schema type isn't a bag of tuples")
     val tupleType = element.valueType
     tupleType.fields
   }
+
+  def isIndexed = element.valueType.tc == TypeCode.IndexType
 
   /**
    * Returns a string representation of the schema.

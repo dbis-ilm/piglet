@@ -30,7 +30,7 @@ object TypeCode extends Enumeration {
   type TypeCode = Value
   val AnyType, IntType, LongType, FloatType, BooleanType, DoubleType,
   ByteArrayType, CharArrayType,
-  TupleType, MapType, BagType, MatrixType,GeometryType = Value
+  TupleType, MapType, BagType, MatrixType,GeometryType, IndexType = Value
 }
 
 import dbis.piglet.schema.TypeCode._
@@ -42,6 +42,7 @@ trait PigType {
   def name: String
   def tc: TypeCode
   def descriptionString: String
+  def plainDescriptionString: String = descriptionString
   def encode: String
 }
 
