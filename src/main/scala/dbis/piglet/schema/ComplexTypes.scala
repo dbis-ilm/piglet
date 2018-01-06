@@ -217,7 +217,7 @@ case class IndexType(var valueType: TupleType, className: String) extends TType 
 
   override def toString = s"$name{$valueType}"
 
-  override def encode = s"Index{${valueType.encode}}"
+  override def encode = s"$className[${valueType.encode}]"
 
   override def fields = Array(Field("idx", Types.AnyType))
 }
