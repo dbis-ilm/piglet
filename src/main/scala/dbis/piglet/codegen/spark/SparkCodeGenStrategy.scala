@@ -24,6 +24,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
         "import dbis.stark.{STObject, Instant, Interval}",
         "import dbis.stark.STObject._",
         "import dbis.stark.spatial._",
+        "import dbis.stark.spatial.indexed._",
         "import dbis.stark.spatial.SpatialRDD._")
     }
     additionalImports

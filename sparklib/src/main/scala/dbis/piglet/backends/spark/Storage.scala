@@ -71,6 +71,13 @@ object PigStorage extends java.io.Serializable {
   def apply[T <: SchemaClass: ClassTag](fraction: Int = 1): PigStorage[T] = {
     new PigStorage[T](fraction)
   }
+
+//  def load[T <: SchemaClass : ClassTag](sc: SparkContext, file: String, extract: (Array[String]) => T, delim: String = "\t") = {
+//    sc.textFile(file).map(_.split(delim, -1)).map(extract)
+//  }
+//
+//  def write[T <: SchemaClass : ClassTag](file: String, rdd: RDD[T], delim: String = ",") =
+//    rdd.map(_.mkString(delim)).saveAsTextFile(file)
 }
 
 //-----------------------------------------------------------------------------------------------------
@@ -147,6 +154,11 @@ class BinStorage[T: ClassTag](fraction: Int = -1) extends java.io.Serializable {
 
 object BinStorage {
   def apply[T: ClassTag](fraction: Int = -1): BinStorage[T] = new BinStorage[T](fraction)
+
+//  def load[T: ClassTag](sc: SparkContext, path: String, extract: (Any) => Any = (any) => any, lineageAndAccum: Option[(String, SizeAccumulator)] = None): RDD[T] =
+//    sc.objectFile[T](path)
+//
+//  def write(path: String, rdd: RDD[_]) = rdd.saveAsObjectFile(path)
 }
 
 class BinStorage2[T: ClassTag](fraction: Int = -1) extends java.io.Serializable {

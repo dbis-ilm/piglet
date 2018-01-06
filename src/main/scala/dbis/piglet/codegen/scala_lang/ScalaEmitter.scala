@@ -18,7 +18,8 @@ object ScalaEmitter extends PigletLogging {
     Types.DoubleType -> "Double",
     Types.CharArrayType -> "String",
     Types.ByteArrayType -> "String", //TODO: check this - maybe this should be Any
-    Types.AnyType -> "String") //TODO: check this
+    Types.AnyType -> "String",
+    Types.stObjectType -> "STObject") //TODO: check this
 
   /**
     * Returns the name of the Scala type for representing the given field. If the schema doesn't exist we assume
@@ -45,7 +46,16 @@ object ScalaEmitter extends PigletLogging {
     * @param name Creates a a class name from template with the given name/identifier
     * @return Returns the tuple class name
     */
-  def schemaClassName(name: String) = s"_${name}_Tuple"
+  def schemaClassName(name: String): String = s"_${name}_Tuple"
+
+
+  def schemaClassName(schema: Schema): String = if(schema.isIndexed) {
+
+
+    typeName(schema.element.valueType)
+
+  } else
+    schemaClassName(schema.className)
 
   /**
     * Generate Scala code for a reference to a named field, a positional field or a tuple/map derefence.
@@ -280,7 +290,7 @@ object ScalaEmitter extends PigletLogging {
           "class" -> ScalaEmitter.schemaClassName(s.className))
       case Some(s) if loaderFunc.nonEmpty && loaderFunc.get.startsWith("BinStorage") =>
 
-        val className = ScalaEmitter.schemaClassName(s.className)
+        val className = ScalaEmitter.schemaClassName(s)
         paramMap += (
           "class" -> className
         )
@@ -416,22 +426,26 @@ object ScalaEmitter extends PigletLogging {
     ))
   }
 
+  def typeName(f: PigType, n: String = ""): String = scalaTypeMappingTable.get(f) match {
+    case Some(tname) => tname
+    case None => f match {
+      // if we have a bag without a name then we assume that we have got
+      // a case class with _<field_name>_Tuple
+      case BagType(v) => s"Iterable[_${v.className}_Tuple]"
+      case TupleType(_, c) => schemaClassName(c)
+      case MapType(v) => s"Map[String,${scalaTypeMappingTable(v)}]"
+      case MatrixType(v, _, _, _) => s"DenseMatrix[${if (v.tc == TypeCode.IntType) "Int" else "Double"}]"
+      case IndexType(tt, className) =>
+
+        val keyFieldType = scalaTypeMappingTable(tt.fields(0).fType)
+        val payloadType = typeName(tt.fields(1).fType)
+
+        s"$className[$keyFieldType, ($keyFieldType, $payloadType)]"
+      case _ => f.descriptionString
+    }
+  }
 
   def createSchemaInfo(schema: Schema) = {
-
-    def typeName(f: PigType, n: String) = scalaTypeMappingTable.get(f) match {
-      case Some(tname) => tname
-      case None => f match {
-        // if we have a bag without a name then we assume that we have got
-        // a case class with _<field_name>_Tuple
-        case BagType(v) => s"Iterable[_${v.className}_Tuple]"
-        case TupleType(_, c) => schemaClassName(c)
-        case MapType(v) => s"Map[String,${scalaTypeMappingTable(v)}]"
-        case MatrixType(v, _, _, _) => s"DenseMatrix[${if (v.tc == TypeCode.IntType) "Int" else "Double"}]"
-        case _ => f.descriptionString
-      }
-    }
-
     val fieldList = schema.fields.toList
 
     // build the list of field names (_0, ..., _n)

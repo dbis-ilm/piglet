@@ -979,9 +979,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
 
   def indexStmt: Parser[PigOperator] = bag ~ "=" ~ indexKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ indexMethod  ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ methodWithParams =>
-      val op = IndexOp(Pipe(out), Pipe(in), field, methodWithParams._1, methodWithParams._2)
-      println(op)
-      op
+      IndexOp(Pipe(out), Pipe(in), field, methodWithParams._1, methodWithParams._2)
   }
   
   lazy val partitionKeyword = "partition".ignoreCase

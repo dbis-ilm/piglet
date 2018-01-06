@@ -295,5 +295,5 @@ object Schema {
     */
   def schemaList(): List[Schema] = schemaSet.values.toList.sortWith(_.schemaCode() < _.schemaCode())
 
-  def hasSpatialTypes = Schema.schemaList().exists(s => s.fields.exists(f => f.fType.tc == TypeCode.GeometryType))
+  def hasSpatialTypes = Schema.schemaList().exists(s => s.fields.exists(f => f.fType.tc == TypeCode.STObject || f.fType.tc == TypeCode.IndexType))
 }

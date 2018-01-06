@@ -30,7 +30,7 @@ object TypeCode extends Enumeration {
   type TypeCode = Value
   val AnyType, IntType, LongType, FloatType, BooleanType, DoubleType,
   ByteArrayType, CharArrayType,
-  TupleType, MapType, BagType, MatrixType,GeometryType, IndexType = Value
+  TupleType, MapType, BagType, MatrixType,STObject, IndexType = Value
 }
 
 import dbis.piglet.schema.TypeCode._
@@ -87,9 +87,9 @@ case class SimpleType(name: String, tc: TypeCode) extends java.io.Serializable w
   }
 }
 
-case class GeometryType() extends PigType with java.io.Serializable {
-  
-  override def tc = TypeCode.GeometryType
+case class STObjectType() extends PigType with java.io.Serializable {
+
+  override def tc = TypeCode.STObject
 //  override def name = "Geometry"
   override def name = "STObject"
 
@@ -200,6 +200,8 @@ object Types {
   val DoubleType = SimpleType("double", TypeCode.DoubleType)
   val ByteArrayType = SimpleType("bytearray", TypeCode.ByteArrayType)
   val CharArrayType = SimpleType("chararray", TypeCode.CharArrayType)
+  val stObjectType = STObjectType()
+
 
   /**
    * Returns the type object representing the type of the given name.

@@ -8,7 +8,9 @@ import dbis.piglet.op.{PigOperator, Store}
   * Created by kai on 05.12.16.
   */
 class StoreEmitter extends CodeEmitter[Store] {
-  override def template: String = """    <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)""".stripMargin
+  override def template: String =
+//    """<func>.write("<file>", <in><if (params)>, <params><endif>)""".stripMargin
+    """    <func>[<class>]().write("<file>", <in><if (params)>, <params><endif>)""".stripMargin
 
 
   override def code(ctx: CodeGenContext, op: Store): String = {
@@ -16,7 +18,10 @@ class StoreEmitter extends CodeEmitter[Store] {
           "file" -> op.file.toString,
           "func" -> op.func.getOrElse(BackendManager.backend.defaultConnector))
         op.schema match {
-          case Some(s) => paramMap += ("class" -> ScalaEmitter.schemaClassName(s.className))
+          case Some(s) =>
+            val cName = ScalaEmitter.schemaClassName(s)
+
+            paramMap += ("class" -> cName)
           case None => paramMap += ("class" -> "Record")
         }
 

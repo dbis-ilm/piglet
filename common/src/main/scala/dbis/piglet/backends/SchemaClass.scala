@@ -33,7 +33,7 @@ trait SchemaClass extends Product {
     *
     * @return a string representation
     */
-  override def toString = mkString()
+  override def toString = s"(${mkString()})"
 
   /**
     * Returns the timestamp of the tuple - either application or system time.
