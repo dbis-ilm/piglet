@@ -1,14 +1,10 @@
 package dbis.piglet.op
 
-import dbis.piglet.expr.Ref
-import dbis.piglet.schema.Schema
-import dbis.piglet.schema.Field
-import scala.collection.mutable.ArrayBuffer
-import dbis.piglet.schema.BagType
-import dbis.piglet.schema.TupleType
-import dbis.piglet.schema.Types
 import dbis.piglet.expr.SpatialJoinPredicate
 import dbis.piglet.op.IndexMethod.IndexMethod
+import dbis.piglet.schema._
+
+import scala.collection.mutable.ArrayBuffer
 
 
 
@@ -27,9 +23,19 @@ case class SpatialJoin(
   override def constructSchema: Option[Schema] = {
     val newFields = ArrayBuffer[Field]()
     inputs.foreach(p => p.producer.schema match {
-      case Some(s) => newFields ++= s.fields map { f =>
-        Field(f.name, f.fType, p.name :: f.lineage)
-      }
+      case Some(s) => if(s.isIndexed) {
+        newFields ++= s.element.valueType.asInstanceOf[IndexType] // a bag of Indexes
+          .valueType.fields // An Index contains tuples with two fields: indexed column and payload
+          .last.fType.asInstanceOf[TupleType] // payload is again a tuple
+          .fields // fields in each tuple
+          .map { f =>
+            Field(f.name, f.fType, p.name :: f.lineage)
+          }
+        } else {
+          newFields ++= s.fields map { f =>
+            Field(f.name, f.fType, p.name :: f.lineage)
+          }
+        }
       case None => newFields += Field("", Types.ByteArrayType)
     })
     schema = Some(Schema(BagType(TupleType(newFields.toArray))))
