@@ -1,6 +1,11 @@
 package dbis.piglet.op
 
-case class Difference(out: Pipe, in1: Pipe, in2: Pipe) extends PigOperator(List(out), List(in1, in2)) {
+import dbis.piglet.expr.Ref
+
+case class Difference(private val out: Pipe, private val in1: Pipe, private val in2: Pipe,
+                      refs1: Option[List[Ref]] = None,
+                      refs2: Option[List[Ref]] = None
+                     ) extends PigOperator(List(out), List(in1, in2)) {
 
   override def lineageString: String = {
     s"""DIFFERENCE%""" + super.lineageString
@@ -9,7 +14,9 @@ case class Difference(out: Pipe, in1: Pipe, in2: Pipe) extends PigOperator(List(
   override def toString =
     s"""DIFFERENCE
        |  out = $outPipeName
-       |  ins = ${inPipeNames.mkString(",")}
+       |  ins = ${inPipeNames.mkString(",")},
+       |  refs1 = ${refs1.map(_.mkString(",")).getOrElse("--")},
+       |  refs2 = ${refs2.map(_.mkString(",")).getOrElse("--")},
        |  inSchema = $inputSchema
        |  outSchema = $schema""".stripMargin
 

@@ -581,7 +581,10 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   }
 
   def differenceStmt = bag ~ "=" ~ differenceKeyword ~ bag ~ "," ~ bag ^^ {
-    case out ~ _ ~ _ ~ in1 ~ _ ~ in2 => Difference(Pipe(out), Pipe(in1), Pipe(in2))
+      case out ~ _ ~ _ ~ in1 ~ _ ~ in2 => Difference(Pipe(out), Pipe(in1), Pipe(in2))
+    } | bag ~ "=" ~ differenceKeyword ~ bag ~ byKeyword ~ refList ~ "," ~ bag ~ byKeyword ~ refList ^^ {
+    case out ~ _ ~ _ ~ in1 ~ _ ~ refs1 ~ _ ~ in2 ~ _ ~ refs2 =>
+      Difference(Pipe(out), Pipe(in1), Pipe(in2), Some(refs1), Some(refs2))
   }
 
   /*
