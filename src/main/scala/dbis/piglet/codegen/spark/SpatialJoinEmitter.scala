@@ -9,9 +9,12 @@ import dbis.piglet.op.IndexMethod.IndexMethod
 
 
 class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
-  
-  override def template = s"""val <out> = <rel1><keyby1><liveindex>.join(
-                    |   <rel2><keyby2>,
+//  new dbis.stark.spatial.partitioner.SpatialGridPartitioner(r2KeyBy,20,true)
+  override def template = s"""
+                     |val <rel2>KeyBy = <rel2><keyby2>
+                     |val <rel2>Parti = new dbis.stark.spatial.partitioner.BSPartitioner(<rel2>KeyBy, 1, 1000, true)
+                    |val <out> = <rel1><keyby1><liveindex>.join(
+                    |   <rel2>KeyBy.partitionBy(<rel2>Parti),
                     |   dbis.stark.spatial.JoinPredicate.<predicate>
                     | ).map{ case (<leftName>,<rightName>) =>
                     |     val t = <className>(<fields>)

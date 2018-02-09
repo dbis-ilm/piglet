@@ -2,7 +2,6 @@ package dbis.piglet.backends.spark
 
 import java.net.{HttpURLConnection, URL, URLEncoder}
 
-import dbis.piglet.backends.SchemaClass
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.AccumulatorV2
 import org.apache.spark.{NarrowDependency, ShuffleDependency}
@@ -125,19 +124,19 @@ object PerfMonitor {
 //  def estimateSize(o: AnyRef): Long = org.apache.spark.util.SizeEstimator.estimate(o)
 
   @inline
-  def sampleSize(t: SchemaClass, lineage: String, accum: SizeAccumulator, randFactor: Int, num: Int = 1): Unit = {
+  def sampleSize(t: AnyRef, lineage: String, accum: SizeAccumulator, randFactor: Int, num: Int = 1): Unit = {
 
     if(accum.containsNot(lineage) || scala.util.Random.nextInt(randFactor) == 0)
       accum.incr(lineage, t, num)
   }
 
   @inline
-  def sampleSize(t: Iterable[SchemaClass], lineage: String, accum: SizeAccumulator, randFactor: Int): Unit = {
+  def sampleSize(t: Iterable[AnyRef], lineage: String, accum: SizeAccumulator, randFactor: Int): Unit = {
     sampleSize(t.toSeq, lineage, accum, randFactor)
   }
 
   @inline
-  def sampleSize(t: Seq[SchemaClass], lineage: String, accum: SizeAccumulator, randFactor: Int): Unit = {
+  def sampleSize(t: Seq[AnyRef], lineage: String, accum: SizeAccumulator, randFactor: Int): Unit = {
 
     if(accum.containsNot(lineage) || scala.util.Random.nextInt(randFactor) == 0) {
       var takenSize = 0L
@@ -301,7 +300,7 @@ class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mut
     }
   }
 
-  def incr(lineage: Lineage, o: SchemaClass, num: Int = 1) = {
+  def incr(lineage: Lineage, o: AnyRef, num: Int = 1) = {
     if(theValue.contains(lineage)) {
       theValue(lineage).add(o)
     } else {
@@ -312,7 +311,7 @@ class SizeAccumulator() extends AccumulatorV2[mutable.Map[String, SizeStat2],mut
       theValue(lineage).addAdditionalBytes(SizeStat2.computeNumBytes(o) * (num - 1) )
   }
 
-  def incr(lineage: Lineage, o: Seq[SchemaClass], num: Int) = {
+  def incr(lineage: Lineage, o: Seq[AnyRef], num: Int) = {
     val bytes = if(o.isEmpty) { 0 } else {
       ((SizeStat2.computeNumBytes(o) / o.size.toDouble) * num).toLong
     }

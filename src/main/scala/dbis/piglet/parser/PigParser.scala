@@ -240,6 +240,8 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   lazy val generateKeyword = "generate".ignoreCase
   lazy val asKeyword = "as".ignoreCase
   lazy val unionKeyword = "union".ignoreCase
+  lazy val intersectionKeyword = "intersection".ignoreCase
+  lazy val differenceKeyword = "difference".ignoreCase
   lazy val registerKeyword = "register".ignoreCase
   lazy val streamKeyword = "stream".ignoreCase
   lazy val throughKeyword = "through".ignoreCase
@@ -574,6 +576,17 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     case out ~ _ ~ _ ~ rlist => Union(Pipe(out), rlist.map(r => Pipe(r)))
   }
 
+  def intersectionStmt = bag ~ "=" ~ intersectionKeyword ~ bag ~ "," ~ bag ^^ {
+    case out ~ _ ~ _ ~ in1 ~ _ ~ in2 => Intersection(Pipe(out), Pipe(in1), Pipe(in2))
+  }
+
+  def differenceStmt = bag ~ "=" ~ differenceKeyword ~ bag ~ "," ~ bag ^^ {
+      case out ~ _ ~ _ ~ in1 ~ _ ~ in2 => Difference(Pipe(out), Pipe(in1), Pipe(in2))
+    } | bag ~ "=" ~ differenceKeyword ~ bag ~ byKeyword ~ refList ~ "," ~ bag ~ byKeyword ~ refList ^^ {
+    case out ~ _ ~ _ ~ in1 ~ _ ~ refs1 ~ _ ~ in2 ~ _ ~ refs2 =>
+      Difference(Pipe(out), Pipe(in1), Pipe(in2), Some(refs1), Some(refs2))
+  }
+
   /*
    * REGISTER <JarFile>
    */
@@ -733,7 +746,8 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     materializeStmt | cacheStmt | delayStmt | rscriptStmt |
     /* standard Pig Latin statements */
     loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | cogroupStmt | accumulateStmt |
-    distinctStmt |  joinStmt | crossStmt | zipStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
+    distinctStmt |  joinStmt | crossStmt | zipStmt | storeStmt | limitStmt | unionStmt | intersectionStmt |
+    differenceStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
     splitStmt | fsStmt | defineStmt | setterStmt | macroRefStmt | displayStmt | visualizeStmt
 
 

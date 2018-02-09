@@ -48,6 +48,8 @@ abstract class ScalaCodeGenStrategy extends CodeGenStrategy with PigletLogging {
       case _: Distinct => DistinctEmitter.instance
       case _: Sample => SampleEmitter.instance
       case _: Union => UnionEmitter.instance
+      case _: Intersection => IntersectionEmitter.instance
+      case _: Difference => DifferenceEmitter.instance
       case _: Grouping => GroupingEmitter.instance
       case _: CoGroup => CoGroupEmitter.instance
       case _: OrderBy => OrderByEmitter.instance

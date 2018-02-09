@@ -27,5 +27,8 @@ object SpatialEmitterHelper {
 
   def keyByCode(schema: Option[Schema], ref: Ref, ctx: CodeGenContext): String =
     s".keyBy(${ctx.asString("tuplePrefix")} => ${ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->schema)), ref)})"
-  
+
+
+  def keyByCode(schema: Option[Schema], refs: Iterable[Ref], ctx: CodeGenContext): String =
+    s".keyBy(${ctx.asString("tuplePrefix")} => (${refs.map(ref => ScalaEmitter.emitRef(CodeGenContext(ctx,Map("schema"->schema)), ref)).mkString(",")}))"
 }
