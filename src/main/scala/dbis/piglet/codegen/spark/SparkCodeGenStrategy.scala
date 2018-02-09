@@ -38,6 +38,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
       case _: Partition => PartitionerEmitter.instance
       case _: Cache => CacheEmitter.instance
       case _: Delay => DelayEmitter.instance
+      case _: Visualize => VisualizeEmitter.instance
       case _ => super.emitterForNode(op)      
     }
   

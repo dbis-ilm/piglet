@@ -734,7 +734,7 @@ class PigParser extends JavaTokenParsers with PigletLogging {
     /* standard Pig Latin statements */
     loadStmt | dumpStmt | describeStmt | foreachStmt | filterStmt | groupingStmt | cogroupStmt | accumulateStmt |
     distinctStmt |  joinStmt | crossStmt | zipStmt | storeStmt | limitStmt | unionStmt | registerStmt | streamStmt | sampleStmt | orderByStmt |
-    splitStmt | fsStmt | defineStmt | setterStmt | macroRefStmt | displayStmt
+    splitStmt | fsStmt | defineStmt | setterStmt | macroRefStmt | displayStmt | visualizeStmt
 
 
 
@@ -993,6 +993,19 @@ class PigParser extends JavaTokenParsers with PigletLogging {
   def partitionStmt = bag ~ "=" ~ partitionKeyword ~ bag ~ onKeyword ~ ref ~ usingKeyword ~ partitionMethod ^^ {
     case out ~ _ ~ _ ~ in ~ _ ~ field ~ _ ~ ((method, params)) => Partition(Pipe(out), Pipe(in), field, method, params)
   } 
+
+  lazy val visualizeKeyword = "visualize".ignoreCase
+  lazy val pointSizeKeyword = "pointSize".ignoreCase
+
+  def pointSize = withKeyword ~ pointSizeKeyword ~ num ^^ {
+    case _ ~ _ ~ n => n
+  }
+
+  def visualizeStmt = visualizeKeyword ~ bag ~ byKeyword ~ ref ~ intoKeyword ~ fileName ~ (pointSize?) ~ asKeyword ~ "(" ~ num ~ "," ~ num ~ ")"  ^^ {
+    case _ ~ in ~ _ ~ field ~ _ ~ path ~ pointSize ~ _ ~ _ ~ width ~ _ ~ height ~ _ =>
+        Visualize(Pipe(in), field, path, width, height, pointSize)
+
+  }
 
   /* ---------------------------------------------------------------------------------------------------------------- */
 

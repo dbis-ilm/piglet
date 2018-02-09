@@ -21,7 +21,7 @@ import dbis.piglet.backends.BackendManager
 import dbis.piglet.codegen.PigletCompiler
 import dbis.piglet.mm.MaterializationManager
 import dbis.piglet.op.cmd.HdfsCmd
-import dbis.piglet.op.{Display, Dump, PigOperator}
+import dbis.piglet.op.{Display, Dump, PigOperator, Visualize}
 import dbis.piglet.parser.PigParser
 import dbis.piglet.plan.DataflowPlan
 import dbis.piglet.plan.PrettyPrinter._
@@ -95,7 +95,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
     * @return true if the string is a command
     */
   private def isCommand(s: String): Boolean = {
-    val cmdList = List("help", "describe", "dump", "display", "prettyprint", "rewrite", "quit", "fs")
+    val cmdList = List("help", "describe", "dump", "display", "visualize", "prettyprint", "rewrite", "quit", "fs")
     val line = s.toLowerCase
     cmdList.exists(cmd => line.startsWith(cmd))
   }
@@ -334,6 +334,16 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
         buf --= displays
       }
 
+      if (s.toLowerCase.startsWith("visualize ")) {
+        val visualizers = buf.filter(_.isInstanceOf[Visualize])
+
+        if(visualizers.length > 1)
+          logger.warn(s"Found ${visualizers.size} VISUALIZE commands - executing only the first one!")
+
+        visualizers.foreach(v => v.inputs.head.removeConsumer(v))
+        buf --= visualizers
+      }
+
       buf ++= PigParser.parseScript(s, resetSchema = false)
       var plan = new DataflowPlan(buf.toList)
       logger.debug("plan created.")
@@ -458,6 +468,7 @@ object PigletREPL extends dbis.piglet.tools.logging.PigletLogging {
       case Line(s, buf) if s.toLowerCase.startsWith(s"describe ") => handleDescribe(s, buf)
       case Line(s, buf) if s.toLowerCase.startsWith(s"dump ") ||
         s.toLowerCase.startsWith(s"display ") ||
+        s.toLowerCase.startsWith(s"visualize ") ||
         s.toLowerCase.startsWith(s"store ") ||
         s.toLowerCase.startsWith(s"socket_write ") => executeScript(s, buf)
       case Line(s, _) if s.toLowerCase.startsWith(s"fs ") => processFsCmd(s)
