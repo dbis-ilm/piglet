@@ -11,8 +11,6 @@ class DifferenceEmitter extends CodeEmitter[Difference] {
 
   override def code(ctx: CodeGenContext, op: Difference): String = {
 
-    println(op)
-
     val (templ,params) = if(op.refs1.isDefined) {
       val m = Map("out" -> op.outPipeName,
         "in1" -> op.inPipeNames.head,

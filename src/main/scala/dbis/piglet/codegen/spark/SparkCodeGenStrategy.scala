@@ -20,7 +20,7 @@ class SparkCodeGenStrategy extends ScalaCodeGenStrategy {
 
     if (plan.checkExpressions(Expr.containsGeometryType) || Schema.hasSpatialTypes) {
       additionalImports ++= Seq(
-        "import com.vividsolutions.jts.io.WKTReader",
+        "import org.locationtech.jts.io.WKTReader",
         "import dbis.stark.{STObject, Instant, Interval}",
         "import dbis.stark.STObject._",
         "import dbis.stark.spatial._",

@@ -2,6 +2,7 @@ package dbis.piglet.op
 
 import dbis.piglet.expr.SpatialJoinPredicate
 import dbis.piglet.op.IndexMethod.IndexMethod
+import dbis.piglet.op.PartitionMethod.PartitionMethod
 import dbis.piglet.schema._
 
 import scala.collection.mutable.ArrayBuffer
@@ -12,12 +13,14 @@ case class SpatialJoin(
     private val out: Pipe, 
     private val in: List[Pipe], 
     predicate: SpatialJoinPredicate,
-    index: Option[(IndexMethod, List[String])]
+    index: Option[(IndexMethod, List[String])],
+    leftParti: Option[(PartitionMethod, List[String])],
+    rightParti: Option[(PartitionMethod, List[String])]
   ) extends PigOperator(List(out), in) {
   
   
   override def lineageString: String = {
-    s"""JOIN%${predicate.toString()}%$index%""" + super.lineageString
+    s"""SPATIALJOIN%${predicate.toString()}%$index%""" + super.lineageString
   }
 
   override def constructSchema: Option[Schema] = {
@@ -50,5 +53,6 @@ case class SpatialJoin(
        |  outSchema = $schema
        |  predicate = $predicate
        |  index = $index""".stripMargin
+//
 
 }

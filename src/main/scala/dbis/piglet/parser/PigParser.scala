@@ -970,8 +970,14 @@ class PigParser extends JavaTokenParsers with PigletLogging {
       SpatialJoinPredicate(r1, r2, SpatialPredicateType.withName(kw.toUpperCase()))
   }
 
-  def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ "," ~ bag ~ onKeyword ~ spatialJoinPredicate ~ (withIndexClause?)  ^^ {
-    case out ~ _ ~ _ ~ in1 ~ _ ~ in2  ~ _ ~ expr ~ idx => SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr, idx)
+  lazy val pointsOnlyKeyword = "pointsonly".ignoreCase
+
+  def partitionClause = partitionKeyword ~ byKeyword ~ partitionMethod ^^ {
+    case _ ~ _ ~ m => m
+  }
+
+  def spatialJoinStmt: Parser[PigOperator] = bag ~ "=" ~ spatialJoinKeyword ~ bag ~ (partitionClause?) ~ "," ~ bag ~ (partitionClause?) ~ onKeyword ~ spatialJoinPredicate ~ (withIndexClause?)  ^^ {
+    case out ~ _ ~ _ ~ in1 ~ leftParti ~ _ ~ in2 ~ rightParti ~ _ ~ expr ~ idx => SpatialJoin(Pipe(out), List(Pipe(in1), Pipe(in2)), expr, idx, leftParti, rightParti)
 
   }
 

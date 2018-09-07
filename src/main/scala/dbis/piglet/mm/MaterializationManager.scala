@@ -134,7 +134,7 @@ class MaterializationManager(private val matBaseDir: URI) extends PigletLogging 
     // just informative output for debugging/comparsion of different strategies
     // prints chosen points for each available strategy - independent from selected strategy
     GlobalStrategy.values.foreach{ s =>
-      logger.debug(s"chosen points for $s \n${GlobalStrategy.getStrategy(s)(candidates,plan,globalOpGraph).mkString("\n")} ")
+      logger.info(s"chosen points for $s \n${GlobalStrategy.getStrategy(s)(candidates,plan,globalOpGraph).mkString("\n")} ")
     }
 
     // getStrategy returns a [[ChooseMatPointStrategy]] which has an apply method that is immediately called

@@ -1,20 +1,24 @@
 package dbis.piglet.codegen.spark
 
 import dbis.piglet.codegen.CodeEmitter
-import dbis.piglet.op.SpatialJoin
+import dbis.piglet.op.{PartitionMethod, SpatialJoin}
 import dbis.piglet.codegen.CodeGenContext
 import dbis.piglet.schema.{IndexType, SchemaException, TupleType}
 import dbis.piglet.codegen.scala_lang.ScalaEmitter
 import dbis.piglet.op.IndexMethod.IndexMethod
+import dbis.piglet.op.PartitionMethod.PartitionMethod
 
 
 class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
-//  new dbis.stark.spatial.partitioner.SpatialGridPartitioner(r2KeyBy,20,true)
+//  new dbis.stark.spatial.partitioner.BSPartitioner(<rel2>KeyBy, 1, 1000, true)
+// val <rel2>Parti = new dbis.stark.spatial.partitioner.SpatialGridPartitioner(<rel2>KeyBy,20,true)  
   override def template = s"""
                      |val <rel2>KeyBy = <rel2><keyby2>
-                     |val <rel2>Parti = new dbis.stark.spatial.partitioner.BSPartitioner(<rel2>KeyBy, 1, 1000, true)
-                    |val <out> = <rel1><keyby1><liveindex>.join(
-                    |   <rel2>KeyBy.partitionBy(<rel2>Parti),
+                     |val <rel1>KeyBy = <rel1><keyby1>
+                     |<parti1>
+                     |<parti2>
+                     |val <out> = <rel1>KeyBy<if (parti1)>.partitionBy(<rel1>Parti)<endif><liveindex>.join(
+                    |   <rel2>KeyBy<if (parti2)>.partitionBy(<rel2>Parti)<endif>,
                     |   dbis.stark.spatial.JoinPredicate.<predicate>
                     | ).map{ case (<leftName>,<rightName>) =>
                     |     val t = <className>(<fields>)
@@ -39,7 +43,13 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
 //                             | ).map{ case (v,w) =>
 //                             |     <className>(<fields>)
 //                             |\\}""".stripMargin
-  
+
+  lazy val partitionTemplate =
+    s"""
+       |val <rel>Parti = new dbis.stark.spatial.partitioner.<methodclass>(<rel>KeyBy, <params>)
+     """.stripMargin
+
+
   def indexTemplate(idxConfig: Option[(IndexMethod, List[String])]) = idxConfig match {
     case Some((_, params)) => CodeEmitter.render(".liveIndex(<params>)", Map("params" -> params.mkString(",")))
     case None => ""
@@ -71,8 +81,7 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
     val fieldList = op.schema.get.fields.indices// all fields
             .map { i => if (i < vsize) s"$lName._$i" else s"$rName._${i - vsize}" }.mkString(", ")
 
-        
-    val params = Map(
+    var params = Map(
       "out" -> op.outPipeName,
       "className" -> ScalaEmitter.schemaClassName(op.schema.get.className),
       "fields" -> fieldList,
@@ -94,7 +103,27 @@ class SpatialJoinEmitter extends CodeEmitter[SpatialJoin] {
       "rightName" -> rName
     )
 
+    op.leftParti.map{ case (method, mparams) => getPartitionerCode(method, mparams, op.inPipeNames.head) }.foreach{ parti => params += "parti1" -> parti}
+    op.rightParti.map{ case (method, mparams) => getPartitionerCode(method, mparams,op.inPipeNames.last) }.foreach{ parti => params += "parti2" -> parti}
+
+
     render(params)
+  }
+
+  private def getPartitionerCode(method: PartitionMethod, params: List[String],relName: String): String = {
+    val methodclass = method match {
+      case PartitionMethod.GRID => "SpatialGridPartitioner"
+      case PartitionMethod.BSP => "BSPartitioner"
+      case _ => ???
+    }
+
+    val m = Map(
+      "methodclass" -> methodclass,
+      "params" -> params.mkString(","),
+      "rel" -> relName
+    )
+
+    CodeEmitter.render(partitionTemplate, m)
   }
 }
 
